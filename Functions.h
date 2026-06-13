@@ -914,6 +914,35 @@ struct	NETWORK_INFO
 	//20250829 기존 make_string() 함수의 이름을 duplicate_str()으로 변경함.
 	CString duplicate_str(CString src, int n);
 
+	//이미지 파일에 key=value 형식의 텍스트 메타데이터를 기록/판독한다. PNG(tEXt 청크)·JPEG(COM 마커) 모두 지원.
+	//GDI+ 메타데이터 API 의 포맷별 편차(특히 PNG 기록 미흡)에 의존하지 않고 파일을 바이트 단위로 직접 다룬다.
+	//- 포맷은 확장자(.png / .jpg / .jpeg)로 판별. 그 외는 set=false / get="".
+	//- set 은 같은 key 의 기존 항목을 먼저 제거 후 새로 기록(중복 방지). 값은 UTF-8 로 저장.
+	//- 기존 메타데이터 수정: 같은 key 로 새 value 를 넘겨 다시 호출하면 기존 값이 교체된다.
+	//- get 은 해당 key 가 없으면 빈 문자열 반환.
+	//- 용도: 스냅샷 버전 등 앱이 생성한 이미지에 생성기 정보를 남겨 후처리(스킵 판정 등)에 사용.
+	//- ex) set_image_metadata(_T("D:\\test.jpg"), ENDORPHIN_SNAPSHOT_VERSION_KEY, ENDORPHIN_SNAPSHOT_VERSION);
+	bool	set_image_metadata(CString image_path, CString key, CString value);
+
+	//- ex) CString ver = get_image_metadata(_T("D:\\test.jpg"), ENDORPHIN_SNAPSHOT_VERSION_KEY);
+	CString	get_image_metadata(CString image_path, CString key);
+
+	//Windows 속성 시스템(IPropertyStore)으로 "표준" 메타데이터를 기록/판독한다. 위 set_image_metadata 와 달리
+	//Windows 탐색기 속성창·다른 앱이 인식하는 진짜 스키마에 저장된다(Windows 가 EXIF/XMP 등에 매핑).
+	//- key 는 <propkey.h> 의 PROPERTYKEY (예: PKEY_Comment=탐색기 "설명", PKEY_Title=제목, PKEY_Keywords=태그).
+	//- JPEG 에서 가장 안정적. PNG 는 Windows 핸들러 지원이 제한적이라 실패할 수 있음.
+	//- 호출 전 COM 초기화는 함수 내부에서 처리(필요 시 CoInitialize/CoUninitialize). get 은 없으면 "".
+	//- 문자열 버전은 속성의 정규 타입으로 자동 변환(PSCoerceToCanonicalValue)하므로 단일 문자열뿐 아니라
+	//  문자열 벡터형(PKEY_Author=만든이, PKEY_Keywords=태그)에도 그대로 사용 가능.
+	//- 날짜형 속성(PKEY_Photo_DateTaken=찍은 날짜 등)은 SYSTEMTIME 오버로드 사용. UTC 로 넘기면 탐색기가 로컬로 표시.
+	//- ex) set_windows_property(_T("D:\\snap.jpg"), PKEY_Comment, _T("Endorphin2 snapshot"));
+	//- ex) set_windows_property(_T("D:\\snap.jpg"), PKEY_ApplicationName, _T("Endorphin2 v2026.6.13.0"));
+	//- ex) SYSTEMTIME st; GetSystemTime(&st); set_windows_property(_T("D:\\snap.jpg"), PKEY_Photo_DateTaken, st);
+	//- ex) CString c = get_windows_property(_T("D:\\snap.jpg"), PKEY_Comment);
+	bool	set_windows_property(CString file_path, const PROPERTYKEY& key, CString value);
+	bool	set_windows_property(CString file_path, const PROPERTYKEY& key, const SYSTEMTIME& st);
+	CString	get_windows_property(CString file_path, const PROPERTYKEY& key);
+
 	//http://yeobi27.tistory.com/280
 	//A2W, A2T 및 그 반대 매크로들은 스택을 사용하므로 문제 소지가 있고 크기 제한도 있으므로
 	//가급적 CA2W, CA2T등을 사용한다. 단 이 매크로들은 encoding을 변경할 수 없다.

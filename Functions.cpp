@@ -15650,18 +15650,21 @@ float similarity(char *str1, char *str2)
 	return lenLCS /= len1;
 }
 
-//파일명 유사도 — Ratcliff-Obershelp (Python difflib.SequenceMatcher) 기반.
+//파일명 "동일 콘텐츠(rename)" 판별 — guessit/Anitomy/Sonarr 등 미디어 매니저가 쓰는 *구조적 파싱* 접근.
 //
-//단순 LCS / Levenshtein 은 "01화 [1080p]" ↔ "02화 [1080p]" 같이 *식별 번호 한 글자만*
-//다른 경우 0.9+ 점수를 줘서 잘못된 매치를 유도. 다음 3단 정공법:
+//핵심: 이건 "문자열 유사도(distance)" 문제가 아니다. 1글자 차이가 같은 파일일 수도("[1080p]" 추가),
+//다른 작품일 수도(ABC123A↔ABC123B) 있어 Levenshtein/Jaro/RO 등 metric 은 원리적으로 부적합하다.
+//rename 은 *서술적* 부분(품질/코덱/그룹/표기)만 바꾸고 *식별자*(작품코드/에피소드/디스크/연도)는 유지한다.
+//→ 식별자 서명이 다르면 다른 콘텐츠, 같으면 같은 콘텐츠. 파이프라인:
 //
-//  1. 정규화: [...], (...) 내용 제거 + 공백 정리. 품질/배포 메타데이터 노이즈 차단.
-//  2. Digit run 일치 강제: 정규화 후 양쪽의 숫자 연속열 (e.g. "01", "1080") 시퀀스가
-//     완전 일치 안 하면 0.0. "01화" vs "02화" 는 다른 콘텐츠 — 매칭 후보에서 즉시 제외.
-//  3. Ratcliff-Obershelp 알고리즘: 가장 긴 *연속* 공통 substring 을 찾아 매치 + 양쪽 잔여
-//     부분에 재귀 적용. matched_chars * 2 / (len1 + len2) 가 ratio.
-//     LCS (subsequence) 와 달리 *연속* substring 만 매치 — token 단위 변화에 적절히
-//     민감하고 단순 char drop 에 너무 관대하지 않음.
+//  1. 정규화: [...], (...) 내용 제거 + 공백 정리.
+//  2. 노이즈 제거: 해상도/코덱/소스/오디오/fps (1080p, x264, 5.1, web-dl ...) — 식별자가 아닌 서술 토큰.
+//     이걸 먼저 지워야 "1080p"·"264"·"5.1" 등이 식별자(숫자 토큰)로 오인되지 않는다.
+//  3. 식별자 서명 강제 일치: 남은 문자열의 "숫자 포함 영숫자 토큰" (e.g. "01", "ABC123A", "2020") 시퀀스가
+//     완전 일치 안 하면 0.0. "ABC123A" vs "ABC123B"(디스크/파트), "01" vs "02"(에피소드) 등 즉시 제외.
+//  4. Ratcliff-Obershelp 비율: 서명이 같을 때 *남은 제목* 의 신뢰도 산출 (연속 공통 substring 매치).
+//
+//한계: 어떤 파서도 100% 는 아니다(guessit 도). 노이즈 키워드/패턴은 라이브러리 관례에 맞춰 확장 가능.
 
 namespace {
 	CString sim_normalize(CString s)
@@ -15686,23 +15689,51 @@ namespace {
 		return s;
 	}
 
-	std::vector<CString> sim_digit_runs(const CString& s)
+	//식별자(코드) 토큰 — ASCII 영숫자 maximal run 중 *숫자를 1개 이상 포함* 한 것.
+	//"ABC123A"/"ABC123B"(디스크·파트), "00"/"01"(에피소드), "1080" 등 콘텐츠 식별 토큰을 뽑는다.
+	//숫자 run 만 보던 기존 gate 는 "ABC123A" vs "ABC123B" 처럼 *숫자에 붙은 letter 식별자* 차이를 못 잡아
+	//다른 작품을 같은 파일로 오인했다 — letter 까지 토큰에 포함해 보완. CJK 제목 텍스트는 숫자가 없어 자동 제외.
+	std::vector<CString> sim_code_tokens(const CString& s)
 	{
-		std::vector<CString> runs;
+		std::vector<CString> tokens;
 		CString cur;
-		for (int i = 0; i < s.GetLength(); i++)
+		bool has_digit = false;
+		for (int i = 0; i <= s.GetLength(); i++)
 		{
-			if (iswdigit((wint_t)s[i]))
-				cur += s[i];
-			else if (!cur.IsEmpty())
+			wchar_t c = (i < s.GetLength()) ? s[i] : 0;
+			bool is_an = (c >= L'0' && c <= L'9') || (c >= L'A' && c <= L'Z') || (c >= L'a' && c <= L'z');
+			if (is_an)
 			{
-				runs.push_back(cur);
+				cur += c;
+				if (c >= L'0' && c <= L'9')
+					has_digit = true;
+			}
+			else
+			{
+				if (!cur.IsEmpty() && has_digit)
+					tokens.push_back(cur);
 				cur.Empty();
+				has_digit = false;
 			}
 		}
-		if (!cur.IsEmpty())
-			runs.push_back(cur);
-		return runs;
+		return tokens;
+	}
+
+	//서술적 노이즈(품질/코덱/소스/오디오/fps) 제거 — 식별자가 아니므로 식별자 추출 전에 지운다.
+	//지우지 않으면 "1080p"·"264"(x264)·"5.1" 등이 숫자 토큰으로 잡혀 식별자로 오인된다.
+	//라이브러리 관례에 맞춰 패턴 추가 가능(guessit 의 quality/codec/source 키워드 표와 동일 역할).
+	CString sim_strip_noise(CString s)
+	{
+		static const std::wregex noise(
+			LR"(\b(\d{3,4}[pi]|4k|2160p|1440p|uhd|fhd|[xh]\.?26[45]|hevc|avc|av1|vp9|xvid|divx|\d{1,2}bit|hdr\d*|sdr|dovi|\d\.\d(ch)?|dd5\.?1|ddp|dts(-?hd)?|aac|ac3|eac3|flac|truehd|atmos|opus|mp3|\d{2,3}fps|web-?dl|webrip|blu-?ray|bd(rip|remux)?|hd(tv|rip)|dvd(rip)?|remux|x?vid)\b)",
+			std::regex::icase | std::regex::optimize);
+		std::wstring out = std::regex_replace(std::wstring(s.GetString()), noise, L" ");
+		CString r(out.c_str());
+		while (r.Replace(_T("  "), _T(" ")) > 0)
+		{
+		}
+		r.Trim();
+		return r;
 	}
 
 	int sim_ro_match_count(const wchar_t* s1, int len1, const wchar_t* s2, int len2)
@@ -15748,21 +15779,27 @@ namespace {
 
 float similarity(CString str1, CString str2)
 {
-	str1 = sim_normalize(str1);
-	str2 = sim_normalize(str2);
+	//1) 정규화([..],(..) 제거) → 2) 노이즈(품질/코덱/소스/오디오) 제거 → 소문자화(케이스 차이는 콘텐츠 차이 아님).
+	str1 = sim_strip_noise(sim_normalize(str1));
+	str2 = sim_strip_noise(sim_normalize(str2));
+	str1.MakeLower();
+	str2.MakeLower();
 
 	if (str1.IsEmpty() && str2.IsEmpty()) return 1.0f;
 	if (str1.IsEmpty() || str2.IsEmpty()) return 0.0f;
 
-	//Digit run 시퀀스 강제 일치 — "01화" vs "02화" 차단.
-	const auto d1 = sim_digit_runs(str1);
-	const auto d2 = sim_digit_runs(str2);
-	if (d1.size() != d2.size())
+	//3) 식별자 서명 강제 일치 — 노이즈 제거 후 남은 "숫자 포함 영숫자 토큰"(작품코드/에피소드/디스크/연도)
+	//   시퀀스가 하나라도 다르면 다른 콘텐츠(0.0). "ABC123A" vs "ABC123B", "01" vs "02" 등 즉시 제외.
+	//   대소문자는 무시(같은 디스크의 표기 차이 흡수)하되 A vs B 는 여전히 구분된다.
+	const auto c1 = sim_code_tokens(str1);
+	const auto c2 = sim_code_tokens(str2);
+	if (c1.size() != c2.size())
 		return 0.0f;
-	for (size_t k = 0; k < d1.size(); k++)
-		if (d1[k] != d2[k])
+	for (size_t k = 0; k < c1.size(); k++)
+		if (c1[k].CompareNoCase(c2[k]) != 0)
 			return 0.0f;
 
+	//4) 서명 일치 → 남은 제목의 Ratcliff-Obershelp 비율로 신뢰도 산출.
 	const int len1 = str1.GetLength();
 	const int len2 = str2.GetLength();
 	const int matched = sim_ro_match_count(str1.GetString(), len1, str2.GetString(), len2);
@@ -19054,6 +19091,450 @@ CString duplicate_str(CString src, int n)
 	for (int i = 0; i < n; i++)
 		result += src;
 
+	return result;
+}
+
+//===== 이미지 메타데이터(PNG tEXt / JPEG COM) — 바이트 단위 직접 기록/판독 =====
+
+//PNG 청크 CRC-32 (표준 다항식 0xEDB88320). Common 에 범용 CRC32 가 없어 자체 구현(최초 1회 테이블 생성).
+static unsigned long sc_png_crc32(const unsigned char* buf, size_t len)
+{
+	static unsigned long table[256];
+	static bool made = false;
+	if (!made)
+	{
+		for (unsigned long n = 0; n < 256; n++)
+		{
+			unsigned long c = n;
+			for (int k = 0; k < 8; k++)
+				c = (c & 1) ? (0xEDB88320UL ^ (c >> 1)) : (c >> 1);
+			table[n] = c;
+		}
+		made = true;
+	}
+
+	unsigned long c = 0xFFFFFFFFUL;
+	for (size_t i = 0; i < len; i++)
+		c = table[(c ^ buf[i]) & 0xFF] ^ (c >> 8);
+	return c ^ 0xFFFFFFFFUL;
+}
+
+//확장자로 포맷 판별 → "png" / "jpg" / "".
+static CString sc_image_ext(const CString& path)
+{
+	if (path.Right(4).MakeLower() == _T(".png"))
+		return _T("png");
+	if (path.Right(4).MakeLower() == _T(".jpg") || path.Right(5).MakeLower() == _T(".jpeg"))
+		return _T("jpg");
+	return _T("");
+}
+
+static bool sc_load_file_bytes(const CString& path, std::vector<unsigned char>& out)
+{
+	CStringW wp(path);
+	std::ifstream f(wp.GetString(), std::ios::binary);
+	if (!f)
+		return false;
+
+	f.seekg(0, std::ios::end);
+	std::streamoff sz = f.tellg();
+	if (sz <= 0)
+		return false;
+
+	f.seekg(0, std::ios::beg);
+	out.resize((size_t)sz);
+	f.read((char*)out.data(), (std::streamsize)sz);
+	return true;
+}
+
+static bool sc_save_file_bytes(const CString& path, const std::vector<unsigned char>& data)
+{
+	CStringW wp(path);
+	std::ofstream f(wp.GetString(), std::ios::binary | std::ios::trunc);
+	if (!f)
+		return false;
+
+	if (!data.empty())
+		f.write((const char*)data.data(), (std::streamsize)data.size());
+	return f.good();
+}
+
+static std::string sc_to_utf8(const CString& s)
+{
+	if (s.IsEmpty())
+		return std::string();
+
+	int n = ::WideCharToMultiByte(CP_UTF8, 0, s, s.GetLength(), NULL, 0, NULL, NULL);
+	std::string out((size_t)n, '\0');
+	::WideCharToMultiByte(CP_UTF8, 0, s, s.GetLength(), &out[0], n, NULL, NULL);
+	return out;
+}
+
+static CString sc_from_utf8(const unsigned char* p, size_t len)
+{
+	if (len == 0)
+		return _T("");
+
+	int n = ::MultiByteToWideChar(CP_UTF8, 0, (const char*)p, (int)len, NULL, 0);
+	CString out;
+	::MultiByteToWideChar(CP_UTF8, 0, (const char*)p, (int)len, out.GetBuffer(n), n);
+	out.ReleaseBuffer(n);
+	return out;
+}
+
+static unsigned long sc_be32(const unsigned char* p)
+{
+	return ((unsigned long)p[0] << 24) | ((unsigned long)p[1] << 16) | ((unsigned long)p[2] << 8) | (unsigned long)p[3];
+}
+
+static void sc_put_be32(std::vector<unsigned char>& v, unsigned long x)
+{
+	v.push_back((unsigned char)((x >> 24) & 0xFF));
+	v.push_back((unsigned char)((x >> 16) & 0xFF));
+	v.push_back((unsigned char)((x >> 8) & 0xFF));
+	v.push_back((unsigned char)(x & 0xFF));
+}
+
+static const unsigned char SC_PNG_SIG[8] = { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A };
+
+static CString sc_png_get_text(const std::vector<unsigned char>& b, const std::string& key)
+{
+	size_t pos = 8;
+	while (pos + 12 <= b.size())
+	{
+		unsigned long clen = sc_be32(&b[pos]);
+		if (pos + 12 + clen > b.size())
+			break;
+
+		const unsigned char* type = &b[pos + 4];
+		if (memcmp(type, "tEXt", 4) == 0)
+		{
+			const unsigned char* data = &b[pos + 8];
+			size_t i = 0;
+			while (i < clen && data[i] != 0)
+				i++;
+			std::string kw((const char*)data, i);
+			if (kw == key && i < clen)
+				return sc_from_utf8(data + i + 1, clen - i - 1);
+		}
+		if (memcmp(type, "IEND", 4) == 0)
+			break;
+
+		pos += 12 + clen;
+	}
+	return _T("");
+}
+
+static bool sc_png_set_text(std::vector<unsigned char>& b, const std::string& key, const std::string& val)
+{
+	//1) 같은 keyword 의 기존 tEXt 청크 제거(중복 방지).
+	size_t pos = 8;
+	while (pos + 12 <= b.size())
+	{
+		unsigned long clen = sc_be32(&b[pos]);
+		if (pos + 12 + clen > b.size())
+			break;
+
+		const unsigned char* type = &b[pos + 4];
+		if (memcmp(type, "IEND", 4) == 0)
+			break;
+
+		bool match = false;
+		if (memcmp(type, "tEXt", 4) == 0)
+		{
+			const unsigned char* data = &b[pos + 8];
+			size_t i = 0;
+			while (i < clen && data[i] != 0)
+				i++;
+			match = (std::string((const char*)data, i) == key);
+		}
+
+		if (match)
+			b.erase(b.begin() + pos, b.begin() + pos + 12 + clen);	//pos 유지하고 재스캔.
+		else
+			pos += 12 + clen;
+	}
+
+	//2) IEND 위치(삽입 지점) 찾기.
+	size_t iend = 0;
+	bool found = false;
+	pos = 8;
+	while (pos + 12 <= b.size())
+	{
+		unsigned long clen = sc_be32(&b[pos]);
+		if (memcmp(&b[pos + 4], "IEND", 4) == 0)
+		{
+			iend = pos;
+			found = true;
+			break;
+		}
+		if (pos + 12 + clen > b.size())
+			break;
+		pos += 12 + clen;
+	}
+	if (!found)
+		return false;
+
+	//3) tEXt 청크 구성: data = keyword + '\0' + text. 길이/타입/데이터/CRC(타입+데이터).
+	std::string data = key;
+	data.push_back('\0');
+	data += val;
+
+	std::vector<unsigned char> chunk;
+	sc_put_be32(chunk, (unsigned long)data.size());
+	const char* t = "tEXt";
+	chunk.insert(chunk.end(), t, t + 4);
+	chunk.insert(chunk.end(), data.begin(), data.end());
+
+	std::vector<unsigned char> crcbuf;
+	crcbuf.insert(crcbuf.end(), t, t + 4);
+	crcbuf.insert(crcbuf.end(), data.begin(), data.end());
+	sc_put_be32(chunk, sc_png_crc32(crcbuf.data(), crcbuf.size()));
+
+	b.insert(b.begin() + iend, chunk.begin(), chunk.end());
+	return true;
+}
+
+//JPEG 세그먼트 순회 — SOI 이후 COM(0xFFFE) 마커들을 찾는다. SOS(0xFFDA)/EOI(0xFFD9) 전까지.
+static CString sc_jpeg_get_com(const std::vector<unsigned char>& b, const std::string& key)
+{
+	std::string prefix = key + "=";
+	size_t pos = 2;
+	while (pos + 4 <= b.size())
+	{
+		if (b[pos] != 0xFF)
+			break;
+
+		unsigned char marker = b[pos + 1];
+		if (marker == 0xD9 || marker == 0xDA)
+			break;
+		if (marker == 0x01 || (marker >= 0xD0 && marker <= 0xD7))
+		{
+			pos += 2;
+			continue;
+		}
+
+		unsigned long seglen = ((unsigned long)b[pos + 2] << 8) | b[pos + 3];
+		if (seglen < 2 || pos + 2 + seglen > b.size())
+			break;
+
+		if (marker == 0xFE)
+		{
+			const unsigned char* payload = &b[pos + 4];
+			size_t plen = seglen - 2;
+			if (plen >= prefix.size() && memcmp(payload, prefix.data(), prefix.size()) == 0)
+				return sc_from_utf8(payload + prefix.size(), plen - prefix.size());
+		}
+
+		pos += 2 + seglen;
+	}
+	return _T("");
+}
+
+static bool sc_jpeg_set_com(std::vector<unsigned char>& b, const std::string& key, const std::string& val)
+{
+	std::string prefix = key + "=";
+
+	//1) 같은 key 의 기존 COM 제거.
+	size_t pos = 2;
+	while (pos + 4 <= b.size())
+	{
+		if (b[pos] != 0xFF)
+			break;
+
+		unsigned char marker = b[pos + 1];
+		if (marker == 0xD9 || marker == 0xDA)
+			break;
+		if (marker == 0x01 || (marker >= 0xD0 && marker <= 0xD7))
+		{
+			pos += 2;
+			continue;
+		}
+
+		unsigned long seglen = ((unsigned long)b[pos + 2] << 8) | b[pos + 3];
+		if (seglen < 2 || pos + 2 + seglen > b.size())
+			break;
+
+		if (marker == 0xFE)
+		{
+			const unsigned char* payload = &b[pos + 4];
+			size_t plen = seglen - 2;
+			if (plen >= prefix.size() && memcmp(payload, prefix.data(), prefix.size()) == 0)
+			{
+				b.erase(b.begin() + pos, b.begin() + pos + 2 + seglen);
+				continue;
+			}
+		}
+
+		pos += 2 + seglen;
+	}
+
+	//2) COM 세그먼트 구성: FF FE, length(2, big-endian = payload+2), payload = key=value. SOI 직후 삽입.
+	std::string payload = prefix + val;
+	size_t seglen = payload.size() + 2;
+	if (seglen > 0xFFFF || b.size() < 2)
+		return false;
+
+	std::vector<unsigned char> seg;
+	seg.push_back(0xFF);
+	seg.push_back(0xFE);
+	seg.push_back((unsigned char)((seglen >> 8) & 0xFF));
+	seg.push_back((unsigned char)(seglen & 0xFF));
+	seg.insert(seg.end(), payload.begin(), payload.end());
+
+	b.insert(b.begin() + 2, seg.begin(), seg.end());
+	return true;
+}
+
+bool set_image_metadata(CString image_path, CString key, CString value)
+{
+	CString fmt = sc_image_ext(image_path);
+	if (fmt.IsEmpty())
+		return false;
+
+	std::vector<unsigned char> b;
+	if (!sc_load_file_bytes(image_path, b))
+		return false;
+
+	std::string k = sc_to_utf8(key);
+	std::string v = sc_to_utf8(value);
+	bool ok = false;
+
+	if (fmt == _T("png"))
+	{
+		if (b.size() < 8 || memcmp(b.data(), SC_PNG_SIG, 8) != 0)
+			return false;
+		ok = sc_png_set_text(b, k, v);
+	}
+	else
+	{
+		if (b.size() < 2 || b[0] != 0xFF || b[1] != 0xD8)
+			return false;
+		ok = sc_jpeg_set_com(b, k, v);
+	}
+
+	if (!ok)
+		return false;
+
+	return sc_save_file_bytes(image_path, b);
+}
+
+CString get_image_metadata(CString image_path, CString key)
+{
+	CString fmt = sc_image_ext(image_path);
+	if (fmt.IsEmpty())
+		return _T("");
+
+	std::vector<unsigned char> b;
+	if (!sc_load_file_bytes(image_path, b))
+		return _T("");
+
+	std::string k = sc_to_utf8(key);
+
+	if (fmt == _T("png"))
+	{
+		if (b.size() < 8 || memcmp(b.data(), SC_PNG_SIG, 8) != 0)
+			return _T("");
+		return sc_png_get_text(b, k);
+	}
+
+	if (b.size() < 2 || b[0] != 0xFF || b[1] != 0xD8)
+		return _T("");
+	return sc_jpeg_get_com(b, k);
+}
+
+//===== Windows 속성 시스템(IPropertyStore) — 탐색기·표준 앱이 인식하는 메타데이터 =====
+#include <ShlObj.h>		//SHGetPropertyStoreFromParsingName
+#include <propsys.h>	//IPropertyStore, GETPROPERTYSTOREFLAGS
+#include <propkey.h>	//PKEY_*
+#pragma comment(lib, "propsys.lib")
+
+bool set_windows_property(CString file_path, const PROPERTYKEY& key, CString value)
+{
+	//COM 초기화 — 이미 초기화돼 있으면(S_FALSE/RPC_E_CHANGED_MODE) 그대로 사용. 우리가 올린 경우만 내림.
+	HRESULT hrco = ::CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
+	bool need_uninit = (hrco == S_OK || hrco == S_FALSE);
+
+	bool ok = false;
+	IPropertyStore* store = NULL;
+	HRESULT hr = ::SHGetPropertyStoreFromParsingName(CStringW(file_path).GetString(), NULL, GPS_READWRITE, IID_PPV_ARGS(&store));
+	if (SUCCEEDED(hr) && store)
+	{
+		PROPVARIANT pv;
+		if (SUCCEEDED(::InitPropVariantFromString(CStringW(value).GetString(), &pv)))
+		{
+			//속성의 정규 타입으로 강제 변환 — 단일 문자열을 문자열 벡터(PKEY_Author/PKEY_Keywords) 등으로도 맞춰줌.
+			//실패해도(coerce 불가) 원본 문자열 그대로 SetValue 시도.
+			::PSCoerceToCanonicalValue(key, &pv);
+			if (SUCCEEDED(store->SetValue(key, pv)) && SUCCEEDED(store->Commit()))
+				ok = true;
+			::PropVariantClear(&pv);
+		}
+		store->Release();
+	}
+
+	if (need_uninit)
+		::CoUninitialize();
+	return ok;
+}
+
+bool set_windows_property(CString file_path, const PROPERTYKEY& key, const SYSTEMTIME& st)
+{
+	HRESULT hrco = ::CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
+	bool need_uninit = (hrco == S_OK || hrco == S_FALSE);
+
+	bool ok = false;
+	IPropertyStore* store = NULL;
+	HRESULT hr = ::SHGetPropertyStoreFromParsingName(CStringW(file_path).GetString(), NULL, GPS_READWRITE, IID_PPV_ARGS(&store));
+	if (SUCCEEDED(hr) && store)
+	{
+		FILETIME ft;
+		if (::SystemTimeToFileTime(&st, &ft))
+		{
+			PROPVARIANT pv;
+			if (SUCCEEDED(::InitPropVariantFromFileTime(&ft, &pv)))
+			{
+				::PSCoerceToCanonicalValue(key, &pv);
+				if (SUCCEEDED(store->SetValue(key, pv)) && SUCCEEDED(store->Commit()))
+					ok = true;
+				::PropVariantClear(&pv);
+			}
+		}
+		store->Release();
+	}
+
+	if (need_uninit)
+		::CoUninitialize();
+	return ok;
+}
+
+CString get_windows_property(CString file_path, const PROPERTYKEY& key)
+{
+	HRESULT hrco = ::CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
+	bool need_uninit = (hrco == S_OK || hrco == S_FALSE);
+
+	CString result;
+	IPropertyStore* store = NULL;
+	HRESULT hr = ::SHGetPropertyStoreFromParsingName(CStringW(file_path).GetString(), NULL, GPS_DEFAULT, IID_PPV_ARGS(&store));
+	if (SUCCEEDED(hr) && store)
+	{
+		PROPVARIANT pv;
+		::PropVariantInit(&pv);
+		if (SUCCEEDED(store->GetValue(key, &pv)) && pv.vt != VT_EMPTY)
+		{
+			PWSTR psz = NULL;
+			if (SUCCEEDED(::PropVariantToStringAlloc(pv, &psz)) && psz)
+			{
+				result = psz;
+				::CoTaskMemFree(psz);
+			}
+		}
+		::PropVariantClear(&pv);
+		store->Release();
+	}
+
+	if (need_uninit)
+		::CoUninitialize();
 	return result;
 }
 

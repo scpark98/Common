@@ -303,6 +303,11 @@ public:
 	//-2이면 현재 위치를, -1면 해제의 의미로 처리한다.
 	void			set_repeat_end(int pos = -2);
 
+//[sub track] seek 가능 구간 표시(style_track 전용) — 부분 다운로드/스트리밍 미디어에서 현재 받아진 frontier 를
+//트랙에 빨간 1px 세로선으로 표시한다. range 단위(set_pos 와 동일)로 지정. -1 이면 숨김(완전 다운로드/일반 미디어).
+	int				m_sub_track_pos = -1;
+	void			set_sub_track_pos(int pos);
+
 //폰트 관련
 	LOGFONT			get_log_font() { return m_lf; }
 	void			set_log_font(LOGFONT lf);

@@ -945,6 +945,15 @@ void CSCSliderCtrl::OnPaint()
 		}
 	}
 
+	//[sub track] 다운로드된 seek 가능 frontier — 빨간 1px 세로선. style_track 전용. -1 이면 숨김.
+	if (m_style == style_track && m_sub_track_pos >= 0)
+	{
+		int cx   = Pos2Pixel(m_sub_track_pos);
+		int cyc  = m_rc.CenterPoint().y;
+		int half = (int)(m_track_height / 2) + 2;	//그루브보다 살짝 돌출시켜 눈에 띄게.
+		dc.FillSolidRect(cx, cyc - half, 1, half * 2, RGB(255, 0, 0));
+	}
+
 	dc.SelectObject(pOldFont);
 	dc.SelectObject(pOldPen);
 
@@ -1887,6 +1896,15 @@ void CSCSliderCtrl::set_repeat_end(int pos)
 		(m_repeat_end <= m_repeat_start))
 		m_repeat_start = GetRangeMin();
 
+	Invalidate();
+}
+
+//[sub track] seek 가능 frontier 위치(range 단위). -1 이면 숨김. 값이 바뀔 때만 redraw.
+void CSCSliderCtrl::set_sub_track_pos(int pos)
+{
+	if (pos == m_sub_track_pos)
+		return;
+	m_sub_track_pos = pos;
 	Invalidate();
 }
 

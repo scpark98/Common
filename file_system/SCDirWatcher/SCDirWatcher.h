@@ -21,6 +21,7 @@
 
 #include <afxwin.h>
 #include <deque>
+#include <mutex>
 #include "ReadDirectoryChanges.h"
 
 static const UINT Message_CSCDirWatcher = ::RegisterWindowMessage(_T("MessageString_CSCDirWatcher"));
@@ -58,6 +59,15 @@ public:
 	//모니터링을 원하는 폴더를 다시 추가하면 된다.
 	void		stop(CString folder = _T(""));
 
+	//특정 폴더(또는 전체)의 변경 통지를 일시 중지/재개한다. stop()과 달리 모니터링 핸들 자체는 유지되어,
+	//resume() 시 add() 재호출 없이 즉시 통지가 재개된다. 배치 작업(자동 스냅샷 등)이 스스로 만든 파일
+	//변경을 일시적으로 무시할 때 사용. folder가 ""이면 전체 통지를 일시 중지/재개.
+	void		pause(CString folder = _T(""));
+	void		resume(CString folder = _T(""));
+
+	//path(전체 경로)가 현재 일시 중지 대상(전체 또는 그 폴더/하위)에 속하면 true. 모니터링 쓰레드에서 통지 직전 판정.
+	bool		is_paused(CString path);
+
 	bool		is_watching(CString folder);
 
 	static CString action_str(int action)
@@ -90,4 +100,9 @@ protected:
 	bool		m_is_thread_running = false;
 	bool		m_is_thread_terminated = false;
 	void		thread_directory_change_watcher();
+
+	//일시 중지 상태 — 모니터링 쓰레드(읽기)와 main 쓰레드(pause/resume 쓰기)가 공유하므로 mutex 보호.
+	bool				m_pause_all = false;
+	std::deque<CString>	m_paused_folders;
+	std::mutex			m_mtx_pause;
 };

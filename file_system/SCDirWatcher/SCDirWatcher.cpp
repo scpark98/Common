@@ -75,6 +75,76 @@ bool CSCDirWatcher::is_watching(CString folder)
     return m_watcher.is_watching(folder);
 }
 
+//폴더명 끝의 '\\' 제거(드라이브 루트 "C:\\"는 보존). add()와 동일한 정규화로 prefix 비교 일관성 확보.
+static void normalize_folder(CString& folder)
+{
+    if (folder.GetLength() > 3 && folder.Right(1) == _T('\\'))
+        folder.Delete(folder.GetLength() - 1, 1);
+}
+
+void CSCDirWatcher::pause(CString folder)
+{
+    std::lock_guard<std::mutex> lock(m_mtx_pause);
+
+    if (folder.IsEmpty())
+    {
+        m_pause_all = true;
+        return;
+    }
+
+    normalize_folder(folder);
+
+    for (int i = 0; i < (int)m_paused_folders.size(); i++)
+        if (m_paused_folders[i].CompareNoCase(folder) == 0)
+            return;
+
+    m_paused_folders.push_back(folder);
+}
+
+void CSCDirWatcher::resume(CString folder)
+{
+    std::lock_guard<std::mutex> lock(m_mtx_pause);
+
+    if (folder.IsEmpty())
+    {
+        m_pause_all = false;
+        m_paused_folders.clear();
+        return;
+    }
+
+    normalize_folder(folder);
+
+    for (int i = 0; i < (int)m_paused_folders.size(); i++)
+    {
+        if (m_paused_folders[i].CompareNoCase(folder) == 0)
+        {
+            m_paused_folders.erase(m_paused_folders.begin() + i);
+            break;
+        }
+    }
+}
+
+bool CSCDirWatcher::is_paused(CString path)
+{
+    std::lock_guard<std::mutex> lock(m_mtx_pause);
+
+    if (m_pause_all)
+        return true;
+
+    for (int i = 0; i < (int)m_paused_folders.size(); i++)
+    {
+        const CString& f = m_paused_folders[i];
+
+        //path 가 폴더 자신이거나 그 하위(folder + '\\' ...)이면 일시 중지 대상.
+        if (path.GetLength() >= f.GetLength() &&
+            path.Left(f.GetLength()).CompareNoCase(f) == 0 &&
+            (path.GetLength() == f.GetLength() || path[f.GetLength()] == _T('\\')))
+            return true;
+    }
+
+    return false;
+}
+
 void CSCDirWatcher::thread_directory_change_watcher()
 {
 	m_is_thread_running = true;
@@ -128,7 +198,9 @@ void CSCDirWatcher::thread_directory_change_watcher()
                     if (dwAction != FILE_ACTION_RENAMED_NEW_NAME)
                         m_old_path.Empty();
 
-                    ::SendMessage(m_parent->m_hWnd, Message_CSCDirWatcher, (WPARAM)&CSCDirWatcherMessage((int)dwAction, CString(wstrFilename.c_str()), m_old_path), 0);
+                    //일시 중지 대상(pause())이면 통지를 전달하지 않는다 — 모니터링 핸들은 유지되므로 resume() 시 즉시 재개.
+                    if (!is_paused(CString(wstrFilename.c_str())))
+                        ::SendMessage(m_parent->m_hWnd, Message_CSCDirWatcher, (WPARAM)&CSCDirWatcherMessage((int)dwAction, CString(wstrFilename.c_str()), m_old_path), 0);
                 }
             }
         }

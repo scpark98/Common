@@ -440,15 +440,72 @@ namespace ffi
 			logWrite(_T("[ffi/dec] subtitle[%d→stream%u] %s"), track_idx, i, buf);
 		}
 
-		//헤더에 길이가 없는 미종료 녹화 파일 — 백그라운드로 전체 packet 을 읽어 총 길이를 산출한다.
-		//정상 파일(duration 있음)은 스캔 안 띄움.
-		if (m_fmt->duration == AV_NOPTS_VALUE)
+		//seek 인덱스 유무 판별 — 부분 다운로드 AVI 등은 파일 끝 idx1 이 없어 인덱스 0. PTS 는 정상이므로 timing 은
+		//기존 PTS 그대로, seek 만 byte 추정으로 전환(m_no_seek_index). 정상(인덱스 있음) 파일은 false → 기존 동작.
+		//(libavformat 62: nb_index_entries 비공개 → avformat_index_get_entries_count 사용.)
+		//AVI(SW codec) — mpeg4/divx 등은 video pts 가 byte-seek 시 garbage 라 pts-seek 가 부정확하고, 컨테이너 헤더
+		//duration(m_fmt->duration)이 malformed 인 경우가 있다(예: GOM ENCODER 가 145분으로 기록했으나 실제는 33:45).
+		//native video index(idx1)는 *실제 frame* 기준이라 정확하므로 — 마지막 entry timestamp = 실제 길이, entry 들의
+		//(ts↔byte)로 seek 인덱스를 직접 구축 — av_read_frame 스캔(헤더가 부풀린 frame 수를 과다 카운트) 대신 사용한다.
+		//그리고 unreliable_video_pts 경로(byte-seek + sample-count 타이밍)로 돌려 전 구간 정확 seek (팟플레이어식).
+		//(h264-in-AVI(HW)는 real pts 가 정확하므로 제외 — 회귀 방지.)
+		bool avi_native_index = false;
+		if (m_video_stream_idx >= 0 &&
+			m_fmt->iformat && m_fmt->iformat->name && strstr(m_fmt->iformat->name, "avi") &&
+			m_hw_pix_fmt == AV_PIX_FMT_NONE)
 		{
-			m_unreliable_video_pts = true;	//video pts 비신뢰 → sample_count 타이밍 + audio 위치 + byte seek.
+			AVStream* vst = m_fmt->streams[m_video_stream_idx];
+			int idx_cnt = avformat_index_get_entries_count(vst);
+			AVRational vtb = vst->time_base;
+			double vfps = (vst->avg_frame_rate.den != 0) ? (double)vst->avg_frame_rate.num / (double)vst->avg_frame_rate.den : 0.0;
+			logWrite(_T("[ffi/dec] AVI(SW) idx_cnt=%d header_dur=%.0fms"), idx_cnt, (double)m_fmt->duration / 1000.0);
+
+			m_unreliable_video_pts = true;
+			m_no_seek_index = true;
+
+			if (idx_cnt > 1)
+			{
+				const AVIndexEntry* last = avformat_index_get_entry(vst, idx_cnt - 1);
+				double idx_dur = (last && last->timestamp != AV_NOPTS_VALUE) ? (double)last->timestamp * av_q2d(vtb) * 1000.0 : 0.0;
+				std::vector<std::pair<int64_t, int64_t>> idx;
+				int step = (vfps > 0.0) ? (int)(vfps * 5.0) : 150;	//~5s 간격 샘플.
+				if (step < 1) step = 1;
+				for (int i = 0; i < idx_cnt; i += step)
+				{
+					const AVIndexEntry* e = avformat_index_get_entry(vst, i);
+					if (e && e->pos >= 0 && e->timestamp != AV_NOPTS_VALUE)
+						idx.push_back(std::make_pair((int64_t)((double)e->timestamp * av_q2d(vtb) * 1000.0), e->pos));
+				}
+				if (idx_dur > 0.0 && !idx.empty())
+				{
+					m_scanned_duration_ms.store(idx_dur);	//duration_ms() 가 malformed 헤더 대신 이 값을 반환.
+					m_buffered_frontier_ms.store(idx_dur);	//전 구간 가용 → 트랙 빨간선 숨김.
+					{
+						std::lock_guard<std::mutex> lk(m_seek_index_mtx);
+						m_seek_index = idx;
+						m_seek_index_snap = false;	//ts↔byte 보간 (byte-seek 착지 후 kf_skip 이 keyframe 으로).
+					}
+					avi_native_index = true;
+					logWrite(_T("[ffi/dec] AVI native-index → dur=%.0fms seek_idx=%zu (malformed 헤더 무시)"), idx_dur, idx.size());
+				}
+			}
+		}
+
+		//헤더에 길이가 없는 미종료 녹화, 또는 native index 가 없는 AVI — 백그라운드 전체 스캔으로 길이+seek 인덱스 산출.
+		if (m_fmt->duration == AV_NOPTS_VALUE && !avi_native_index)
+		{
+			m_unreliable_video_pts = true;
 			m_scan_quit.store(false);
 			m_scanned_duration_ms.store(-1.0);
 			m_scan_thread = std::thread(&CDecoder::scan_duration_worker, this);
-			logWrite(_T("[ffi/dec] duration unknown — unreliable_video_pts + duration estimate started"));
+			logWrite(_T("[ffi/dec] duration unknown — unreliable + 스캔 시작"));
+		}
+		else if (m_no_seek_index && !avi_native_index)
+		{
+			m_scan_quit.store(false);
+			m_scanned_duration_ms.store(-1.0);
+			m_scan_thread = std::thread(&CDecoder::scan_duration_worker, this);
+			logWrite(_T("[ffi/dec] AVI native index 없음 — byte-seek 스캔 시작"));
 		}
 
 		//일부 파일은 컨테이너 codecpar 의 width/height 가 실제 SPS 코딩 크기와 다르다(헤더 메타 오류).
@@ -558,6 +615,7 @@ namespace ffi
 		bool estimate_done = false;
 
 		std::vector<std::pair<int64_t, int64_t>> index;	//(시간 ms, 파일 byte). ~5s 간격. audio 있으면 audio ms, 없으면 video 프레임 ms. 끝에 m_seek_index 로 publish.
+		size_t published_size = 0;	//m_seek_index 에 점진 publish 한 index 항목 수 (스캔 중 byte-seek 가능하게).
 		int64_t last_idx_ms = INT64_MIN;
 
 		AVPacket* pkt = av_packet_alloc();
@@ -603,6 +661,21 @@ namespace ffi
 					}
 				}
 				av_packet_unref(pkt);
+
+				//[진행상황 + 인덱스 점진 발행] 재생과 독립적으로 트랙 red(buffered frontier)가 앞서 채워지고,
+				//스캔된 구간은 byte-seek(byte_for_time_ms = m_seek_index 보간)로 즉시 이동 가능해진다(팟플레이어식).
+				if (atb.den > 0 && a_last_end != AV_NOPTS_VALUE)
+					m_buffered_frontier_ms.store((double)a_last_end * av_q2d(atb) * 1000.0);
+				else if (aidx < 0 && fps > 0.0 && v_count > 0)
+					m_buffered_frontier_ms.store((double)v_count * 1000.0 / fps);
+
+				if (index.size() != published_size)
+				{
+					std::lock_guard<std::mutex> lk(m_seek_index_mtx);
+					m_seek_index = index;
+					m_seek_index_snap = (aidx < 0);
+					published_size = index.size();
+				}
 
 				//1단계 추정 — 앞부분 audio 시간 ÷ 읽은 byte 비율로 전체 길이 외삽 (bitrate 거의 균일 가정).
 				if (!estimate_done && a_last_end != AV_NOPTS_VALUE && atb.den > 0 && file_size > 0)
@@ -690,8 +763,10 @@ namespace ffi
 		m_scan_quit.store(true);
 		if (m_scan_thread.joinable())
 			m_scan_thread.join();
+		m_buffered_frontier_ms.store(-1.0);
 		m_scanned_duration_ms.store(-1.0);
 		m_unreliable_video_pts = false;
+		m_no_seek_index = false;
 		{
 			std::lock_guard<std::mutex> lk(m_seek_index_mtx);
 			m_seek_index.clear();
@@ -888,6 +963,12 @@ namespace ffi
 		if (!m_fmt || m_fmt->duration == AV_NOPTS_VALUE)
 			return 0.0;
 		return (double)m_fmt->duration / 1000.0;   //AV_TIME_BASE = 1000000 (μs), /1000 → ms.
+	}
+
+	double CDecoder::buffered_ms()
+	{
+		//frontier probe 스레드가 별도 컨텍스트로 산출한 값. 재생과 무관(=재생을 따라가지 않음).
+		return m_buffered_frontier_ms.load();
 	}
 
 	double CDecoder::frame_rate() const
@@ -1200,9 +1281,9 @@ namespace ffi
 						AVRational{1, AV_TIME_BASE}, vtb);
 
 					int hr_seek;
-					if (m_unreliable_video_pts)
+					if (m_unreliable_video_pts || m_no_seek_index)
 					{
-						//[byte 추정 seek] 인덱스 없는 미종료 파일 — 시간 기반 av_seek_frame 이 시작 부근으로 fallback 함(검증됨).
+						//[byte 추정 seek] 인덱스 없는 파일 — 시간 기반 av_seek_frame 이 시작 부근으로 fallback 함(검증됨).
 						//파일 크기·추정 길이로 target byte 를 비례 추정 → AVSEEK_FLAG_BYTE 이동, 착지 후 첫 video keyframe 부터
 						//emit(clean picture). 위치는 audio pts(연속·정확)가 반영. 정상 파일은 이 분기 안 탐(아래 pts-seek).
 						//1순위: seek 인덱스(시간→byte 보간) — 콘텐츠 실제 byte 분포 반영, garbage tail/비균일 bitrate overshoot 방지.

@@ -112,6 +112,14 @@ namespace ffi
 		//이 경우 video·audio rtStart 를 sample_count 기반으로(garbage pts 우회), 위치는 audio 실시간 pts, seek 는 byte 추정으로
 		//전환해야 한다. open() 에서 m_fmt->duration==NOPTS 면 true. *정상 파일은 false → 기존 pts 기반 동작 그대로*.
 		bool	unreliable_video_pts() const { return m_unreliable_video_pts; }
+		//seek 인덱스가 없는 파일(예: 부분 다운로드 AVI — 파일 끝 idx1 누락). PTS 는 정상이라 timing 은 기존 PTS
+		//기반 그대로 두되, seek 만 byte 추정(m_seek_index)으로 전환한다. 정상 파일(인덱스 있음)은 false.
+		//이 값이 true 면 dshow 라우팅이 SW codec(mpeg4 등)도 internal path 로 보낸다(LAV 는 인덱스 없는 seek 가 느림).
+		bool	no_seek_index() const { return m_no_seek_index; }
+		//[buffered frontier] 부분 다운로드/스트리밍 미디어에서 현재 seek 가능한 끝 시각(ms). 인덱스(시간→byte)가
+		//완전하다는 전제로(OpenDML superindex 등) 현재 파일 크기에 해당하는 마지막 index entry 시각을 반환한다.
+		//인덱스 없음/판별 불가 시 -1. 완전 다운로드면 duration 에 근접. 트랙바의 seek 가능 구간 표시·OSD 용.
+		double	buffered_ms();
 		bool	is_eof()	   const { return m_eof.load(); }	//av_read_frame AVERROR_EOF 도달 + queue 비면 stream 끝.
 
 		//queue 의 현재 size — 디버깅용.
@@ -198,9 +206,17 @@ namespace ffi
 		std::atomic<double>		m_scanned_duration_ms{-1.0};	//< 0 = 미산출. > 0 = 산출된 총 길이(ms).
 		void					scan_duration_worker();
 
+		//[buffered frontier] seek 가능 끝 시각(ms). scan_duration_worker 가 점진 발행, AVI native-index 는 open 에서
+		//duration 으로 설정. < 0 = 미산출/숨김. buffered_ms() 가 반환(트랙 빨간선·OSD 용).
+		std::atomic<double>		m_buffered_frontier_ms{-1.0};
+
 		//video pts 가 비선형/엉터리라 sample_count 타이밍 + audio 위치 + byte seek 로 전환할지. open 에서 set, worker/pin 이 read.
 		//set-once (worker 시작 전 open). 정상 파일은 false → 모든 기존 경로 그대로 (정상 미디어 회귀 방지).
 		bool					m_unreliable_video_pts = false;
+
+		//seek 인덱스 없는 파일(부분 다운로드 AVI 등). open 에서 avformat_index_get_entries_count==0 이면 set.
+		//byte-seek 만 켜고 timing 은 PTS 그대로. set-once (open). 정상 파일은 false.
+		bool					m_no_seek_index = false;
 
 		//[seek 인덱스] 인덱스 없는 미종료 파일의 byte-seek 정확도용. 스캔(scan_duration_worker)이 (audio시간 ms, 파일 byte 위치)
 		//샘플을 ~수초 간격으로 기록. byte-seek 시 시간→byte 를 보간해 *콘텐츠가 차지한 실제 byte 영역* 으로 이동 (linear×filesize

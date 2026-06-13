@@ -493,7 +493,9 @@ namespace ffi
 
 		//fast path — frame 이 이미 NV12 (HW transferred 등) 면 swscale 우회, 직접 copy.
 		//매 frame swscale alloc/free 가 thread-unsafe 또는 무거워 crash/freeze 원인.
-		if ((AVPixelFormat)frame->format == AV_PIX_FMT_NV12)
+		//단, frame 크기가 negotiated 크기(w,h)와 같을 때만. 가변 해상도 스트림(인트로 큰 해상도 → 본편 작은 해상도)
+		//에서 다른 크기 frame 은 아래 swscale 로 negotiated 크기에 맞춰 스케일해야 stride 가 안 어긋난다.
+		if ((AVPixelFormat)frame->format == AV_PIX_FMT_NV12 && frame->width == w && frame->height == h)
 		{
 			//dst stride = aligned_w. src 의 valid 영역은 처음 w byte, 나머지는 padding (0 또는 stale 무관).
 			uint8_t* dst_y	= pData;
@@ -597,13 +599,19 @@ namespace ffi
 
 		++m_sample_count;
 
-		//매 frame 의 rt 추적 — 매 60 frame (+ seek 후 첫 frame: m_sample_count 가 seek 마다 0 리셋 → 0%60==0 로 1개).
-		if (m_sample_count % 60 == 0)
+		//[render 진단] 샘플 timing vs 그래프 stream clock. NewSegment(0,end) 이라 renderer 는 sample.rtStart 시점에 표시.
+		//stream clock(StreamTime)과 rtStart 가 크게 어긋나면 renderer 가 frame 을 미래로 보고 hold / 과거로 보고 drop
+		//→ 화면이 1fps/정지. 검은 미디어 디버깅용 — seek 직후 첫 5 frame + 이후 60 frame 마다.
+		if (m_sample_count <= 5 || m_sample_count % 60 == 0)
 		{
-			logWrite(_T("[ffi/src] frame[%lld] pts=%lld rtStart=%lld(ms=%lld) seg=%lld key=%d"),
-				m_sample_count, (long long)frame->pts,
-				(long long)rtStart, (long long)(rtStart / 10000),
-				(long long)m_segment_start,
+			CRefTime stream_t;
+			REFERENCE_TIME clk = (m_pFilter && m_pFilter->StreamTime(stream_t) == S_OK) ? (REFERENCE_TIME)stream_t : -1;
+			logWrite(_T("[ffi/src/render] frame[%lld] rtStart=%lldms rtStop=%lldms seg=%lldms streamClock=%lldms (rtStart-clk=%lldms) key=%d"),
+				m_sample_count,
+				(long long)(rtStart / 10000), (long long)(rtStop / 10000),
+				(long long)(m_segment_start / 10000),
+				(long long)(clk < 0 ? -1 : clk / 10000),
+				(long long)(clk < 0 ? 0 : (rtStart - clk) / 10000),
 				(int)((frame->flags & AV_FRAME_FLAG_KEY) ? 1 : 0));
 		}
 

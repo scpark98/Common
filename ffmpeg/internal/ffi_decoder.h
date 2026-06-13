@@ -159,6 +159,12 @@ namespace ffi
 		AVCodecContext*		m_video_ctx = nullptr;
 		int					m_video_stream_idx = -1;
 
+		//open() 의 probe 디코드로 확정한 실제 frame 크기. 컨테이너 codecpar 가 SPS 코딩 크기와 다른 파일
+		//(헤더 메타 오류) 에서 m_video_ctx->width 는 첫 디코드 전까지 잘못된 값이라 video_width/height 가
+		//이 값을 우선 반환한다. 0 이면 미확정 → m_video_ctx 값 fallback.
+		int					m_probe_w = 0;
+		int					m_probe_h = 0;
+
 		//HW 가속 — D3D11VA / DXVA2. SW keyframe walk decode 의 5-10초 freeze 회피.
 		AVBufferRef*		m_hw_device_ctx = nullptr;
 		AVPixelFormat		m_hw_pix_fmt = AV_PIX_FMT_NONE;	  //HW frame format (codec 의 get_format 반환).

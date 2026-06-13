@@ -451,6 +451,62 @@ namespace ffi
 			logWrite(_T("[ffi/dec] duration unknown — unreliable_video_pts + duration estimate started"));
 		}
 
+		//일부 파일은 컨테이너 codecpar 의 width/height 가 실제 SPS 코딩 크기와 다르다(헤더 메타 오류).
+		//그 경우 m_video_ctx->width 는 첫 frame 을 디코드해야 정정된다. 그런데 GetMediaType/DecideBufferSize
+		//는 graph 연결 시점(첫 디코드 전)에 호출돼 MPCVR 에 잘못된 해상도로 negotiate → FillBuffer 가 정정된
+		//stride 로 채우면 렌더러 해석이 어긋나 화면이 검정/흰색으로 깨진다(컨테이너 해상도 ≠ 실제 코딩 해상도인
+		//미디어). 여기서 첫 video frame 을 미리 디코드해 차원을 확정한 뒤 flush + 위치 복원.
+		if (m_video_stream_idx >= 0 && m_video_ctx)
+		{
+			//가변 해상도 케이스: 스트림이 처음 ~1초는 큰 해상도 프레임, 이후 더 작은 해상도로 바뀌는 미디어가 있다
+			//(타 플레이어도 frame 0 에서 큰 값 → <1초 후 작은 값). 단일 negotiate 인 DirectShow 는 두 해상도를
+			//다 받을 수 없으므로, 여러 frame 을 디코드해 *지배적(sustained)* 해상도를 mode 로 결정한다.
+			//FillBuffer 는 frame 크기가 이 negotiated 크기와 다르면 swscale 로 맞춰 스케일한다(인트로 프레임 흡수).
+			//단일 해상도 미디어(99%)는 cnt_b 가 끝까지 0 → 조기 종료해 open latency 최소화.
+			AVPacket* pkt = av_packet_alloc();
+			AVFrame*  frm = av_frame_alloc();
+			int wa = 0, ha = 0, ca = 0;	  //2-bucket — 대부분 미디어는 해상도 종류가 1~2 개.
+			int wb = 0, hb = 0, cb = 0;
+			int frames = 0;
+			ULONGLONG t0 = GetTickCount64();
+			while (pkt && frm && frames < 90 && (GetTickCount64() - t0) < 2500)
+			{
+				if (cb == 0 && frames >= 45)	//단일 해상도 확정 → 조기 종료.
+					break;
+				if (av_read_frame(m_fmt, pkt) < 0)
+					break;
+				if (pkt->stream_index == m_video_stream_idx)
+				{
+					int sr = avcodec_send_packet(m_video_ctx, pkt);
+					if (sr >= 0 || sr == AVERROR(EAGAIN))
+					{
+						while (avcodec_receive_frame(m_video_ctx, frm) >= 0)
+						{
+							int fw = frm->width;
+							int fh = frm->height;
+							av_frame_unref(frm);
+							if (fw <= 0 || fh <= 0)
+								continue;
+							++frames;
+							if (wa == 0)			{ wa = fw; ha = fh; ca = 1; }
+							else if (fw == wa && fh == ha)	++ca;
+							else if (wb == 0)		{ wb = fw; hb = fh; cb = 1; }
+							else if (fw == wb && fh == hb)	++cb;
+						}
+					}
+				}
+				av_packet_unref(pkt);
+			}
+			if (frm) av_frame_free(&frm);
+			if (pkt) av_packet_free(&pkt);
+			avcodec_flush_buffers(m_video_ctx);
+			av_seek_frame(m_fmt, -1, 0, AVSEEK_FLAG_BACKWARD);
+			if (cb > ca)		{ m_probe_w = wb; m_probe_h = hb; }
+			else if (ca > 0)	{ m_probe_w = wa; m_probe_h = ha; }
+			logWrite(_T("[ffi/dec] dim probe: A=%dx%d(%d) B=%dx%d(%d) → video_width/height=%dx%d (frames=%d %llums)"),
+				wa, ha, ca, wb, hb, cb, video_width(), video_height(), frames, GetTickCount64() - t0);
+		}
+
 		return true;
 	}
 
@@ -668,6 +724,8 @@ namespace ffi
 		}
 
 		m_video_stream_idx = -1;
+		m_probe_w = 0;
+		m_probe_h = 0;
 		m_audio_stream_idx = -1;
 		m_audio_stream_indices.clear();
 		m_audio_track_names.clear();
@@ -809,11 +867,15 @@ namespace ffi
 
 	int CDecoder::video_width() const
 	{
+		if (m_probe_w > 0)
+			return m_probe_w;
 		return m_video_ctx ? m_video_ctx->width : 0;
 	}
 
 	int CDecoder::video_height() const
 	{
+		if (m_probe_h > 0)
+			return m_probe_h;
 		return m_video_ctx ? m_video_ctx->height : 0;
 	}
 

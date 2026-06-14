@@ -566,7 +566,7 @@ void CSCListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 	{
 		CRect rc_client;
 		GetClientRect(rc_client);
-		CRect rc_corner(rc_client.right - m_scrollbar_width, rc_client.bottom - m_scrollbar_width,
+		CRect rc_corner(rc_client.right - m_scrollbar.get_width(), rc_client.bottom - m_scrollbar.get_width(),
 						rc_client.right, rc_client.bottom);
 		CRect rc_overlap;
 		if (rc_overlap.IntersectRect(rc_corner, &lpDIS->rcItem))
@@ -1627,9 +1627,9 @@ void CSCListBox::edit(int index)
 	if (m_v_paint_shift > 0)
 		rItem.OffsetRect(0, -m_v_paint_shift);
 
-	//세로 오버레이가 보이면 edit 의 우측이 그 영역을 침범하지 않도록 m_scrollbar_width 만큼 줄임.
+	//세로 오버레이가 보이면 edit 의 우측이 그 영역을 침범하지 않도록 m_scrollbar.get_width() 만큼 줄임.
 	if (::IsWindow(m_scrollbar.m_hWnd) && m_scrollbar.IsWindowVisible())
-		rItem.right -= m_scrollbar_width;
+		rItem.right -= m_scrollbar.get_width();
 
 	//ES_MULTILINE EDIT 의 caret 높이는 폰트 line height 와 거의 동일하다. client area 가 caret 보다 작거나
 	//거의 같으면 Windows 가 caret 표시를 suppress 한다. 위/아래로 여유를 확보해 caret 이 항상 보이게 함.
@@ -2138,15 +2138,15 @@ void CSCListBox::setup_scrollbar()
 	CRect rc;
 	GetClientRect(&rc);
 	m_scrollbar.create(this, CSCScrollbar::vertical,
-		rc.right - m_scrollbar_width, 0, m_scrollbar_width, rc.Height());
+		rc.right - m_scrollbar.get_width(), 0, m_scrollbar.get_width(), rc.Height());
 	m_scrollbar.set_color_theme(m_theme, false);
 	m_scrollbar.set_line(3);		//화살표 클릭 = 3 라인.
 	m_scrollbar.ShowWindow(SW_HIDE);
 
 	//가로 오버레이는 CVtListCtrlEx/CSCTreeCtrl 처럼 항상 생성한다(표시 여부는 sync_scrollbar 의 need_h 가 결정).
-	//세로 오버레이가 우측 corner 를 점유하므로 가로는 우측을 m_scrollbar_width 만큼 비워 sync_scrollbar 가 배치.
+	//세로 오버레이가 우측 corner 를 점유하므로 가로는 우측을 m_scrollbar.get_width() 만큼 비워 sync_scrollbar 가 배치.
 	m_scrollbar_h.create(this, CSCScrollbar::horizontal,
-		0, rc.bottom - m_scrollbar_width, rc.Width() - m_scrollbar_width, m_scrollbar_width);
+		0, rc.bottom - m_scrollbar.get_width(), rc.Width() - m_scrollbar.get_width(), m_scrollbar.get_width());
 	m_scrollbar_h.set_color_theme(m_theme, false);
 	m_scrollbar_h.set_line(30);	//화살표 클릭 = 30px (CVtListCtrlEx 와 동일).
 	m_scrollbar_h.ShowWindow(SW_HIDE);
@@ -2179,7 +2179,7 @@ void CSCListBox::sync_scrollbar()
 
 	//세로 가시 항목 수 — H-bar 가 보일 때는 그 영역만큼 viewport 줄어듦. 마지막 항목이 H-bar 와 겹치지 않도록 visible 차감.
 	//paint shift 같은 위치 보정 없이 *viewport 자체* 가 정확 → 잔상 없음 + 마지막 항목 H-bar 위에 안 들어감.
-	int eff_h = need_h ? max(0, rc.Height() - m_scrollbar_width) : rc.Height();
+	int eff_h = need_h ? max(0, rc.Height() - m_scrollbar.get_width()) : rc.Height();
 	int visible = (m_line_height > 0) ? (eff_h / m_line_height) : 0;
 	bool need_v = (total > visible) && (visible > 0);
 
@@ -2195,11 +2195,11 @@ void CSCListBox::sync_scrollbar()
 		CRect r_last;
 		//GetItemRect 는 스크롤로 가려진 항목엔 client 밖 좌표를 반환 → top<bottom(=일부 보임) 조건으로 바닥 근처일 때만 적용.
 		if (GetItemRect(total - 1, r_last) != LB_ERR
-			&& r_last.top < rc.bottom && r_last.bottom > rc.bottom - m_scrollbar_width)
+			&& r_last.top < rc.bottom && r_last.bottom > rc.bottom - m_scrollbar.get_width())
 		{
-			new_shift = r_last.bottom - (rc.bottom - m_scrollbar_width);
-			if (new_shift > m_scrollbar_width)
-				new_shift = m_scrollbar_width;
+			new_shift = r_last.bottom - (rc.bottom - m_scrollbar.get_width());
+			if (new_shift > m_scrollbar.get_width())
+				new_shift = m_scrollbar.get_width();
 		}
 	}
 	if (new_shift != m_v_paint_shift)
@@ -2208,8 +2208,8 @@ void CSCListBox::sync_scrollbar()
 		Invalidate(FALSE);
 	}
 
-	int v_bottom = need_h ? (rc.bottom - m_scrollbar_width) : rc.bottom;
-	int h_right  = need_v ? (rc.right - m_scrollbar_width) : rc.right;
+	int v_bottom = need_h ? (rc.bottom - m_scrollbar.get_width()) : rc.bottom;
+	int h_right  = need_v ? (rc.right - m_scrollbar.get_width()) : rc.right;
 
 	//세로 위치
 	CRect rCurV;

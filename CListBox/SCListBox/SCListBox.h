@@ -438,7 +438,6 @@ public:
 
 	//자체 스크롤바 — CSCTreeCtrl / CSCThumbCtrl 와 동일 패턴. WS_VSCROLL 제거 + OnNcCalcSize 가 NC 영역 0 → native scrollbar 안 보임.
 	CSCScrollbar	m_scrollbar;
-	int				m_scrollbar_width = 14;	//track(window) 폭 — 18→16→14 로 양쪽 1px씩 축소(CVtListCtrlEx 와 통일).
 	bool			m_scrollbar_setup = false;
 
 	//가로 themed 오버레이 — 네이티브 가로 스크롤바는 일절 쓰지 않고 이 컨트롤로만 가로 스크롤한다.

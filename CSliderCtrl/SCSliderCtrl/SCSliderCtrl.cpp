@@ -923,9 +923,16 @@ void CSCSliderCtrl::OnPaint()
 
 				for (int j = 1; j < 5; j++)
 				{
-					dc.MoveTo(pxpos - j, cy - 5 - j);
-					dc.LineTo(pxpos + j + 1, cy - 5 - j);	//역삼각형
-					//dc.LineTo(pxpos + 1, cy - 5 - j);		//역직각삼각형
+					if (j == 4)
+					{
+						dc.MoveTo(pxpos - j + 1, cy - 5 - j);
+						dc.LineTo(pxpos + j - 0, cy - 5 - j);	//역삼각형
+					}
+					else
+					{
+						dc.MoveTo(pxpos - j, cy - 5 - j);
+						dc.LineTo(pxpos + j + 1, cy - 5 - j);	//역삼각형
+					}
 				}
 				dc.SelectObject(pOldPen);
 			}

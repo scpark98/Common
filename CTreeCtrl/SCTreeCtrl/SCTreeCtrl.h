@@ -420,7 +420,6 @@ public:
 	//트리 mutation 후 sync_scrollbar() 외부 호출 가능.
 	CSCScrollbar	m_scrollbar;	//vertical
 	CSCScrollbar	m_scrollbar_h;	//horizontal
-	int				m_scrollbar_width = 14;	//track (window) 폭 — 18→16→14 로 양쪽 1px씩 축소. thumb 두께는 CSCScrollbar 내부 (resting 2, hover 6).
 	int				m_h_wheel_accum = 0;	//mouse driver 가 한 번 굴림에 작은 zDelta 다수 메시지 보낼 때 누적해서 WHEEL_DELTA 단위로 process.
 	int				m_h_scroll_pos = 0;		//사용자 H scroll 위치(px). 0..(m_h_content_width - viewport). 전량 customdraw 의 over_shift paint-shift 로 시각화.
 	int				m_h_content_width = 0;	//sync_scrollbar 가 가시 항목 라벨 right 최댓값으로 측정한 자연 콘텐츠 폭. native si 대신 H scroll 의 source of truth.

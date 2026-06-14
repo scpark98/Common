@@ -3320,10 +3320,10 @@ void CSCTreeCtrl::edit_item(HTREEITEM hItem)
 
 	//단, 그 오른쪽 끝이 rc.right를 넘어가지 않게 보정한다.
 	GetClientRect(rc);
-	//세로 오버레이가 보이면 edit 의 우측이 그 영역을 침범하지 않도록 m_scrollbar_width 만큼 줄임.
+	//세로 오버레이가 보이면 edit 의 우측이 그 영역을 침범하지 않도록 m_scrollbar.get_width() 만큼 줄임.
 	int right_limit = rc.right - 1;
 	if (::IsWindow(m_scrollbar.GetSafeHwnd()) && m_scrollbar.IsWindowVisible())
-		right_limit -= m_scrollbar_width;
+		right_limit -= m_scrollbar.get_width();
 	if (r.right > right_limit)
 		r.right = right_limit;
 
@@ -3686,7 +3686,7 @@ void CSCTreeCtrl::OnNMCustomDraw(NMHDR* pNMHDR, LRESULT* pResult)
 			{
 				CRect rcClient2;
 				GetClientRect(&rcClient2);
-				CRect rcCorner(rcClient2.right - m_scrollbar_width, rcClient2.bottom - m_scrollbar_width,
+				CRect rcCorner(rcClient2.right - m_scrollbar.get_width(), rcClient2.bottom - m_scrollbar.get_width(),
 							   rcClient2.right, rcClient2.bottom);
 				dc.FillSolidRect(&rcCorner, m_theme.cr_back.ToCOLORREF());
 			}
@@ -3784,10 +3784,10 @@ void CSCTreeCtrl::OnNMCustomDraw(NMHDR* pNMHDR, LRESULT* pResult)
 			}
 
 			//1. row fill.
-			//   V scrollbar visible 시에만 우측 m_scrollbar_width reserve. hide 시 풀폭. m_v_visible_state 는 sync_scrollbar 가 정한 stable cache 라 paint cycle stale 안전.
+			//   V scrollbar visible 시에만 우측 m_scrollbar.get_width() reserve. hide 시 풀폭. m_v_visible_state 는 sync_scrollbar 가 정한 stable cache 라 paint cycle stale 안전.
 			CRect rcClient;
 			GetClientRect(&rcClient);
-			int right_limit = rcClient.right - (m_scrollbar_setup && m_v_visible_state ? m_scrollbar_width : 0);
+			int right_limit = rcClient.right - (m_scrollbar_setup && m_v_visible_state ? m_scrollbar.get_width() : 0);
 			CRect rcFill(rcClient.left, rcRow.top, right_limit, rcRow.bottom);
 
 			//TVS_FULLROWSELECT on → 강조도 풀폭. off → 일반 배경만 풀폭으로 칠하고 selection/hover/drop 강조는 라벨(rcText) 영역만.
@@ -4614,7 +4614,7 @@ void CSCTreeCtrl::OnMouseHWheel(UINT nFlags, short zDelta, CPoint pt)
 	//native tree 는 H scroll 불가 → m_h_scroll_pos 를 직접 이동, customdraw paint-shift 로 시각화.
 	CRect rc;
 	GetClientRect(&rc);
-	int right_limit_h = rc.Width() - (m_v_visible_state ? m_scrollbar_width : 0);
+	int right_limit_h = rc.Width() - (m_v_visible_state ? m_scrollbar.get_width() : 0);
 	int max_pos = max(0, m_h_content_width - right_limit_h);
 	int new_pos = m_h_scroll_pos + direction * notches * 60;
 	if (new_pos < 0)
@@ -4731,7 +4731,7 @@ void CSCTreeCtrl::setup_scrollbar()
 		return;
 
 	//WS_VSCROLL + WS_HSCROLL 제거 — overlay 로 대체.
-	//정공 NC reservation: WM_NCCALCSIZE 에서 우측·하단 m_scrollbar_width 점유 → tree client 자체 좁아짐 → tree 의 자체 H/V scroll max 가 자연스럽게 늘어남.
+	//정공 NC reservation: WM_NCCALCSIZE 에서 우측·하단 m_scrollbar.get_width() 점유 → tree client 자체 좁아짐 → tree 의 자체 H/V scroll max 가 자연스럽게 늘어남.
 	//overlay 는 tree 의 부모 dialog 의 child 로 만들어 NC 영역 (= tree 의 window 우측·하단) 에 위치. tree 의 child clipping 영향 안 받음.
 	//set_message_target(this) — overlay 가 dialog 의 child 라도 Message_CSCScrollbar 는 우리 tree 로 직접 dispatch.
 	//WS_VSCROLL/HSCROLL 제거 — overlay 로 대체.
@@ -4744,7 +4744,7 @@ void CSCTreeCtrl::setup_scrollbar()
 	GetClientRect(&rc);
 	//V overlay: tree client 안 우측 끝. height 는 H overlay 자리만큼 짧게.
 	m_scrollbar.create(this, CSCScrollbar::vertical,
-		rc.right - m_scrollbar_width, 0, m_scrollbar_width, rc.Height() - m_scrollbar_width);
+		rc.right - m_scrollbar.get_width(), 0, m_scrollbar.get_width(), rc.Height() - m_scrollbar.get_width());
 	m_scrollbar.set_color_theme(m_theme, false);
 	m_scrollbar.set_line(3);
 	m_scrollbar.ShowWindow(SW_HIDE);
@@ -4754,7 +4754,7 @@ void CSCTreeCtrl::setup_scrollbar()
 	//set_message_target(this) — parent 가 dialog 라도 Message_CSCScrollbar 를 우리 tree 로 직접 dispatch.
 	CWnd* pParentH = GetParent();
 	m_scrollbar_h.create(pParentH ? pParentH : (CWnd*)this, CSCScrollbar::horizontal,
-		0, 0, 10, m_scrollbar_width);
+		0, 0, 10, m_scrollbar.get_width());
 	m_scrollbar_h.ModifyStyle(0, WS_CLIPSIBLINGS);
 	m_scrollbar_h.set_message_target(this);
 	m_scrollbar_h.set_color_theme(m_theme, false);
@@ -4798,7 +4798,7 @@ void CSCTreeCtrl::sync_scrollbar()
 	//listctrl(total_col_width)/listbox(m_max_horizontal_extent) 와 동일하게 *전체 펼침 항목* 기준으로 자연
 	//콘텐츠 폭을 구한다(measure_content_width — 수직 스크롤 무관 고정값). 모든 H scroll 은 customdraw 의
 	//over_shift paint-shift 로 처리하므로 native scroll 은 쓰지 않는다.
-	int right_limit_h = rc.Width() - (need_v ? m_scrollbar_width : 0);
+	int right_limit_h = rc.Width() - (need_v ? m_scrollbar.get_width() : 0);
 	int content_w = get_content_width();	//캐시 — 변경(insert/delete/expand/collapse/font) 시에만 재측정.
 	m_h_content_width = content_w;
 	bool need_h = ::IsWindow(m_scrollbar_h.m_hWnd) && (right_limit_h > 0) && (content_w > right_limit_h);
@@ -4856,7 +4856,7 @@ void CSCTreeCtrl::sync_scrollbar()
 	//V overlay (tree child): client 우측 끝, 높이는 client 하단까지. H 가 보이면 NC 예약으로 client 높이가
 	//이미 줄어 있으므로 그대로 rc.Height() 가 가로바 위에서 멈춘다(여기서 따로 빼지 않는다).
 	{
-		CRect rTarget(rc.right - m_scrollbar_width, 0, rc.right, rc.Height());
+		CRect rTarget(rc.right - m_scrollbar.get_width(), 0, rc.right, rc.Height());
 		CRect rCur;
 		m_scrollbar.GetWindowRect(&rCur);
 		ScreenToClient(&rCur);
@@ -4870,8 +4870,8 @@ void CSCTreeCtrl::sync_scrollbar()
 	{
 		CPoint strip_tl(0, rc.bottom);	//rc = NC 로 축소된 client → rc.bottom = 예약 띠 상단(=가로바 위치)
 		ClientToScreen(&strip_tl);
-		int h_width = rc.Width() - (need_v ? m_scrollbar_width : 0);
-		CRect rTarget(strip_tl.x, strip_tl.y, strip_tl.x + h_width, strip_tl.y + m_scrollbar_width);
+		int h_width = rc.Width() - (need_v ? m_scrollbar.get_width() : 0);
+		CRect rTarget(strip_tl.x, strip_tl.y, strip_tl.x + h_width, strip_tl.y + m_scrollbar.get_width());
 		CWnd* pParent = GetParent();
 		if (pParent)
 			pParent->ScreenToClient(&rTarget);
@@ -5107,7 +5107,7 @@ void CSCTreeCtrl::OnNcPaint()
 		//V/H overlay 가 만나는 우하단 코너 — 가로바를 세로바 너비만큼 줄여 비워둔 자리를 cr_back 으로 채운다(탐색기/listctrl 동일).
 		if (m_v_visible_state && m_h_visible_state)
 		{
-			CRect rcCorner(rc.right - m_scrollbar_width, rc.bottom - m_scrollbar_width, rc.right, rc.bottom);
+			CRect rcCorner(rc.right - m_scrollbar.get_width(), rc.bottom - m_scrollbar.get_width(), rc.right, rc.bottom);
 			dc.FillSolidRect(&rcCorner, m_theme.cr_back.ToCOLORREF());
 		}
 
@@ -5481,11 +5481,11 @@ void CSCTreeCtrl::OnNcCalcSize(BOOL bCalcValidRects, NCCALCSIZE_PARAMS* lpncsp)
 	if (m_draw_border)
 		::InflateRect(&lpncsp->rgrc[0], -1, -1);
 
-	//H 스크롤바가 보일 때만 하단 m_scrollbar_width 를 NC 로 예약한다. 그러면 native 세로 스크롤이 client 바닥을
+	//H 스크롤바가 보일 때만 하단 m_scrollbar.get_width() 를 NC 로 예약한다. 그러면 native 세로 스크롤이 client 바닥을
 	//이만큼 위로 보고 마지막 항목을 그 위에 멈춘다 → 가로바(이 예약 띠에 놓이는 dialog-child overlay)에 안 가린다.
 	//세로바는 우측 텍스트 클리핑으로 처리하므로 우측은 예약하지 않는다. (need_h 변화 시 sync_scrollbar 가 SWP_FRAMECHANGED 로 재계산.)
-	if (m_h_visible_state && lpncsp->rgrc[0].bottom - lpncsp->rgrc[0].top > m_scrollbar_width)
-		lpncsp->rgrc[0].bottom -= m_scrollbar_width;
+	if (m_h_visible_state && lpncsp->rgrc[0].bottom - lpncsp->rgrc[0].top > m_scrollbar.get_width())
+		lpncsp->rgrc[0].bottom -= m_scrollbar.get_width();
 }
 
 void CSCTreeCtrl::OnStyleChanging(int nStyleType, LPSTYLESTRUCT lpStyleStruct)

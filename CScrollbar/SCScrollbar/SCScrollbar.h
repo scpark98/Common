@@ -81,7 +81,12 @@ public:
 	void	set_show_arrows(bool show);
 	bool	get_show_arrows() const { return m_show_arrows; }
 	int		get_thickness_normal() const { return m_thickness_normal; }
-	int		get_thickness_hover() const { return m_thickness_hover; }	//host 가 layout 시 reserve 할 두께 — 윈도우 width 가 항상 hover thickness.
+	int		get_thickness_hover() const { return m_thickness_hover; }
+
+	//스크롤바 폭(breadth)의 단일 출처 — 세로바의 가로폭 = 가로바의 세로높이 = window cross-axis 크기.
+	//host 는 자기 상수로 복제하지 말고 이 값을 질의해 create 의 cross 크기 + 레이아웃 reserve 에 사용한다.
+	int		get_width() const { return m_width; }
+	void	set_width(int w) { m_width = max(1, w); if (::IsWindow(m_hWnd)) Invalidate(); }
 
 //테마 — int preset 또는 외부 CSCColorTheme 그대로 가져오기.
 	void	set_color_theme(int theme, bool invalidate = true);
@@ -105,13 +110,16 @@ protected:
 	int				m_page = 1;
 	int				m_line = 1;
 
-	//시각 — m_thickness 는 *thumb 의 cross 두께만*. track 영역(=window 폭) 과 별개.
+	//폭(breadth) — 스크롤바 cross-axis 크기. 폭 개념의 단일 출처(get_width/set_width). create() 가 실제 생성 폭으로 갱신.
+	//화살표 버튼은 정사각형(폭×폭)이라 arrow 길이도 이 값으로 통일(별도 arrow_size 상수 제거).
+	int				m_width = 20;
+
+	//시각 — m_thickness 는 *thumb 의 cross 두께만* (컬럼 폭 m_width 와 별개인 가는 막대 굵기).
 	int				m_thickness = 1;			//현재 적용된 thumb cross 두께.
 	int				m_thickness_normal = 1;		//resting thumb 두께. draw_thumb 의 +1 보정으로 실제 그려지는 폭 = 2 px.
 	int				m_thickness_hover = 5;		//hover thumb 두께. draw_thumb 의 +1 보정으로 실제 그려지는 폭 = 6 px (탐색기 reference).
 	bool			m_window_hovering = false;	//마우스가 scrollbar 윈도우 안에 있는지.
 	bool			m_show_arrows = true;	//arrow 영역은 항상 reserve, 그리기만 hover 시 — 탐색기 스타일.
-	int				m_arrow_size = 16;	//화살표 영역 크기. host window 폭 (16) 과 동일 → 정사각형 16×16.
 
 	//상호작용 상태
 	enum SCROLL_PART { part_none = 0, part_arrow_lt, part_arrow_rb, part_thumb, part_track_lt, part_track_rb };

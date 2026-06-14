@@ -37,6 +37,7 @@ bool CSCScrollbar::create(CWnd* parent, ORIENTATION orient, int x, int y, int cx
 		return false;
 
 	m_orient = orient;
+	m_width = (orient == vertical) ? cx : cy;	//cross-axis 크기 = 폭. get_width() 의 출처로 보관.
 
 	//WS_CHILD + WS_VISIBLE — host 의 client 영역에 배치. 자체 paint 라 WS_CLIPCHILDREN 이슈 없음.
 	const DWORD style = WS_CHILD | WS_VISIBLE;
@@ -181,8 +182,8 @@ CRect CSCScrollbar::calc_arrow_lt_rect() const
 
 	CRect rc = get_visible_rect();
 	if (m_orient == vertical)
-		return CRect(rc.left, rc.top, rc.right, rc.top + m_arrow_size);
-	return CRect(rc.left, rc.top, rc.left + m_arrow_size, rc.bottom);
+		return CRect(rc.left, rc.top, rc.right, rc.top + m_width);
+	return CRect(rc.left, rc.top, rc.left + m_width, rc.bottom);
 }
 
 CRect CSCScrollbar::calc_arrow_rb_rect() const
@@ -192,8 +193,8 @@ CRect CSCScrollbar::calc_arrow_rb_rect() const
 
 	CRect rc = get_visible_rect();
 	if (m_orient == vertical)
-		return CRect(rc.left, rc.bottom - m_arrow_size, rc.right, rc.bottom);
-	return CRect(rc.right - m_arrow_size, rc.top, rc.right, rc.bottom);
+		return CRect(rc.left, rc.bottom - m_width, rc.right, rc.bottom);
+	return CRect(rc.right - m_width, rc.top, rc.right, rc.bottom);
 }
 
 CRect CSCScrollbar::calc_track_rect() const
@@ -204,13 +205,13 @@ CRect CSCScrollbar::calc_track_rect() const
 
 	if (m_orient == vertical)
 	{
-		rc.top += m_arrow_size;
-		rc.bottom -= m_arrow_size;
+		rc.top += m_width;
+		rc.bottom -= m_width;
 	}
 	else
 	{
-		rc.left += m_arrow_size;
-		rc.right -= m_arrow_size;
+		rc.left += m_width;
+		rc.right -= m_width;
 	}
 	return rc;
 }

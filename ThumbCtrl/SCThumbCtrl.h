@@ -273,7 +273,6 @@ public:
 
 //자체 스크롤바 — recalc_tile_rect 가 m_scroll_total > viewport 면 자동 표시.
 	CSCScrollbar	m_scrollbar;
-	int				m_scrollbar_width = 18;			//track (window) 폭. thumb 두께는 CSCScrollbar 내부 (resting 2, hover 5).
 	bool			m_scrollbar_visible = false;	//현재 표시 상태 — 레이아웃이 visibility 변경 감지에 사용.
 	LRESULT			on_message_CSCScrollbar(WPARAM wParam, LPARAM lParam);
 

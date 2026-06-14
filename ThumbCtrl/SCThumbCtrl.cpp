@@ -114,7 +114,7 @@ bool CSCThumbCtrl::create(CWnd* parent, int left, int top, int right, int bottom
 	//TRACE(_T("rc = %s\n"), get_rect_info_string(rc));
 
 	//자체 스크롤바 — m_scroll_total > viewport 일 때만 가시화. 기본 hide 로 시작.
-	m_scrollbar.create(this, CSCScrollbar::vertical, rc.right - m_scrollbar_width, 0, m_scrollbar_width, rc.Height());
+	m_scrollbar.create(this, CSCScrollbar::vertical, rc.right - m_scrollbar.get_width(), 0, m_scrollbar.get_width(), rc.Height());
 	m_scrollbar.set_color_theme(m_theme, false);
 	m_scrollbar.ShowWindow(SW_HIDE);
 
@@ -178,7 +178,7 @@ void CSCThumbCtrl::recalc_tile_rect()
 
 	while (max_iter-- > 0)
 	{
-		int reserve = m_scrollbar_visible ? m_scrollbar_width : 0;
+		int reserve = m_scrollbar_visible ? m_scrollbar.get_width() : 0;
 		int rc_right = rc.right - reserve;
 
 		rTile = make_rect(m_sz_margin.cx, m_sz_margin.cy + m_scroll_pos, m_sz_tile.cx, m_sz_tile.cy);

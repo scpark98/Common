@@ -94,6 +94,7 @@ BEGIN_MESSAGE_MAP(CVtListCtrlEx, CListCtrl)
 	ON_REGISTERED_MESSAGE(Message_CHeaderCtrlEx, &CVtListCtrlEx::on_message_CHeaderCtrlEx)
 	ON_WM_NCPAINT()
 	ON_WM_NCCALCSIZE()
+	ON_WM_STYLECHANGING()
 	ON_WM_MOUSEWHEEL()
 	ON_WM_MOUSEHWHEEL()
 	ON_REGISTERED_MESSAGE(Message_CSCScrollbar, &CVtListCtrlEx::on_message_CSCScrollbar)
@@ -1822,8 +1823,8 @@ void CVtListCtrlEx::OnPaint()
 		if (vis_v && vis_h)
 		{
 			rcCornerBottom = CRect(
-				rcFull.right - m_scrollbar_width,
-				rcFull.bottom - m_scrollbar_height,
+				rcFull.right - m_scrollbar.get_width(),
+				rcFull.bottom - m_scrollbar.get_width(),
 				rcFull.right, rcFull.bottom);
 		}
 
@@ -2005,10 +2006,10 @@ CSCStaticEdit* CVtListCtrlEx::edit_item(int item, int subItem)
 	else if (align == HDF_RIGHT)
 		halign = DT_RIGHT;
 
-	//세로 오버레이가 보이면 edit 의 우측이 그 영역을 침범하지 않도록 m_scrollbar_width 만큼 줄임.
+	//세로 오버레이가 보이면 edit 의 우측이 그 영역을 침범하지 않도록 m_scrollbar.get_width() 만큼 줄임.
 	int right_limit = rc.right;
 	if (::IsWindow(m_scrollbar.GetSafeHwnd()) && m_scrollbar.IsWindowVisible())
-		right_limit -= m_scrollbar_width;
+		right_limit -= m_scrollbar.get_width();
 	if (r.right > right_limit)
 		r.right = right_limit;
 
@@ -5882,6 +5883,22 @@ void CVtListCtrlEx::OnNcPaint()
 
 	CWindowDC dc(this);
 
+	//가로바 출현 시 OnNcCalcSize 가 예약한 하단 gw NC 띠. 가로바(dialog child)는 [0, content_view_w]만 덮고
+	//그 우측 gw 코너(세로바 바로 아래)는 listctrl NC 영역으로 남아 stale 픽셀이 보인다. 띠 전체를 cr_back 으로
+	//채우면 가로바가 좌측을 덮고 코너는 listctrl 배경색으로 남는다. (가로/세로바가 만나는 코너 = 컨트롤 배경색.)
+	if (m_h_visible_state)
+	{
+		int gw = m_scrollbar.get_width();
+		int b  = m_draw_border ? 1 : 0;
+		CRect rcWin;
+		GetWindowRect(&rcWin);
+		rcWin.OffsetRect(-rcWin.TopLeft());
+
+		CRect band(b, rcWin.Height() - b - gw, rcWin.Width() - b, rcWin.Height() - b);
+		CBrush br(m_theme.cr_back.ToCOLORREF());
+		dc.FillRect(&band, &br);
+	}
+
 	//PreSubclassWindow 에서 WS_BORDER/WS_EX_CLIENTEDGE 를 제거하고 m_draw_border 로 옮겨놨다 — GetStyle 직접 검사는 작동 안 함.
 	if (m_draw_border)
 	{
@@ -5890,6 +5907,17 @@ void CVtListCtrlEx::OnNcPaint()
 		rc.OffsetRect(-rc.TopLeft());
 		draw_rect(&dc, rc, m_theme.cr_border_inactive);
 	}
+}
+
+void CVtListCtrlEx::OnStyleChanging(int nStyleType, LPSTYLESTRUCT lpStyleStruct)
+{
+	//CSCScrollbar overlay 가 native scrollbar 를 대체. native 가 overflow 감지 시 WS_HSCROLL/WS_VSCROLL 을 다시
+	//붙이려 함 → 여기서 강제 strip. WS_HSCROLL 이 살아있으면 native 가 자기 hsb 만 예약하고 OnNcCalcSize 의 하단 NC
+	//예약을 무시해 두꺼운 가로바가 마지막 항목을 가린다(CSCTreeCtrl 동일 패턴). 가로 스크롤 시 헤더는 수동 동기화.
+	if (m_scrollbar_setup && nStyleType == GWL_STYLE && lpStyleStruct)
+		lpStyleStruct->styleNew &= ~(WS_VSCROLL | WS_HSCROLL);
+
+	CListCtrl::OnStyleChanging(nStyleType, lpStyleStruct);
 }
 
 void CVtListCtrlEx::OnNcCalcSize(BOOL bCalcValidRects, NCCALCSIZE_PARAMS* lpncsp)
@@ -5906,6 +5934,17 @@ void CVtListCtrlEx::OnNcCalcSize(BOOL bCalcValidRects, NCCALCSIZE_PARAMS* lpncsp
 			lpncsp->rgrc[0].bottom -= 1;
 			m_border_nc_reserved = true;	//1px 확보됨 — OnNcPaint 의 self-heal 강제 recalc 불필요.
 		}
+		//세로바 보이면 우측 gw, 가로바 보이면 하단 gw 를 NC 로 예약 → native content 영역 = 실제 가시 영역.
+		//그러면 native 가 컬럼을 content 폭까지만 그리고(마지막 divider 가 세로바 밑에 안 가림), 가로 scroll 한계도
+		//content 폭 기준으로 정확히 잡아 가려진 부분을 스크롤로 꺼낼 수 있다. WS_VSCROLL/HSCROLL strip(OnStyleChanging)
+		//이 전제 — 비트가 살아있으면 native 가 자기 바만 보고 NC 무시. 바는 이 예약 띠에 dialog-child 로 놓인다.
+		int gw = m_scrollbar.get_width();
+		if (m_v_visible_state && bCalcValidRects &&
+			lpncsp->rgrc[0].right - lpncsp->rgrc[0].left > gw)
+			lpncsp->rgrc[0].right -= gw;
+		if (m_h_visible_state && bCalcValidRects &&
+			lpncsp->rgrc[0].bottom - lpncsp->rgrc[0].top > gw)
+			lpncsp->rgrc[0].bottom -= gw;
 		return;
 	}
 
@@ -5919,28 +5958,32 @@ void CVtListCtrlEx::setup_scrollbar()
 
 	m_scrollbar_setup = true;
 
-	//WS_VSCROLL/HSCROLL 비트는 유지 — listview 의 horizontal scroll 시 body↔header sync 메커니즘이
-	//이 비트에 의존한다. 비트 제거 시 Scroll(CSize(dx, 0)) 가 body 만 이동하고 header 가 안 따라와
-	//우측 끝까지 가로 휠 후 header 가 그대로 남는 현상(image #4) 발생.
-	//native scrollbar 는 OnNcCalcSize override(NC=0) 가 단독으로 시각화를 차단하므로 비트 유지해도 안 보임.
-	ModifyStyle(0, WS_CLIPCHILDREN, SWP_FRAMECHANGED);
+	//WS_VSCROLL/HSCROLL strip — native 가 살려두면 OnNcCalcSize 하단 NC 예약을 무시(자기 hsb 만 봄)해 두꺼운
+	//가로바가 마지막 항목을 가린다(CSCTreeCtrl 동일). OnStyleChanging 이 재부착도 차단. 가로 스크롤 시 헤더는
+	//수동 동기화(sync_header_h_offset). native scrollbar 시각화는 OnNcCalcSize override 가 단독 차단.
+	ModifyStyle(WS_VSCROLL | WS_HSCROLL, WS_CLIPCHILDREN, SWP_FRAMECHANGED);
 
 	//빈 영역 cr_back 처리 — native 가 자체 erase 시 사용.
 	SetBkColor(m_theme.cr_back.ToCOLORREF());
 	SetTextBkColor(m_theme.cr_back.ToCOLORREF());
 
-	CRect rc;
-	GetClientRect(&rc);
+	//세로바·가로바 모두 *부모 dialog 의 child*. NC 로 예약한 우측/하단 띠(=client 밖)에 놓이므로 listctrl child 면
+	//클리핑된다. 위치는 sync_scrollbar 가 parent 좌표로, 통지는 set_message_target(this) 로 회수.
+	CWnd* pParent = GetParent();
+	CWnd* pHost   = pParent ? pParent : (CWnd*)this;
 
-	m_scrollbar.create(this, CSCScrollbar::vertical,
-		rc.right - m_scrollbar_width, 0, m_scrollbar_width, rc.Height());
+	m_scrollbar.create(pHost, CSCScrollbar::vertical,
+		0, 0, m_scrollbar.get_width(), 10);
+	m_scrollbar.ModifyStyle(0, WS_CLIPSIBLINGS);
+	m_scrollbar.set_message_target(this);
 	m_scrollbar.set_color_theme(m_theme, false);
 	m_scrollbar.set_line(3);		//화살표 클릭 = 3 라인 (휠 single notch 와 동일).
 	m_scrollbar.ShowWindow(SW_HIDE);
 
-	m_scrollbar_h.create(this, CSCScrollbar::horizontal,
-		0, rc.bottom - m_scrollbar_height,
-		rc.Width() - m_scrollbar_width, m_scrollbar_height);
+	m_scrollbar_h.create(pHost, CSCScrollbar::horizontal,
+		0, 0, 10, m_scrollbar_h.get_width());
+	m_scrollbar_h.ModifyStyle(0, WS_CLIPSIBLINGS);
+	m_scrollbar_h.set_message_target(this);
 	m_scrollbar_h.set_color_theme(m_theme, false);
 	m_scrollbar_h.set_line(30);		//화살표 클릭 = 30px (average char width ~ 7 의 약 4 배).
 	m_scrollbar_h.ShowWindow(SW_HIDE);
@@ -5996,48 +6039,96 @@ void CVtListCtrlEx::sync_scrollbar()
 	int col_count = get_column_count();
 	for (int i = 0; i < col_count; i++)
 		total_col_width += GetColumnWidth(i);
-	bool need_h = (col_count > 0) && (total_col_width > rc.Width());
 
-	//visible(세로 가시 항목 수): 커스텀 헤더 height + (가로바 표시 시) 가로바 높이를 뺀 영역 / 실제 행 높이.
-	//행 높이는 m_line_height(MeasureItem 이 보고하는 안정값) 사용 — GetItemRect 는 재측정 전 stale 값(예 19≠21)을
-	//반환해 visible 이 과대평가되어 세로 스크롤바가 늦게 나타난다. GetCountPerPage 는 커스텀 헤더/가로바를 반영 못함.
-	//가로바가 보이면 그 높이만큼 표시 영역이 줄어 세로바가 더 일찍 필요해진다.
-	int avail_h = rc.Height() - get_header_height() - (need_h ? m_scrollbar_height : 0);
-	int visible = (m_line_height > 0) ? (avail_h / m_line_height) : GetCountPerPage();
-	bool need_v = (total > visible) && (visible > 0);
+	int gw     = m_scrollbar.get_width();
+	int header = get_header_height();
 
-	//탐색기 스타일 — list.top 부터 세로 scrollbar 시작. header 위로 overlay.
-	int top_offset = 0;
+	//세로바·가로바 필요 여부는 상호의존적이다 (둘 다 NC 로 content 영역을 줄인다):
+	// - 세로바: 우측 gw 를 NC 예약 → 가용 컬럼 폭이 gw 만큼 줄어 가로바를 유발.
+	// - 가로바: 하단 gw 를 NC 예약 → 가시 행수가 줄어 세로바를 유발.
+	//따라서 둘을 수렴 반복으로 함께 푼다. 진입 rc 는 현재 NC 상태(현재 m_v/h_visible_state)를 반영하므로,
+	//바가 없을 때의 full 치수를 복원해 기준으로 둔다.
+	int full_w = rc.Width()  + (m_v_visible_state ? gw : 0);
+	int full_h = rc.Height() + (m_h_visible_state ? gw : 0);
 
-	int v_right = rc.right;
-	int h_bottom = rc.bottom;
-	int v_bottom = need_h ? (rc.bottom - m_scrollbar_height) : rc.bottom;
-	int h_right = need_v ? (rc.right - m_scrollbar_width) : rc.right;
-
-	//세로 scrollbar 위치/크기.
-	CRect rCurV;
-	m_scrollbar.GetWindowRect(rCurV);
-	ScreenToClient(rCurV);
-	int cur_v_width = rCurV.Width();
-	CRect rTargetV(v_right - cur_v_width, top_offset, v_right, v_bottom);
-	if (rCurV != rTargetV)
+	bool need_v = false;
+	bool need_h = false;
+	for (int pass = 0; pass < 3; pass++)
 	{
-		CRect rOld = rCurV;
-		m_scrollbar.MoveWindow(rTargetV);
-		InvalidateRect(rOld, TRUE);
+		int usable_h = full_h - (need_h ? gw : 0);
+		int avail = (m_line_height > 0) ? max(0, (usable_h - header) / m_line_height) : GetCountPerPage();
+		bool nv = total > avail;
+		int usable_w = full_w - (nv ? gw : 0);
+		bool nh = (col_count > 0) && (total_col_width > usable_w);
+		if (nv == need_v && nh == need_h)
+			break;
+		need_v = nv;
+		need_h = nh;
 	}
 
-	//가로 scrollbar — list 좌측 edge 에 정확히 정렬 (padding 없음 — list 항목이 그 틈으로 비치는 문제 회피).
-	CRect rCurH;
-	m_scrollbar_h.GetWindowRect(rCurH);
-	ScreenToClient(rCurH);
-	int cur_h_height = rCurH.Height();
-	CRect rTargetH(0, h_bottom - cur_h_height, h_right, h_bottom);
-	if (rCurH != rTargetH)
+	//need_v / need_h 상태가 바뀌면 framechange 로 우측/하단 NC 재적용. 두 플래그는 OnNcCalcSize 가 읽으므로
+	//framechange *전* 에 갱신. 창 크기 불변 → 리사이즈 헬퍼 충돌·렌더 깨짐 없음.
+	bool old_v = m_v_visible_state;
+	bool old_h = m_h_visible_state;
+	m_v_visible_state = need_v;
+	m_h_visible_state = need_h;
+	if ((need_v != old_v || need_h != old_h) && !m_syncing)
 	{
-		CRect rOld = rCurH;
-		m_scrollbar_h.MoveWindow(rTargetH);
-		InvalidateRect(rOld, TRUE);
+		m_syncing = true;
+		SetWindowPos(NULL, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
+		m_syncing = false;
+		GetClientRect(&rc);	//NC 적용된 content 영역(우측/하단 gw 빠짐)
+
+		//전환 순간 화면갱신 보강 — NC 띠가 parent↔listctrl 사이를 오가고 바가 재배치되며, 우하단 코너(두 띠가
+		//만나는 곳)는 어느 바도 안 덮는다. self + parent 의 우리 window 영역 전체를 invalidate 해 stale 제거.
+		Invalidate(FALSE);
+		if (CWnd* pParent = GetParent())
+		{
+			CRect rWin;
+			GetWindowRect(&rWin);
+			pParent->ScreenToClient(&rWin);
+			pParent->InvalidateRect(&rWin, TRUE);
+		}
+	}
+
+	//최종 content 영역 기준 — NC 가 이미 우측/하단 gw 를 뺐으므로 rc 가 곧 가시 영역.
+	//가로 폭 단일 출처(회귀 방지): content_view_w = rc.Width(). need_h 판정·가로바 길이·max scroll·page·range 가 모두 사용.
+	int content_view_w = rc.Width();
+	int avail_rows = (m_line_height > 0) ? max(0, (rc.Height() - header) / m_line_height) : GetCountPerPage();
+	int visible = avail_rows;
+
+	//세로 scrollbar — 우측 NC 띠(parent child). [rc.right, rc.right+gw] × content 높이를 parent 좌표로 배치.
+	if (::IsWindow(m_scrollbar.m_hWnd))
+	{
+		CPoint strip_tl(rc.right, rc.top);
+		ClientToScreen(&strip_tl);
+		CRect rTargetV(strip_tl.x, strip_tl.y, strip_tl.x + gw, strip_tl.y + rc.Height());
+		CRect rCurV;
+		m_scrollbar.GetWindowRect(&rCurV);
+		if (CWnd* pParent = GetParent())
+		{
+			pParent->ScreenToClient(&rTargetV);
+			pParent->ScreenToClient(&rCurV);
+		}
+		if (rCurV != rTargetV)
+			m_scrollbar.MoveWindow(rTargetV);
+	}
+
+	//가로 scrollbar — 하단 NC 띠(parent child). [rc.left, rc.bottom] × (content 폭 × gw)를 parent 좌표로 배치.
+	if (::IsWindow(m_scrollbar_h.m_hWnd))
+	{
+		CPoint band_tl(rc.left, rc.bottom);
+		ClientToScreen(&band_tl);
+		CRect rTargetH(band_tl.x, band_tl.y, band_tl.x + content_view_w, band_tl.y + gw);
+		CRect rCurH;
+		m_scrollbar_h.GetWindowRect(&rCurH);
+		if (CWnd* pParent = GetParent())
+		{
+			pParent->ScreenToClient(&rTargetH);
+			pParent->ScreenToClient(&rCurH);
+		}
+		if (rCurH != rTargetH)
+			m_scrollbar_h.MoveWindow(rTargetH);
 	}
 
 	//IsWindowVisible() 는 부모 chain 의 WS_VISIBLE 까지 검사 — OnInitDialog 안에서는
@@ -6056,6 +6147,8 @@ void CVtListCtrlEx::sync_scrollbar()
 		m_scrollbar.set_page(visible);
 		m_scrollbar.set_pos(top);
 		m_scrollbar.ShowWindow(SW_SHOW);
+		//parent dialog 의 child 라 형제인 listctrl 위로 z-order 올려야 보인다.
+		m_scrollbar.SetWindowPos(&CWnd::wndTop, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
 	}
 
 	if (!need_h)
@@ -6065,21 +6158,20 @@ void CVtListCtrlEx::sync_scrollbar()
 	}
 	else
 	{
-		//listview 가 자체적으로 마지막 컬럼 right divider 의 hit-test 영역이 view 안에 머물도록
-		//가로 scroll limit 에 약간의 padding 을 둔다. 우리 overlay 가 단순히 (total_col_width - client)
-		//까지만 스크롤하면 listview 의 실제 scroll 끝(GetScrollLimit)보다 짧아 마지막 divider 가
-		//view 밖에 위치 → 마우스 hit-test 실패. listview 의 GetScrollLimit 과 sync 한다.
-		int lv_limit = GetScrollLimit(SB_HORZ);
-		int max_h = max(lv_limit, max(0, total_col_width - rc.Width()));
+		//TODO(미해결): 가로 끝까지 스크롤해도 마지막 컬럼 우측 구분자가 v-bar 밑으로 ~native_margin(측정 5px) 가린다.
+		//원인 — native 가로 스크롤 viewport = 헤더 폭이고, 헤더가 그리기 client 보다 그만큼 넓다. (technical_memo 참조.)
+		int max_h = max(0, total_col_width - content_view_w);
 		if (m_h_scroll_pos > max_h)
 			m_h_scroll_pos = max_h;
 		if (m_h_scroll_pos < 0)
 			m_h_scroll_pos = 0;
-		int total_h_range = max_h + rc.Width();
+		int total_h_range = max_h + content_view_w;
 		m_scrollbar_h.set_range(0, total_h_range - 1);
-		m_scrollbar_h.set_page(rc.Width());
+		m_scrollbar_h.set_page(content_view_w);
 		m_scrollbar_h.set_pos(m_h_scroll_pos);
 		m_scrollbar_h.ShowWindow(SW_SHOW);
+		//parent dialog 의 child 라 형제인 listctrl 위로 z-order 올려야 보인다.
+		m_scrollbar_h.SetWindowPos(&CWnd::wndTop, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
 		//drag-during 에는 listview 의 paint cycle 이 멈춰 있어 자식 ShowWindow(SW_SHOW) 가 invalidate
 		//만 마크하고 즉시 그려지지 않는다 (release 후에야 보이는 현상). 즉시 paint 강제.
 		m_scrollbar_h.RedrawWindow(NULL, NULL, RDW_INVALIDATE | RDW_UPDATENOW);

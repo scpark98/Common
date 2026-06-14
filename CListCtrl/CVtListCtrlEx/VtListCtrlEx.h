@@ -879,15 +879,20 @@ public:
 	afx_msg void OnSize(UINT nType, int cx, int cy);
 	afx_msg void OnNcPaint();
 	afx_msg void OnNcCalcSize(BOOL bCalcValidRects, NCCALCSIZE_PARAMS* lpncsp);
+	afx_msg void OnStyleChanging(int nStyleType, LPSTYLESTRUCT lpStyleStruct);
 	afx_msg BOOL OnMouseWheel(UINT nFlags, short zDelta, CPoint pt);
 	afx_msg void OnMouseHWheel(UINT nFlags, short zDelta, CPoint pt);
 
-	//자체 스크롤바 — CSCListBox / CSCTreeCtrl 와 동일 패턴. 가로/세로 모두 overlay.
-	CSCScrollbar	m_scrollbar;		//세로
-	CSCScrollbar	m_scrollbar_h;		//가로 — listctrl 은 column 가로폭 합계 > client 일 때 필요.
-	int				m_scrollbar_width = 14;	//track(window) 폭 — 18→16→14 로 양쪽 1px씩 축소.
-	int				m_scrollbar_height = 14;
+	//자체 스크롤바 — 세로/가로 모두 *부모 dialog 의 child*. OnNcCalcSize 가 세로바는 우측 gw, 가로바는 하단 gw 를
+	//NC 로 예약해 native content 영역을 실제 가시 영역과 일치시킨다 → native 의 스크롤 한계·divider hit-test·count
+	//per page 가 자동으로 맞아 overlay-vs-native 불일치(컬럼이 바 밑에 가림, 마지막 항목 가림 등)가 구조적으로 제거됨.
+	//바는 NC 영역(=client 밖)에 놓이므로 listctrl child 면 클리핑된다 → 둘 다 dialog child + set_message_target(this).
+	CSCScrollbar	m_scrollbar;		//세로 — 우측 NC 띠
+	CSCScrollbar	m_scrollbar_h;		//가로 — 하단 NC 띠 (column 가로폭 합계 > content 폭일 때)
 	bool			m_scrollbar_setup = false;
+	bool			m_v_visible_state = false;	//세로바 필요 상태 — OnNcCalcSize 가 읽어 우측 gw 예약
+	bool			m_h_visible_state = false;	//가로바 필요 상태 — OnNcCalcSize 가 읽어 하단 gw 예약
+	bool			m_syncing = false;			//framechange 재진입 가드 (SWP_FRAMECHANGED → OnSize → sync 재진입 차단)
 	//WS_BORDER/WS_EX_CLIENTEDGE 가 켜져 있으면 PreSubclassWindow 에서 native border 제거하고 이 플래그를 켠 뒤
 	//OnNcCalcSize 에서 1px NC 확보 → OnNcPaint 가 theme 색으로 직접 그린다. (CSCTreeCtrl 와 동일 패턴.)
 	bool			m_draw_border = false;

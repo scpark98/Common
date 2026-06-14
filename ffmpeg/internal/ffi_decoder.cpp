@@ -458,35 +458,60 @@ namespace ffi
 			int idx_cnt = avformat_index_get_entries_count(vst);
 			AVRational vtb = vst->time_base;
 			double vfps = (vst->avg_frame_rate.den != 0) ? (double)vst->avg_frame_rate.num / (double)vst->avg_frame_rate.den : 0.0;
-			logWrite(_T("[ffi/dec] AVI(SW) idx_cnt=%d header_dur=%.0fms"), idx_cnt, (double)m_fmt->duration / 1000.0);
+			double header_dur_ms = (m_fmt->duration != AV_NOPTS_VALUE) ? (double)m_fmt->duration / 1000.0 : -1.0;
+			logWrite(_T("[ffi/dec] AVI(SW) idx_cnt=%d header_dur=%.0fms"), idx_cnt, header_dur_ms);
 
-			m_unreliable_video_pts = true;
-			m_no_seek_index = true;
-
+			//native video index(idx1) 의 마지막 entry timestamp = 실제 길이.
+			double idx_dur = 0.0;
 			if (idx_cnt > 1)
 			{
 				const AVIndexEntry* last = avformat_index_get_entry(vst, idx_cnt - 1);
-				double idx_dur = (last && last->timestamp != AV_NOPTS_VALUE) ? (double)last->timestamp * av_q2d(vtb) * 1000.0 : 0.0;
-				std::vector<std::pair<int64_t, int64_t>> idx;
-				int step = (vfps > 0.0) ? (int)(vfps * 5.0) : 150;	//~5s 간격 샘플.
-				if (step < 1) step = 1;
-				for (int i = 0; i < idx_cnt; i += step)
+				idx_dur = (last && last->timestamp != AV_NOPTS_VALUE) ? (double)last->timestamp * av_q2d(vtb) * 1000.0 : 0.0;
+			}
+
+			//정상 indexed AVI 판정 — native index 가 충분(>1)하고 헤더 duration 이 index 산출 길이와 거의 일치(±2%).
+			//이 경우 video pts·index 모두 신뢰 가능 → 일반 pts-seek(avformat_seek_file + probe, 팟플레이어식 정확 seek).
+			//byte-seek/unreliable 경로는 *깨진* 파일(index 없음 또는 header duration malformed, 예: GOM ENCODER) 전용.
+			//(정상 mpeg4/divx AVI 를 byte-seek 로 보내면 garbage pts·비결정적 착지로 트랙이동이 어긋난다.)
+			double dur_diff = (header_dur_ms > idx_dur) ? (header_dur_ms - idx_dur) : (idx_dur - header_dur_ms);
+			bool header_dur_bad   = (header_dur_ms <= 0.0) || (idx_dur > 0.0 && dur_diff > idx_dur * 0.02);
+			bool valid_native_idx = (idx_cnt > 1) && (idx_dur > 0.0);
+
+			if (valid_native_idx && !header_dur_bad)
+			{
+				//정상 파일 — unreliable/no_seek_index 설정 안 함. duration 은 헤더(정상)에서. 기존 정상-파일 동작과 동일(회귀 0).
+				avi_native_index = true;
+				logWrite(_T("[ffi/dec] AVI 정상 인덱스(idx=%d dur=%.0fms header=%.0fms) — pts-seek 경로"), idx_cnt, idx_dur, header_dur_ms);
+			}
+			else
+			{
+				//깨진 파일 — byte-seek 경로. native index 가 있으면 그것으로(ts↔byte), 없으면 아래 백그라운드 스캔.
+				m_unreliable_video_pts = true;
+				m_no_seek_index = true;
+
+				if (valid_native_idx)
 				{
-					const AVIndexEntry* e = avformat_index_get_entry(vst, i);
-					if (e && e->pos >= 0 && e->timestamp != AV_NOPTS_VALUE)
-						idx.push_back(std::make_pair((int64_t)((double)e->timestamp * av_q2d(vtb) * 1000.0), e->pos));
-				}
-				if (idx_dur > 0.0 && !idx.empty())
-				{
-					m_scanned_duration_ms.store(idx_dur);	//duration_ms() 가 malformed 헤더 대신 이 값을 반환.
-					m_buffered_frontier_ms.store(idx_dur);	//전 구간 가용 → 트랙 빨간선 숨김.
+					std::vector<std::pair<int64_t, int64_t>> idx;
+					int step = (vfps > 0.0) ? (int)(vfps * 5.0) : 150;	//~5s 간격 샘플.
+					if (step < 1) step = 1;
+					for (int i = 0; i < idx_cnt; i += step)
 					{
-						std::lock_guard<std::mutex> lk(m_seek_index_mtx);
-						m_seek_index = idx;
-						m_seek_index_snap = false;	//ts↔byte 보간 (byte-seek 착지 후 kf_skip 이 keyframe 으로).
+						const AVIndexEntry* e = avformat_index_get_entry(vst, i);
+						if (e && e->pos >= 0 && e->timestamp != AV_NOPTS_VALUE)
+							idx.push_back(std::make_pair((int64_t)((double)e->timestamp * av_q2d(vtb) * 1000.0), e->pos));
 					}
-					avi_native_index = true;
-					logWrite(_T("[ffi/dec] AVI native-index → dur=%.0fms seek_idx=%zu (malformed 헤더 무시)"), idx_dur, idx.size());
+					if (!idx.empty())
+					{
+						m_scanned_duration_ms.store(idx_dur);	//duration_ms() 가 malformed 헤더 대신 이 값을 반환.
+						m_buffered_frontier_ms.store(idx_dur);	//전 구간 가용 → 트랙 빨간선 숨김.
+						{
+							std::lock_guard<std::mutex> lk(m_seek_index_mtx);
+							m_seek_index = idx;
+							m_seek_index_snap = false;	//ts↔byte 보간 (byte-seek 착지 후 kf_skip 이 keyframe 으로).
+						}
+						avi_native_index = true;
+						logWrite(_T("[ffi/dec] AVI native-index(header malformed) → dur=%.0fms seek_idx=%zu byte-seek"), idx_dur, idx.size());
+					}
 				}
 			}
 		}
@@ -1309,8 +1334,9 @@ namespace ffi
 							m_kf_skip_active  = true;
 							m_kf_skip_min_pts = INT64_MIN;	//착지 후 첫 keyframe 부터 디코드.
 							m_kf_skip_count   = 0;
-							logWrite(_T("[ffi/dec/byteseek] seek_pos=%.0fms method=%ls target_byte=%lld hr=%d"),
-								seek_pos, method, (long long)target_byte, hr_seek);
+							int64_t avio_landed = (m_fmt->pb) ? avio_tell(m_fmt->pb) : -1;
+							logWrite(_T("[ffi/dec/byteseek] seek_pos=%.0fms method=%ls target_byte=%lld hr=%d avio_tell=%lld"),
+								seek_pos, method, (long long)target_byte, hr_seek, (long long)avio_landed);
 						}
 						else
 						{
@@ -1568,9 +1594,9 @@ namespace ffi
 					}
 					//전진 keyframe 도달 — skip 종료. 이 packet 부터 정상 디코드 (아래로 fall through).
 					m_kf_skip_active = false;
-					logWrite(_T("[ffi/dec/kf] keyframe reached pts=%lld min=%lld target=%lld → decode start"),
+					logWrite(_T("[ffi/dec/kf] keyframe reached pts=%lld min=%lld target=%lld pkt_pos=%lld → decode start"),
 						(long long)((pkt->pts != AV_NOPTS_VALUE) ? pkt->pts : pkt->dts),
-						(long long)m_kf_skip_min_pts, (long long)m_kf_skip_target_pts);
+						(long long)m_kf_skip_min_pts, (long long)m_kf_skip_target_pts, (long long)pkt->pos);
 				}
 				//audio packet 은 skip 하지 않고 정상 디코드로 흘려보낸다 (아래 fall through).
 				//[GOP 시작~target] 구간 audio 를 확보해야 audio 첫 emit 의 미디어 시점이 video_first 와 정렬되어

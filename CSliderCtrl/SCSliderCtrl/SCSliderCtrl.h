@@ -209,7 +209,26 @@ public:
 
 	//set_track_color()는 active 영역과 inactive 영역을 지정하므로
 	void	set_track_color(Gdiplus::Color cr_active, Gdiplus::Color cr_inactive) { m_cr_active = cr_active; m_cr_inactive = cr_inactive; }
-	void	set_active_color(Gdiplus::Color cr_active);
+	void	set_active_color(Gdiplus::Color cr_active);	//단색(solid).
+
+	//active(processed) 영역을 현재 위치 %로 stops 보간한 '단색'으로 채운다 (0%=첫색 ~ 100%=끝색).
+	//예: 볼륨 — set_active_color_by_pos(Orange, Red) → 작을 땐 주황, 클수록 빨강.
+	void	set_active_color_by_pos(const std::vector<Gdiplus::Color>& colors);
+	template<typename... TRest>
+	void	set_active_color_by_pos(Gdiplus::Color cr_first, Gdiplus::Color cr_second, TRest... cr_rest)
+	{
+		set_active_color_by_pos(std::vector<Gdiplus::Color>{ cr_first, cr_second, Gdiplus::Color(cr_rest)... });
+	}
+
+	//active(processed) 영역 자체를 좌→우 N-stop 그라디언트로 채운다.
+	//예: set_active_gradient(Black, Red, Yellow).
+	void	set_active_gradient(const std::vector<Gdiplus::Color>& colors);
+	template<typename... TRest>
+	void	set_active_gradient(Gdiplus::Color cr_first, Gdiplus::Color cr_second, TRest... cr_rest)
+	{
+		set_active_gradient(std::vector<Gdiplus::Color>{ cr_first, cr_second, Gdiplus::Color(cr_rest)... });
+	}
+
 	void	set_inactive_color(Gdiplus::Color cr_inactive);
 	void	set_back_color(Gdiplus::Color cr_back);
 	void	set_thumb_color(Gdiplus::Color cr_thumb);
@@ -421,7 +440,10 @@ protected:
 
 	bool			m_transparent = false;
 	//COLORREF		m_cr_back;				// back color of control
-	Gdiplus::Color	m_cr_active;			//processed area
+	Gdiplus::Color	m_cr_active;			//processed area (대표색 — _by_pos/_gradient 시 m_active_colors.front())
+	enum active_fill_mode { active_solid, active_pos_color, active_gradient_fill };
+	int				m_active_fill_mode = active_solid;	//active 영역 채우기 모드.
+	std::vector<Gdiplus::Color>	m_active_colors;	//_by_pos / _gradient_fill 의 색 stops (2색 이상)
 	Gdiplus::Color	m_cr_inactive;			//not processed area
 	float			m_track_height = 14.0f;	//트랙 두께(px). float — g.FillRectangle(RectF) 에 그대로 사용해 짝수/소수 두께도 cy 에 정확히 센터 정렬.
 	//CPen			m_penThumb;
@@ -442,6 +464,8 @@ protected:
 	std::vector<Gdiplus::Color>	m_gradient_colors;
 	// m_gradient_colors에서 비율 t(0~1)에 해당하는 색상을 보간하여 반환
 	Gdiplus::Color	sample_gradient(float t) const;
+	// 임의 stops(N개)에서 비율 t(0~1) 위치 색 보간 (active pos-color 모드용)
+	static Gdiplus::Color	sample_stops(const std::vector<Gdiplus::Color>& stops, float t);
 
 	//컨트롤의 enable, disable 상태에 따라 그려지는 색상이 달라지므로 사용
 	Gdiplus::Color	enable_color(Gdiplus::Color cr, int offset = 64);

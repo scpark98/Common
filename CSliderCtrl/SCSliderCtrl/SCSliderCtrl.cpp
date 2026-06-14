@@ -625,8 +625,43 @@ void CSCSliderCtrl::OnPaint()
 		if (r.right > r.left)
 		{
 			g.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
-			draw_round_rect(&g, Gdiplus::Rect(r.left, r.top, r.Width(), r.Height()),
-				Gdiplus::Color::Transparent, cr_active, r.Height() / 2, 0);
+
+			if (m_active_fill_mode == active_gradient_fill && m_active_colors.size() >= 2)
+			{
+				//active 영역 자체를 좌→우 N-stop 그라디언트로 채움.
+				Gdiplus::GraphicsPath path;
+				get_round_rect_path(&path,
+					Gdiplus::Rect(r.left, r.top, r.Width(), r.Height()),
+					r.Height() * 0.5f, 1);
+
+				const int n = (int)m_active_colors.size();
+				std::vector<Gdiplus::Color>	stops(n);
+				std::vector<Gdiplus::REAL>	gpos(n);
+				for (int i = 0; i < n; i++)
+				{
+					stops[i] = enable_color(m_active_colors[i]);
+					gpos[i] = (Gdiplus::REAL)i / (Gdiplus::REAL)(n - 1);
+				}
+
+				Gdiplus::LinearGradientBrush grad(
+					Gdiplus::PointF((Gdiplus::REAL)r.left, (Gdiplus::REAL)r.top),
+					Gdiplus::PointF((Gdiplus::REAL)(r.right + 1), (Gdiplus::REAL)r.top),
+					stops.front(), stops.back());
+				grad.SetInterpolationColors(stops.data(), gpos.data(), n);
+				g.FillPath(&grad, &path);
+			}
+			else
+			{
+				//pos-color 모드면 현재 위치 %로 stops 보간한 단색, 아니면 기존 단색.
+				Gdiplus::Color cr_fill = cr_active;
+				if (m_active_fill_mode == active_pos_color && m_active_colors.size() >= 2 && upper > lower)
+				{
+					float t = (float)(pos - lower) / (float)(upper - lower);
+					cr_fill = enable_color(sample_stops(m_active_colors, t));
+				}
+				draw_round_rect(&g, Gdiplus::Rect(r.left, r.top, r.Width(), r.Height()),
+					Gdiplus::Color::Transparent, cr_fill, r.Height() / 2, 0);
+			}
 		}
 	}
 	else if (m_style == style_step)
@@ -1499,6 +1534,26 @@ void CSCSliderCtrl::set_back_color(Gdiplus::Color crBack)
 void CSCSliderCtrl::set_active_color(Gdiplus::Color cr_active)
 {
 	m_cr_active = cr_active;
+	m_active_colors.clear();
+	m_active_fill_mode = active_solid;
+	Invalidate();
+}
+
+void CSCSliderCtrl::set_active_color_by_pos(const std::vector<Gdiplus::Color>& colors)
+{
+	m_active_colors = colors;
+	if (!m_active_colors.empty())
+		m_cr_active = m_active_colors.front();	//solid 의존 코드(텍스트/테마 등) 호환용 대표색.
+	m_active_fill_mode = (m_active_colors.size() >= 2) ? active_pos_color : active_solid;
+	Invalidate();
+}
+
+void CSCSliderCtrl::set_active_gradient(const std::vector<Gdiplus::Color>& colors)
+{
+	m_active_colors = colors;
+	if (!m_active_colors.empty())
+		m_cr_active = m_active_colors.front();
+	m_active_fill_mode = (m_active_colors.size() >= 2) ? active_gradient_fill : active_solid;
 	Invalidate();
 }
 
@@ -2174,6 +2229,24 @@ Gdiplus::Color CSCSliderCtrl::sample_gradient(float t) const
 	const float local_t = (t - idx * segment) / segment;
 
 	return lerp_color(m_gradient_colors[idx], m_gradient_colors[idx + 1], local_t);
+}
+
+//임의 stops(N개) 에서 비율 t(0~1) 위치의 색을 보간 — active pos-color 모드용(m_active_colors).
+Gdiplus::Color CSCSliderCtrl::sample_stops(const std::vector<Gdiplus::Color>& stops, float t)
+{
+	const int n = static_cast<int>(stops.size());
+	if (n == 0)
+		return Gdiplus::Color(Gdiplus::Color::Black);
+	if (n == 1)
+		return stops[0];
+
+	t = max(0.f, min(1.f, t));
+
+	const float segment = 1.f / static_cast<float>(n - 1);
+	const int   idx = min(static_cast<int>(t / segment), n - 2);
+	const float local_t = (t - idx * segment) / segment;
+
+	return lerp_color(stops[idx], stops[idx + 1], local_t);
 }
 
 //휠을 올리면 감소하고 내리면 증가하는 기본 동작을 반대로 동작하도록 수정.

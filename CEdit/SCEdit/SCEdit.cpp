@@ -84,6 +84,7 @@ BEGIN_MESSAGE_MAP(CSCEdit, CEdit)
 	ON_CONTROL_REFLECT_EX(EN_CHANGE, &CSCEdit::OnEnChange)
 	ON_WM_KEYDOWN()
 	ON_WM_MOUSEWHEEL()
+	ON_WM_GETDLGCODE()
 END_MESSAGE_MAP()
 
 /////////////////////////////////////////////////////////////////////////////
@@ -211,6 +212,16 @@ int CSCEdit::get_font_size(bool pixel_size)
 //CDC::DrawText()의 define을 사용한다.(DT_TOP, DT_VCENTER, DT_BOTTOM)
 void CSCEdit::set_line_align(DWORD align)
 {
+	//valign 은 CEdit::SetRect() 로 구현하는데 SetRect 는 ES_MULTILINE 이 있어야만 동작한다(없으면 조용히 no-op
+	//→ valign 이 안 먹는데 에러도 없는 침묵 버그). ES_MULTILINE 은 생성 후 추가 불가라 리소스 속성에서
+	//Multiline=True 로 설정해야 한다. 빠뜨리면 디버그에서 즉시 알아채도록 가드.
+	//단 DT_TOP(기본)은 ES_MULTILINE 없이도 자연히 맞으므로(SetRect 불필요), 실제 재배치가 필요한 vcenter/bottom 만 검사.
+	if ((align & (DT_VCENTER | DT_BOTTOM)) && !(GetStyle() & ES_MULTILINE))
+	{
+		TRACE(_T("[CSCEdit] set_line_align: vcenter/bottom 은 ES_MULTILINE 필요(없으면 valign 무효). 리소스 속성에서 Multiline=True 설정.\n"));
+		ASSERT(FALSE);
+	}
+
 	CRect rr, rc;
 
 	GetRect(rr);
@@ -1267,6 +1278,19 @@ void CSCEdit::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
 	}
 
 	CEdit::OnKeyDown(nChar, nRepCnt, nFlags);
+}
+
+UINT CSCEdit::OnGetDlgCode()
+{
+	UINT code = CEdit::OnGetDlgCode();
+
+	//valign 을 위해 ES_MULTILINE 을 주지만 실제 멀티라인 입력은 아니므로, ES_WANTRETURN 이 없으면
+	//멀티라인 edit 이 반환하는 DLGC_WANTALLKEYS/DLGC_WANTMESSAGE 를 제거해 다이얼로그 매니저가 Enter 를
+	//기본버튼으로, Tab 을 다음 컨트롤로 넘기게 한다(단일라인과 동일). 진짜 멀티라인(ES_WANTRETURN)은 그대로.
+	if (!(GetStyle() & ES_WANTRETURN))
+		code &= ~(DLGC_WANTALLKEYS | DLGC_WANTMESSAGE);
+
+	return code;
 }
 
 // Shift + MouseWheel = VK_UP/DOWN 과 동일한 수치 증감. 고해상도 휠은 WHEEL_DELTA 단위로 반복.

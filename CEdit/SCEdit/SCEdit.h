@@ -2,6 +2,12 @@
 - vertical align을 설정하기 위해서는 ES_MULTILINE 속성이 있어야 한다.
   ES_MULTILINE 속성은 생성후에는 변경할 수 없으므로 리소스 에디터에서 설정해야 한다.
   set_line_align(DT_VCENTER); 와 같이 호출하여 수직 정렬을 설정할 수 있다.
+  (ES_MULTILINE 을 빠뜨리면 valign 이 조용히 무효가 되므로 set_line_align 에서 ASSERT 로 즉시 알려준다.)
+
+- ES_MULTILINE 은 valign(SetRect) 을 위한 것일 뿐 실제 여러 줄 입력 용도가 아니다.
+  실제 멀티라인 입력이 필요할 때만 ES_WANTRETURN 을 추가로 설정한다.
+  ES_WANTRETURN 이 없으면 OnGetDlgCode 가 단일라인처럼 보고하여 Enter→기본버튼(OnOK), Tab→다음 컨트롤이
+  정상 동작한다(멀티라인이 Enter 를 삼키는 문제 방지). 즉 ES_MULTILINE 만 켜면 Enter 처리는 자동으로 단일라인.
 
 [수정 내용]
 - 20250821 text, back, border, readonly, disabled 등 설정 모두 가능
@@ -304,6 +310,9 @@ public:
 	afx_msg BOOL OnEnChange();
 	afx_msg void OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags);
 	afx_msg BOOL OnMouseWheel(UINT nFlags, short zDelta, CPoint pt);
+	//CSCEdit 의 ES_MULTILINE 은 valign(SetRect) 전용이고 실제 멀티라인 입력이 아니다. ES_WANTRETURN 이
+	//지정되지 않았으면 단일라인처럼 다이얼로그 네비게이션(Enter→기본버튼, Tab→다음)이 되도록 dlg code 보정.
+	afx_msg UINT OnGetDlgCode();
 };
 
 /////////////////////////////////////////////////////////////////////////////

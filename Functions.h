@@ -1964,6 +1964,10 @@ h		: 복사할 height 크기(pixel)
 	CString		GetTimeStringFromMilliSeconds(int ms, bool bHasHour = true, bool bHasMilliSec = true);
 	int			GetSecondsFromTimeString(CString timeString);
 	int			GetMilliSecondsFromTimeString(CString timeString);
+	//여러 형식의 시간 입력 문자열을 ms 로 파싱(사용자 입력 정규화). 허용 형식:
+	//  "hh:mm:ss" / "hh:mm:ss.fff" (콜론 2개) / "hhmmss"(6자리) / "hhmmssfff"(9자리) / 그 외 숫자만 = ms 정수.
+	//성공 시 ms 에 결과 저장 후 true, 형식 오류면 false(ms 미변경).
+	bool		parse_time_input_to_ms(CString text, int& ms);
 	void		GetTimeFromSeconds(int nTotalSeconds, int& nHours, int& nMinutes, int& nSeconds);
 	void		SetSystemTimeClock(WORD wYear, WORD wMonth, WORD wDay, WORD wHour, WORD wMinute, WORD wSecond);
 	double		GetElapsedTime(__timeb32 pOldTime);	//pOldTime과 현재 시간의 차이 계산

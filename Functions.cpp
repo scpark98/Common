@@ -2120,6 +2120,54 @@ int	GetMilliSecondsFromTimeString(CString timeString)
 	return time;
 }
 
+bool parse_time_input_to_ms(CString text, int& ms)
+{
+	text.Trim();
+	if (text.IsEmpty())
+		return false;
+
+	int colons = get_char_count(text, ':');
+	if (colons == 2)
+	{
+		ms = GetMilliSecondsFromTimeString(text);
+		return true;
+	}
+	if (colons != 0)
+		return false;
+
+	//콜론 없음 — 숫자만 허용.
+	for (int i = 0; i < text.GetLength(); ++i)
+		if (text[i] < _T('0') || text[i] > _T('9'))
+			return false;
+
+	int len = text.GetLength();
+	if (len == 6)	//hhmmss
+	{
+		int hh = _ttoi(text.Left(2));
+		int mm = _ttoi(text.Mid(2, 2));
+		int ss = _ttoi(text.Mid(4, 2));
+		if (mm >= 60 || ss >= 60)
+			return false;
+		ms = (hh * 3600 + mm * 60 + ss) * 1000;
+		return true;
+	}
+	if (len == 9)	//hhmmssfff
+	{
+		int hh  = _ttoi(text.Left(2));
+		int mm  = _ttoi(text.Mid(2, 2));
+		int ss  = _ttoi(text.Mid(4, 2));
+		int fff = _ttoi(text.Mid(6, 3));
+		if (mm >= 60 || ss >= 60)
+			return false;
+		ms = (hh * 3600 + mm * 60 + ss) * 1000 + fff;
+		return true;
+	}
+
+	//그 외 — ms 정수.
+	ms = _ttoi(text);
+	return true;
+}
+
 bool IsHexaColorString(CString str)
 {
 	bool result = true;

@@ -877,6 +877,7 @@ public:
 	//native header 의 raw HDN_* notification 직접 가로채기 — listview 가 reflect 하지 않는 경로.
 	virtual BOOL OnNotify(WPARAM wParam, LPARAM lParam, LRESULT* pResult) override;
 	afx_msg void OnSize(UINT nType, int cx, int cy);
+	afx_msg void OnWindowPosChanged(WINDOWPOS* lpwndpos);
 	afx_msg void OnNcPaint();
 	afx_msg void OnNcCalcSize(BOOL bCalcValidRects, NCCALCSIZE_PARAMS* lpncsp);
 	afx_msg void OnStyleChanging(int nStyleType, LPSTYLESTRUCT lpStyleStruct);
@@ -892,6 +893,7 @@ public:
 	bool			m_scrollbar_setup = false;
 	bool			m_v_visible_state = false;	//세로바 필요 상태 — OnNcCalcSize 가 읽어 우측 gw 예약
 	bool			m_h_visible_state = false;	//가로바 필요 상태 — OnNcCalcSize 가 읽어 하단 gw 예약
+	int				m_bottom_reserve = 0;		//세로바 시 하단 partial row 예약 px — OnNcCalcSize 가 설정, sync(바 위치)·OnNcPaint(빈영역 fill)가 읽음
 	bool			m_syncing = false;			//framechange 재진입 가드 (SWP_FRAMECHANGED → OnSize → sync 재진입 차단)
 	//WS_BORDER/WS_EX_CLIENTEDGE 가 켜져 있으면 PreSubclassWindow 에서 native border 제거하고 이 플래그를 켠 뒤
 	//OnNcCalcSize 에서 1px NC 확보 → OnNcPaint 가 theme 색으로 직접 그린다. (CSCTreeCtrl 와 동일 패턴.)

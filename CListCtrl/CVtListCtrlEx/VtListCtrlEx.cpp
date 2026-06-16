@@ -90,6 +90,7 @@ BEGIN_MESSAGE_MAP(CVtListCtrlEx, CListCtrl)
 	ON_NOTIFY_REFLECT(LVN_BEGINSCROLL, &CVtListCtrlEx::OnLvnBeginScroll)
 	ON_NOTIFY_REFLECT(LVN_ENDSCROLL, &CVtListCtrlEx::OnLvnEndScroll)
 	ON_WM_SIZE()
+	ON_WM_WINDOWPOSCHANGED()
 	ON_REGISTERED_MESSAGE(Message_CGdiButton, &CVtListCtrlEx::on_message_CGdiButton)
 	ON_REGISTERED_MESSAGE(Message_CHeaderCtrlEx, &CVtListCtrlEx::on_message_CHeaderCtrlEx)
 	ON_WM_NCPAINT()
@@ -319,14 +320,15 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 			//(이전엔 selected 시 셀 색을 무조건 덮어써 자막창의 red 자막이 selected 시 white 로 바뀌는 회귀 발생.)
 			if (m_has_focus)
 			{
-				if (crText.GetValue() == listctrlex_unused_color.GetValue())
+				//unused(미지정) 또는 dim(보조 텍스트) 셀은 선택 시 cr_text_selected 로 — dim 은 선택 배경 위에서 가독성 위해 양보.
+				if (crText.GetValue() == listctrlex_unused_color.GetValue() || crText.GetValue() == listctrlex_dim_color.GetValue())
 					crText = m_theme.cr_text_selected;
 				if ((is_full_row_selection || iSubItem == 0) && crBack.GetValue() == listctrlex_unused_color.GetValue())
 					crBack = m_theme.cr_back_selected;
 			}
 			else
 			{
-				if (crText.GetValue() == listctrlex_unused_color.GetValue())
+				if (crText.GetValue() == listctrlex_unused_color.GetValue() || crText.GetValue() == listctrlex_dim_color.GetValue())
 					crText = m_theme.cr_text_selected_inactive;
 				if ((is_full_row_selection || iSubItem == 0) && crBack.GetValue() == listctrlex_unused_color.GetValue())
 					crBack = m_theme.cr_back_selected_inactive;
@@ -336,15 +338,18 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		//단 대상 항목이 파일인 경우는 drop hilited 표시를 하지 않는다.
 		else if (is_drophilited) //ok
 		{
-			if (crText.GetValue() == listctrlex_unused_color.GetValue())
+			if (crText.GetValue() == listctrlex_unused_color.GetValue() || crText.GetValue() == listctrlex_dim_color.GetValue())
 				crText = m_theme.cr_text_selected;
 			if (crBack.GetValue() == listctrlex_unused_color.GetValue())
 				crBack = m_theme.cr_back_selected;
 		}
 		else
 		{
+			//비선택: unused → 기본 글자색, dim sentinel → theme 의 흐릿한 보조색(cr_text_dim, theme 변경에 적응), 그 외 명시색 유지.
 			if (crText.GetValue() == listctrlex_unused_color.GetValue())
 				crText = m_theme.cr_text;
+			else if (crText.GetValue() == listctrlex_dim_color.GetValue())
+				crText = m_theme.cr_text_dim;
 			else
 				crText = m_list_db[iItem].crText[iSubItem];
 
@@ -1817,17 +1822,6 @@ void CVtListCtrlEx::OnPaint()
 				rcCornerTop = CRect(rh.right, rh.top, rcFull.right, rh.bottom);
 		}
 
-		CRect rcCornerBottom;
-		bool vis_v = ::IsWindow(m_scrollbar.GetSafeHwnd()) && m_scrollbar.IsWindowVisible();
-		bool vis_h = ::IsWindow(m_scrollbar_h.GetSafeHwnd()) && m_scrollbar_h.IsWindowVisible();
-		if (vis_v && vis_h)
-		{
-			rcCornerBottom = CRect(
-				rcFull.right - m_scrollbar.get_width(),
-				rcFull.bottom - m_scrollbar.get_width(),
-				rcFull.right, rcFull.bottom);
-		}
-
 		//paintDC 에 직접 [FillSolidRect(erase) → DefWindowProc(WM_PAINT)(draw)] 흐름은
 		//컬럼 폭 드래그 같은 partial invalidate 케이스에서 erase 프레임이 그대로 화면에 노출돼
 		//변경된 컬럼만 깜빡인다. memory DC 에 모두 그린 뒤 destructor 가 BitBlt 으로 한 번에
@@ -1837,16 +1831,9 @@ void CVtListCtrlEx::OnPaint()
 
 		if (!rcCornerTop.IsRectEmpty())
 			pDC->FillSolidRect(rcCornerTop, m_theme.cr_header_back.ToCOLORREF());
-		if (!rcCornerBottom.IsRectEmpty())
-		{
-			//탐색기처럼 h/v 스크롤바가 만나는 코너를 컨트롤 배경색(cr_back)으로 칠한다.
-			pDC->FillSolidRect(rcCornerBottom, m_theme.cr_back.ToCOLORREF());
-		}
 
 		if (!rcCornerTop.IsRectEmpty())
 			pDC->ExcludeClipRect(rcCornerTop);
-		if (!rcCornerBottom.IsRectEmpty())
-			pDC->ExcludeClipRect(rcCornerBottom);
 
 		pDC->FillSolidRect(rc, m_theme.cr_back.ToCOLORREF());
 
@@ -2720,7 +2707,7 @@ int CVtListCtrlEx::insert_folder(int index, CString new_folder_name, bool is_rem
 
 	set_text(index, col_filesize, _T(""));
 	set_text(index, col_filedate, get_cur_datetime_str(2, true, _T(" "), false, false));
-	set_text_color(index, col_filedate, RGB(109, 109, 109));
+	set_text_color(index, col_filedate, listctrlex_dim_color);
 
 	CVtFileInfo fi;
 	WIN32_FIND_DATA data;
@@ -4784,14 +4771,14 @@ void CVtListCtrlEx::display_filelist(CString cur_path)
 			if (ul_total_space.QuadPart > 0)
 				set_text(index, col_filedate, get_size_str(ul_total_space.QuadPart, -1));
 
-			set_text_color(index, col_filesize, RGB(109, 109, 109));
-			set_text_color(index, col_filedate, RGB(109, 109, 109));
+			set_text_color(index, col_filesize, listctrlex_dim_color);
+			set_text_color(index, col_filedate, listctrlex_dim_color);
 		}
 		else
 		{
 			set_text(index, col_filesize, _T(""));
 			set_text(index, col_filedate, get_file_time_str(m_cur_folders[i].data.ftLastWriteTime));
-			set_text_color(index, col_filedate, RGB(109, 109, 109));
+			set_text_color(index, col_filedate, listctrlex_dim_color);
 		}
 	}
 
@@ -4817,8 +4804,8 @@ void CVtListCtrlEx::display_filelist(CString cur_path)
 
 		set_text(index, col_filesize, get_size_str(get_file_size(m_cur_files[i].data)));
 		set_text(index, col_filedate, m_cur_files[i].get_file_time_str());
-		set_text_color(index, col_filesize, RGB(109, 109, 109));
-		set_text_color(index, col_filedate, RGB(109, 109, 109));
+		set_text_color(index, col_filesize, listctrlex_dim_color);
+		set_text_color(index, col_filedate, listctrlex_dim_color);
 	}
 
 	//bulk 종료 — 항목수·scrollbar 를 한 번만 갱신.
@@ -5787,6 +5774,17 @@ void CVtListCtrlEx::OnSize(UINT nType, int cx, int cy)
 		Invalidate(FALSE);
 }
 
+void CVtListCtrlEx::OnWindowPosChanged(WINDOWPOS* lpwndpos)
+{
+	CListCtrl::OnWindowPosChanged(lpwndpos);
+
+	//하단 remainder 예약으로 client 높이는 itemH 배수 단위로만 바뀐다 → sub-row 만큼 window 가 커질 땐 client 가
+	//안 변해 WM_SIZE 가 안 떠 sync 가 호출되지 않는다(스크롤바가 window 를 못 따라옴). window 크기 변화에서도
+	//sync 를 돌려 바가 매 순간 window 에 맞게 따라오게 한다. m_syncing 으로 framechange 재진입은 차단.
+	if (m_scrollbar_setup && lpwndpos && !(lpwndpos->flags & SWP_NOSIZE) && !m_syncing)
+		sync_scrollbar();
+}
+
 void CVtListCtrlEx::show_auto_scroll_button(bool show)
 {
 	m_show_auto_scroll_button = show;
@@ -5886,15 +5884,17 @@ void CVtListCtrlEx::OnNcPaint()
 	//가로바 출현 시 OnNcCalcSize 가 예약한 하단 gw NC 띠. 가로바(dialog child)는 [0, content_view_w]만 덮고
 	//그 우측 gw 코너(세로바 바로 아래)는 listctrl NC 영역으로 남아 stale 픽셀이 보인다. 띠 전체를 cr_back 으로
 	//채우면 가로바가 좌측을 덮고 코너는 listctrl 배경색으로 남는다. (가로/세로바가 만나는 코너 = 컨트롤 배경색.)
-	if (m_h_visible_state)
+	//하단 NC 띠 = 가로바 gw(있을 때) + 세로바 시 예약한 partial row remainder(m_bottom_reserve). 둘 다 cr_back 으로
+	//채워 — 가로바/세로바가 그 위에 그려지고, 마지막 행 아래 gap 과 코너는 listctrl 배경색으로 남는다.
+	int bottom_band = (m_h_visible_state ? m_scrollbar.get_width() : 0) + m_bottom_reserve;
+	if (bottom_band > 0)
 	{
-		int gw = m_scrollbar.get_width();
-		int b  = m_draw_border ? 1 : 0;
+		int b = m_draw_border ? 1 : 0;
 		CRect rcWin;
 		GetWindowRect(&rcWin);
 		rcWin.OffsetRect(-rcWin.TopLeft());
 
-		CRect band(b, rcWin.Height() - b - gw, rcWin.Width() - b, rcWin.Height() - b);
+		CRect band(b, rcWin.Height() - b - bottom_band, rcWin.Width() - b, rcWin.Height() - b);
 		CBrush br(m_theme.cr_back.ToCOLORREF());
 		dc.FillRect(&band, &br);
 	}
@@ -5914,8 +5914,9 @@ void CVtListCtrlEx::OnStyleChanging(int nStyleType, LPSTYLESTRUCT lpStyleStruct)
 	//CSCScrollbar overlay 가 native scrollbar 를 대체. native 가 overflow 감지 시 WS_HSCROLL/WS_VSCROLL 을 다시
 	//붙이려 함 → 여기서 강제 strip. WS_HSCROLL 이 살아있으면 native 가 자기 hsb 만 예약하고 OnNcCalcSize 의 하단 NC
 	//예약을 무시해 두꺼운 가로바가 마지막 항목을 가린다(CSCTreeCtrl 동일 패턴). 가로 스크롤 시 헤더는 수동 동기화.
+	//WS_VSCROLL 은 유지(세로 bottom-align 위해). WS_HSCROLL 만 strip.
 	if (m_scrollbar_setup && nStyleType == GWL_STYLE && lpStyleStruct)
-		lpStyleStruct->styleNew &= ~(WS_VSCROLL | WS_HSCROLL);
+		lpStyleStruct->styleNew &= ~WS_HSCROLL;
 
 	CListCtrl::OnStyleChanging(nStyleType, lpStyleStruct);
 }
@@ -5945,6 +5946,25 @@ void CVtListCtrlEx::OnNcCalcSize(BOOL bCalcValidRects, NCCALCSIZE_PARAMS* lpncsp
 		if (m_h_visible_state && bCalcValidRects &&
 			lpncsp->rgrc[0].bottom - lpncsp->rgrc[0].top > gw)
 			lpncsp->rgrc[0].bottom -= gw;
+
+		//세로바가 있을 때 하단의 partial row(remainder)를 NC 로 추가 예약 → native 의 item 영역이 itemH 의 정확한
+		//배수가 되어 nPage 의 ceil==floor. 그러면 native 가 nPage 를 어떻게 재계산하든 max scroll 이 마지막 항목을
+		//완전히 보여준다(끝 항목 잘림·thumb 튐의 근본 해결). 예약한 remainder 는 마지막 행 아래의 빈 영역(cr_back).
+		m_bottom_reserve = 0;
+		if (m_v_visible_state && bCalcValidRects && m_line_height > 0)
+		{
+			int hdr = get_header_height();
+			int item_area = (lpncsp->rgrc[0].bottom - lpncsp->rgrc[0].top) - hdr;
+			if (item_area > m_line_height)
+			{
+				int rem = item_area % m_line_height;
+				if (rem > 0)
+				{
+					lpncsp->rgrc[0].bottom -= rem;
+					m_bottom_reserve = rem;
+				}
+			}
+		}
 		return;
 	}
 
@@ -5958,10 +5978,12 @@ void CVtListCtrlEx::setup_scrollbar()
 
 	m_scrollbar_setup = true;
 
-	//WS_VSCROLL/HSCROLL strip — native 가 살려두면 OnNcCalcSize 하단 NC 예약을 무시(자기 hsb 만 봄)해 두꺼운
+	//WS_HSCROLL strip — native 가 살려두면 OnNcCalcSize 하단 NC 예약을 무시(자기 hsb 만 봄)해 두꺼운
 	//가로바가 마지막 항목을 가린다(CSCTreeCtrl 동일). OnStyleChanging 이 재부착도 차단. 가로 스크롤 시 헤더는
 	//수동 동기화(sync_header_h_offset). native scrollbar 시각화는 OnNcCalcSize override 가 단독 차단.
-	ModifyStyle(WS_VSCROLL | WS_HSCROLL, WS_CLIPCHILDREN, SWP_FRAMECHANGED);
+	//WS_VSCROLL 은 유지 — strip 하면 native 가 세로 max scroll 을 top-align(첫 항목 flush)에서 클램프해
+	//마지막 항목이 항상 partial 로 잘린다. 유지하면 native 가 정상 bottom-align(마지막 항목 flush)한다.
+	ModifyStyle(WS_HSCROLL, WS_CLIPCHILDREN, SWP_FRAMECHANGED);
 
 	//빈 영역 cr_back 처리 — native 가 자체 erase 시 사용.
 	SetBkColor(m_theme.cr_back.ToCOLORREF());
@@ -6102,7 +6124,8 @@ void CVtListCtrlEx::sync_scrollbar()
 	{
 		CPoint strip_tl(rc.right, rc.top);
 		ClientToScreen(&strip_tl);
-		CRect rTargetV(strip_tl.x, strip_tl.y, strip_tl.x + gw, strip_tl.y + rc.Height());
+		//rc.bottom 은 remainder 예약으로 마지막 행 바로 아래까지만. 세로바는 그 아래 gap(remainder)까지 덮어 가로바 윗변에 닿게 연장.
+		CRect rTargetV(strip_tl.x, strip_tl.y, strip_tl.x + gw, strip_tl.y + rc.Height() + m_bottom_reserve);
 		CRect rCurV;
 		m_scrollbar.GetWindowRect(&rCurV);
 		if (CWnd* pParent = GetParent())
@@ -6117,7 +6140,8 @@ void CVtListCtrlEx::sync_scrollbar()
 	//가로 scrollbar — 하단 NC 띠(parent child). [rc.left, rc.bottom] × (content 폭 × gw)를 parent 좌표로 배치.
 	if (::IsWindow(m_scrollbar_h.m_hWnd))
 	{
-		CPoint band_tl(rc.left, rc.bottom);
+		//rc.bottom 위에 remainder gap 이 있으므로 가로바는 그만큼 더 내려 window 바닥(gap 아래)에 놓는다.
+		CPoint band_tl(rc.left, rc.bottom + m_bottom_reserve);
 		ClientToScreen(&band_tl);
 		CRect rTargetH(band_tl.x, band_tl.y, band_tl.x + content_view_w, band_tl.y + gw);
 		CRect rCurH;
@@ -6143,9 +6167,17 @@ void CVtListCtrlEx::sync_scrollbar()
 	{
 		int top = GetTopIndex();
 		if (top < 0) top = 0;
+		int page = visible;
+		int max_pos = (total - 1) - page + 1;
+		//마지막 항목이 content 바닥 안에 완전히 들어왔으면(=바닥까지 스크롤됨) thumb 은 GetTopIndex 대신 max_pos 로 pin —
+		//트랙 끝에 닿게 하고 튐 제거. 그 외엔 GetTopIndex 그대로.
+		int thumb_pos = top;
+		CRect rLast;
+		if (total > 0 && GetItemRect(total - 1, &rLast, LVIR_BOUNDS) && rLast.bottom <= rc.Height())
+			thumb_pos = max_pos;
 		m_scrollbar.set_range(0, total - 1);
-		m_scrollbar.set_page(visible);
-		m_scrollbar.set_pos(top);
+		m_scrollbar.set_page(page);
+		m_scrollbar.set_pos(thumb_pos);
 		m_scrollbar.ShowWindow(SW_SHOW);
 		//parent dialog 의 child 라 형제인 listctrl 위로 z-order 올려야 보인다.
 		m_scrollbar.SetWindowPos(&CWnd::wndTop, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
@@ -6196,30 +6228,40 @@ LRESULT CVtListCtrlEx::on_message_CSCScrollbar(WPARAM wParam, LPARAM lParam)
 		//드래그해도 마지막 항목이 보이지 않는다. msg->pos 를 그대로 쓰고 total-1 안전 클램프만 둔다.
 		int total = GetItemCount();
 		int new_top = max(0, min(msg->pos, total - 1));
-
 		int cur_top = GetTopIndex();
-		if (new_top != cur_top && total > 0)
-		{
-			CRect rItem;
-			if (GetItemRect(0, &rItem, LVIR_BOUNDS))
-			{
-				int item_h = rItem.Height();
-				if (item_h > 0)
-					Scroll(CSize(0, (new_top - cur_top) * item_h));
-			}
-		}
 
-		//pixel 정렬 보정 — ensure_visible(visible_center) 등이 top 한계를 넘는 Scroll 을 호출하면
-		//listctrl 이 부분 스크롤로 끝내 item 0 top y 가 header_bottom 와 어긋난 채 정착할 수 있음.
-		//top_index 가 같아 위 Scroll 이 발화 안 해도 잔여 offset 을 여기서 보정.
-		if (total > 0)
+		CRect rc;
+		GetClientRect(&rc);
+		int header = m_HeaderCtrlEx.GetSafeHwnd() ? get_header_height() : 0;
+		int visible = (m_line_height > 0) ? max(0, (rc.Height() - header) / m_line_height) : GetCountPerPage();
+		int max_top = max(0, total - visible);
+
+		if (new_top >= max_top && total > 0)
 		{
-			int target_idx = max(0, min(new_top, total - 1));
-			CRect rItem;
-			if (GetItemRect(target_idx, &rItem, LVIR_BOUNDS))
+			//바닥 — Scroll()/EnsureVisible 은 item-aligned(첫 항목 flush)에서 멈춰 마지막 항목이 잘린다.
+			//native 자체 스크롤바 메시지 SB_BOTTOM 은 bottom-align(마지막 항목 flush)한다. WS_VSCROLL 유지가 전제.
+			SendMessage(WM_VSCROLL, MAKEWPARAM(SB_BOTTOM, 0), 0);
+		}
+		else
+		{
+			if (new_top != cur_top && total > 0)
 			{
-				int header_h = m_HeaderCtrlEx.GetSafeHwnd() ? get_header_height() : 0;
-				int dy = rItem.top - header_h;
+				CRect rItem;
+				if (GetItemRect(0, &rItem, LVIR_BOUNDS))
+				{
+					int item_h = rItem.Height();
+					if (item_h > 0)
+						Scroll(CSize(0, (new_top - cur_top) * item_h));
+				}
+			}
+
+			//pixel 정렬 보정 — ensure_visible(visible_center) 등이 top 한계를 넘는 Scroll 을 호출하면
+			//listctrl 이 부분 스크롤로 끝내 item 0 top y 가 header_bottom 와 어긋난 채 정착할 수 있음.
+			//top_index 가 같아 위 Scroll 이 발화 안 해도 잔여 offset 을 여기서 보정.
+			CRect rItem;
+			if (GetItemRect(new_top, &rItem, LVIR_BOUNDS))
+			{
+				int dy = rItem.top - header;
 				if (dy != 0)
 					Scroll(CSize(0, dy));
 			}
@@ -6269,7 +6311,18 @@ BOOL CVtListCtrlEx::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
 			int item_h = rItem.Height();
 			if (item_h > 0)
 			{
-				Scroll(CSize(0, lines * item_h));
+				int total = GetItemCount();
+				CRect rc;
+				GetClientRect(&rc);
+				int header = m_HeaderCtrlEx.GetSafeHwnd() ? get_header_height() : 0;
+				int visible = (m_line_height > 0) ? max(0, (rc.Height() - header) / m_line_height) : GetCountPerPage();
+				int max_top = max(0, total - visible);
+				int target_top = GetTopIndex() + lines;
+
+				if (lines > 0 && target_top >= max_top)
+					SendMessage(WM_VSCROLL, MAKEWPARAM(SB_BOTTOM, 0), 0);	//바닥 — native bottom-align 시도
+				else
+					Scroll(CSize(0, lines * item_h));
 				UpdateWindow();
 				sync_scrollbar();
 				return TRUE;

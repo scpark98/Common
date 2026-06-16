@@ -2,10 +2,15 @@
 
 #include <thread>
 #include <mutex>
+
+//webp(애니메이션) 지원은 기본 ON. webp lib 이 없는 타깃(예: Win32 빌드 — 현재 webp lib 은 x64 전용)에서는
+//SCD2IMAGE_NO_WEBP 를 정의해 webp 코드/링크를 제외한다. 정적 이미지(jpg/png/gif/tiff)는 영향 없음.
+#ifndef SCD2IMAGE_NO_WEBP
 #include <webp/mux.h>
 #include <webp/demux.h>
 #include <webp/encode.h>
 #include <webp/decode.h>
+#endif
 
 #include "../../SCGdiplusBitmap.h"
 
@@ -14,9 +19,11 @@
 #pragma comment(lib, "d2d1.lib")
 #pragma comment(lib, "d3d11.lib")
 
+#ifndef SCD2IMAGE_NO_WEBP
 #pragma comment(lib, "libwebp.lib")
 #pragma comment(lib, "libwebpmux.lib")
 #pragma comment(lib, "libwebpdemux.lib")
+#endif
 
 static std::recursive_mutex g_d2d_dc_mutex;
 
@@ -1428,6 +1435,9 @@ void CSCD2Image::convert_PBGRA_to_BGRA(byte* pixels, int width, int height, int 
 
 HRESULT CSCD2Image::save_webp(LPCTSTR path, ...)
 {
+#ifdef SCD2IMAGE_NO_WEBP
+	return E_NOTIMPL;		//webp 미지원 빌드(SCD2IMAGE_NO_WEBP) — webp 저장 불가.
+#else
 	//이미지가 정상적으로 로딩되어있지 않은 경우
 	if (m_pWICFactory == nullptr)
 		return S_FALSE;
@@ -1533,6 +1543,7 @@ HRESULT CSCD2Image::save_webp(LPCTSTR path, ...)
 	WebPAnimEncoderDelete(enc);
 
 	return hr;
+#endif
 }
 
 HRESULT CSCD2Image::save_gif(LPCTSTR path, ...)
@@ -3830,6 +3841,9 @@ WICBitmapTransformOptions CSCD2Image::ExifOrientationToWicTransform(USHORT orien
 
 bool CSCD2Image::read_webp_frame_delay(const uint8_t* data, size_t size)
 {
+#ifdef SCD2IMAGE_NO_WEBP
+	return false;			//webp 미지원 빌드(SCD2IMAGE_NO_WEBP) — 프레임 딜레이 추출 불가.
+#else
 	if (!data || size == 0)
 		return false;
 
@@ -3862,6 +3876,7 @@ bool CSCD2Image::read_webp_frame_delay(const uint8_t* data, size_t size)
 
 	WebPDemuxDelete(demux);
 	return !m_frame_delay.empty();
+#endif
 }
 
 void CSCD2Image::apply_orientation_transform()

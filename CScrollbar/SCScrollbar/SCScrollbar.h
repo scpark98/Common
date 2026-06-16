@@ -112,7 +112,7 @@ protected:
 
 	//폭(breadth) — 스크롤바 cross-axis 크기. 폭 개념의 단일 출처(get_width/set_width). create() 가 실제 생성 폭으로 갱신.
 	//화살표 버튼은 정사각형(폭×폭)이라 arrow 길이도 이 값으로 통일(별도 arrow_size 상수 제거).
-	int				m_width = 20;
+	int				m_width = 16;
 
 	//시각 — m_thickness 는 *thumb 의 cross 두께만* (컬럼 폭 m_width 와 별개인 가는 막대 굵기).
 	int				m_thickness = 1;			//현재 적용된 thumb cross 두께.

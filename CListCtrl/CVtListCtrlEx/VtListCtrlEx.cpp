@@ -6159,11 +6159,11 @@ void CVtListCtrlEx::sync_scrollbar()
 	int avail_rows = (m_line_height > 0) ? max(0, (rc.Height() - header) / m_line_height) : GetCountPerPage();
 	int visible = avail_rows;
 
-	logWrite(_T("[sync] rc=(%d,%d,%d,%d) W=%d H=%d header=%d colcnt=%d total_col_w=%d content_view_w=%d total=%d | need_v=%d need_h=%d reserve=%d vis=%d hwndV=%d hwndH=%d vVis=%d hVis=%d"),
-		rc.left, rc.top, rc.right, rc.bottom, rc.Width(), rc.Height(), header, col_count, total_col_width, content_view_w, total,
-		(int)need_v, (int)need_h, m_bottom_reserve, visible,
-		(int)::IsWindow(m_scrollbar.m_hWnd), (int)::IsWindow(m_scrollbar_h.m_hWnd),
-		(int)(::IsWindow(m_scrollbar.m_hWnd) && m_scrollbar.IsWindowVisible()), (int)(::IsWindow(m_scrollbar_h.m_hWnd) && m_scrollbar_h.IsWindowVisible()));
+	//logWrite(_T("[sync] rc=(%d,%d,%d,%d) W=%d H=%d header=%d colcnt=%d total_col_w=%d content_view_w=%d total=%d | need_v=%d need_h=%d reserve=%d vis=%d hwndV=%d hwndH=%d vVis=%d hVis=%d"),
+	//	rc.left, rc.top, rc.right, rc.bottom, rc.Width(), rc.Height(), header, col_count, total_col_width, content_view_w, total,
+	//	(int)need_v, (int)need_h, m_bottom_reserve, visible,
+	//	(int)::IsWindow(m_scrollbar.m_hWnd), (int)::IsWindow(m_scrollbar_h.m_hWnd),
+	//	(int)(::IsWindow(m_scrollbar.m_hWnd) && m_scrollbar.IsWindowVisible()), (int)(::IsWindow(m_scrollbar_h.m_hWnd) && m_scrollbar_h.IsWindowVisible()));
 
 	//세로 scrollbar — 우측 NC 띠(parent child). [rc.right, rc.right+gw] × content 높이를 parent 좌표로 배치.
 	if (::IsWindow(m_scrollbar.m_hWnd))

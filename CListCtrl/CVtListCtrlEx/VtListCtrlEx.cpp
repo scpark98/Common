@@ -11,6 +11,7 @@
 
 #include "../../colors.h"
 #include "../../MemoryDC.h"
+#include "../../log/SCLog/SCLog.h"
 #include <afxvslistbox.h>
 
 #define IDC_EDIT_CELL	1001
@@ -1805,6 +1806,20 @@ void CVtListCtrlEx::OnPaint()
 	{
 		pHeaderCtrl->GetClientRect(&rcHeader);
 		rc.top += rcHeader.Height();
+	}
+
+	//[gap diag] top 항목이 헤더 하단과 어긋날 때만 상세 기록 — gap/overlap 원인(스크롤 offset vs 헤더높이 vs 가변행) 격리.
+	if (m_scrollbar_setup && GetItemCount() > 0)
+	{
+		int dtop = GetTopIndex();
+		CRect dri(0,0,0,0), dri0(0,0,0,0);
+		BOOL ok = (dtop >= 0) ? GetItemRect(dtop, &dri, LVIR_BOUNDS) : FALSE;
+		GetItemRect(0, &dri0, LVIR_BOUNDS);
+		int hh = get_header_height();
+		int nat_hdr = pHeaderCtrl ? rcHeader.Height() : 0;
+		if (ok && dri.top != hh)
+			logWrite(_T("[gap] topIdx=%d itemTop=%d itemBot=%d itemH=%d | header_get=%d header_native=%d | item0Top=%d item0H=%d lineH=%d"),
+				dtop, dri.top, dri.bottom, dri.Height(), hh, nat_hdr, dri0.top, dri0.Height(), m_line_height);
 	}
 
 	if (m_scrollbar_setup)
@@ -5686,6 +5701,25 @@ void CVtListCtrlEx::OnLvnEndScroll(NMHDR* pNMHDR, LRESULT* pResult)
 	{
 		UpdateWindow();
 		sync_scrollbar();
+
+		//top 항목을 헤더 하단에 스냅 — header_height ≠ line_height 인 경우 native 가 클릭/EnsureVisible 시
+		//top 항목을 헤더에 딱 안 맞춰 sub-pixel 어긋남(gap/overlap)이 생긴다. 모든 scroll source 가 수렴하는
+		//이 지점에서 보정. Scroll 이 다시 LVN_ENDSCROLL 을 유발하므로 m_snapping 으로 재진입 차단(수렴 후 dy=0).
+		if (!m_snapping && m_HeaderCtrlEx.GetSafeHwnd() && GetItemCount() > 0)
+		{
+			int top = GetTopIndex();
+			CRect ri;
+			if (top >= 0 && GetItemRect(top, &ri, LVIR_BOUNDS))
+			{
+				int dy = ri.top - get_header_height();
+				if (dy != 0)
+				{
+					m_snapping = true;
+					Scroll(CSize(0, dy));
+					m_snapping = false;
+				}
+			}
+		}
 	}
 
 	*pResult = 0;
@@ -5994,6 +6028,12 @@ void CVtListCtrlEx::setup_scrollbar()
 	CWnd* pParent = GetParent();
 	CWnd* pHost   = pParent ? pParent : (CWnd*)this;
 
+	//부모가 자기 client 를 repaint(예: 리사이즈 시 CSCThemeDlg::OnSize 의 Invalidate)할 때, child 인 스크롤바 overlay
+	//위를 덮어 그려 리사이즈 중 바가 사라지는 회귀(자식이 늦게 repaint 돼 hover 전까지 안 보임)를 막는다.
+	//WS_CLIPCHILDREN 을 부모에 부여하면 부모 paint 가 child window 영역을 제외 → 바가 덮이지 않는다.
+	if (pParent)
+		pParent->ModifyStyle(0, WS_CLIPCHILDREN);
+
 	m_scrollbar.create(pHost, CSCScrollbar::vertical,
 		0, 0, m_scrollbar.get_width(), 10);
 	m_scrollbar.ModifyStyle(0, WS_CLIPSIBLINGS);
@@ -6119,6 +6159,12 @@ void CVtListCtrlEx::sync_scrollbar()
 	int avail_rows = (m_line_height > 0) ? max(0, (rc.Height() - header) / m_line_height) : GetCountPerPage();
 	int visible = avail_rows;
 
+	logWrite(_T("[sync] rc=(%d,%d,%d,%d) W=%d H=%d header=%d colcnt=%d total_col_w=%d content_view_w=%d total=%d | need_v=%d need_h=%d reserve=%d vis=%d hwndV=%d hwndH=%d vVis=%d hVis=%d"),
+		rc.left, rc.top, rc.right, rc.bottom, rc.Width(), rc.Height(), header, col_count, total_col_width, content_view_w, total,
+		(int)need_v, (int)need_h, m_bottom_reserve, visible,
+		(int)::IsWindow(m_scrollbar.m_hWnd), (int)::IsWindow(m_scrollbar_h.m_hWnd),
+		(int)(::IsWindow(m_scrollbar.m_hWnd) && m_scrollbar.IsWindowVisible()), (int)(::IsWindow(m_scrollbar_h.m_hWnd) && m_scrollbar_h.IsWindowVisible()));
+
 	//세로 scrollbar — 우측 NC 띠(parent child). [rc.right, rc.right+gw] × content 높이를 parent 좌표로 배치.
 	if (::IsWindow(m_scrollbar.m_hWnd))
 	{
@@ -6208,6 +6254,7 @@ void CVtListCtrlEx::sync_scrollbar()
 		//만 마크하고 즉시 그려지지 않는다 (release 후에야 보이는 현상). 즉시 paint 강제.
 		m_scrollbar_h.RedrawWindow(NULL, NULL, RDW_INVALIDATE | RDW_UPDATENOW);
 	}
+
 }
 
 LRESULT CVtListCtrlEx::on_message_CSCScrollbar(WPARAM wParam, LPARAM lParam)

@@ -74,24 +74,26 @@
 #define LOGWRITE_DISABLE_FOR_PROFILING	0
 
 #if LOGWRITE_DISABLE_FOR_PROFILING
-#define logWrite(fmt, ...)	((void)0)
-#define logWriteI(fmt, ...)	((void)0)
-#define logWriteW(fmt, ...)	((void)0)
-#define logWriteE(fmt, ...)	((void)0)
-#define logWriteC(fmt, ...)	((void)0)
-#define logWriteS(fmt, ...)	((void)0)
-#define logWriteD(fmt, ...)	((void)0)
+#define logWrite(fmt, ...)	(CString())
+#define logWriteI(fmt, ...)	(CString())
+#define logWriteW(fmt, ...)	(CString())
+#define logWriteE(fmt, ...)	(CString())
+#define logWriteC(fmt, ...)	(CString())
+#define logWriteS(fmt, ...)	(CString())
+#define logWriteD(fmt, ...)	(CString())
 #else
 //pLog 는 CSCLog 생성자에서만 this 로 세팅된다. gLog 인스턴스가 아직 만들어지지 않았거나
 //(예: InitInstance 이전·도중의 OnPaint) 애초에 선언되지 않은 프로젝트에서는 pLog == NULL 이므로
 //NULL->write() 로 멤버 atomic(m_writer_count) 에 접근해 액세스 위반이 난다. 매크로 단에서 가드.
-#define logWrite(fmt, ...)	do { if (pLog) pLog->write(SCLOG_LEVEL_NONE, __function__, __LINE__, fmt, ##__VA_ARGS__); } while(0)
-#define logWriteI(fmt, ...)	do { if (pLog) pLog->write(SCLOG_LEVEL_INFO, __function__, __LINE__, fmt, ##__VA_ARGS__); } while(0)
-#define logWriteW(fmt, ...)	do { if (pLog) pLog->write(SCLOG_LEVEL_WARN, __function__, __LINE__, fmt, ##__VA_ARGS__); } while(0)
-#define logWriteE(fmt, ...)	do { if (pLog) pLog->write(SCLOG_LEVEL_ERROR, __function__, __LINE__, fmt, ##__VA_ARGS__); } while(0)
-#define logWriteC(fmt, ...)	do { if (pLog) pLog->write(SCLOG_LEVEL_CRITICAL, __function__, __LINE__, fmt, ##__VA_ARGS__); } while(0)
-#define logWriteS(fmt, ...)	do { if (pLog) pLog->write(SCLOG_LEVEL_SQL, __function__, __LINE__, fmt, ##__VA_ARGS__); } while(0)
-#define logWriteD(fmt, ...)	do { if (pLog) pLog->write(SCLOG_LEVEL_DEBUG, __function__, __LINE__, fmt, ##__VA_ARGS__); } while(0)
+//conditional expression 으로 작성하여 write() 의 CString 반환값을 살린다 (CString s = logWrite(...) 가능).
+//pLog == NULL 이면 빈 CString 을 반환. 매크로가 expression 이므로 if/else 안에서도 안전하다.
+#define logWrite(fmt, ...)	(pLog ? pLog->write(SCLOG_LEVEL_NONE,     __function__, __LINE__, fmt, ##__VA_ARGS__) : CString())
+#define logWriteI(fmt, ...)	(pLog ? pLog->write(SCLOG_LEVEL_INFO,     __function__, __LINE__, fmt, ##__VA_ARGS__) : CString())
+#define logWriteW(fmt, ...)	(pLog ? pLog->write(SCLOG_LEVEL_WARN,     __function__, __LINE__, fmt, ##__VA_ARGS__) : CString())
+#define logWriteE(fmt, ...)	(pLog ? pLog->write(SCLOG_LEVEL_ERROR,    __function__, __LINE__, fmt, ##__VA_ARGS__) : CString())
+#define logWriteC(fmt, ...)	(pLog ? pLog->write(SCLOG_LEVEL_CRITICAL, __function__, __LINE__, fmt, ##__VA_ARGS__) : CString())
+#define logWriteS(fmt, ...)	(pLog ? pLog->write(SCLOG_LEVEL_SQL,      __function__, __LINE__, fmt, ##__VA_ARGS__) : CString())
+#define logWriteD(fmt, ...)	(pLog ? pLog->write(SCLOG_LEVEL_DEBUG,    __function__, __LINE__, fmt, ##__VA_ARGS__) : CString())
 #endif
 
 enum SCLOG_LEVEL

@@ -295,9 +295,13 @@ public:
 	void		set_color(Gdiplus::Color cr_text, Gdiplus::Color cr_back, bool auto_color = true);
 
 	//SC* 시리즈 컨트롤들과 동일한 호출 패턴 — 부모 dlg 의 m_theme 객체를 그대로 받아 cr_text/cr_back 적용.
-	//내부에 m_theme 멤버를 두지 않는 클래스라 set_text_color/set_back_color 의 auto_color=true 경로를 거쳐
-	//hover/down/disabled 까지 자동 산출된다.
+	//내부에 m_theme 멤버를 두지 않는 클래스라 set_text_color/set_back_color 의 auto_color 경로를 거쳐
+	//hover/down/disabled 까지 산출된다. auto_color 여부는 버튼 멤버 m_auto_color(아래 set_auto_color) 를 따른다.
 	void		set_color_theme(const CSCColorTheme& theme, bool invalidate = true);
+
+	//hover/down 색을 normal 에서 자동 산출(true, 기본)할지, normal 그대로 둬 플랫하게(false) 할지.
+	//테마 인자가 아니라 버튼의 상호작용 성격이므로 멤버로 보관 — 한 번만 지정하면 이후 테마 재적용·전환에도 유지된다.
+	void		set_auto_color(bool on) { m_auto_color = on; }
 
 	//void		set_back_imageBitmap* pBack);		//배경을 설정, 변경할 경우 사용
 	void		set_text_color(Gdiplus::Color normal, bool auto_color = true);
@@ -562,6 +566,7 @@ protected:
 	std::deque <Gdiplus::Color>	m_cr_back;		//투명 PNG라도 배경색을 설정했다면 배경색이 그려진다.
 	std::deque <Gdiplus::Color> m_cr_border;	//border의 색상은 기본적으로 m_cr_back과 동일하게 세팅되지만 개별 설정도 가능하다.
 	bool		m_border_color_user_set = false;	//set_border_color/set_round(cr_border!=Transparent) 호출 시 true. set_back_color 가 m_cr_border 를 덮어쓰지 않도록 보호.
+	bool		m_auto_color = true;				//set_color_theme 적용 시 hover/down 색 자동 산출 여부. set_auto_color 로 변경.
 
 	//int			m_width = 0;
 	//int			m_height = 0;

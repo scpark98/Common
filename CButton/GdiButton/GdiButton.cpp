@@ -556,7 +556,7 @@ void CGdiButton::set_color_theme(const CSCColorTheme& theme, bool invalidate)
 {
 	//텍스트 색은 모든 버튼 종류 공통 — push / checkbox / radio / image-button 의 label 모두 theme.cr_text 사용.
 	//(primary push 버튼이 cr_button_text 를 명시했으면 아래 push 분기에서 다시 override.)
-	set_text_color(theme.cr_text, true);
+	set_text_color(theme.cr_text, m_auto_color);
 
 	//배경색 분기:
 	//- push-button (PUSHBUTTON / DEFPUSHBUTTON / PUSHLIKE, image 없음)
@@ -593,21 +593,21 @@ void CGdiButton::set_color_theme(const CSCColorTheme& theme, bool invalidate)
 		cr_face   = theme.cr_button_back;
 		cr_border = (theme.cr_button_border.GetA() != 0) ? theme.cr_button_border : theme.cr_button_back;
 		if (theme.cr_button_text.GetA() != 0)
-			set_text_color(theme.cr_button_text, true);
+			set_text_color(theme.cr_button_text, m_auto_color);
 	}
 	else
 	{
 		//Windows 11 push-button look — cr_back luma 로 light/dark 자동 분기.
 		//  light theme (cr_back=white) : face ≈ #F7F7F7, border ≈ #D0D0D0
 		//  dark  theme (cr_back=dark)  : face ≈ cr_back +16, border ≈ cr_back +40
-		//hover/down/disabled 색은 set_back_color/set_border_color 의 auto_color=true 가 자동 산출.
+		//hover/down/disabled 색은 set_back_color/set_border_color 의 auto_color(=m_auto_color) 가 산출.
 		const bool is_light = (get_luminance(theme.cr_back) >= 128);
 		cr_face   = is_light ? get_color(theme.cr_back, -8)  : get_color(theme.cr_back, 16);
 		cr_border = is_light ? get_color(theme.cr_back, -40) : get_color(theme.cr_back, 40);
 	}
 
-	set_back_color(cr_face, true);
-	set_border_color(cr_border, true);
+	set_back_color(cr_face, m_auto_color);
+	set_border_color(cr_border, m_auto_color);
 	//theme.cr_parent_back 을 명시적으로 전달 — 없으면 set_round → set_transparent 의 Transparent 가드에 막혀
 	//m_cr_parent_back 이 초기 Transparent (= ToCOLORREF 시 흰색) 로 남아 round 코너 바깥이 흰색으로 찍힘.
 	//push 가 아닌 경우는 round=0 (사각) — checkbox/radio/image-button 모서리를 둥글릴 이유 없음.

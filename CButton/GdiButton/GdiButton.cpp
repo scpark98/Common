@@ -854,7 +854,7 @@ CRect CGdiButton::calc_rect()
 		if (is_button_style(BS_PUSHLIKE))
 			return CRect(2, 0, 2 + sz.cx + 2, sz.cy);
 
-		total_width += (6 * 2 + 1);		//check or radio image
+		total_width += m_check_size;	//check or radio image (Windows 96DPI 표준 13, set_check_size 로 변경 가능)
 		total_width += 4;				//the gap of check or radio image and text
 		total_width += sz.cx;			//text extend
 		total_width += 2;				//right margin
@@ -1395,16 +1395,15 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 	//기본 텍스트도 출력한다.
 	else
 	{
-		int		size = 8;
 		CRect	r = rc;
 
 		//사각형 안에 v자 체크를 직접 그려준다.
 		if (is_button_style(BS_CHECKBOX, BS_AUTOCHECKBOX) && !is_button_style(BS_PUSHLIKE))
 		{
 			r.left += 2;
-			r.right = r.left + size * 2;
-			r.top = r.CenterPoint().y - size;
-			r.bottom = r.top + size * 2;
+			r.right = r.left + m_check_size;
+			r.top = r.CenterPoint().y - m_check_size / 2;
+			r.bottom = r.top + m_check_size;
 
 			Gdiplus::Color cr_check_fill = (is_disabled ? Gdiplus::Color::LightGray : m_cr_check_fill);
 
@@ -1450,9 +1449,9 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 			{
 				//dc.DrawFrameControl(r, DFC_BUTTON, DFCS_BUTTONRADIO);
 				r.left += 2;
-				r.right = r.left + size * 2;
-				r.top = r.CenterPoint().y - size;
-				r.bottom = r.top + size * 2;
+				r.right = r.left + m_check_size;
+				r.top = r.CenterPoint().y - m_check_size / 2;
+				r.bottom = r.top + m_check_size;
 
 				Gdiplus::Pen pen(cr_text, 1.0);
 				Gdiplus::SolidBrush br(cr_text);

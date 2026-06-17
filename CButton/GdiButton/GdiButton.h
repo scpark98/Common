@@ -473,6 +473,9 @@ public:
 	};
 	void		set_check_style(int check_style, Gdiplus::Color cr_fill = Gdiplus::Color::Transparent);
 
+	//직접 그리는 checkbox/radio 글리프(정사각형)의 픽셀 크기. 기본 13 = Windows 96DPI 표준 글리프 크기.
+	void		set_check_size(int size) { m_check_size = (size > 0) ? size : m_check_size; if (m_hWnd) Invalidate(); }
+
 	//public으로 하여 CSCGdiplusBitmap의 effect등의 함수등을 사용할 수 있도록 함.
 	//하나의 버튼에는 n개의 이미지를 담을 수 있고 각 이미지는 4개의 state image를 각각 설정할 수 있다.
 	std::deque<CGdiButtonImage*> m_image;
@@ -492,6 +495,7 @@ protected:
 	//checkbox를 직접 그려줄 경우 윈도우 기본 스타일, 라운드 채움 스타일 등
 	int			m_check_style = check_style_default;
 	Gdiplus::Color m_cr_check_fill = Gdiplus::Color::RoyalBlue;
+	int			m_check_size = 13;			//직접 그리는 checkbox/radio 글리프 정사각형 크기(px). Windows 96DPI 표준=13. set_check_size 로 변경.
 
 	//set_button_action()으로 SC_HELP, SC_PIN, SC_MINIMIZE, SC_MAXIMIZE, SC_CLOSE 중의 한 값으로 줄 경우 해당 버튼이 그려진다.
 	int			m_button_cmd = -1;

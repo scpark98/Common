@@ -827,12 +827,16 @@ struct	NETWORK_INFO
 	//resource string table의 문자열을 리턴한다.
 	extern CString load_string(UINT nID);
 
+	//마지막 표시 자리의 반올림 방향. 탐색기는 파일 크기(KB)=올림, 드라이브/폴더 용량(GB/TB)=내림이라 용도별로 다르다.
+	enum size_round { size_round_up = 0, size_round_down = 1 };
+
 	//unit			: -1:auto, 0:bytes, 1:KB, 2:MB, 3:GB ~
 	//auto일 경우는 1000보다 작을떄까지 나누고 소수점은 2자리까지 표시한다.(ex 7.28TB)
 	//floats		: 소수점을 몇 자리까지 표시할지
 	//unit_string	: 단위를 표시할 지
 	//comma			: 정수 부분에 자리수 콤마를 표시할 지
-	CString		get_size_str(ULONGLONG size, int unit = 1, int floats = 0, bool unit_string = true, bool comma = true);
+	//rounding		: 마지막 자리 반올림 방향. 파일 크기는 기본(올림)으로 탐색기 KB 컬럼과 일치, 드라이브 용량은 size_round_down.
+	CString		get_size_str(ULONGLONG size, int unit = 1, int floats = 0, bool unit_string = true, bool comma = true, int rounding = size_round_up);
 
 	//src를 파싱해서 특정 길이 이상의 문자열들로 나눈다.
 	std::deque<CString> parse_divide(CString src, int len);

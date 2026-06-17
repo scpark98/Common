@@ -1402,7 +1402,7 @@ CString		get_file_size_str(WIN32_FIND_DATA data, int unit, int floats, bool unit
 //floats		: 소수점을 몇 자리까지 표시할지
 //unit_string	: 단위를 표시할 지
 //comma			: 정수 부분에 자리수 콤마를 표시할 지
-CString		get_size_str(ULONGLONG size, int unit, int floats, bool unit_string, bool comma)
+CString		get_size_str(ULONGLONG size, int unit, int floats, bool unit_string, bool comma, int rounding)
 {
 	double dsize = (double)size;
 	CString size_str;
@@ -1417,7 +1417,15 @@ CString		get_size_str(ULONGLONG size, int unit, int floats, bool unit_string, bo
 	{
 		unit = 0;
 
-		//1024가 아니라 1000인 점에 주의!
+		//나누기는 1024(2진 단위: 1KB=1024B), 그러나 단위 승격 임계는 1024 가 아니라 "1000" 인 점에 주의!
+		//이유: 표시 값을 항상 "유효숫자 3자리"로 묶기 위해서다. 정수부가 4자리(>=1000)가 되려는 순간 다음 단위로
+		//올려, 아래 floats(=3-정수자릿수) 와 짝을 이뤄 어떤 크기든 3자리로 보이게 한다.
+		//  예) 465       -> 정수 3자리, floats 0 -> "465GB"
+		//      88.9      -> 정수 2자리, floats 1 -> "88.9GB"
+		//      7.28      -> 정수 1자리, floats 2 -> "7.28TB"
+		//임계를 1024 로 두면 1010KB 같은 4자리 값이 그대로 노출돼 이 포맷이 깨진다(1000 임계면 1010KB -> "0.99MB" 로 승격).
+		//단 부작용: 정확히 1000~1023 구간 값은 비표준으로 보인다 — 예) 1000KB 는 "1000 KB" 가 아니라 1024 로 나눠 "0.98MB".
+		//(Windows 탐색기는 1024 경계로 끊으므로 이 경계 구간에서만 미세하게 달라진다. 일반 크기는 영향 없음.)
 		while (dsize >= 1000.0)
 		{
 			dsize /= 1024.0;
@@ -1442,15 +1450,17 @@ CString		get_size_str(ULONGLONG size, int unit, int floats, bool unit_string, bo
 	//dsize = 0.01234;
 	//floats = 2;
 	double multiply = pow(10.0, floats);
-	dsize = ceil(dsize * multiply) / multiply;// ROUND(dsize, floats);
-	//0.045KB일 때 floats가 0이면 0KB으로 리턴될 것이다.
-	//이 경우라면 1KB로 리턴하는 것이 맞다.
-	//실제 파일의 크기가 0byte일때만 0을 리턴하자.
-	//0.045KB일 때 floats가 1이면 역시 0.0KB로 리턴될 것이다.
-	//이 경우라면 0.1KB로 리턴되는게 맞다.
-	//floats가 1이면 0.1이고 이 0.1보다 dsize가 작다면 그냥 0.1라고 해주자.
-	double dmin = 1.0 / pow(10.0, floats);
-	if (dsize > 0.0 && dsize < dmin)
+	double dmin = 1.0 / multiply;
+
+	//탐색기는 표시 정밀도의 마지막 자리에서 용도별로 반올림 방향이 다르다 — 파일 크기(KB 컬럼)는 올림(부분 KB 도 한 KB),
+	//드라이브/폴더 용량(GB/TB)은 내림. 단일 모드로는 둘 다 못 맞춰 호출처가 rounding 으로 선택한다(기본=올림).
+	//0 이 아닌데 내림으로 0 이 되는 작은 값은 0 대신 dmin(최소 표시 단위)으로 보정 — 반올림 이전 값 기준 판정.
+	bool nonzero = (dsize > 0.0);
+	if (rounding == size_round_down)
+		dsize = floor(dsize * multiply) / multiply;
+	else
+		dsize = ceil(dsize * multiply) / multiply;
+	if (nonzero && dsize < dmin)
 		dsize = dmin;
 
 	//dsize = ROUND(dsize, floats + 1);

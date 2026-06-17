@@ -7,10 +7,10 @@
 //특정 색상값을 [색상없음]의 의미로 사용하기 위해.
 #define listctrlex_unused_color	Gdiplus::Color(17,235,53)
 
-//"흐릿한 보조 텍스트"(파일 크기/날짜 등) sentinel — 그리기 시점에 비선택은 theme cr_text_dim, 선택은 cr_text_selected 로
-//해석한다. 고정 회색을 박지 않으므로 theme 변경에도 적응하고, 선택 시 가독성 위해 자동으로 selected 색이 된다.
-//(의미색 cr_text_selected 보존 규칙과 구분 — 이건 dim 이라 선택 시 양보한다.)
-#define listctrlex_dim_color	Gdiplus::Color(18,235,53)
+//"약한 보조 텍스트"(파일 크기/날짜 등) sentinel — 그리기 시점에 비선택은 get_weak_color(cr_text,16)(본문색 한 톤 약화),
+//선택은 cr_text_selected 로 해석한다. 고정 회색을 박지 않으므로 theme 변경에도 적응하고, 선택 시 가독성 위해 자동으로 selected 색이 된다.
+//(의미색 cr_text_selected 보존 규칙과 구분 — 이건 보조색이라 선택 시 양보한다.)
+#define listctrlex_weak_color	Gdiplus::Color(18,235,53)
 
 //한 라인에 대한 정보를 담는 클래스
 class CListCtrlData

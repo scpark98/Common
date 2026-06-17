@@ -321,15 +321,15 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 			//(이전엔 selected 시 셀 색을 무조건 덮어써 자막창의 red 자막이 selected 시 white 로 바뀌는 회귀 발생.)
 			if (m_has_focus)
 			{
-				//unused(미지정) 또는 dim(보조 텍스트) 셀은 선택 시 cr_text_selected 로 — dim 은 선택 배경 위에서 가독성 위해 양보.
-				if (crText.GetValue() == listctrlex_unused_color.GetValue() || crText.GetValue() == listctrlex_dim_color.GetValue())
+				//unused(미지정) 또는 weak(보조 텍스트) 셀은 선택 시 cr_text_selected 로 — 보조색은 선택 배경 위에서 가독성 위해 양보.
+				if (crText.GetValue() == listctrlex_unused_color.GetValue() || crText.GetValue() == listctrlex_weak_color.GetValue())
 					crText = m_theme.cr_text_selected;
 				if ((is_full_row_selection || iSubItem == 0) && crBack.GetValue() == listctrlex_unused_color.GetValue())
 					crBack = m_theme.cr_back_selected;
 			}
 			else
 			{
-				if (crText.GetValue() == listctrlex_unused_color.GetValue() || crText.GetValue() == listctrlex_dim_color.GetValue())
+				if (crText.GetValue() == listctrlex_unused_color.GetValue() || crText.GetValue() == listctrlex_weak_color.GetValue())
 					crText = m_theme.cr_text_selected_inactive;
 				if ((is_full_row_selection || iSubItem == 0) && crBack.GetValue() == listctrlex_unused_color.GetValue())
 					crBack = m_theme.cr_back_selected_inactive;
@@ -339,18 +339,20 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		//단 대상 항목이 파일인 경우는 drop hilited 표시를 하지 않는다.
 		else if (is_drophilited) //ok
 		{
-			if (crText.GetValue() == listctrlex_unused_color.GetValue() || crText.GetValue() == listctrlex_dim_color.GetValue())
+			if (crText.GetValue() == listctrlex_unused_color.GetValue() || crText.GetValue() == listctrlex_weak_color.GetValue())
 				crText = m_theme.cr_text_selected;
 			if (crBack.GetValue() == listctrlex_unused_color.GetValue())
 				crBack = m_theme.cr_back_selected;
 		}
 		else
 		{
-			//비선택: unused → 기본 글자색, dim sentinel → theme 의 흐릿한 보조색(cr_text_dim, theme 변경에 적응), 그 외 명시색 유지.
+			//비선택: unused → 기본 글자색, weak sentinel → 본문색을 한 톤만 약화(get_weak_color(cr_text,16)), 그 외 명시색 유지.
+			//cr_text_dim(=get_weak_color(fg,100)) 은 dark_gray 처럼 본문색이 이미 옅은 테마에서 과하게 어두워져 크기/날짜가
+			//거의 안 보였다. 16 만 약화하면 본문보다 살짝 흐리되 가독성은 유지된다.
 			if (crText.GetValue() == listctrlex_unused_color.GetValue())
 				crText = m_theme.cr_text;
-			else if (crText.GetValue() == listctrlex_dim_color.GetValue())
-				crText = m_theme.cr_text_dim;
+			else if (crText.GetValue() == listctrlex_weak_color.GetValue())
+				crText = get_weak_color(m_theme.cr_text, 16);
 			else
 				crText = m_list_db[iItem].crText[iSubItem];
 
@@ -2722,7 +2724,7 @@ int CVtListCtrlEx::insert_folder(int index, CString new_folder_name, bool is_rem
 
 	set_text(index, col_filesize, _T(""));
 	set_text(index, col_filedate, get_cur_datetime_str(2, true, _T(" "), false, false));
-	set_text_color(index, col_filedate, listctrlex_dim_color);
+	set_text_color(index, col_filedate, listctrlex_weak_color);
 
 	CVtFileInfo fi;
 	WIN32_FIND_DATA data;
@@ -4781,19 +4783,20 @@ void CVtListCtrlEx::display_filelist(CString cur_path)
 				//::SendMessage(GetParent()->GetSafeHwnd(), Message_CVtListCtrlEx, (WPARAM) & (CVtListCtrlExMessage(this, message_get_remote_total_space, NULL, real_path)), (LPARAM)&ul_total_space);
 			}
 
+			//드라이브 용량은 탐색기와 동일하게 내림(size_round_down). unit=-1(auto) 자리를 채우려 floats/unit_string/comma 는 기본값 명시.
 			if (ul_free_space.QuadPart > 0)
-				set_text(index, col_filesize, get_size_str(ul_free_space.QuadPart, -1));
+				set_text(index, col_filesize, get_size_str(ul_free_space.QuadPart, -1, 0, true, true, size_round_down));
 			if (ul_total_space.QuadPart > 0)
-				set_text(index, col_filedate, get_size_str(ul_total_space.QuadPart, -1));
+				set_text(index, col_filedate, get_size_str(ul_total_space.QuadPart, -1, 0, true, true, size_round_down));
 
-			set_text_color(index, col_filesize, listctrlex_dim_color);
-			set_text_color(index, col_filedate, listctrlex_dim_color);
+			set_text_color(index, col_filesize, listctrlex_weak_color);
+			set_text_color(index, col_filedate, listctrlex_weak_color);
 		}
 		else
 		{
 			set_text(index, col_filesize, _T(""));
 			set_text(index, col_filedate, get_file_time_str(m_cur_folders[i].data.ftLastWriteTime));
-			set_text_color(index, col_filedate, listctrlex_dim_color);
+			set_text_color(index, col_filedate, listctrlex_weak_color);
 		}
 	}
 
@@ -4819,8 +4822,8 @@ void CVtListCtrlEx::display_filelist(CString cur_path)
 
 		set_text(index, col_filesize, get_size_str(get_file_size(m_cur_files[i].data)));
 		set_text(index, col_filedate, m_cur_files[i].get_file_time_str());
-		set_text_color(index, col_filesize, listctrlex_dim_color);
-		set_text_color(index, col_filedate, listctrlex_dim_color);
+		set_text_color(index, col_filesize, listctrlex_weak_color);
+		set_text_color(index, col_filedate, listctrlex_weak_color);
 	}
 
 	//bulk 종료 — 항목수·scrollbar 를 한 번만 갱신.

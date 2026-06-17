@@ -41,6 +41,7 @@ http://www.devpia.com/MAEUL/Contents/Detail.aspx?BoardID=51&MAEULNo=20&no=567
 #include <vector>
 #include <deque>
 #include <map>
+#include <unordered_map>
 #include <algorithm>
 #include <set>
 #include <ostream>
@@ -2027,6 +2028,50 @@ h		: 복사할 height 크기(pixel)
 	//Gdiplus
 	//Gdiplus::MeasureString()의 오류를 대체.(http://www.soen.kr/lecture/library/gdiplus/1-7.htm)
 	Gdiplus::RectF measure_string(Gdiplus::Graphics* g, Gdiplus::Font& font, LPCTSTR String, int length = -1);
+
+	//width × height 픽셀을 get_pixel(x, y) 로 순회하며 색상별 픽셀 수를 센다.
+	//결과를 out 에 빈도 내림차순으로 채운다(first = 색, second = 픽셀 수).
+	//top_n > 0 이면 상위 top_n 개만 남긴다(0 = 전체). ignore_alpha = true 면 alpha 무시(RGB 만 키).
+	//get_pixel 은 Gdiplus::Color(int x, int y) 를 돌려주는 임의 callable — CSCGdiplusBitmap / CSCD2Image 등 픽셀 접근 방식이 다른 클래스가 각자의 get_pixel 을 넘겨 공용으로 쓴다.
+	//반환 = 사용된 서로 다른 색상 개수.
+	template <typename PixelFn>
+	int count_color_used(int width, int height, PixelFn get_pixel,
+		std::vector<std::pair<Gdiplus::Color, int>>& out,
+		int top_n = 0, bool ignore_alpha = false)
+	{
+		out.clear();
+
+		if (width <= 0 || height <= 0)
+			return 0;
+
+		std::unordered_map<DWORD, int> count;
+		count.reserve(min(width * height, 1 << 16));
+
+		for (int y = 0; y < height; y++)
+		{
+			for (int x = 0; x < width; x++)
+			{
+				Gdiplus::Color cr = get_pixel(x, y);
+				DWORD argb = ignore_alpha
+					? Gdiplus::Color::MakeARGB(255, cr.GetRed(), cr.GetGreen(), cr.GetBlue())
+					: cr.GetValue();
+				++count[argb];
+			}
+		}
+
+		out.reserve(count.size());
+		for (const auto& kv : count)
+			out.emplace_back(Gdiplus::Color(kv.first), kv.second);
+
+		std::sort(out.begin(), out.end(),
+			[](const std::pair<Gdiplus::Color, int>& a, const std::pair<Gdiplus::Color, int>& b)
+			{ return a.second > b.second; });
+
+		if (top_n > 0 && (int)out.size() > top_n)
+			out.resize(top_n);
+
+		return (int)count.size();
+	}
 
 	//Gdiplus를 이용한 텍스트 출력
 	CRect		draw_text(Gdiplus::Graphics& g,

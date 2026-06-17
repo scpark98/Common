@@ -1809,6 +1809,21 @@ CSize CSCD2ImageDlg::get_img_size()
 	return CSize(m_images[0].get_width(), m_images[0].get_height());
 }
 
+void CSCD2ImageDlg::count_color_used()
+{
+	if (m_images.size() == 0 || m_images[0].is_empty())
+		return;
+
+	m_images[0].count_color_used(10);
+
+	CString str;
+
+	for (int i = 0; i < MIN(10, m_images[0].m_color_used.size()); i++)
+	{
+		TRACE(_T("%d. %s = %d\n"), i, get_color_str(m_images[0].m_color_used[i].first), m_images[0].m_color_used[i].second);
+	}
+}
+
 int CSCD2ImageDlg::get_channel()
 {
 	if (m_images.size() == 0 || m_images[0].is_empty())

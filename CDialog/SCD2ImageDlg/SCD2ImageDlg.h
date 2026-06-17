@@ -198,6 +198,8 @@ public:
 	void			set_show_info(bool show);
 	void			set_alt_info(CString alt_info) { m_alt_info = alt_info; Invalidate(); }
 
+	void			count_color_used();
+
 	int				get_channel();
 
 	bool			get_show_pixel_pos() { return m_show_pixel_pos; }

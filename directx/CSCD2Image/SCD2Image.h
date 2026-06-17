@@ -139,6 +139,13 @@ public:
 	
 	Gdiplus::Color			get_pixel(int x, int y);
 
+	//이미지의 색상별 픽셀 수를 센다. 결과는 m_color_used 에 빈도 내림차순으로 저장.
+	//top_n > 0 이면 상위 top_n 개만 남긴다(0 = 전체). ignore_alpha = true 면 alpha 무시(RGB 만 키).
+	//반환 = 사용된 서로 다른 색상 개수. (get_alpha_pixel_count 와 동일하게 0번 프레임의 m_data 대상)
+	int						count_color_used(int top_n = 0, bool ignore_alpha = false);
+	//count_color_used() 결과. first = 색, second = 픽셀 수. 빈도 내림차순 정렬됨.
+	std::vector<std::pair<Gdiplus::Color, int>>	m_color_used;
+
 	//PixelFormat24bppRGB과 같이 정의된 값을 문자열로 리턴하며 simple = true일 경우는 "RGB (24bit)"와 같이 리턴한다.
 	//fmt가 주어지지 않으면 현재 이미지의 PixelFormat을 구하여 결과를 리턴한다.
 	//한번 구한 후에는 m_pixel_format_str 변수에 저장되고 이를 리턴하지만 다시 구해야 할 경우는 reset = true로 호출한다.

@@ -2329,6 +2329,19 @@ Gdiplus::Color CSCD2Image::get_pixel(int x, int y)
 	return Gdiplus::Color(a, r, g, b);
 }
 
+int CSCD2Image::count_color_used(int top_n, bool ignore_alpha)
+{
+	if (m_data == nullptr)
+	{
+		m_color_used.clear();
+		return 0;
+	}
+
+	return ::count_color_used((int)get_width(), (int)get_height(),
+		[this](int x, int y) { return get_pixel(x, y); },
+		m_color_used, top_n, ignore_alpha);
+}
+
 CString CSCD2Image::get_pixel_format_str(WICPixelFormatGUID *pf, bool simple, bool reset)
 {
 	if (reset)

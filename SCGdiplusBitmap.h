@@ -380,6 +380,13 @@ public:
 	Gdiplus::Color	get_pixel(int x, int y);
 	void			set_pixel(int x, int y, Gdiplus::Color cr);
 
+	//이미지의 색상별 픽셀 수를 센다. 결과는 m_color_used 에 빈도 내림차순으로 저장.
+	//top_n > 0 이면 상위 top_n 개만 남긴다(0 = 전체). ignore_alpha = true 면 alpha 무시(RGB 만 키).
+	//반환 = 사용된 서로 다른 색상 개수.
+	int				count_color_used(int top_n = 0, bool ignore_alpha = false);
+	//count_color_used() 결과. first = 색, second = 픽셀 수. 빈도 내림차순 정렬됨.
+	std::vector<std::pair<Gdiplus::Color, int>>	m_color_used;
+
 
 	//특정 위치의 색상이나 특정색상을 새로운 색상으로 변경한다.
 	void			replace_color(int tx, int ty, Gdiplus::Color dst);

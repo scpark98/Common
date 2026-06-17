@@ -4068,6 +4068,22 @@ void CSCGdiplusBitmap::set_pixel(int x, int y, Gdiplus::Color cr)
 	}
 }
 
+int CSCGdiplusBitmap::count_color_used(int top_n, bool ignore_alpha)
+{
+	if (!is_valid())
+	{
+		m_color_used.clear();
+		return 0;
+	}
+
+	if (data == NULL)
+		get_raw_data();
+
+	return ::count_color_used(width, height,
+		[this](int x, int y) { return get_pixel(x, y); },
+		m_color_used, top_n, ignore_alpha);
+}
+
 //현재 이미지를 이용해서 배경 그림자로 사용할 이미지를 생성한다.
 void CSCGdiplusBitmap::create_back_shadow_image(CSCGdiplusBitmap* shadow, float sigma, int shadow_type, int depth, Gdiplus::Color cr_shadow)
 {

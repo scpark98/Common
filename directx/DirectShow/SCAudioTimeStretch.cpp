@@ -26,7 +26,7 @@ void CSCAudioTimeStretch::set_rate(double rate)
 	if (rate < 0.01) rate = 0.01;
 	m_pending_rate.store(rate);
 	m_pending_rate_changed.store(true);
-	logWrite(_T("[time_stretch] set_rate pending=%.3f (anchor reset 트리거)"), rate);
+	//logWrite(_T("[time_stretch] set_rate pending=%.3f (anchor reset 트리거)"), rate);
 }
 
 int64_t CSCAudioTimeStretch::processed_input_pts_ms() const
@@ -58,7 +58,7 @@ bool CSCAudioTimeStretch::init_filter_graph(int sample_rate, int channels, int b
 	const AVFilter* abuffersink = avfilter_get_by_name("abuffersink");
 	if (!abuffer || !atempo || !abuffersink)
 	{
-		logWrite(_T("[time_stretch] filter lookup fail"));
+		//logWrite(_T("[time_stretch] filter lookup fail"));
 		release_filter_graph();
 		return false;
 	}
@@ -79,7 +79,7 @@ bool CSCAudioTimeStretch::init_filter_graph(int sample_rate, int channels, int b
 	av_channel_layout_uninit(&layout);
 
 	int hr = avfilter_graph_create_filter(&m_filter_src, abuffer, "in", src_args, NULL, m_filter_graph);
-	if (hr < 0) { logWrite(_T("[time_stretch] abuffer create fail hr=%d args=%S"), hr, src_args); release_filter_graph(); return false; }
+	if (hr < 0) { /*logWrite(_T("[time_stretch] abuffer create fail hr=%d args=%S"), hr, src_args);*/ release_filter_graph(); return false; }
 
 	//atempo chain — 단일 instance [0.5, 2.0] 한계 회피.
 	//r<0.5: 0.5 push 하며 r/=0.5 반복, 마지막 [0.5,1.0] 의 r 한 번 더.
@@ -114,7 +114,7 @@ bool CSCAudioTimeStretch::init_filter_graph(int sample_rate, int channels, int b
 		hr = avfilter_graph_create_filter(&ctx, atempo, name, tempo_args, NULL, m_filter_graph);
 		if (hr < 0)
 		{
-			logWrite(_T("[time_stretch] atempo[%zu]=%.3f create fail hr=%d"), k, tempos[k], hr);
+			//logWrite(_T("[time_stretch] atempo[%zu]=%.3f create fail hr=%d"), k, tempos[k], hr);
 			release_filter_graph();
 			return false;
 		}
@@ -123,7 +123,7 @@ bool CSCAudioTimeStretch::init_filter_graph(int sample_rate, int channels, int b
 	m_filter_atempo = atempo_chain.empty() ? nullptr : atempo_chain.front();
 
 	hr = avfilter_graph_create_filter(&m_filter_sink, abuffersink, "out", NULL, NULL, m_filter_graph);
-	if (hr < 0) { logWrite(_T("[time_stretch] abuffersink create fail hr=%d"), hr); release_filter_graph(); return false; }
+	if (hr < 0) { /*logWrite(_T("[time_stretch] abuffersink create fail hr=%d"), hr);*/ release_filter_graph(); return false; }
 
 	//sink 의 출력 sample format 고정 — input 과 동일.
 	const AVSampleFormat out_fmts[] = { sfmt, AV_SAMPLE_FMT_NONE };
@@ -134,17 +134,17 @@ bool CSCAudioTimeStretch::init_filter_graph(int sample_rate, int channels, int b
 
 	//link: src → atempo_chain[0] → atempo_chain[1] → ... → sink
 	hr = avfilter_link(m_filter_src, 0, atempo_chain.front(), 0);
-	if (hr < 0) { logWrite(_T("[time_stretch] link src->atempo[0] fail hr=%d"), hr); release_filter_graph(); return false; }
+	if (hr < 0) { /*logWrite(_T("[time_stretch] link src->atempo[0] fail hr=%d"), hr);*/ release_filter_graph(); return false; }
 	for (size_t k = 0; k + 1 < atempo_chain.size(); ++k)
 	{
 		hr = avfilter_link(atempo_chain[k], 0, atempo_chain[k + 1], 0);
-		if (hr < 0) { logWrite(_T("[time_stretch] link atempo[%zu]->atempo[%zu] fail hr=%d"), k, k+1, hr); release_filter_graph(); return false; }
+		if (hr < 0) { /*logWrite(_T("[time_stretch] link atempo[%zu]->atempo[%zu] fail hr=%d"), k, k+1, hr);*/ release_filter_graph(); return false; }
 	}
 	hr = avfilter_link(atempo_chain.back(), 0, m_filter_sink, 0);
-	if (hr < 0) { logWrite(_T("[time_stretch] link atempo->sink fail hr=%d"), hr); release_filter_graph(); return false; }
+	if (hr < 0) { /*logWrite(_T("[time_stretch] link atempo->sink fail hr=%d"), hr);*/ release_filter_graph(); return false; }
 
 	hr = avfilter_graph_config(m_filter_graph, NULL);
-	if (hr < 0) { logWrite(_T("[time_stretch] graph_config fail hr=%d"), hr); release_filter_graph(); return false; }
+	if (hr < 0) { /*logWrite(_T("[time_stretch] graph_config fail hr=%d"), hr);*/ release_filter_graph(); return false; }
 
 	m_filter_sr  = sample_rate;
 	m_filter_ch  = channels;
@@ -162,8 +162,8 @@ bool CSCAudioTimeStretch::init_filter_graph(int sample_rate, int channels, int b
 		seg.Format(_T("%s%.3f"), k ? _T(",") : _T(""), tempos[k]);
 		chain_desc += seg;
 	}
-	logWrite(_T("[time_stretch] graph init OK sr=%d ch=%d bps=%d flt=%d rate=%.3f chain=[%s]"),
-		sample_rate, channels, bits_per_sample, (int)is_float, initial_rate, chain_desc.GetString());
+	//logWrite(_T("[time_stretch] graph init OK sr=%d ch=%d bps=%d flt=%d rate=%.3f chain=[%s]"),
+		//sample_rate, channels, bits_per_sample, (int)is_float, initial_rate, chain_desc.GetString());
 	return true;
 }
 
@@ -197,11 +197,11 @@ bool CSCAudioTimeStretch::send_filter_rate(double rate)
 
 	//chain 의 instance 개수가 rate 따라 변하므로 send_command 만으로 불가능 — graph rebuild.
 	//(ffi_source_filter 의 update_audio_filter_rate 와 동일 원칙. 호출 빈도는 dialog throttle 로 제한.)
-	logWrite(_T("[time_stretch] tempo %.3f -> %.3f (graph rebuild, chain)"), m_filter_rate, rate);
+	//logWrite(_T("[time_stretch] tempo %.3f -> %.3f (graph rebuild, chain)"), m_filter_rate, rate);
 	m_pending_rate.store(rate);
 	if (!init_filter_graph(m_filter_sr, m_filter_ch, m_filter_bps, m_filter_flt))
 	{
-		logWrite(_T("[time_stretch] init_filter_graph fail on rate change"));
+		//logWrite(_T("[time_stretch] init_filter_graph fail on rate change"));
 		return false;
 	}
 	return true;
@@ -322,7 +322,7 @@ void CSCAudioTimeStretch::process_with_atempo(IMediaSample* pIn)
 	av_frame_free(&in_frame);
 	if (hr_push < 0)
 	{
-		logWrite(_T("[time_stretch] buffersrc_add_frame fail hr=%d"), hr_push);
+		//logWrite(_T("[time_stretch] buffersrc_add_frame fail hr=%d"), hr_push);
 		return;
 	}
 
@@ -349,7 +349,7 @@ void CSCAudioTimeStretch::process_with_atempo(IMediaSample* pIn)
 	}
 	if (!pAlloc)
 	{
-		logWrite(_T("[time_stretch] no downstream allocator — bypass"));
+		//logWrite(_T("[time_stretch] no downstream allocator — bypass"));
 		return;
 	}
 
@@ -428,8 +428,8 @@ void CSCAudioTimeStretch::process_one(const work_item& w)
 				init_filter_graph(sr, ch, bps, flt);
 			m_anchor_set = false;
 			m_emitted_total = 0;
-			logWrite(_T("[time_stretch] rate change → graph rebuild sr=%d ch=%d bps=%d flt=%d"),
-				sr, ch, bps, (int)flt);
+			//logWrite(_T("[time_stretch] rate change → graph rebuild sr=%d ch=%d bps=%d flt=%d"),
+				//sr, ch, bps, (int)flt);
 		}
 
 		double rate = m_pending_rate.load();

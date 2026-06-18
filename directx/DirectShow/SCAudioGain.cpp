@@ -196,8 +196,8 @@ void CSCAudioGain::process_sample(BYTE* buf, long len, const WAVEFORMATEX* wfx)
 	static int s_trace_count = 0;
 	if (s_trace_count < 3)
 	{
-		logWrite(_T("[AudioGain] process_sample #%d len=%ld gain=%.3f tag=0x%04X bps=%d ch=%d"),
-			s_trace_count, len, gain, wfx->wFormatTag, wfx->wBitsPerSample, wfx->nChannels);
+		//logWrite(_T("[AudioGain] process_sample #%d len=%ld gain=%.3f tag=0x%04X bps=%d ch=%d"),
+			//s_trace_count, len, gain, wfx->wFormatTag, wfx->wBitsPerSample, wfx->nChannels);
 		s_trace_count++;
 	}
 

@@ -288,8 +288,8 @@ public:
 
 		static int s_count = 0;
 		if (++s_count <= 20)
-			logWrite(_T("[sub_sink] Receive #%d len=%ld rt=%lld..%lld"),
-				s_count, len, (long long)rtStart, (long long)rtEnd);
+			;//logWrite(_T("[sub_sink] Receive #%d len=%ld rt=%lld..%lld"),
+				//s_count, len, (long long)rtStart, (long long)rtEnd);
 
 		//sample timestamp 는 NewSegment.tStart 기준 segment-relative offset 이므로
 		//absolute stream time 으로 변환하기 위해 m_segment_start 를 add 한다.
@@ -446,8 +446,8 @@ void CDShow::setup_subtitle_grabber(HWND target, UINT msg)
 
 	if (!m_pGB || !m_pSplitter || !target)
 	{
-		logWrite(_T("[sub_grab] precondition fail: pGB=%p pSplitter=%p target=%p"),
-			(void*)m_pGB, (void*)m_pSplitter, (void*)target);
+		//logWrite(_T("[sub_grab] precondition fail: pGB=%p pSplitter=%p target=%p"),
+			//(void*)m_pGB, (void*)m_pSplitter, (void*)target);
 		return;
 	}
 
@@ -483,8 +483,8 @@ void CDShow::setup_subtitle_grabber(HWND target, UINT msg)
 					AM_MEDIA_TYPE* pmt = NULL;
 					if (pEnumMT->Next(1, &pmt, NULL) == S_OK)
 					{
-						logWrite(_T("[sub_grab] splitter pin '%s' major.D1=%08lX sub.D1=%08lX"),
-							pi.achName, pmt->majortype.Data1, pmt->subtype.Data1);
+						//logWrite(_T("[sub_grab] splitter pin '%s' major.D1=%08lX sub.D1=%08lX"),
+							//pi.achName, pmt->majortype.Data1, pmt->subtype.Data1);
 						//IsEqualGUID + Data1 fallback (E487EB08 은 자막 majortype 의 unique signature)
 						if (IsEqualGUID(pmt->majortype, MEDIATYPE_Subtitle) ||
 							pmt->majortype.Data1 == 0xE487EB08)
@@ -509,8 +509,8 @@ void CDShow::setup_subtitle_grabber(HWND target, UINT msg)
 		}
 		pEnum->Release();
 	}
-	logWrite(_T("[sub_grab] splitter pin scan: seen=%d out=%d subtitle=%d → pSubPin=%p"),
-		pin_seen, pin_out, pin_sub, (void*)pSubPin);
+	//logWrite(_T("[sub_grab] splitter pin scan: seen=%d out=%d subtitle=%d → pSubPin=%p"),
+		//pin_seen, pin_out, pin_sub, (void*)pSubPin);
 
 	if (!pSubPin)
 	{
@@ -533,7 +533,7 @@ void CDShow::setup_subtitle_grabber(HWND target, UINT msg)
 		hr_conn = m_pGB->ConnectDirect(pSubPin, pSinkIn, NULL);
 		pSinkIn->Release();
 	}
-	logWrite(_T("[sub_grab] ConnectDirect sink hr=0x%08x"), hr_conn);
+	//logWrite(_T("[sub_grab] ConnectDirect sink hr=0x%08x"), hr_conn);
 
 	pSubPin->Release();
 
@@ -585,12 +585,12 @@ void CDShow::set_audio_compressor_makeup_db(float db)
 {
 	if (!m_pAudioCompressorFilter) return;
 	((CSCAudioCompressor*)m_pAudioCompressorFilter)->set_makeup_db(db);
-	logWrite(_T("[set_audio_compressor_makeup_db] db=%.2f"), db);
+	//logWrite(_T("[set_audio_compressor_makeup_db] db=%.2f"), db);
 }
 
 void CDShow::setup_audio_gain_filter()
 {
-	logWrite(_T("[AudioGain] setup entry gb=%p"), m_pGB);
+	//logWrite(_T("[AudioGain] setup entry gb=%p"), m_pGB);
 	teardown_audio_gain_filter();
 
 	if (!m_pGB) return;
@@ -661,20 +661,20 @@ void CDShow::setup_audio_gain_filter()
 
 	if (!pRenderer || !pRendererIn)
 	{
-		logWrite(_T("[AudioGain] no audio renderer found"));
+		//logWrite(_T("[AudioGain] no audio renderer found"));
 		if (pRenderer) pRenderer->Release();
 		if (pRendererIn) pRendererIn->Release();
 		if (pMC) { if (saved_state == State_Running) pMC->Run(); else if (saved_state == State_Paused) pMC->Pause(); }
 		return;
 	}
-	logWrite(_T("[AudioGain] audio renderer found pRenderer=%p pRendererIn=%p"), pRenderer, pRendererIn);
+	//logWrite(_T("[AudioGain] audio renderer found pRenderer=%p pRendererIn=%p"), pRenderer, pRendererIn);
 
 	//audio renderer input 의 connected upstream output pin 가져옴.
 	pRendererIn->ConnectedTo(&pUpstreamOut);
 
 	if (!pUpstreamOut)
 	{
-		logWrite(_T("[AudioGain] upstream pin not connected"));
+		//logWrite(_T("[AudioGain] upstream pin not connected"));
 		pRenderer->Release();
 		pRendererIn->Release();
 		if (pMC) { if (saved_state == State_Running) pMC->Run(); else if (saved_state == State_Paused) pMC->Pause(); }
@@ -686,8 +686,8 @@ void CDShow::setup_audio_gain_filter()
 	memset(&saved_mt, 0, sizeof(saved_mt));
 	HRESULT hr_mt = pRendererIn->ConnectionMediaType(&saved_mt);
 	bool has_saved_mt = SUCCEEDED(hr_mt);
-	logWrite(_T("[AudioGain] saved mt hr=0x%08lX major.D1=%08lX sub.D1=%08lX cbFmt=%lu"),
-		hr_mt, saved_mt.majortype.Data1, saved_mt.subtype.Data1, saved_mt.cbFormat);
+	//logWrite(_T("[AudioGain] saved mt hr=0x%08lX major.D1=%08lX sub.D1=%08lX cbFmt=%lu"),
+		//hr_mt, saved_mt.majortype.Data1, saved_mt.subtype.Data1, saved_mt.cbFormat);
 
 	//기존 connection 끊기.
 	m_pGB->Disconnect(pRendererIn);
@@ -698,7 +698,7 @@ void CDShow::setup_audio_gain_filter()
 	pGain->AddRef();
 
 	HRESULT hr_add = m_pGB->AddFilter(pGain, L"SC Audio Gain");
-	logWrite(_T("[AudioGain] AddFilter hr=0x%08lX"), hr_add);
+	//logWrite(_T("[AudioGain] AddFilter hr=0x%08lX"), hr_add);
 	if (FAILED(hr_add))
 	{
 		m_pGB->ConnectDirect(pUpstreamOut, pRendererIn, has_saved_mt ? &saved_mt : NULL);
@@ -718,21 +718,21 @@ void CDShow::setup_audio_gain_filter()
 
 	HRESULT hr1 = (pGainIn  ? m_pGB->ConnectDirect(pUpstreamOut, pGainIn,  has_saved_mt ? &saved_mt : NULL) : E_FAIL);
 	HRESULT hr2 = (pGainOut ? m_pGB->ConnectDirect(pGainOut, pRendererIn, has_saved_mt ? &saved_mt : NULL) : E_FAIL);
-	logWrite(_T("[AudioGain] Connect upstream->gain hr=0x%08lX  gain->renderer hr=0x%08lX"), hr1, hr2);
+	//logWrite(_T("[AudioGain] Connect upstream->gain hr=0x%08lX  gain->renderer hr=0x%08lX"), hr1, hr2);
 
 	if (pGainIn) pGainIn->Release();
 	if (pGainOut) pGainOut->Release();
 
 	if (FAILED(hr1) || FAILED(hr2))
 	{
-		logWrite(_T("[AudioGain] connect failed - restoring original chain"));
+		//logWrite(_T("[AudioGain] connect failed - restoring original chain"));
 		m_pGB->RemoveFilter(pGain);
 		pGain->Release();
 		m_pGB->ConnectDirect(pUpstreamOut, pRendererIn, has_saved_mt ? &saved_mt : NULL);
 	}
 	else
 	{
-		logWrite(_T("[AudioGain] gain filter inserted into graph"));
+		//logWrite(_T("[AudioGain] gain filter inserted into graph"));
 		m_pAudioGainFilter = pGain;
 
 		//AGC default 적용 — registry "setting\audio_agc_enabled" + "audio_agc_target_db" 에서 읽고
@@ -742,14 +742,14 @@ void CDShow::setup_audio_gain_filter()
 		pGain->set_agc_target_db((float)target_int);
 		pGain->set_agc_enabled(agc_on);
 		pGain->reset_agc();
-		logWrite(_T("[AudioGain] AGC enabled=%d target=%d dB"), (int)agc_on, target_int);
+		//logWrite(_T("[AudioGain] AGC enabled=%d target=%d dB"), (int)agc_on, target_int);
 
 		//audio_sync 복원 — chain teardown/setup 토글 시 이전 m_audio_sync 가 0 이 아니면
 		//새 chain 에 set_delay_ms 적용. rate=1.0 복귀 후 audio_sync 유실 방지.
 		if (m_audio_sync != 0)
 		{
 			pGain->set_delay_ms(m_audio_sync);
-			logWrite(_T("[AudioGain] audio_sync %d ms re-applied after chain setup"), m_audio_sync);
+			//logWrite(_T("[AudioGain] audio_sync %d ms re-applied after chain setup"), m_audio_sync);
 		}
 
 		//Compressor 도 chain 에 추가: upstream → gain → compressor → renderer.
@@ -774,7 +774,7 @@ void CDShow::setup_audio_gain_filter()
 			pComp->set_makeup_db(0.0f);	//set_volume 에서 동적 조절
 
 			HRESULT hr_addc = m_pGB->AddFilter(pComp, L"SC Audio Compressor");
-			logWrite(_T("[AudioComp] AddFilter hr=0x%08lX"), hr_addc);
+			//logWrite(_T("[AudioComp] AddFilter hr=0x%08lX"), hr_addc);
 
 			IPin* pCompIn = NULL, * pCompOut = NULL;
 			pComp->FindPin(L"In",  &pCompIn);
@@ -782,21 +782,21 @@ void CDShow::setup_audio_gain_filter()
 
 			HRESULT hr_c1 = (pCompIn  ? m_pGB->ConnectDirect(pGainOutPin, pCompIn,  has_comp_mt ? &comp_mt : NULL) : E_FAIL);
 			HRESULT hr_c2 = (pCompOut ? m_pGB->ConnectDirect(pCompOut, pRendererIn, has_comp_mt ? &comp_mt : NULL) : E_FAIL);
-			logWrite(_T("[AudioComp] Connect gain->comp hr=0x%08lX  comp->renderer hr=0x%08lX"), hr_c1, hr_c2);
+			//logWrite(_T("[AudioComp] Connect gain->comp hr=0x%08lX  comp->renderer hr=0x%08lX"), hr_c1, hr_c2);
 
 			if (pCompIn) pCompIn->Release();
 			if (pCompOut) pCompOut->Release();
 
 			if (FAILED(hr_c1) || FAILED(hr_c2))
 			{
-				logWrite(_T("[AudioComp] connect failed - reverting (compressor 없이 gain 만 사용)"));
+				//logWrite(_T("[AudioComp] connect failed - reverting (compressor 없이 gain 만 사용)"));
 				m_pGB->RemoveFilter(pComp);
 				pComp->Release();
 				m_pGB->ConnectDirect(pGainOutPin, pRendererIn, has_comp_mt ? &comp_mt : NULL);
 			}
 			else
 			{
-				logWrite(_T("[AudioComp] compressor inserted into chain (gain->comp->renderer)"));
+				//logWrite(_T("[AudioComp] compressor inserted into chain (gain->comp->renderer)"));
 				m_pAudioCompressorFilter = pComp;
 			}
 
@@ -831,7 +831,7 @@ void CDShow::setup_audio_gain_filter()
 				pTS->AddRef();
 
 				HRESULT hr_addts = m_pGB->AddFilter(pTS, L"SC Audio Time-Stretch");
-				logWrite(_T("[AudioTS] AddFilter hr=0x%08lX"), hr_addts);
+				//logWrite(_T("[AudioTS] AddFilter hr=0x%08lX"), hr_addts);
 
 				IPin* pTsIn = NULL, *pTsOut = NULL;
 				pTS->FindPin(L"In",  &pTsIn);
@@ -839,21 +839,21 @@ void CDShow::setup_audio_gain_filter()
 
 				HRESULT hr_t1 = (pTsIn  ? m_pGB->ConnectDirect(pTailOut, pTsIn,  has_ts_mt ? &ts_mt : NULL) : E_FAIL);
 				HRESULT hr_t2 = (pTsOut ? m_pGB->ConnectDirect(pTsOut, pRendererIn, has_ts_mt ? &ts_mt : NULL) : E_FAIL);
-				logWrite(_T("[AudioTS] Connect comp->ts hr=0x%08lX  ts->renderer hr=0x%08lX"), hr_t1, hr_t2);
+				//logWrite(_T("[AudioTS] Connect comp->ts hr=0x%08lX  ts->renderer hr=0x%08lX"), hr_t1, hr_t2);
 
 				if (pTsIn) pTsIn->Release();
 				if (pTsOut) pTsOut->Release();
 
 				if (FAILED(hr_t1) || FAILED(hr_t2))
 				{
-					logWrite(_T("[AudioTS] connect failed - reverting (time-stretch 없이 compressor 까지만 사용)"));
+					//logWrite(_T("[AudioTS] connect failed - reverting (time-stretch 없이 compressor 까지만 사용)"));
 					m_pGB->RemoveFilter(pTS);
 					pTS->Release();
 					m_pGB->ConnectDirect(pTailOut, pRendererIn, has_ts_mt ? &ts_mt : NULL);
 				}
 				else
 				{
-					logWrite(_T("[AudioTS] time-stretch inserted into chain (comp->ts->renderer)"));
+					//logWrite(_T("[AudioTS] time-stretch inserted into chain (comp->ts->renderer)"));
 					m_pAudioTimeStretchFilter = pTS;
 				}
 
@@ -885,16 +885,16 @@ void CDShow::setup_audio_gain_filter()
 			if (pMF)
 			{
 				HRESULT hr_sync = pMF->SetSyncSource(pClock);
-				logWrite(_T("[AudioGain] SetSyncSource(audio renderer clock) hr=0x%08lX"), hr_sync);
+				//logWrite(_T("[AudioGain] SetSyncSource(audio renderer clock) hr=0x%08lX"), hr_sync);
 			}
 			else
 			{
-				logWrite(_T("[AudioGain] graph IMediaFilter QI fail — SetSyncSource skipped"));
+				//logWrite(_T("[AudioGain] graph IMediaFilter QI fail — SetSyncSource skipped"));
 			}
 		}
 		else
 		{
-			logWrite(_T("[AudioGain] audio renderer IReferenceClock not exposed — SetSyncSource skipped"));
+			//logWrite(_T("[AudioGain] audio renderer IReferenceClock not exposed — SetSyncSource skipped"));
 		}
 	}
 
@@ -988,7 +988,7 @@ void CDShow::teardown_audio_gain_filter()
 	if (pUpstreamOut && pDownstreamIn)
 	{
 		hr_reconnect = m_pGB->ConnectDirect(pUpstreamOut, pDownstreamIn, has_mt ? &saved_mt : NULL);
-		logWrite(_T("[AudioGain] teardown direct reconnect hr=0x%08x"), hr_reconnect);
+		//logWrite(_T("[AudioGain] teardown direct reconnect hr=0x%08x"), hr_reconnect);
 	}
 	if (pUpstreamOut) pUpstreamOut->Release();
 	if (pDownstreamIn) pDownstreamIn->Release();
@@ -1080,18 +1080,18 @@ void CDShow::setup_video_time_scale_filter()
 
 	if (!pRenderer || !pRendererIn)
 	{
-		logWrite(_T("[VideoTS] no video renderer found"));
+		//logWrite(_T("[VideoTS] no video renderer found"));
 		if (pRenderer) pRenderer->Release();
 		if (pRendererIn) pRendererIn->Release();
 		if (pMC) { if (saved_state == State_Running) pMC->Run(); else if (saved_state == State_Paused) pMC->Pause(); }
 		return;
 	}
-	logWrite(_T("[VideoTS] video renderer found pRenderer=%p pRendererIn=%p"), pRenderer, pRendererIn);
+	//logWrite(_T("[VideoTS] video renderer found pRenderer=%p pRendererIn=%p"), pRenderer, pRendererIn);
 
 	pRendererIn->ConnectedTo(&pUpstreamOut);
 	if (!pUpstreamOut)
 	{
-		logWrite(_T("[VideoTS] upstream pin not connected"));
+		//logWrite(_T("[VideoTS] upstream pin not connected"));
 		pRenderer->Release(); pRendererIn->Release();
 		if (pMC) { if (saved_state == State_Running) pMC->Run(); else if (saved_state == State_Paused) pMC->Pause(); }
 		return;
@@ -1109,7 +1109,7 @@ void CDShow::setup_video_time_scale_filter()
 	pTS->AddRef();
 
 	HRESULT hr_add = m_pGB->AddFilter(pTS, L"SC Video Time-Scale");
-	logWrite(_T("[VideoTS] AddFilter hr=0x%08lX"), hr_add);
+	//logWrite(_T("[VideoTS] AddFilter hr=0x%08lX"), hr_add);
 	if (FAILED(hr_add))
 	{
 		m_pGB->ConnectDirect(pUpstreamOut, pRendererIn, has_saved_mt ? &saved_mt : NULL);
@@ -1123,21 +1123,21 @@ void CDShow::setup_video_time_scale_filter()
 
 		HRESULT hr_t1 = (pTsIn  ? m_pGB->ConnectDirect(pUpstreamOut, pTsIn,  has_saved_mt ? &saved_mt : NULL) : E_FAIL);
 		HRESULT hr_t2 = (pTsOut ? m_pGB->ConnectDirect(pTsOut, pRendererIn, has_saved_mt ? &saved_mt : NULL) : E_FAIL);
-		logWrite(_T("[VideoTS] Connect upstream->ts hr=0x%08lX  ts->renderer hr=0x%08lX"), hr_t1, hr_t2);
+		//logWrite(_T("[VideoTS] Connect upstream->ts hr=0x%08lX  ts->renderer hr=0x%08lX"), hr_t1, hr_t2);
 
 		if (pTsIn) pTsIn->Release();
 		if (pTsOut) pTsOut->Release();
 
 		if (FAILED(hr_t1) || FAILED(hr_t2))
 		{
-			logWrite(_T("[VideoTS] connect failed - restoring original"));
+			//logWrite(_T("[VideoTS] connect failed - restoring original"));
 			m_pGB->RemoveFilter(pTS);
 			pTS->Release();
 			m_pGB->ConnectDirect(pUpstreamOut, pRendererIn, has_saved_mt ? &saved_mt : NULL);
 		}
 		else
 		{
-			logWrite(_T("[VideoTS] video time-scale inserted into chain"));
+			//logWrite(_T("[VideoTS] video time-scale inserted into chain"));
 			m_pVideoTimeScaleFilter = pTS;
 		}
 	}
@@ -1192,7 +1192,7 @@ void CDShow::teardown_video_time_scale_filter()
 	if (pUpstreamOut && pDownstreamIn)
 	{
 		HRESULT hr_r = m_pGB->ConnectDirect(pUpstreamOut, pDownstreamIn, has_mt ? &saved_mt : NULL);
-		logWrite(_T("[VideoTS] teardown direct reconnect hr=0x%08x"), hr_r);
+		//logWrite(_T("[VideoTS] teardown direct reconnect hr=0x%08x"), hr_r);
 	}
 	if (pUpstreamOut) pUpstreamOut->Release();
 	if (pDownstreamIn) pDownstreamIn->Release();
@@ -1211,7 +1211,7 @@ void CDShow::teardown_video_time_scale_filter()
 
 void CDShow::set_audio_gain_db(float db)
 {
-	logWrite(_T("[set_audio_gain_db] db=%.2f filter=%p"), db, m_pAudioGainFilter);
+	//logWrite(_T("[set_audio_gain_db] db=%.2f filter=%p"), db, m_pAudioGainFilter);
 	if (!m_pAudioGainFilter) return;
 	CSCAudioGain* pGain = (CSCAudioGain*)m_pAudioGainFilter;
 	pGain->set_gain_db(db);
@@ -1309,13 +1309,13 @@ CDShow::CDShow()
 	m_default_interval = AfxGetApp()->GetProfileInt(_T("setting"), _T("default track interval"), 5);
 	m_control_interval = AfxGetApp()->GetProfileInt(_T("setting"), _T("control track interval"), 30);
 
-	logWrite(_T("[reg] CDShow.ctor: GetProfileInt subtitle/show ENTER"));
+	//logWrite(_T("[reg] CDShow.ctor: GetProfileInt subtitle/show ENTER"));
 	m_show_subtitle = AfxGetApp()->GetProfileInt(_T("subtitle"), _T("show"), true);
-	logWrite(_T("[reg] CDShow.ctor: GetProfileInt subtitle/show OK = %d"), m_show_subtitle);
+	//logWrite(_T("[reg] CDShow.ctor: GetProfileInt subtitle/show OK = %d"), m_show_subtitle);
 
-	logWrite(_T("[reg] CDShow.ctor: GetProfileString subtitle/setting ENTER"));
+	//logWrite(_T("[reg] CDShow.ctor: GetProfileString subtitle/setting ENTER"));
 	m_subCfg <<= AfxGetApp()->GetProfileString(_T("subtitle"), _T("setting"), _T(""));
-	logWrite(_T("[reg] CDShow.ctor: subtitle/setting deserialize OK is_sane=%d"), (int)m_subCfg.is_sane());
+	//logWrite(_T("[reg] CDShow.ctor: subtitle/setting deserialize OK is_sane=%d"), (int)m_subCfg.is_sane());
 
 	//<<= 가 deserialize 후 is_sane() 으로 자체 검증, 부적합하면 set_default() 호출.
 	//garbage 잔여 (옛 schema, 부분 쓰기, 손상 토큰) 가 registry 에 남아있으면 매 실행마다 reset 되므로
@@ -1324,7 +1324,7 @@ CDShow::CDShow()
 		CString style;
 		AfxGetApp()->WriteProfileString(_T("subtitle"), _T("setting"), style <<= m_subCfg);
 	}
-	logWrite(_T("[reg] CDShow.ctor: subtitle/setting writeback OK"));
+	//logWrite(_T("[reg] CDShow.ctor: subtitle/setting writeback OK"));
 
 	/*
 	memset(&m_subCfg, 0, sizeof(m_subCfg));
@@ -1507,7 +1507,7 @@ int CDShow::load_media(CString sfile, CWnd* pParent, bool auto_render)
 	if (m_use_internal_ffmpeg)
 	{
 		int ret = load_media_internal_ffmpeg(sfile, pParent);
-		logWrite(_T("[load/internal] result=%d"), ret);
+		//logWrite(_T("[load/internal] result=%d"), ret);
 		if (ret == 1)
 			return ret;
 
@@ -1518,7 +1518,7 @@ int CDShow::load_media(CString sfile, CWnd* pParent, bool auto_render)
 										//m_pFFiSource=nullptr → empty 반환 → UI 의 "Video Codec:" 등 비어 보이는 회귀.)
 		CoCreateInstance(CLSID_FilterGraph, NULL, CLSCTX_INPROC_SERVER, IID_IGraphBuilder, (void**)&m_pGB);
 		m_media_filename = sfile;   //close_media() 가 reset 한 filename 재세팅 — LAV path 의 OSD/registry 가 caller file 인식 필요.
-		logWrite(_T("[load/internal] falling back to LAV path"));
+		//logWrite(_T("[load/internal] falling back to LAV path"));
 		//아래 LAV path 로 흐름 계속.
 	}
 
@@ -1532,7 +1532,7 @@ int CDShow::load_media(CString sfile, CWnd* pParent, bool auto_render)
 	{
 		m_pGB->AddFilter(m_VMR, L"MPC Video Renderer");
 		m_use_mpcvr = true;
-		logWrite(_T("[renderer] MPC Video Renderer (MPCVR) selected"));
+		//logWrite(_T("[renderer] MPC Video Renderer (MPCVR) selected"));
 
 		//MPC-BE 방식 — pin 연결 전 put_Owner 만 호출. put_WindowStyle/put_Visible/put_MessageDrain 은 호출 안 함
 		//(E_NOTIMPL 반환 + 내부 상태 변경 가능성 — 직전 시도에서 화면 깨짐 원인).
@@ -1540,7 +1540,7 @@ int CDShow::load_media(CString sfile, CWnd* pParent, bool auto_render)
 		if (pVW)
 		{
 			HRESULT hr_owner = pVW->put_Owner((OAHWND)pParent->m_hWnd);
-			logWrite(_T("[renderer] MPCVR put_Owner=0x%08x"), hr_owner);
+			//logWrite(_T("[renderer] MPCVR put_Owner=0x%08x"), hr_owner);
 		}
 
 		//IExFilterConfig 로 resize 동작 최적화. MPC-BE 가 권장하는 lessRedraws 활성화.
@@ -1549,19 +1549,19 @@ int CDShow::load_media(CString sfile, CWnd* pParent, bool auto_render)
 		{
 			HRESULT hr_lr = pCfg->Flt_SetBool("lessRedraws", true);
 			HRESULT hr_dc = pCfg->Flt_SetBool("d3dFullscreenControl", false);
-			logWrite(_T("[renderer] MPCVR cfg lessRedraws=0x%08x d3dFullscreenControl=0x%08x"), hr_lr, hr_dc);
+			//logWrite(_T("[renderer] MPCVR cfg lessRedraws=0x%08x d3dFullscreenControl=0x%08x"), hr_lr, hr_dc);
 		}
 	}
 	else
 	{
-		logWrite(_T("[renderer] MPCVR CoCreate failed hr=0x%08x — try EVR"), hr_mpcvr);
+		//logWrite(_T("[renderer] MPCVR CoCreate failed hr=0x%08x — try EVR"), hr_mpcvr);
 		m_VMR = NULL;
 		HRESULT hr_evr = CoCreateInstance(CLSID_EnhancedVideoRenderer, NULL, CLSCTX_INPROC,
 			IID_IBaseFilter, (LPVOID*)&m_VMR);
 		if (SUCCEEDED(hr_evr) && m_VMR != NULL)
 		{
 			m_pGB->AddFilter(m_VMR, L"Enhanced Video Renderer");
-			logWrite(_T("[renderer] EVR selected"));
+			//logWrite(_T("[renderer] EVR selected"));
 		}
 		else
 		{
@@ -1571,7 +1571,7 @@ int CDShow::load_media(CString sfile, CWnd* pParent, bool auto_render)
 			if (m_VMR != NULL)
 			{
 				m_pGB->AddFilter(m_VMR, L"Video Mixing Renderer 9");
-				logWrite(_T("[renderer] VMR9 selected"));
+				//logWrite(_T("[renderer] VMR9 selected"));
 			}
 		}
 	}
@@ -1688,14 +1688,14 @@ int CDShow::load_media(CString sfile, CWnd* pParent, bool auto_render)
 
 			if (is_windows_media())
 			{
-				logWrite(_T("[wmv] is_windows_media=true — building graph"));
+				//logWrite(_T("[wmv] is_windows_media=true — building graph"));
 
 				//WM ASF Reader 는 source 로 유지 (ASF 파싱 잘 함). decoder 만 LAV 로 교체 — MPC-BE 패턴.
 				//기존 WMVideo/WMAudio Decoder DMO 는 seek 후 video frame 생성을 못 하는 알려진 결함 → LAV 의
 				//FFmpeg 기반 decoder 가 WMV1/2/3/VC-1/WMA 모두 처리 + 빠른 flush + DXVA2 가속.
 				HRESULT hr_find = FindFilter(_T("WM ASF Reader"), CLSID_LegacyAmFilterCategory, &m_SourceBase );
 				HRESULT hr_add = m_SourceBase ? m_pGB->AddFilter(m_SourceBase, _T("WM ASF Reader")) : E_FAIL;
-				logWrite(_T("[wmv] WM ASF Reader find=0x%08x add=0x%08x ptr=%p"), hr_find, hr_add, m_SourceBase);
+				//logWrite(_T("[wmv] WM ASF Reader find=0x%08x add=0x%08x ptr=%p"), hr_find, hr_add, m_SourceBase);
 
 				if (m_SourceBase)
 				{
@@ -1703,19 +1703,19 @@ int CDShow::load_media(CString sfile, CWnd* pParent, bool auto_render)
 					if (m_pFileSource)
 					{
 						HRESULT hr_load = m_pFileSource->Load(wFileName, NULL);
-						logWrite(_T("[wmv] WM ASF Reader Load hr=0x%08x"), hr_load);
+						//logWrite(_T("[wmv] WM ASF Reader Load hr=0x%08x"), hr_load);
 					}
 				}
 
 				IBaseFilter* pLavV = NULL;
 				HRESULT hr_lav_v_find = FindFilter(_T("LAV Video Decoder"), CLSID_LegacyAmFilterCategory, &pLavV);
 				HRESULT hr_lav_v_add = pLavV ? m_pGB->AddFilter(pLavV, _T("LAV Video Decoder")) : E_FAIL;
-				logWrite(_T("[wmv] LAV Video Decoder find=0x%08x add=0x%08x ptr=%p"), hr_lav_v_find, hr_lav_v_add, pLavV);
+				//logWrite(_T("[wmv] LAV Video Decoder find=0x%08x add=0x%08x ptr=%p"), hr_lav_v_find, hr_lav_v_add, pLavV);
 
 				IBaseFilter* pLavA = NULL;
 				HRESULT hr_lav_a_find = FindFilter(_T("LAV Audio Decoder"), CLSID_LegacyAmFilterCategory, &pLavA);
 				HRESULT hr_lav_a_add = pLavA ? m_pGB->AddFilter(pLavA, _T("LAV Audio Decoder")) : E_FAIL;
-				logWrite(_T("[wmv] LAV Audio Decoder find=0x%08x add=0x%08x ptr=%p"), hr_lav_a_find, hr_lav_a_add, pLavA);
+				//logWrite(_T("[wmv] LAV Audio Decoder find=0x%08x add=0x%08x ptr=%p"), hr_lav_a_find, hr_lav_a_add, pLavA);
 
 				//LAV Video Decoder 가 없으면 fallback 으로 WMVideo Decoder DMO 추가 (느리지만 재생은 됨).
 				if (!pLavV)
@@ -1723,14 +1723,14 @@ int CDShow::load_media(CString sfile, CWnd* pParent, bool auto_render)
 					IBaseFilter* pDmo = NULL;
 					HRESULT hr_dmo_find = FindFilter(_T("WMVideo Decoder DMO"), CLSID_LegacyAmFilterCategory, &pDmo);
 					HRESULT hr_dmo_add = pDmo ? m_pGB->AddFilter(pDmo, _T("WMVideo Decoder DMO")) : E_FAIL;
-					logWrite(_T("[wmv] fallback WMVideo Decoder DMO find=0x%08x add=0x%08x"), hr_dmo_find, hr_dmo_add);
+					//logWrite(_T("[wmv] fallback WMVideo Decoder DMO find=0x%08x add=0x%08x"), hr_dmo_find, hr_dmo_add);
 				}
 				if (!pLavA)
 				{
 					IBaseFilter* pDmo = NULL;
 					HRESULT hr_dmo_find = FindFilter(_T("WMAudio Decoder DMO"), CLSID_LegacyAmFilterCategory, &pDmo);
 					HRESULT hr_dmo_add = pDmo ? m_pGB->AddFilter(pDmo, _T("WMAudio Decoder DMO")) : E_FAIL;
-					logWrite(_T("[wmv] fallback WMAudio Decoder DMO find=0x%08x add=0x%08x"), hr_dmo_find, hr_dmo_add);
+					//logWrite(_T("[wmv] fallback WMAudio Decoder DMO find=0x%08x add=0x%08x"), hr_dmo_find, hr_dmo_add);
 				}
 			}
 			else
@@ -1866,7 +1866,7 @@ int CDShow::load_media(CString sfile, CWnd* pParent, bool auto_render)
 					if (pSrcOut && pSplIn)
 					{
 						HRESULT hr_conn = m_pGB->Connect(pSrcOut, pSplIn);
-						logWrite(_T("[splitter] explicit Connect File Source -> LAV Splitter hr=0x%08x"), hr_conn);
+						//logWrite(_T("[splitter] explicit Connect File Source -> LAV Splitter hr=0x%08x"), hr_conn);
 					}
 				}
 
@@ -1939,7 +1939,7 @@ int CDShow::load_media(CString sfile, CWnd* pParent, bool auto_render)
 
 				HRESULT hr_v = connect_splitter_to_lav(L"Video", pLavVideo);
 				HRESULT hr_a = connect_splitter_to_lav(L"Audio", pLavAudio);
-				logWrite(_T("[splitter->lav] Video hr=0x%08x  Audio hr=0x%08x"), hr_v, hr_a);
+				//logWrite(_T("[splitter->lav] Video hr=0x%08x  Audio hr=0x%08x"), hr_v, hr_a);
 
 				//LAV 가 WMV3/WMA 등을 reject 하는 환경 fallback — MPC Video Decoder 시도 (MPC-BE 설치 시 사용 가능).
 				//그것도 실패면 default RenderOutputPins(splitter) 가 registry 에서 (느린) DMO 자동 선택.
@@ -1951,7 +1951,7 @@ int CDShow::load_media(CString sfile, CWnd* pParent, bool auto_render)
 					{
 						m_pGB->AddFilter(pMpcVideo, _T("MPC Video Decoder"));
 						hr_v = connect_splitter_to_lav(L"Video", pMpcVideo);
-						logWrite(_T("[splitter->mpc] Video hr=0x%08x"), hr_v);
+						//logWrite(_T("[splitter->mpc] Video hr=0x%08x"), hr_v);
 					}
 				}
 				IBaseFilter* pMpcAudio = NULL;
@@ -1962,7 +1962,7 @@ int CDShow::load_media(CString sfile, CWnd* pParent, bool auto_render)
 					{
 						m_pGB->AddFilter(pMpcAudio, _T("MPC Audio Decoder"));
 						hr_a = connect_splitter_to_lav(L"Audio", pMpcAudio);
-						logWrite(_T("[splitter->mpc] Audio hr=0x%08x"), hr_a);
+						//logWrite(_T("[splitter->mpc] Audio hr=0x%08x"), hr_a);
 					}
 				}
 
@@ -1973,12 +1973,12 @@ int CDShow::load_media(CString sfile, CWnd* pParent, bool auto_render)
 				if (SUCCEEDED(hr_v) && pVDec)
 				{
 					HRESULT hr_rv = RenderOutputPins(m_pGB, pVDec);
-					logWrite(_T("[decoder->renderer] Video render hr=0x%08x"), hr_rv);
+					//logWrite(_T("[decoder->renderer] Video render hr=0x%08x"), hr_rv);
 				}
 				if (SUCCEEDED(hr_a) && pADec)
 				{
 					HRESULT hr_ra = RenderOutputPins(m_pGB, pADec);
-					logWrite(_T("[decoder->renderer] Audio render hr=0x%08x"), hr_ra);
+					//logWrite(_T("[decoder->renderer] Audio render hr=0x%08x"), hr_ra);
 				}
 
 				if (pLavVideo) pLavVideo->Release();
@@ -2091,12 +2091,12 @@ int CDShow::load_media(CString sfile, CWnd* pParent, bool auto_render)
 			if (pMF)
 			{
 				HRESULT hr_set = pMF->SetSyncSource(pSysClock);
-				logWrite(_T("[clock] graph sync source = SystemClock hr=0x%08x"), hr_set);
+				//logWrite(_T("[clock] graph sync source = SystemClock hr=0x%08x"), hr_set);
 			}
 		}
 		else
 		{
-			logWrite(_T("[clock] SystemClock CoCreateInstance failed hr=0x%08x — keep default audio clock"), hr_sc);
+			//logWrite(_T("[clock] SystemClock CoCreateInstance failed hr=0x%08x — keep default audio clock"), hr_sc);
 		}
 	}
 
@@ -2111,7 +2111,7 @@ int CDShow::load_media(CString sfile, CWnd* pParent, bool auto_render)
 		CreateDirectory(grf_path, NULL);
 		grf_path += _T("\\last_graph.grf");
 		HRESULT hr_save = save_filter_graph(m_pGB, grf_path);
-		logWrite(_T("[graph] save_filter_graph hr=0x%08lX path=%s"), hr_save, grf_path.GetString());
+		//logWrite(_T("[graph] save_filter_graph hr=0x%08lX path=%s"), hr_save, grf_path.GetString());
 	}
 
 	//graph 구조 dump — 모든 filter / pin / connection 을 로그로 출력.
@@ -2126,7 +2126,7 @@ int CDShow::load_media(CString sfile, CWnd* pParent, bool auto_render)
 				FILTER_INFO fi; memset(&fi, 0, sizeof(fi));
 				pF->QueryFilterInfo(&fi);
 				if (fi.pGraph) fi.pGraph->Release();
-				logWrite(_T("[graph] filter[%d] %s"), fidx, fi.achName);
+				//logWrite(_T("[graph] filter[%d] %s"), fidx, fi.achName);
 
 				IEnumPins* pEnumP = NULL;
 				if (SUCCEEDED(pF->EnumPins(&pEnumP)) && pEnumP)
@@ -2155,9 +2155,9 @@ int CDShow::load_media(CString sfile, CWnd* pParent, bool auto_render)
 							}
 							AM_MEDIA_TYPE mt; memset(&mt, 0, sizeof(mt));
 							pP->ConnectionMediaType(&mt);
-							logWrite(_T("[graph]   pin[%d] %s '%s' -> '%s'.'%s'  major.D1=%08lX"),
-								pidx, dir == PINDIR_INPUT ? _T("IN ") : _T("OUT"),
-								pi.achName, cfi.achName, ci.achName, mt.majortype.Data1);
+							//logWrite(_T("[graph]   pin[%d] %s '%s' -> '%s'.'%s'  major.D1=%08lX"),
+								//pidx, dir == PINDIR_INPUT ? _T("IN ") : _T("OUT"),
+								//pi.achName, cfi.achName, ci.achName, mt.majortype.Data1);
 							if (mt.cbFormat && mt.pbFormat) CoTaskMemFree(mt.pbFormat);
 							if (mt.pUnk) mt.pUnk->Release();
 							if (ci.pFilter) ci.pFilter->Release();
@@ -2165,8 +2165,8 @@ int CDShow::load_media(CString sfile, CWnd* pParent, bool auto_render)
 						}
 						else
 						{
-							logWrite(_T("[graph]   pin[%d] %s '%s' -> (disconnected)"),
-								pidx, dir == PINDIR_INPUT ? _T("IN ") : _T("OUT"), pi.achName);
+							//logWrite(_T("[graph]   pin[%d] %s '%s' -> (disconnected)"),
+								//pidx, dir == PINDIR_INPUT ? _T("IN ") : _T("OUT"), pi.achName);
 						}
 						pP->Release();
 						pidx++;
@@ -2895,7 +2895,7 @@ int CDShow::load_media_internal_ffmpeg(CString sfile, CWnd* pParent)
 	{
 		m_pGB->AddFilter(m_VMR, L"MPC Video Renderer");
 		m_use_mpcvr = true;
-		logWrite(_T("[internal] MPC Video Renderer selected"));
+		//logWrite(_T("[internal] MPC Video Renderer selected"));
 		CComQIPtr<IVideoWindow> pVW(m_VMR);
 		if (pVW && pParent)
 			pVW->put_Owner((OAHWND)pParent->m_hWnd);
@@ -2913,7 +2913,7 @@ int CDShow::load_media_internal_ffmpeg(CString sfile, CWnd* pParent)
 		if (SUCCEEDED(hr_evr) && m_VMR != NULL)
 		{
 			m_pGB->AddFilter(m_VMR, L"Enhanced Video Renderer");
-			logWrite(_T("[internal] EVR selected"));
+			//logWrite(_T("[internal] EVR selected"));
 		}
 		else
 		{
@@ -2922,7 +2922,7 @@ int CDShow::load_media_internal_ffmpeg(CString sfile, CWnd* pParent)
 			if (m_VMR != NULL)
 			{
 				m_pGB->AddFilter(m_VMR, L"Video Mixing Renderer 9");
-				logWrite(_T("[internal] VMR9 selected"));
+				//logWrite(_T("[internal] VMR9 selected"));
 			}
 		}
 	}
@@ -2932,7 +2932,7 @@ int CDShow::load_media_internal_ffmpeg(CString sfile, CWnd* pParent)
 	ffi::CFFiSource* pFFi = new ffi::CFFiSource(NULL, &hr_src);
 	if (!pFFi || FAILED(hr_src))
 	{
-		logWrite(_T("[internal] CFFiSource ctor fail hr=0x%08x"), hr_src);
+		//logWrite(_T("[internal] CFFiSource ctor fail hr=0x%08x"), hr_src);
 		if (pFFi) delete pFFi;
 		return 0;
 	}
@@ -2944,14 +2944,14 @@ int CDShow::load_media_internal_ffmpeg(CString sfile, CWnd* pParent)
 	if (m_pending_internal_audio_track >= 0)
 	{
 		pFFi->decoder().set_initial_audio_track(m_pending_internal_audio_track);
-		logWrite(_T("[internal] forcing audio track %d for open"), m_pending_internal_audio_track);
+		//logWrite(_T("[internal] forcing audio track %d for open"), m_pending_internal_audio_track);
 		m_pending_internal_audio_track = -1;
 	}
 
 	HRESULT hr = pFFi->open_file(sfile);
 	if (FAILED(hr))
 	{
-		logWrite(_T("[internal] CFFiSource.open_file fail hr=0x%08x"), hr);
+		//logWrite(_T("[internal] CFFiSource.open_file fail hr=0x%08x"), hr);
 		pFFi->Release();
 		return 0;
 	}
@@ -2968,20 +2968,20 @@ int CDShow::load_media_internal_ffmpeg(CString sfile, CWnd* pParent)
 		const bool safe_sw = (codec == L"MJPEG") || (codec == L"MPEG4") || pFFi->decoder().no_seek_index();
 		if (!safe_sw)
 		{
-			logWrite(_T("[internal] no HW accel for codec=%s — fallback to LAV path"), codec.c_str());
+			//logWrite(_T("[internal] no HW accel for codec=%s — fallback to LAV path"), codec.c_str());
 			pFFi->Release();
 			m_pFFiSource = nullptr;
 			return -1;   //caller 가 LAV path 진행 신호.
 		}
-		logWrite(_T("[internal] no HW accel for codec=%s no_seek_index=%d — internal SW decode"),
-			codec.c_str(), (int)pFFi->decoder().no_seek_index());
+		//logWrite(_T("[internal] no HW accel for codec=%s no_seek_index=%d — internal SW decode"),
+			//codec.c_str(), (int)pFFi->decoder().no_seek_index());
 	}
 
 	//no-PTS 영상 (일부 AVI 등) — internal path 는 PTS 기반 A/V 동기·seek·컨트롤바라 timestamp 없는 영상은
 	//동기 어긋남·seek 튐·시계 정지가 발생. LAV 는 splitter 가 timestamp 를 재생성해 정상 처리하므로 LAV 로 fallback.
 	if (!pFFi->decoder().video_has_pts())
 	{
-		logWrite(_T("[internal] video has no PTS — fallback to LAV path"));
+		//logWrite(_T("[internal] video has no PTS — fallback to LAV path"));
 		pFFi->Release();
 		m_pFFiSource = nullptr;
 		return -1;   //caller 가 LAV path 진행 신호.
@@ -3011,7 +3011,7 @@ int CDShow::load_media_internal_ffmpeg(CString sfile, CWnd* pParent)
 			if (SUCCEEDED(pPin->QueryDirection(&dir)) && dir == PINDIR_OUTPUT)
 			{
 				hr = m_pGB->Render(pPin);
-				logWrite(_T("[internal] Render(pin[%d]) hr=0x%08x"), pidx, hr);
+				//logWrite(_T("[internal] Render(pin[%d]) hr=0x%08x"), pidx, hr);
 			}
 			pPin->Release();
 			++pidx;
@@ -3030,14 +3030,14 @@ int CDShow::load_media_internal_ffmpeg(CString sfile, CWnd* pParent)
 	HRESULT hr_me = m_pGB->QueryInterface(IID_PPV_ARGS(&m_pME));
 	if (m_pME != NULL && pParent != NULL)
 		m_pME->SetNotifyWindow((OAHWND)pParent->m_hWnd, WM_GRAPHNOTIFY, 0);
-	logWrite(_T("[internal] IMediaEventEx hr=0x%08x me=%p"), hr_me, (void*)m_pME);
+	//logWrite(_T("[internal] IMediaEventEx hr=0x%08x me=%p"), hr_me, (void*)m_pME);
 
 	//=== 5) media info ===
 	m_duration   = pFFi->decoder().duration_ms();
 	m_video_size = CSize(pFFi->decoder().video_width(), pFFi->decoder().video_height());
 	m_frame_rate = pFFi->decoder().frame_rate();
-	logWrite(_T("[internal] open OK %dx%d fps=%.2f duration=%.0fms"),
-		m_video_size.cx, m_video_size.cy, m_frame_rate, m_duration);
+	//logWrite(_T("[internal] open OK %dx%d fps=%.2f duration=%.0fms"),
+		//m_video_size.cx, m_video_size.cy, m_frame_rate, m_duration);
 
 	//stream list — Endorphin2 의 open_media corruption check 통과용.
 	m_video_stream.clear();
@@ -3077,7 +3077,7 @@ int CDShow::load_media_internal_ffmpeg(CString sfile, CWnd* pParent)
 	if (pFFi->decoder().has_audio())
 	{
 		setup_audio_filter_chain();
-		logWrite(_T("[internal] SC Audio chain setup"));
+		//logWrite(_T("[internal] SC Audio chain setup"));
 	}
 
 	//새 renderer 인스턴스의 surface position 설정 — OnSize 가 fire 안 되는 미디어 전환 (mkv→mp4 등) 케이스에서
@@ -3089,8 +3089,8 @@ int CDShow::load_media_internal_ffmpeg(CString sfile, CWnd* pParent)
 		if (r.IsRectEmpty())
 			pParent->GetClientRect(&r);
 		set_video_position(r);
-		logWrite(_T("[internal] set_video_position(%d,%d,%d,%d) after open"),
-			r.left, r.top, r.right, r.bottom);
+		//logWrite(_T("[internal] set_video_position(%d,%d,%d,%d) after open"),
+			//r.left, r.top, r.right, r.bottom);
 	}
 
 	//graph 가 ref 보유 — 우리 소유권 해제.
@@ -3153,7 +3153,7 @@ void CDShow::analyze_stream(IBaseFilter *pBaseFilter)
 			if (name_check.Find(_T("No subtitles")) >= 0 ||
 				name_check.Find(_T("Forced Subtitles")) >= 0)
 			{
-				logWrite(_T("[analyze] subtitle stream[%d] '%s' skipped (virtual)"), i, name_check.GetString());
+				//logWrite(_T("[analyze] subtitle stream[%d] '%s' skipped (virtual)"), i, name_check.GetString());
 			}
 			else
 			{
@@ -3388,19 +3388,19 @@ bool CDShow::set_video_rotation(int degrees)
 	//좌표 반사만 가능하고 회전 파라미터가 없어 90° 회전 불가.
 	if (!m_use_mpcvr || m_VMR == NULL)
 	{
-		logWrite(_T("[rotate] 회전은 MPC Video Renderer 에서만 지원 — 현재 렌더러 미지원"));
+		//logWrite(_T("[rotate] 회전은 MPC Video Renderer 에서만 지원 — 현재 렌더러 미지원"));
 		return false;
 	}
 
 	CComQIPtr<IExFilterConfig> pCfg(m_VMR);
 	if (!pCfg)
 	{
-		logWrite(_T("[rotate] IExFilterConfig QI 실패"));
+		//logWrite(_T("[rotate] IExFilterConfig QI 실패"));
 		return false;
 	}
 
 	HRESULT hr = pCfg->Flt_SetInt("rotation", degrees);
-	logWrite(_T("[rotate] Flt_SetInt(rotation,%d) hr=0x%08x"), degrees, hr);
+	//logWrite(_T("[rotate] Flt_SetInt(rotation,%d) hr=0x%08x"), degrees, hr);
 	if (FAILED(hr))
 		return false;
 
@@ -3548,10 +3548,10 @@ void CDShow::set_track_pos(double pos, bool seek_to_keyframe)
 		REFERENCE_TIME post_pos = 0;
 		m_pMS->GetCurrentPosition(&post_pos);
 
-		logWrite(_T("[seek/t0] SetPositions pos=%.0fms hr=0x%08x flags=0x%08x setpos_us=%lld pre_pos=%.0fms post_pos=%.0fms"),
-			pos, hr, flags,
-			(long long)((qpc_t1.QuadPart - qpc_t0.QuadPart) * 1000000LL / qpc_freq.QuadPart),
-			(double)pre_pos / 10000.0, (double)post_pos / 10000.0);
+		//logWrite(_T("[seek/t0] SetPositions pos=%.0fms hr=0x%08x flags=0x%08x setpos_us=%lld pre_pos=%.0fms post_pos=%.0fms"),
+			//pos, hr, flags,
+			//(long long)((qpc_t1.QuadPart - qpc_t0.QuadPart) * 1000000LL / qpc_freq.QuadPart),
+			//(double)pre_pos / 10000.0, (double)post_pos / 10000.0);
 	}
 
 	//seek target cache — get_track_pos 가 INTERMEDIATE transition 중에 cache 반환 (B→A→B 깜빡임 회피).
@@ -3619,9 +3619,9 @@ void CDShow::set_track_pos(double pos, bool seek_to_keyframe)
 					::Sleep(10);
 				}
 
-				logWrite(_T("[seek/t1] redraw_us=%lld total_advance_us=%lld (T0→clock@target)"),
-					(long long)((qpc_t3.QuadPart - qpc_t2.QuadPart) * 1000000LL / qpc_freq.QuadPart),
-					(long long)advance_us);
+				//logWrite(_T("[seek/t1] redraw_us=%lld total_advance_us=%lld (T0→clock@target)"),
+					//(long long)((qpc_t3.QuadPart - qpc_t2.QuadPart) * 1000000LL / qpc_freq.QuadPart),
+					//(long long)advance_us);
 			}
 		}
 	}
@@ -3678,7 +3678,7 @@ void CDShow::replay_from_start()
 			NULL, AM_SEEKING_NoPositioning);
 		m_play_state = State_Running;
 
-		logWrite(_T("[repeat] internal FFmpeg — flushing seek0 (no Stop/Run)"));
+		//logWrite(_T("[repeat] internal FFmpeg — flushing seek0 (no Stop/Run)"));
 		return;
 	}
 
@@ -3814,14 +3814,14 @@ void CDShow::select_subtitle_stream(int index)
 {
 	if (!m_pSplitter)
 	{
-		logWrite(_T("[sub_sel] no splitter — skip (internal path or pre-load)"));
+		//logWrite(_T("[sub_sel] no splitter — skip (internal path or pre-load)"));
 		return;
 	}
 
 	CComQIPtr<IAMStreamSelect> pStreamSelect(m_pSplitter);
 	if (!pStreamSelect)
 	{
-		logWrite(_T("[sub_sel] splitter has no IAMStreamSelect — skip"));
+		//logWrite(_T("[sub_sel] splitter has no IAMStreamSelect — skip"));
 		return;
 	}
 
@@ -3832,21 +3832,21 @@ void CDShow::select_subtitle_stream(int index)
 		for (size_t k = 0; k < m_subtitle_stream.size(); k++)
 		{
 			HRESULT hr = pStreamSelect->Enable(m_subtitle_stream[k].get_index(), 0);
-			logWrite(_T("[sub_sel] disable subtitle[%zu] stream_idx=%d hr=0x%08x"),
-				k, m_subtitle_stream[k].get_index(), hr);
+			//logWrite(_T("[sub_sel] disable subtitle[%zu] stream_idx=%d hr=0x%08x"),
+				//k, m_subtitle_stream[k].get_index(), hr);
 		}
 		m_subtitle_stream_index = -1;
 		return;
 	}
 	if (index >= (int)m_subtitle_stream.size())
 	{
-		logWrite(_T("[sub_sel] index=%d out of range (size=%zu)"), index, m_subtitle_stream.size());
+		//logWrite(_T("[sub_sel] index=%d out of range (size=%zu)"), index, m_subtitle_stream.size());
 		return;
 	}
 
 	HRESULT hr = pStreamSelect->Enable(m_subtitle_stream[index].get_index(), AMSTREAMSELECTENABLE_ENABLE);
-	logWrite(_T("[sub_sel] enable subtitle[%d] stream_idx=%d hr=0x%08x"),
-		index, m_subtitle_stream[index].get_index(), hr);
+	//logWrite(_T("[sub_sel] enable subtitle[%d] stream_idx=%d hr=0x%08x"),
+		//index, m_subtitle_stream[index].get_index(), hr);
 	m_subtitle_stream_index = index;
 }
 
@@ -3905,14 +3905,14 @@ void CDShow::set_playback_rate(double rate)
 		((CSCAudioTimeStretch*)m_pAudioTimeStretchFilter)->set_rate(rate);
 		if (m_pVideoTimeScaleFilter)
 			((CSCVideoTimeScale*)m_pVideoTimeScaleFilter)->set_rate(rate);
-		logWrite(_T("[playback_rate] LAV path → CSCAudioTimeStretch + CSCVideoTimeScale set_rate(%.3f)"), rate);
+		//logWrite(_T("[playback_rate] LAV path → CSCAudioTimeStretch + CSCVideoTimeScale set_rate(%.3f)"), rate);
 	}
 	else if (m_pFFiSource)
 	{
 		//graph SetRate 안 호출 — LAV path 와 동일 원칙. 호출 시 audio renderer(DSound) 의 rate scaling 이 atempo 와 이중 적용되어 audio 가 1.0x source rate 로 들림.
 		//ChangeRate callback 은 set_playback_rate 가 직접 source filter 의 atomic rate 설정으로 대체.
 		((ffi::CFFiSource*)m_pFFiSource)->set_playback_rate(rate);
-		logWrite(_T("[playback_rate] internal path → CFFiSource->set_playback_rate(%.3f) (graph SetRate skipped — DSound 이중 rate scaling 회피)"), rate);
+		//logWrite(_T("[playback_rate] internal path → CFFiSource->set_playback_rate(%.3f) (graph SetRate skipped — DSound 이중 rate scaling 회피)"), rate);
 	}
 	else
 	{
@@ -3920,7 +3920,7 @@ void CDShow::set_playback_rate(double rate)
 			hr = m_pMS->SetRate(rate);
 		if (FAILED(hr) && m_pMP)
 			hr = m_pMP->put_Rate(rate);
-		logWrite(_T("[playback_rate] fallback graph SetRate %.3f hr=0x%08x"), rate, hr);
+		//logWrite(_T("[playback_rate] fallback graph SetRate %.3f hr=0x%08x"), rate, hr);
 	}
 
 	//self-seek — chain 전체 flush (DSound / MPC-VR queue 의 old timestamp sample 제거) + 새 NewSegment 발행
@@ -4846,7 +4846,7 @@ void CDShow::set_volume(int volume, bool reset_mute)
 	//
 	//IBasicAudio 는 -100~0 dB 범위만 attenuation 가능. boost (>0 dB) 는 compressor makeup_db 로 처리.
 	const int v = m_volume_mute ? 0 : m_volume;
-	logWrite(_T("[set_volume] v=%d gain=%p comp=%p"), v, m_pAudioGainFilter, m_pAudioCompressorFilter);
+	//logWrite(_T("[set_volume] v=%d gain=%p comp=%p"), v, m_pAudioGainFilter, m_pAudioCompressorFilter);
 
 	//gain filter 는 chain 에 있지만 항상 0 dB (passthrough). amplification 은 compressor makeup 으로.
 	set_audio_gain_db(0.0f);
@@ -4971,8 +4971,8 @@ HRESULT CDShow::HandleGraphEvent(WPARAM wParam,LPARAM lparam)
 					if (fi.pGraph) fi.pGraph->Release();
 				}
 			}
-			logWrite(_T("[EC_COMPLETE] hr=0x%08lX cur=%lldms dur=%lldms sender='%s'"),
-				(LONG)lParam1, cur_ns / 10000, dur_ns / 10000, sender_name.GetString());
+			//logWrite(_T("[EC_COMPLETE] hr=0x%08lX cur=%lldms dur=%lldms sender='%s'"),
+				//(LONG)lParam1, cur_ns / 10000, dur_ns / 10000, sender_name.GetString());
 			::SendMessage(m_pParent->m_hWnd, MESSAGE_DSHOW_MEDIA, msg_ec_complete, 0);
 			/*
 			CComQIPtr<IMediaPosition> pMP(m_pGB);
@@ -5891,7 +5891,7 @@ void CDShow::audio_sync(int sync)
 	if (m_pFFiSource)
 	{
 		((ffi::CFFiSource*)m_pFFiSource)->set_audio_sync_delay_ms(m_audio_sync);
-		logWrite(_T("[AudioSync] internal path: anchor offset = %d ms"), m_audio_sync);
+		//logWrite(_T("[AudioSync] internal path: anchor offset = %d ms"), m_audio_sync);
 		flush_audio_buffer();
 		return;
 	}
@@ -5969,10 +5969,10 @@ CString CDShow::get_audio_delay_status()
 		pF->Release();
 	}
 
-	logWrite(_T("[audio_delay_diag] all=%s | supports=%s | gain_chain=%s"),
-		all_filters.GetString(),
-		supported.IsEmpty() ? _T("(none)") : supported.GetString(),
-		m_pAudioGainFilter ? _T("yes") : _T("no"));
+	//logWrite(_T("[audio_delay_diag] all=%s | supports=%s | gain_chain=%s"),
+		//all_filters.GetString(),
+		//supported.IsEmpty() ? _T("(none)") : supported.GetString(),
+		//m_pAudioGainFilter ? _T("yes") : _T("no"));
 
 	//지원 시 empty 반환 — caller (OSD) 가 별도 표시 안 함.
 	//미지원 시만 문자열 반환 — caller 가 붉은 계열로 강조.

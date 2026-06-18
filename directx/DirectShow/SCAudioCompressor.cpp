@@ -241,7 +241,7 @@ void CSCAudioCompressor::process_sample(BYTE* buf, long len, const WAVEFORMATEX*
 				if (a > max_out) max_out = a;
 			}
 		}
-		logWrite(_T("[AudioComp] call#%ld max_in=%.4f max_out=%.4f env[0]=%.4f makeup=%.3f thr=%.4f"),
-			s_call_count, max_in, max_out, m_envelope_linked, makeup, threshold);
+		//logWrite(_T("[AudioComp] call#%ld max_in=%.4f max_out=%.4f env[0]=%.4f makeup=%.3f thr=%.4f"),
+			//s_call_count, max_in, max_out, m_envelope_linked, makeup, threshold);
 	}
 }

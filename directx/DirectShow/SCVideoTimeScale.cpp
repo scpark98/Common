@@ -242,8 +242,8 @@ STDMETHODIMP CSCVideoTimeScaleInputPin::ReceiveConnection(IPin* pConnector, cons
 
 	m_pConnected = pConnector;
 	m_pConnected->AddRef();
-	logWrite(_T("[VideoTS] ReceiveConnection major.D1=%08lX sub.D1=%08lX cbFmt=%lu"),
-		pmt->majortype.Data1, pmt->subtype.Data1, pmt->cbFormat);
+	//logWrite(_T("[VideoTS] ReceiveConnection major.D1=%08lX sub.D1=%08lX cbFmt=%lu"),
+		//pmt->majortype.Data1, pmt->subtype.Data1, pmt->cbFormat);
 	return S_OK;
 }
 
@@ -562,7 +562,7 @@ STDMETHODIMP CSCVideoTimeScaleOutputPin::Connect(IPin* pReceivePin, const AM_MED
 				crop_src_h      = h;
 				crop_dst_w      = even_w;
 				crop_dst_h      = even_h;
-				logWrite(_T("[VideoTS] odd NV12 %dx%d → crop to even %dx%d for MPC-VR"), w, h, even_w, even_h);
+				//logWrite(_T("[VideoTS] odd NV12 %dx%d → crop to even %dx%d for MPC-VR"), w, h, even_w, even_h);
 			}
 		}
 	}
@@ -600,8 +600,8 @@ STDMETHODIMP CSCVideoTimeScaleOutputPin::Connect(IPin* pReceivePin, const AM_MED
 				if (m_pOutAllocator) { m_pOutAllocator->Decommit(); m_pOutAllocator->Release(); }
 				m_pOutAllocator = pOwn;	//keep ref (Decommit+Release in Disconnect/dtor)
 				m_pFilter->set_crop_to_even(crop_dst_w, crop_dst_h, crop_src_stride, crop_src_h);
-				logWrite(_T("[VideoTS] crop allocator SetProperties hr=0x%08x act.cbBuffer=%ld NotifyAllocator hr=0x%08x"),
-					hra, act.cbBuffer, hrn);
+				//logWrite(_T("[VideoTS] crop allocator SetProperties hr=0x%08x act.cbBuffer=%ld NotifyAllocator hr=0x%08x"),
+					//hra, act.cbBuffer, hrn);
 			}
 		}
 		else if (m_pDownstreamInput)

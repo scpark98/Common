@@ -626,19 +626,19 @@ STDMETHODIMP CSCAudioTransformInputPin::ReceiveConnection(IPin* pConnector, cons
 	{
 		m_pFilter->set_wave_format(pmt->pbFormat, pmt->cbFormat);
 		const WAVEFORMATEX* wfx = (const WAVEFORMATEX*)pmt->pbFormat;
-		logWrite(_T("[AudioFilter] ReceiveConnection wfx tag=0x%04X ch=%d sample_rate=%lu bps=%d cbSize=%d cbFmt=%lu"),
-			wfx->wFormatTag, wfx->nChannels, wfx->nSamplesPerSec, wfx->wBitsPerSample, wfx->cbSize, pmt->cbFormat);
+		//logWrite(_T("[AudioFilter] ReceiveConnection wfx tag=0x%04X ch=%d sample_rate=%lu bps=%d cbSize=%d cbFmt=%lu"),
+			//wfx->wFormatTag, wfx->nChannels, wfx->nSamplesPerSec, wfx->wBitsPerSample, wfx->cbSize, pmt->cbFormat);
 		if (wfx->wFormatTag == WAVE_FORMAT_EXTENSIBLE && pmt->cbFormat >= sizeof(WAVEFORMATEXTENSIBLE))
 		{
 			const WAVEFORMATEXTENSIBLE* wfex = (const WAVEFORMATEXTENSIBLE*)pmt->pbFormat;
-			logWrite(_T("[AudioFilter] WFEX SubFormat.D1=%08lX validBits=%d ChMask=0x%lX"),
-				wfex->SubFormat.Data1, wfex->Samples.wValidBitsPerSample, wfex->dwChannelMask);
+			//logWrite(_T("[AudioFilter] WFEX SubFormat.D1=%08lX validBits=%d ChMask=0x%lX"),
+				//wfex->SubFormat.Data1, wfex->Samples.wValidBitsPerSample, wfex->dwChannelMask);
 		}
 	}
 	else
 	{
-		logWrite(_T("[AudioFilter] ReceiveConnection no WAVEFORMATEX (formattype.D1=%08lX cbFmt=%lu)"),
-			pmt->formattype.Data1, pmt->cbFormat);
+		//logWrite(_T("[AudioFilter] ReceiveConnection no WAVEFORMATEX (formattype.D1=%08lX cbFmt=%lu)"),
+			//pmt->formattype.Data1, pmt->cbFormat);
 	}
 
 	free_media_type();

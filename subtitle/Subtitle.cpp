@@ -203,8 +203,8 @@ bool CSubtitle::load_smi(CString sfile)
 	DWORD __t2 = GetTickCount();
 	int total_track_cues = 0;
 	for (const auto& kv : m_tracks) total_track_cues += (int)kv.second.size();
-	logWrite(_T("[sub] load_smi total=%lums parse=%lums rebuild=%lums tracks=%d total_cues=%d active_cues=%d"),
-		__t2 - __t0, __t1 - __t0, __t2 - __t1, (int)m_tracks.size(), total_track_cues, (int)m_subtitle.size());
+	//logWrite(_T("[sub] load_smi total=%lums parse=%lums rebuild=%lums tracks=%d total_cues=%d active_cues=%d"),
+		//__t2 - __t0, __t1 - __t0, __t2 - __t1, (int)m_tracks.size(), total_track_cues, (int)m_subtitle.size());
 	return true;
 }
 

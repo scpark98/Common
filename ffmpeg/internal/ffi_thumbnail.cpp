@@ -26,7 +26,7 @@ namespace ffi
 		if (hr < 0)
 		{
 			char buf[256];
-			logWrite(_T("[ffi/thumb] open fail hr=%d (%hs)"), hr, err_str(hr, buf, sizeof(buf)));
+			//logWrite(_T("[ffi/thumb] open fail hr=%d (%hs)"), hr, err_str(hr, buf, sizeof(buf)));
 			m_fmt = nullptr;
 			return false;
 		}
@@ -70,8 +70,8 @@ namespace ffi
 			return false;
 		}
 
-		logWrite(_T("[ffi/thumb] open OK %dx%d codec=%hs dur=%.0fms"),
-			m_vctx->width, m_vctx->height, dec->name, duration_ms());
+		//logWrite(_T("[ffi/thumb] open OK %dx%d codec=%hs dur=%.0fms"),
+			//m_vctx->width, m_vctx->height, dec->name, duration_ms());
 		return true;
 	}
 

@@ -75,7 +75,7 @@ bool list_embedded_subtitle_streams(LPCTSTR media_path, std::vector<EmbeddedSubt
 	int hr = avformat_open_input(&fmt, u8path.c_str(), NULL, NULL);
 	if (hr < 0 || !fmt)
 	{
-		logWrite(_T("[sub_export/list] open fail hr=%d"), hr);
+		//logWrite(_T("[sub_export/list] open fail hr=%d"), hr);
 		return false;
 	}
 
@@ -100,7 +100,7 @@ bool list_embedded_subtitle_streams(LPCTSTR media_path, std::vector<EmbeddedSubt
 		out.push_back(es);
 	}
 
-	logWrite(_T("[sub_export/list] %d subtitle streams"), (int)out.size());
+	//logWrite(_T("[sub_export/list] %d subtitle streams"), (int)out.size());
 	avformat_close_input(&fmt);
 	return true;
 }
@@ -180,7 +180,7 @@ bool export_subtitle_stream(LPCTSTR media_path, int stream_index, LPCTSTR out_pa
 	AVFormatContext* in_fmt = NULL;
 	if (avformat_open_input(&in_fmt, u8path.c_str(), NULL, NULL) < 0 || !in_fmt)
 	{
-		logWrite(_T("[sub_export/export] open fail"));
+		//logWrite(_T("[sub_export/export] open fail"));
 		return false;
 	}
 	if (avformat_find_stream_info(in_fmt, NULL) < 0)
@@ -202,7 +202,7 @@ bool export_subtitle_stream(LPCTSTR media_path, int stream_index, LPCTSTR out_pa
 	}
 	if (!codec_is_text_subtitle(st->codecpar->codec_id))
 	{
-		logWrite(_T("[sub_export/export] non-text codec — skip"));
+		//logWrite(_T("[sub_export/export] non-text codec — skip"));
 		avformat_close_input(&in_fmt);
 		return false;
 	}
@@ -233,7 +233,7 @@ bool export_subtitle_stream(LPCTSTR media_path, int stream_index, LPCTSTR out_pa
 	CString cc_class = lang_to_cc_class(lang);
 	if (cc_class.IsEmpty())
 		cc_class = _T("ENCC");
-	logWrite(_T("[sub_export/export] stream lang='%s' -> class=%s"), lang.GetString(), cc_class.GetString());
+	//logWrite(_T("[sub_export/export] stream lang='%s' -> class=%s"), lang.GetString(), cc_class.GetString());
 
 	CSubtitle sub;
 	sub.set_subtitle_file(out_path);
@@ -344,14 +344,14 @@ bool export_subtitle_stream(LPCTSTR media_path, int stream_index, LPCTSTR out_pa
 	avcodec_free_context(&dec);
 	avformat_close_input(&in_fmt);
 
-	logWrite(_T("[sub_export/export] decoded %d captions"), caption_count);
+	//logWrite(_T("[sub_export/export] decoded %d captions"), caption_count);
 
 	if (caption_count == 0)
 		return false;
 
 	//save_subtitle_file 가 out_path 의 확장자 자동 dispatch (smi/srt/ass).
 	bool ok = sub.save_subtitle_file(out_path);
-	logWrite(_T("[sub_export/export] save fmt=%d ok=%d path='%s'"),
-		(int)fmt, (int)ok, out_path);
+	//logWrite(_T("[sub_export/export] save fmt=%d ok=%d path='%s'"),
+		//(int)fmt, (int)ok, out_path);
 	return ok;
 }

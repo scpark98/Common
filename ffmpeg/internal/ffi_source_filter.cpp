@@ -61,8 +61,8 @@ namespace ffi
 	{
 		//CSourceSeeking::SetRate 가 m_dRateSeeking 갱신 후 본 함수 호출. source 의 atomic rate 로 전파 →
 		//video/audio FillBuffer 가 sample.rtStart/rtStop scaling 에 사용.
-		logWrite(_T("[ffi/seek/diag] ChangeRate called, m_dRateSeeking=%.3f pPin=%p source=%p"),
-			m_dRateSeeking, m_pPin, m_pPin ? m_pPin->source() : NULL);
+		//logWrite(_T("[ffi/seek/diag] ChangeRate called, m_dRateSeeking=%.3f pPin=%p source=%p"),
+			//m_dRateSeeking, m_pPin, m_pPin ? m_pPin->source() : NULL);
 		if (m_pPin && m_pPin->source())
 			m_pPin->source()->set_playback_rate(m_dRateSeeking);
 		return S_OK;
@@ -173,14 +173,14 @@ namespace ffi
 
 		auto us = [&](const LARGE_INTEGER& a, const LARGE_INTEGER& b) -> long long
 			{ return (b.QuadPart - a.QuadPart) * 1000000LL / pf.QuadPart; };
-		logWrite(_T("[ffi/src/seek_prof] decoder.seek=%lld beginflush=%lld stop=%lld endflush=%lld pause=%lld audioflush=%lld | total=%lldus thr=%d"),
-			us(t_enter, t_seek), us(t_seek, t_bf), us(t_bf, t_stop), us(t_stop, t_ef),
-			us(t_ef, t_pause), us(t_pause, t_audio), us(t_enter, t_audio), thr ? 1 : 0);
+		//logWrite(_T("[ffi/src/seek_prof] decoder.seek=%lld beginflush=%lld stop=%lld endflush=%lld pause=%lld audioflush=%lld | total=%lldus thr=%d"),
+			//us(t_enter, t_seek), us(t_seek, t_bf), us(t_bf, t_stop), us(t_stop, t_ef),
+			//us(t_ef, t_pause), us(t_pause, t_audio), us(t_enter, t_audio), thr ? 1 : 0);
 
-		logWrite(_T("[ffi/src] on_change_start → seek %.0fms + %s (NewSegment 0..%lld)"),
-			pos_ms,
-			thr ? _T("Stop/Flush/Pause cycle") : _T("pre-streaming defer"),
-			(long long)rtStop);
+		//logWrite(_T("[ffi/src] on_change_start → seek %.0fms + %s (NewSegment 0..%lld)"),
+			//pos_ms,
+			//thr ? _T("Stop/Flush/Pause cycle") : _T("pre-streaming defer"),
+			//(long long)rtStop);
 	}
 
 	HRESULT CFFiVideoStream::OnThreadStartPlay()
@@ -201,14 +201,14 @@ namespace ffi
 		//OnThreadStartPlay 가 이 값으로 NewSegment(0, stop, 1.0) 호출 — stop=0 이면 renderer 가 sample drop.
 		if (m_pSource && m_pending_segment_stop <= 0)
 			m_pending_segment_stop = (REFERENCE_TIME)(m_pSource->decoder().duration_ms() * 10000.0);
-		logWrite(_T("[ffi/src] video stream thread create (segment_stop=%lld)"),
-			(long long)m_pending_segment_stop);
+		//logWrite(_T("[ffi/src] video stream thread create (segment_stop=%lld)"),
+			//(long long)m_pending_segment_stop);
 		return NOERROR;
 	}
 
 	HRESULT CFFiVideoStream::OnThreadDestroy()
 	{
-		logWrite(_T("[ffi/src] video stream thread destroy"));
+		//logWrite(_T("[ffi/src] video stream thread destroy"));
 		return NOERROR;
 	}
 
@@ -318,7 +318,7 @@ namespace ffi
 				HRESULT hr = GetDeliveryBuffer(&pSample, NULL, NULL, 0);
 				ULONGLONG t_gdb_ms = GetTickCount64() - t0;
 				if (t_gdb_ms > 100)
-					logWrite(_T("[ffi/src/video/diag] GetDeliveryBuffer wait %llums"), t_gdb_ms);
+					;//logWrite(_T("[ffi/src/video/diag] GetDeliveryBuffer wait %llums"), t_gdb_ms);
 
 				if (FAILED(hr))
 				{
@@ -334,7 +334,7 @@ namespace ffi
 					hr = Deliver(pSample);
 					ULONGLONG t_dlv_ms = GetTickCount64() - t1;
 					if (t_dlv_ms > 100)
-						logWrite(_T("[ffi/src/video/diag] Deliver wait %llums"), t_dlv_ms);
+						;//logWrite(_T("[ffi/src/video/diag] Deliver wait %llums"), t_dlv_ms);
 
 					pSample->Release();
 					if (hr != S_OK)
@@ -373,15 +373,15 @@ namespace ffi
 		ULONGLONG now_ms = GetTickCount64();
 		if (m_fb_count_since_seek == 0)
 		{
-			logWrite(_T("[ffi/src/video/diag] FillBuffer first entry +%llums after seek"),
-				m_seek_t0_ms ? (now_ms - m_seek_t0_ms) : 0ULL);
+			//logWrite(_T("[ffi/src/video/diag] FillBuffer first entry +%llums after seek"),
+				//m_seek_t0_ms ? (now_ms - m_seek_t0_ms) : 0ULL);
 		}
 		else if (m_fb_last_entry_ms != 0)
 		{
 			ULONGLONG gap_ms = now_ms - m_fb_last_entry_ms;
 			if (gap_ms > 100)
-				logWrite(_T("[ffi/src/video/diag] FillBuffer entry gap %llums (call #%d since seek)"),
-					gap_ms, m_fb_count_since_seek);
+				;//logWrite(_T("[ffi/src/video/diag] FillBuffer entry gap %llums (call #%d since seek)"),
+					//gap_ms, m_fb_count_since_seek);
 		}
 		m_fb_last_entry_ms = now_ms;
 		++m_fb_count_since_seek;
@@ -435,9 +435,9 @@ namespace ffi
 					if (!m_frame_step_this_seek && m_seek_t0_ms != 0 &&
 						(GetTickCount64() - m_seek_t0_ms) >= SKIP_LATENCY_BUDGET_MS)
 					{
-						logWrite(_T("[ffi/src/video/diag] budget exceeded skip=%d frame_pts=%lld target=%lld elapsed=%llums → emit + skip disable"),
-							skipped, (long long)frame->pts, (long long)seek_target_pts,
-							GetTickCount64() - m_seek_t0_ms);
+						//logWrite(_T("[ffi/src/video/diag] budget exceeded skip=%d frame_pts=%lld target=%lld elapsed=%llums → emit + skip disable"),
+							//skipped, (long long)frame->pts, (long long)seek_target_pts,
+							//GetTickCount64() - m_seek_t0_ms);
 						m_budget_exceeded_this_seek = true;
 						break;
 					}
@@ -446,8 +446,8 @@ namespace ffi
 					continue;
 				}
 				if (skipped > 0)
-					logWrite(_T("[ffi/src/video/diag] pre-target skip=%d frame_pts=%lld target_pts=%lld"),
-						skipped, (long long)frame->pts, (long long)seek_target_pts);
+					;//logWrite(_T("[ffi/src/video/diag] pre-target skip=%d frame_pts=%lld target_pts=%lld"),
+						//skipped, (long long)frame->pts, (long long)seek_target_pts);
 				break;
 			}
 			if (!dec.is_running())
@@ -455,7 +455,7 @@ namespace ffi
 			//EOS — decoder 가 av_read_frame EOF + queue 비면 stream 끝. S_FALSE → DeliverEndOfStream → EC_COMPLETE.
 			if (dec.is_eof() && dec.video_queue_size() == 0)
 			{
-				logWrite(_T("[ffi/src/video/diag] EOS reached — DeliverEndOfStream"));
+				//logWrite(_T("[ffi/src/video/diag] EOS reached — DeliverEndOfStream"));
 				return S_FALSE;
 			}
 			//CMD_STOP / CMD_PAUSE 등 pending command peek — close 시 wait loop 깨기 (deadlock 회피).
@@ -466,11 +466,11 @@ namespace ffi
 			Sleep(2);
 			wait_v_ms += 2;
 			if (wait_v_ms == 500 || wait_v_ms == 2000 || wait_v_ms == 5000)
-				logWrite(_T("[ffi/src/video/diag] FillBuffer waiting %dms queue empty"), wait_v_ms);
+				;//logWrite(_T("[ffi/src/video/diag] FillBuffer waiting %dms queue empty"), wait_v_ms);
 		}
 		if (wait_v_ms >= 100)
-			logWrite(_T("[ffi/src/video/diag] wait=%dms frame_pts=%lld seg_rt=%lld"),
-				wait_v_ms, (long long)frame->pts, (long long)seg_rt);
+			;//logWrite(_T("[ffi/src/video/diag] wait=%dms frame_pts=%lld seg_rt=%lld"),
+				//wait_v_ms, (long long)frame->pts, (long long)seg_rt);
 
 		BYTE* pData = NULL;
 		HRESULT hr = pSample->GetPointer(&pData);
@@ -606,13 +606,13 @@ namespace ffi
 		{
 			CRefTime stream_t;
 			REFERENCE_TIME clk = (m_pFilter && m_pFilter->StreamTime(stream_t) == S_OK) ? (REFERENCE_TIME)stream_t : -1;
-			logWrite(_T("[ffi/src/render] frame[%lld] rtStart=%lldms rtStop=%lldms seg=%lldms streamClock=%lldms (rtStart-clk=%lldms) key=%d"),
-				m_sample_count,
-				(long long)(rtStart / 10000), (long long)(rtStop / 10000),
-				(long long)(m_segment_start / 10000),
-				(long long)(clk < 0 ? -1 : clk / 10000),
-				(long long)(clk < 0 ? 0 : (rtStart - clk) / 10000),
-				(int)((frame->flags & AV_FRAME_FLAG_KEY) ? 1 : 0));
+			//logWrite(_T("[ffi/src/render] frame[%lld] rtStart=%lldms rtStop=%lldms seg=%lldms streamClock=%lldms (rtStart-clk=%lldms) key=%d"),
+				//m_sample_count,
+				//(long long)(rtStart / 10000), (long long)(rtStop / 10000),
+				//(long long)(m_segment_start / 10000),
+				//(long long)(clk < 0 ? -1 : clk / 10000),
+				//(long long)(clk < 0 ? 0 : (rtStart - clk) / 10000),
+				//(int)((frame->flags & AV_FRAME_FLAG_KEY) ? 1 : 0));
 		}
 
 		av_frame_free(&frame);
@@ -666,7 +666,7 @@ namespace ffi
 		if (rate == 1.0)
 		{
 			m_filter_rate = 1.0;
-			logWrite(_T("[ffi/src/audio/filter] rate=1.0 → graph skip (swr passthrough)"));
+			//logWrite(_T("[ffi/src/audio/filter] rate=1.0 → graph skip (swr passthrough)"));
 			return true;
 		}
 
@@ -679,8 +679,8 @@ namespace ffi
 		const AVFilter* abuffersink = avfilter_get_by_name("abuffersink");
 		if (!abuffer || !atempo || !abuffersink)
 		{
-			logWrite(_T("[ffi/src/audio/filter] filter lookup fail abuffer=%p atempo=%p abuffersink=%p"),
-				abuffer, atempo, abuffersink);
+			//logWrite(_T("[ffi/src/audio/filter] filter lookup fail abuffer=%p atempo=%p abuffersink=%p"),
+				//abuffer, atempo, abuffersink);
 			release_audio_filter();
 			return false;
 		}
@@ -695,7 +695,7 @@ namespace ffi
 
 		int hr = avfilter_graph_create_filter(&m_filter_src, abuffer, "in",
 			src_args, NULL, m_filter_graph);
-		if (hr < 0) { logWrite(_T("[ffi/src/audio/filter] abuffer create fail hr=%d"), hr); release_audio_filter(); return false; }
+		if (hr < 0) { /*logWrite(_T("[ffi/src/audio/filter] abuffer create fail hr=%d"), hr);*/ release_audio_filter(); return false; }
 
 		//atempo chain — 단일 instance valid range [0.5, 2.0] 를 벗어나는 rate 도
 		//atempo=A,atempo=B,... 직렬 (곱이 rate) 로 처리. 0.1~4.0 까지 audio 도 pitch-preserve rate scale.
@@ -731,7 +731,7 @@ namespace ffi
 				tempo_args, NULL, m_filter_graph);
 			if (hr < 0)
 			{
-				logWrite(_T("[ffi/src/audio/filter] atempo[%zu]=%.3f create fail hr=%d"), k, tempos[k], hr);
+				//logWrite(_T("[ffi/src/audio/filter] atempo[%zu]=%.3f create fail hr=%d"), k, tempos[k], hr);
 				release_audio_filter();
 				return false;
 			}
@@ -741,7 +741,7 @@ namespace ffi
 
 		hr = avfilter_graph_create_filter(&m_filter_sink, abuffersink, "out",
 			NULL, NULL, m_filter_graph);
-		if (hr < 0) { logWrite(_T("[ffi/src/audio/filter] abuffersink create fail hr=%d"), hr); release_audio_filter(); return false; }
+		if (hr < 0) { /*logWrite(_T("[ffi/src/audio/filter] abuffersink create fail hr=%d"), hr);*/ release_audio_filter(); return false; }
 
 		//sink 의 출력 sample format 강제 S16 — swr 와 일치.
 		//av_opt_set_int_list 가 내부에서 deprecated av_int_list_length_for_size 호출 — C4996 회피.
@@ -753,17 +753,17 @@ namespace ffi
 
 		//link: src → atempo_chain[0] → atempo_chain[1] → ... → sink
 		hr = avfilter_link(m_filter_src, 0, atempo_chain.front(), 0);
-		if (hr < 0) { logWrite(_T("[ffi/src/audio/filter] link src->atempo[0] fail hr=%d"), hr); release_audio_filter(); return false; }
+		if (hr < 0) { /*logWrite(_T("[ffi/src/audio/filter] link src->atempo[0] fail hr=%d"), hr);*/ release_audio_filter(); return false; }
 		for (size_t k = 0; k + 1 < atempo_chain.size(); ++k)
 		{
 			hr = avfilter_link(atempo_chain[k], 0, atempo_chain[k + 1], 0);
-			if (hr < 0) { logWrite(_T("[ffi/src/audio/filter] link atempo[%zu]->atempo[%zu] fail hr=%d"), k, k+1, hr); release_audio_filter(); return false; }
+			if (hr < 0) { /*logWrite(_T("[ffi/src/audio/filter] link atempo[%zu]->atempo[%zu] fail hr=%d"), k, k+1, hr);*/ release_audio_filter(); return false; }
 		}
 		hr = avfilter_link(atempo_chain.back(), 0, m_filter_sink, 0);
-		if (hr < 0) { logWrite(_T("[ffi/src/audio/filter] link atempo->sink fail hr=%d"), hr); release_audio_filter(); return false; }
+		if (hr < 0) { /*logWrite(_T("[ffi/src/audio/filter] link atempo->sink fail hr=%d"), hr);*/ release_audio_filter(); return false; }
 
 		hr = avfilter_graph_config(m_filter_graph, NULL);
-		if (hr < 0) { logWrite(_T("[ffi/src/audio/filter] graph_config fail hr=%d"), hr); release_audio_filter(); return false; }
+		if (hr < 0) { /*logWrite(_T("[ffi/src/audio/filter] graph_config fail hr=%d"), hr);*/ release_audio_filter(); return false; }
 
 		m_filter_rate = rate;
 		CString chain_desc;
@@ -773,8 +773,8 @@ namespace ffi
 			seg.Format(_T("%s%.3f"), k ? _T(",") : _T(""), tempos[k]);
 			chain_desc += seg;
 		}
-		logWrite(_T("[ffi/src/audio/filter] init OK rate=%.3f chain=[%s] sr=%d ch=%d layout=%S"),
-			m_filter_rate, chain_desc.GetString(), m_out_sample_rate, m_out_channels, layout_desc);
+		//logWrite(_T("[ffi/src/audio/filter] init OK rate=%.3f chain=[%s] sr=%d ch=%d layout=%S"),
+			//m_filter_rate, chain_desc.GetString(), m_out_sample_rate, m_out_channels, layout_desc);
 		return true;
 	}
 
@@ -805,7 +805,7 @@ namespace ffi
 
 		//atempo chain 으로 0.1~4.0 범위 audio rate 적용 — init_audio_filter 가 r 분해 후 chain build.
 		//rebuild path 유지 — freezing 회피는 dialog 레벨 throttle 로 호출 빈도 자체 제한.
-		logWrite(_T("[ffi/src/audio/filter] tempo %.3f -> %.3f (graph rebuild, chain)"), m_filter_rate, rate);
+		//logWrite(_T("[ffi/src/audio/filter] tempo %.3f -> %.3f (graph rebuild, chain)"), m_filter_rate, rate);
 		return init_audio_filter(rate);
 	}
 
@@ -844,14 +844,14 @@ namespace ffi
 			av_channel_layout_uninit(&in_layout);
 			if (hr < 0)
 			{
-				logWrite(_T("[ffi/src/audio] swr_init fail hr=%d"), hr);
+				//logWrite(_T("[ffi/src/audio] swr_init fail hr=%d"), hr);
 				swr_free(&m_swr);
 				m_swr = nullptr;
 				return E_FAIL;
 			}
 
-			logWrite(_T("[ffi/src/audio] swr ready in_fmt=%d → S16, %dHz ch=%d"),
-				(int)in_fmt, m_out_sample_rate, m_out_channels);
+			//logWrite(_T("[ffi/src/audio] swr ready in_fmt=%d → S16, %dHz ch=%d"),
+				//(int)in_fmt, m_out_sample_rate, m_out_channels);
 		}
 
 		//atempo filter graph — source 의 현재 playback_rate 로 init. 이후 FillBuffer 가 rate 변경 감지 시 send_command.
@@ -1017,9 +1017,9 @@ namespace ffi
 					continue;
 				}
 				if (audio_skipped > 0)
-					logWrite(_T("[ffi/src/audio/diag] anchor skip=%d frame_pts=%lld video_anchor_rt=%lld sync_delay_rt=%lld nopts_skip_rt=%lld(target=%lld)"),
-						audio_skipped, (long long)frame->pts, (long long)video_anchor, (long long)sync_delay,
-						(long long)m_audio_sync_skipped_rt, (long long)(sync_delay < 0 ? -sync_delay : 0));
+					;//logWrite(_T("[ffi/src/audio/diag] anchor skip=%d frame_pts=%lld video_anchor_rt=%lld sync_delay_rt=%lld nopts_skip_rt=%lld(target=%lld)"),
+						//audio_skipped, (long long)frame->pts, (long long)video_anchor, (long long)sync_delay,
+						//(long long)m_audio_sync_skipped_rt, (long long)(sync_delay < 0 ? -sync_delay : 0));
 
 				//get_track_pos 의 source — 원본 미디어 시점 (audio decoder input PTS). rate 무관.
 				if (frame->pts != AV_NOPTS_VALUE && audio_tb.num > 0 && audio_tb.den > 0)
@@ -1034,7 +1034,7 @@ namespace ffi
 			//EOS — video pin 과 동일. audio queue 도 비면 stream 끝.
 			if (dec.is_eof() && dec.audio_queue_size() == 0)
 			{
-				logWrite(_T("[ffi/src/audio/diag] EOS reached — DeliverEndOfStream"));
+				//logWrite(_T("[ffi/src/audio/diag] EOS reached — DeliverEndOfStream"));
 				return S_FALSE;
 			}
 			//video pin 과 동일 — pending CMD peek 로 wait loop 깨기.
@@ -1044,7 +1044,7 @@ namespace ffi
 			Sleep(2);
 			wait_ms += 2;
 			if (wait_ms == 500 || wait_ms == 2000 || wait_ms == 5000)
-				logWrite(_T("[ffi/src/audio/diag] FillBuffer waiting %dms audio_queue empty"), wait_ms);
+				;//logWrite(_T("[ffi/src/audio/diag] FillBuffer waiting %dms audio_queue empty"), wait_ms);
 		}
 
 		BYTE* pData = NULL;
@@ -1183,9 +1183,9 @@ namespace ffi
 			}
 			seekgap_mx = mx;
 			if (log_diag)
-				logWrite(_T("[ffi/src/audio/diag] fill#%d samples=%d ch=%d nb=%d fmt=%d max_abs=%d sc=%lld"),
-					s_fill_count, out_samples, m_out_channels, frame->nb_samples, (int)frame->format,
-					(int)mx, (long long)m_sample_count);
+				;//logWrite(_T("[ffi/src/audio/diag] fill#%d samples=%d ch=%d nb=%d fmt=%d max_abs=%d sc=%lld"),
+					//s_fill_count, out_samples, m_out_channels, frame->nb_samples, (int)frame->format,
+					//(int)mx, (long long)m_sample_count);
 		}
 
 		//timing — anchor offset 을 *첫 emit 에서 한 번만* video_first 와 정렬해 잡고, rtStart 는 sample_count 로
@@ -1235,8 +1235,8 @@ namespace ffi
 				{
 					rtStart += sync_delay;
 					if (m_seekgap_remaining.load() > 0)
-						logWrite(_T("[ffi/src/audio/sync] NOPTS slower: rtStart += delay %lldms → rtStart_ms=%lld"),
-							(long long)(sync_delay / 10000), (long long)(rtStart / 10000));
+						;//logWrite(_T("[ffi/src/audio/sync] NOPTS slower: rtStart += delay %lldms → rtStart_ms=%lld"),
+							//(long long)(sync_delay / 10000), (long long)(rtStart / 10000));
 				}
 			}
 		}
@@ -1260,8 +1260,8 @@ namespace ffi
 			::QueryPerformanceCounter(&qn);
 			long long t0 = m_seekgap_qpc.load();
 			long long ms = t0 ? (qn.QuadPart - t0) * 1000LL / qf.QuadPart : -1;
-			logWrite(_T("[ffi/src/audio/seekgap] +%lldms fill_after_seek=%d max_abs=%d rtStart_ms=%lld samples=%d sc=%lld"),
-				ms, (16 - seekgap_left), (int)seekgap_mx, (long long)(rtStart / 10000), out_samples, (long long)m_sample_count);
+			//logWrite(_T("[ffi/src/audio/seekgap] +%lldms fill_after_seek=%d max_abs=%d rtStart_ms=%lld samples=%d sc=%lld"),
+				//ms, (16 - seekgap_left), (int)seekgap_mx, (long long)(rtStart / 10000), out_samples, (long long)m_sample_count);
 			m_seekgap_remaining.store(seekgap_left - 1);
 		}
 
@@ -1311,7 +1311,7 @@ namespace ffi
 		m_audio_offset_rt = 0;
 		m_audio_offset_set = false;	  //다음 FillBuffer 첫 frame 시 video_first_emit_pts_rt 와 비교 후 set.
 		m_audio_sync_skipped_rt = 0;  //NOPTS audio_sync 빠르게-skip 누적 — 새 segment 시작이므로 재계산.
-		logWrite(_T("[ffi/src/audio/sync] on_seek_flush reset sample_count=0 (athr=%d, post-Stop)"), athr ? 1 : 0);
+		//logWrite(_T("[ffi/src/audio/sync] on_seek_flush reset sample_count=0 (athr=%d, post-Stop)"), athr ? 1 : 0);
 		if (athr)
 		{
 			DeliverEndFlush();
@@ -1322,8 +1322,8 @@ namespace ffi
 
 		auto aus = [&](const LARGE_INTEGER& x, const LARGE_INTEGER& y) -> long long
 			{ return (y.QuadPart - x.QuadPart) * 1000000LL / apf.QuadPart; };
-		logWrite(_T("[ffi/src/audio/seek_prof] initfilter=%lld beginflush=%lld stop=%lld endflush+pause=%lld | total=%lldus thr=%d"),
-			aus(a0, a1), aus(a1, a2), aus(a2, a3), aus(a3, a4), aus(a0, a5), athr ? 1 : 0);
+		//logWrite(_T("[ffi/src/audio/seek_prof] initfilter=%lld beginflush=%lld stop=%lld endflush+pause=%lld | total=%lldus thr=%d"),
+			//aus(a0, a1), aus(a1, a2), aus(a2, a3), aus(a3, a4), aus(a0, a5), athr ? 1 : 0);
 
 		//[seekgap diag] resume 시점(t0)부터 첫 15 fill 의 delivery 타이밍 측정 시작.
 		m_seekgap_qpc.store(a5.QuadPart);
@@ -1396,7 +1396,7 @@ namespace ffi
 
 		if (!m_decoder.open(utf16_path))
 		{
-			logWrite(_T("[ffi/src] open_file decoder.open fail"));
+			//logWrite(_T("[ffi/src] open_file decoder.open fail"));
 			return E_FAIL;
 		}
 
@@ -1405,7 +1405,7 @@ namespace ffi
 		m_pVideoStream = new CFFiVideoStream(&hr, this, L"Video");
 		if (!m_pVideoStream || FAILED(hr))
 		{
-			logWrite(_T("[ffi/src] video stream create fail hr=0x%08x"), hr);
+			//logWrite(_T("[ffi/src] video stream create fail hr=0x%08x"), hr);
 			return FAILED(hr) ? hr : E_OUTOFMEMORY;
 		}
 
@@ -1416,16 +1416,16 @@ namespace ffi
 			m_pAudioStream = new CFFiAudioStream(&hr_a, this, L"Audio");
 			if (!m_pAudioStream || FAILED(hr_a))
 			{
-				logWrite(_T("[ffi/src] audio stream create fail hr=0x%08x"), hr_a);
+				//logWrite(_T("[ffi/src] audio stream create fail hr=0x%08x"), hr_a);
 				//audio 실패해도 video 만으로 계속.
 				m_pAudioStream = nullptr;
 			}
 		}
 
-		logWrite(_T("[ffi/src] open_file OK %dx%d fps=%.2f duration=%.0fms audio=%d"),
-			m_decoder.video_width(), m_decoder.video_height(),
-			m_decoder.frame_rate(), m_decoder.duration_ms(),
-			(int)m_decoder.has_audio());
+		//logWrite(_T("[ffi/src] open_file OK %dx%d fps=%.2f duration=%.0fms audio=%d"),
+			//m_decoder.video_width(), m_decoder.video_height(),
+			//m_decoder.frame_rate(), m_decoder.duration_ms(),
+			//(int)m_decoder.has_audio());
 
 		return S_OK;
 	}

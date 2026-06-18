@@ -109,7 +109,7 @@ namespace ffi
 			FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN, NULL);
 		if (h == INVALID_HANDLE_VALUE)
 		{
-			logWrite(_T("[ffi/dec] CreateFile fail err=%u"), ::GetLastError());
+			//logWrite(_T("[ffi/dec] CreateFile fail err=%u"), ::GetLastError());
 			return false;
 		}
 		m_file_handle = h;
@@ -155,7 +155,7 @@ namespace ffi
 		if (hr < 0)
 		{
 			char buf[256];
-			logWrite(_T("[ffi/dec] avformat_open_input fail hr=%d (%hs)"), hr, ffi::err_str(hr, buf, sizeof(buf)));
+			//logWrite(_T("[ffi/dec] avformat_open_input fail hr=%d (%hs)"), hr, ffi::err_str(hr, buf, sizeof(buf)));
 			//avformat_open_input 실패 시 m_fmt 는 자동 해제 (NULL set). close() 가 m_avio + handle 정리.
 			close();
 			return false;
@@ -165,7 +165,7 @@ namespace ffi
 		if (hr < 0)
 		{
 			char buf[256];
-			logWrite(_T("[ffi/dec] find_stream_info fail hr=%d (%hs)"), hr, ffi::err_str(hr, buf, sizeof(buf)));
+			//logWrite(_T("[ffi/dec] find_stream_info fail hr=%d (%hs)"), hr, ffi::err_str(hr, buf, sizeof(buf)));
 			close();
 			return false;
 		}
@@ -174,7 +174,7 @@ namespace ffi
 		m_video_stream_idx = av_find_best_stream(m_fmt, AVMEDIA_TYPE_VIDEO, -1, -1, NULL, 0);
 		if (m_video_stream_idx < 0)
 		{
-			logWrite(_T("[ffi/dec] no video stream"));
+			//logWrite(_T("[ffi/dec] no video stream"));
 			close();
 			return false;
 		}
@@ -206,7 +206,7 @@ namespace ffi
 			}
 			//probe 로 소비한 packet 위치를 처음으로 되돌림 (재생은 이후 on_change_start/seek 가 위치 설정).
 			av_seek_frame(m_fmt, -1, 0, AVSEEK_FLAG_BACKWARD);
-			logWrite(_T("[ffi/dec] video_has_pts=%d"), (int)m_video_has_pts);
+			//logWrite(_T("[ffi/dec] video_has_pts=%d"), (int)m_video_has_pts);
 		}
 
 		//decoder 준비
@@ -214,7 +214,7 @@ namespace ffi
 		const AVCodec* codec = avcodec_find_decoder(par->codec_id);
 		if (!codec)
 		{
-			logWrite(_T("[ffi/dec] no decoder for codec_id=%d"), (int)par->codec_id);
+			//logWrite(_T("[ffi/dec] no decoder for codec_id=%d"), (int)par->codec_id);
 			close();
 			return false;
 		}
@@ -256,20 +256,20 @@ namespace ffi
 						m_video_ctx->hw_device_ctx = av_buffer_ref(m_hw_device_ctx);
 						m_video_ctx->opaque = (void*)(intptr_t)m_hw_pix_fmt;   //get_hw_format callback 이 ctx->opaque 통해 접근.
 						m_video_ctx->get_format = get_hw_format;
-						logWrite(_T("[ffi/dec] HW accel enabled type=%hs hw_pix_fmt=%d"),
-							av_hwdevice_get_type_name(type), (int)m_hw_pix_fmt);
+						//logWrite(_T("[ffi/dec] HW accel enabled type=%hs hw_pix_fmt=%d"),
+							//av_hwdevice_get_type_name(type), (int)m_hw_pix_fmt);
 						break;
 					}
 					else
 					{
-						logWrite(_T("[ffi/dec] HW device create fail type=%hs hr=%d — try next"),
-							av_hwdevice_get_type_name(type), dhr);
+						//logWrite(_T("[ffi/dec] HW device create fail type=%hs hr=%d — try next"),
+							//av_hwdevice_get_type_name(type), dhr);
 						m_hw_pix_fmt = AV_PIX_FMT_NONE;
 					}
 				}
 			}
 			if (m_hw_pix_fmt == AV_PIX_FMT_NONE)
-				logWrite(_T("[ffi/dec] no HW accel for codec=%hs — fallback to SW"), codec->name);
+				;//logWrite(_T("[ffi/dec] no HW accel for codec=%hs — fallback to SW"), codec->name);
 		}
 
 		//multi-threaded decode — FFmpeg 의 thread_type 자동 (frame + slice). PotPlayer 의 "Thread Frame" 과 동일.
@@ -281,13 +281,13 @@ namespace ffi
 		if (hr < 0)
 		{
 			char buf[256];
-			logWrite(_T("[ffi/dec] avcodec_open2 fail hr=%d (%hs)"), hr, ffi::err_str(hr, buf, sizeof(buf)));
+			//logWrite(_T("[ffi/dec] avcodec_open2 fail hr=%d (%hs)"), hr, ffi::err_str(hr, buf, sizeof(buf)));
 			close();
 			return false;
 		}
 
-		logWrite(_T("[ffi/dec] opened codec=%hs %dx%d threads=%d"),
-			codec->name, m_video_ctx->width, m_video_ctx->height, m_video_ctx->thread_count);
+		//logWrite(_T("[ffi/dec] opened codec=%hs %dx%d threads=%d"),
+			//codec->name, m_video_ctx->width, m_video_ctx->height, m_video_ctx->thread_count);
 
 		//모든 audio stream enumerate + display name 빌드. m_audio_stream_indices 가 menu 의 track index 와 1:1.
 		m_audio_stream_indices.clear();
@@ -329,7 +329,7 @@ namespace ffi
 
 			m_audio_track_names.push_back(buf);
 
-			logWrite(_T("[ffi/dec] audio[%d→stream%u] %s"), track_idx, i, buf);
+			//logWrite(_T("[ffi/dec] audio[%d→stream%u] %s"), track_idx, i, buf);
 		}
 
 		//초기 선택: m_initial_audio_track 우선 (track switch 의 close+reopen 채널), 없으면 av_find_best_stream.
@@ -338,8 +338,8 @@ namespace ffi
 		{
 			chosen_stream_idx = m_audio_stream_indices[m_initial_audio_track];
 			m_audio_track_current = m_initial_audio_track;
-			logWrite(_T("[ffi/dec] audio track forced: track %d → stream %d"),
-				m_initial_audio_track, chosen_stream_idx);
+			//logWrite(_T("[ffi/dec] audio track forced: track %d → stream %d"),
+				//m_initial_audio_track, chosen_stream_idx);
 		}
 		else if (!m_audio_stream_indices.empty())
 		{
@@ -366,13 +366,13 @@ namespace ffi
 				chosen_stream_idx = m_audio_stream_indices[0];
 				m_audio_track_current = 0;
 			}
-			logWrite(_T("[ffi/dec] audio track auto: track %d → stream %d"),
-				m_audio_track_current, chosen_stream_idx);
+			//logWrite(_T("[ffi/dec] audio track auto: track %d → stream %d"),
+				//m_audio_track_current, chosen_stream_idx);
 		}
 		m_initial_audio_track = -1;	  //consume
 
 		m_audio_stream_idx = chosen_stream_idx;
-		logWrite(_T("[ffi/dec/diag] selected audio stream idx=%d"), m_audio_stream_idx);
+		//logWrite(_T("[ffi/dec/diag] selected audio stream idx=%d"), m_audio_stream_idx);
 		if (m_audio_stream_idx >= 0)
 		{
 			AVCodecParameters* apar = m_fmt->streams[m_audio_stream_idx]->codecpar;
@@ -386,21 +386,21 @@ namespace ffi
 					int ahr = avcodec_open2(m_audio_ctx, acodec, NULL);
 					if (ahr < 0)
 					{
-						logWrite(_T("[ffi/dec] audio codec open fail hr=%d — audio disabled"), ahr);
+						//logWrite(_T("[ffi/dec] audio codec open fail hr=%d — audio disabled"), ahr);
 						avcodec_free_context(&m_audio_ctx);
 						m_audio_stream_idx = -1;
 					}
 					else
 					{
-						logWrite(_T("[ffi/dec] opened audio codec=%hs %dHz ch=%d sample_fmt=%d"),
-							acodec->name, m_audio_ctx->sample_rate,
-							m_audio_ctx->ch_layout.nb_channels, (int)m_audio_ctx->sample_fmt);
+						//logWrite(_T("[ffi/dec] opened audio codec=%hs %dHz ch=%d sample_fmt=%d"),
+							//acodec->name, m_audio_ctx->sample_rate,
+							//m_audio_ctx->ch_layout.nb_channels, (int)m_audio_ctx->sample_fmt);
 					}
 				}
 			}
 			else
 			{
-				logWrite(_T("[ffi/dec] no audio decoder for codec_id=%d"), (int)apar->codec_id);
+				//logWrite(_T("[ffi/dec] no audio decoder for codec_id=%d"), (int)apar->codec_id);
 				m_audio_stream_idx = -1;
 			}
 		}
@@ -437,7 +437,7 @@ namespace ffi
 					track_idx + 1, codec_str);
 
 			m_subtitle_track_names.push_back(buf);
-			logWrite(_T("[ffi/dec] subtitle[%d→stream%u] %s"), track_idx, i, buf);
+			//logWrite(_T("[ffi/dec] subtitle[%d→stream%u] %s"), track_idx, i, buf);
 		}
 
 		//seek 인덱스 유무 판별 — 부분 다운로드 AVI 등은 파일 끝 idx1 이 없어 인덱스 0. PTS 는 정상이므로 timing 은
@@ -459,7 +459,7 @@ namespace ffi
 			AVRational vtb = vst->time_base;
 			double vfps = (vst->avg_frame_rate.den != 0) ? (double)vst->avg_frame_rate.num / (double)vst->avg_frame_rate.den : 0.0;
 			double header_dur_ms = (m_fmt->duration != AV_NOPTS_VALUE) ? (double)m_fmt->duration / 1000.0 : -1.0;
-			logWrite(_T("[ffi/dec] AVI(SW) idx_cnt=%d header_dur=%.0fms"), idx_cnt, header_dur_ms);
+			//logWrite(_T("[ffi/dec] AVI(SW) idx_cnt=%d header_dur=%.0fms"), idx_cnt, header_dur_ms);
 
 			//native video index(idx1) 의 마지막 entry timestamp = 실제 길이.
 			double idx_dur = 0.0;
@@ -481,7 +481,7 @@ namespace ffi
 			{
 				//정상 파일 — unreliable/no_seek_index 설정 안 함. duration 은 헤더(정상)에서. 기존 정상-파일 동작과 동일(회귀 0).
 				avi_native_index = true;
-				logWrite(_T("[ffi/dec] AVI 정상 인덱스(idx=%d dur=%.0fms header=%.0fms) — pts-seek 경로"), idx_cnt, idx_dur, header_dur_ms);
+				//logWrite(_T("[ffi/dec] AVI 정상 인덱스(idx=%d dur=%.0fms header=%.0fms) — pts-seek 경로"), idx_cnt, idx_dur, header_dur_ms);
 			}
 			else
 			{
@@ -510,7 +510,7 @@ namespace ffi
 							m_seek_index_snap = false;	//ts↔byte 보간 (byte-seek 착지 후 kf_skip 이 keyframe 으로).
 						}
 						avi_native_index = true;
-						logWrite(_T("[ffi/dec] AVI native-index(header malformed) → dur=%.0fms seek_idx=%zu byte-seek"), idx_dur, idx.size());
+						//logWrite(_T("[ffi/dec] AVI native-index(header malformed) → dur=%.0fms seek_idx=%zu byte-seek"), idx_dur, idx.size());
 					}
 				}
 			}
@@ -523,14 +523,14 @@ namespace ffi
 			m_scan_quit.store(false);
 			m_scanned_duration_ms.store(-1.0);
 			m_scan_thread = std::thread(&CDecoder::scan_duration_worker, this);
-			logWrite(_T("[ffi/dec] duration unknown — unreliable + 스캔 시작"));
+			//logWrite(_T("[ffi/dec] duration unknown — unreliable + 스캔 시작"));
 		}
 		else if (m_no_seek_index && !avi_native_index)
 		{
 			m_scan_quit.store(false);
 			m_scanned_duration_ms.store(-1.0);
 			m_scan_thread = std::thread(&CDecoder::scan_duration_worker, this);
-			logWrite(_T("[ffi/dec] AVI native index 없음 — byte-seek 스캔 시작"));
+			//logWrite(_T("[ffi/dec] AVI native index 없음 — byte-seek 스캔 시작"));
 		}
 
 		//일부 파일은 컨테이너 codecpar 의 width/height 가 실제 SPS 코딩 크기와 다르다(헤더 메타 오류).
@@ -585,8 +585,8 @@ namespace ffi
 			av_seek_frame(m_fmt, -1, 0, AVSEEK_FLAG_BACKWARD);
 			if (cb > ca)		{ m_probe_w = wb; m_probe_h = hb; }
 			else if (ca > 0)	{ m_probe_w = wa; m_probe_h = ha; }
-			logWrite(_T("[ffi/dec] dim probe: A=%dx%d(%d) B=%dx%d(%d) → video_width/height=%dx%d (frames=%d %llums)"),
-				wa, ha, ca, wb, hb, cb, video_width(), video_height(), frames, GetTickCount64() - t0);
+			//logWrite(_T("[ffi/dec] dim probe: A=%dx%d(%d) B=%dx%d(%d) → video_width/height=%dx%d (frames=%d %llums)"),
+				//wa, ha, ca, wb, hb, cb, video_width(), video_height(), frames, GetTickCount64() - t0);
 		}
 
 		return true;
@@ -713,8 +713,8 @@ namespace ffi
 						if (est_ms > 0.0)
 						{
 							m_scanned_duration_ms.store(est_ms);
-							logWrite(_T("[ffi/dec] duration estimate (phase1) ~%.0fms (covered=%.0fms pos=%lld/%lld)"),
-								est_ms, covered_ms, (long long)pos, (long long)file_size);
+							//logWrite(_T("[ffi/dec] duration estimate (phase1) ~%.0fms (covered=%.0fms pos=%lld/%lld)"),
+								//est_ms, covered_ms, (long long)pos, (long long)file_size);
 						}
 						estimate_done = true;
 					}
@@ -731,8 +731,8 @@ namespace ffi
 			if (dur_ms > 0.0)
 			{
 				m_scanned_duration_ms.store(dur_ms);	//2단계 — 정확값으로 교체.
-				logWrite(_T("[ffi/dec] full scan done (phase2) — duration=%.0fms (video=%.0fms[%lld frames] audio=%.0fms)"),
-					dur_ms, dur_v_ms, (long long)v_count, dur_a_ms);
+				//logWrite(_T("[ffi/dec] full scan done (phase2) — duration=%.0fms (video=%.0fms[%lld frames] audio=%.0fms)"),
+					//dur_ms, dur_v_ms, (long long)v_count, dur_a_ms);
 			}
 
 			//seek 인덱스 publish — 이후 byte-seek 가 시간→byte 보간으로 정확히 이동(garbage tail/비균일 bitrate overshoot 방지).
@@ -741,8 +741,8 @@ namespace ffi
 				std::lock_guard<std::mutex> lk(m_seek_index_mtx);
 				m_seek_index = std::move(index);
 				m_seek_index_snap = (aidx < 0);	//video-only = keyframe 인덱스 → snap. audio = 보간.
-				logWrite(_T("[ffi/dec] seek index built — %zu entries snap=%d (last %lldms @ byte %lld)"),
-					m_seek_index.size(), (int)m_seek_index_snap, (long long)m_seek_index.back().first, (long long)m_seek_index.back().second);
+				//logWrite(_T("[ffi/dec] seek index built — %zu entries snap=%d (last %lldms @ byte %lld)"),
+					//m_seek_index.size(), (int)m_seek_index_snap, (long long)m_seek_index.back().first, (long long)m_seek_index.back().second);
 			}
 		}
 
@@ -839,7 +839,7 @@ namespace ffi
 			return;
 		m_quit.store(false);
 		m_thread = std::thread(&CDecoder::worker_loop, this);
-		logWrite(_T("[ffi/dec] worker started"));
+		//logWrite(_T("[ffi/dec] worker started"));
 	}
 
 	void CDecoder::stop()
@@ -864,7 +864,7 @@ namespace ffi
 			m_audio_queue.pop_front();
 			av_frame_free(&f);
 		}
-		logWrite(_T("[ffi/dec] worker stopped"));
+		//logWrite(_T("[ffi/dec] worker stopped"));
 	}
 
 	void CDecoder::seek(double pos_ms, int64_t segment_rt, double prev_emit_ms)
@@ -1335,14 +1335,14 @@ namespace ffi
 							m_kf_skip_min_pts = INT64_MIN;	//착지 후 첫 keyframe 부터 디코드.
 							m_kf_skip_count   = 0;
 							int64_t avio_landed = (m_fmt->pb) ? avio_tell(m_fmt->pb) : -1;
-							logWrite(_T("[ffi/dec/byteseek] seek_pos=%.0fms method=%ls target_byte=%lld hr=%d avio_tell=%lld"),
-								seek_pos, method, (long long)target_byte, hr_seek, (long long)avio_landed);
+							//logWrite(_T("[ffi/dec/byteseek] seek_pos=%.0fms method=%ls target_byte=%lld hr=%d avio_tell=%lld"),
+								//seek_pos, method, (long long)target_byte, hr_seek, (long long)avio_landed);
 						}
 						else
 						{
 							hr_seek = av_seek_frame(m_fmt, -1, 0, AVSEEK_FLAG_BYTE);
 							m_kf_skip_active = false;
-							logWrite(_T("[ffi/dec/byteseek] no index/duration yet — seek to start"));
+							//logWrite(_T("[ffi/dec/byteseek] no index/duration yet — seek to start"));
 						}
 					}
 					else if (kf_mode)
@@ -1402,8 +1402,8 @@ namespace ffi
 							av_packet_free(&probe);
 							//확정 seek_ts 로 복귀 — probe 가 demuxer 를 전진시켰으므로. 그 keyframe 부터 디코드.
 							hr_seek = avformat_seek_file(m_fmt, m_video_stream_idx, INT64_MIN, seek_ts, seek_ts, AVSEEK_FLAG_BACKWARD);
-							logWrite(_T("[ffi/dec/kf] backward probe attempts=%d final_seek_ts=%lld target=%lld"),
-								probe_attempts, (long long)seek_ts, (long long)target_pts);
+							//logWrite(_T("[ffi/dec/kf] backward probe attempts=%d final_seek_ts=%lld target=%lld"),
+								//probe_attempts, (long long)seek_ts, (long long)target_pts);
 							m_kf_skip_active  = true;
 							m_kf_skip_min_pts = INT64_MIN;	//landing keyframe(<=target) 부터 emit.
 							m_kf_skip_count   = 0;
@@ -1448,8 +1448,8 @@ namespace ffi
 						av_packet_free(&probe);
 						//확정 seek_ts 로 복귀 — probe 가 demuxer 를 전진시켰으므로.
 						hr_seek = avformat_seek_file(m_fmt, m_video_stream_idx, INT64_MIN, seek_ts, seek_ts, AVSEEK_FLAG_BACKWARD);
-						logWrite(_T("[ffi/dec/exact] backward probe attempts=%d final_seek_ts=%lld target=%lld"),
-							probe_attempts, (long long)seek_ts, (long long)target_pts);
+						//logWrite(_T("[ffi/dec/exact] backward probe attempts=%d final_seek_ts=%lld target=%lld"),
+							//probe_attempts, (long long)seek_ts, (long long)target_pts);
 						m_kf_skip_active = false;
 					}
 					avcodec_flush_buffers(m_video_ctx);
@@ -1463,8 +1463,8 @@ namespace ffi
 					m_segment_rt.store(m_pending_segment_rt);
 					m_video_first_emit_pts_rt.store(LLONG_MIN);	  //다음 video frame push 시 set.
 					int new_gen = m_seek_generation.fetch_add(1) + 1;
-					logWrite(_T("[ffi/dec] seek to %.0fms hr=%d gen=%d seg_rt=%lld seek_us=%lld"),
-						seek_pos, hr_seek, new_gen, (long long)m_pending_segment_rt, seek_us);
+					//logWrite(_T("[ffi/dec] seek to %.0fms hr=%d gen=%d seg_rt=%lld seek_us=%lld"),
+						//seek_pos, hr_seek, new_gen, (long long)m_pending_segment_rt, seek_us);
 
 					//first frame 시간 측정용 — worker 가 다음 frame push 시점.
 					m_first_frame_after_seek = false;
@@ -1519,8 +1519,8 @@ namespace ffi
 					if (m_audio_ctx)
 						avcodec_flush_buffers(m_audio_ctx);
 					m_eof.store(false);
-					logWrite(_T("[ffi/dec/kf] forward keyframe not found before EOF → backward fallback target_pts=%lld"),
-						(long long)m_kf_skip_target_pts);
+					//logWrite(_T("[ffi/dec/kf] forward keyframe not found before EOF → backward fallback target_pts=%lld"),
+						//(long long)m_kf_skip_target_pts);
 					continue;
 				}
 				//EOF — flag set. queue 비면 source FillBuffer 가 S_FALSE 반환 → DeliverEndOfStream → renderer EC_COMPLETE 발화.
@@ -1547,9 +1547,9 @@ namespace ffi
 					vq = m_video_queue.size();
 					aq = m_audio_queue.size();
 				}
-				logWrite(_T("[ffi/dec/diag] pkt total=%lld v=%lld a=%lld other=%lld | queue v=%zu a=%zu"),
-					(long long)s_pkt_total, (long long)s_pkt_video, (long long)s_pkt_audio, (long long)s_pkt_other,
-					vq, aq);
+				//logWrite(_T("[ffi/dec/diag] pkt total=%lld v=%lld a=%lld other=%lld | queue v=%zu a=%zu"),
+					//(long long)s_pkt_total, (long long)s_pkt_video, (long long)s_pkt_audio, (long long)s_pkt_other,
+					//vq, aq);
 			}
 
 			//[위치 스캔] seek 후 첫 frame 디코드 전까지(kf_skip 구간 + bound bail 후 손상 구간 통과 포함) 현재 읽는
@@ -1583,8 +1583,8 @@ namespace ffi
 						{
 							m_kf_skip_active = false;
 							m_did_garbage_scan = true;	//손상 구간 확정 — 복구 시 audio decoder 재생성.
-							logWrite(_T("[ffi/dec/kf] skip limit(%lld) 초과 — 손상 구간 판단, 정상 디코드로 전환(무한 skip/freeze 방지)"),
-								(long long)kf_skip_limit);
+							//logWrite(_T("[ffi/dec/kf] skip limit(%lld) 초과 — 손상 구간 판단, 정상 디코드로 전환(무한 skip/freeze 방지)"),
+								//(long long)kf_skip_limit);
 							//이 packet 은 keyframe 이 아니므로 디코드해도 frame 안 나옴 → 버리고 다음 packet 부터 정상 경로.
 							av_packet_unref(pkt);
 							continue;
@@ -1594,9 +1594,9 @@ namespace ffi
 					}
 					//전진 keyframe 도달 — skip 종료. 이 packet 부터 정상 디코드 (아래로 fall through).
 					m_kf_skip_active = false;
-					logWrite(_T("[ffi/dec/kf] keyframe reached pts=%lld min=%lld target=%lld pkt_pos=%lld → decode start"),
-						(long long)((pkt->pts != AV_NOPTS_VALUE) ? pkt->pts : pkt->dts),
-						(long long)m_kf_skip_min_pts, (long long)m_kf_skip_target_pts, (long long)pkt->pos);
+					//logWrite(_T("[ffi/dec/kf] keyframe reached pts=%lld min=%lld target=%lld pkt_pos=%lld → decode start"),
+						//(long long)((pkt->pts != AV_NOPTS_VALUE) ? pkt->pts : pkt->dts),
+						//(long long)m_kf_skip_min_pts, (long long)m_kf_skip_target_pts, (long long)pkt->pos);
 				}
 				//audio packet 은 skip 하지 않고 정상 디코드로 흘려보낸다 (아래 fall through).
 				//[GOP 시작~target] 구간 audio 를 확보해야 audio 첫 emit 의 미디어 시점이 video_first 와 정렬되어
@@ -1618,7 +1618,7 @@ namespace ffi
 					m_pos_searching.store(true, std::memory_order_relaxed);
 					m_did_garbage_scan = true;
 					m_video_no_frame_count = 0;
-					logWrite(_T("[ffi/dec/kf] 디코드 stall 감지(frame 연속 미생성) — searching 재진입(손상 구간 스캔)"));
+					//logWrite(_T("[ffi/dec/kf] 디코드 stall 감지(frame 연속 미생성) — searching 재진입(손상 구간 스캔)"));
 				}
 
 				hr = avcodec_send_packet(m_video_ctx, pkt);
@@ -1671,7 +1671,7 @@ namespace ffi
 								if (avcodec_open2(m_audio_ctx, acodec, NULL) < 0)
 									avcodec_free_context(&m_audio_ctx);
 							}
-							logWrite(_T("[ffi/dec] 손상 후 audio decoder 재생성 (채널설정 복구)"));
+							//logWrite(_T("[ffi/dec] 손상 후 audio decoder 재생성 (채널설정 복구)"));
 						}
 						std::unique_lock<std::mutex> lk(m_mtx_queue);
 						while (!m_audio_queue.empty())
@@ -1721,7 +1721,7 @@ namespace ffi
 						if (s_xfer_count <= 5 || s_xfer_count % 50 == 0)
 						{
 							long long us = (qpc_t1.QuadPart - qpc_t0.QuadPart) * 1000000LL / qpc_freq.QuadPart;
-							logWrite(_T("[ffi/dec/hw] transfer#%d xfer=%d us=%lld"), s_xfer_count, xfer, us);
+							//logWrite(_T("[ffi/dec/hw] transfer#%d xfer=%d us=%lld"), s_xfer_count, xfer, us);
 						}
 						if (xfer >= 0)
 						{
@@ -1759,8 +1759,8 @@ namespace ffi
 						::QueryPerformanceFrequency(&qpc_freq);
 						::QueryPerformanceCounter(&qpc_now);
 						long long us = (qpc_now.QuadPart - m_seek_done_qpc) * 1000000LL / qpc_freq.QuadPart;
-						logWrite(_T("[ffi/dec/seek] seek→first_video_frame us=%lld pts=%lld"),
-							us, (long long)out_frame->pts);
+						//logWrite(_T("[ffi/dec/seek] seek→first_video_frame us=%lld pts=%lld"),
+							//us, (long long)out_frame->pts);
 						m_first_frame_after_seek = true;
 					}
 				}

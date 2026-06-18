@@ -11,7 +11,6 @@
 
 #include "../../colors.h"
 #include "../../MemoryDC.h"
-#include "../../log/SCLog/SCLog.h"
 #include <afxvslistbox.h>
 
 #define IDC_EDIT_CELL	1001
@@ -1808,20 +1807,6 @@ void CVtListCtrlEx::OnPaint()
 	{
 		pHeaderCtrl->GetClientRect(&rcHeader);
 		rc.top += rcHeader.Height();
-	}
-
-	//[gap diag] top 항목이 헤더 하단과 어긋날 때만 상세 기록 — gap/overlap 원인(스크롤 offset vs 헤더높이 vs 가변행) 격리.
-	if (m_scrollbar_setup && GetItemCount() > 0)
-	{
-		int dtop = GetTopIndex();
-		CRect dri(0,0,0,0), dri0(0,0,0,0);
-		BOOL ok = (dtop >= 0) ? GetItemRect(dtop, &dri, LVIR_BOUNDS) : FALSE;
-		GetItemRect(0, &dri0, LVIR_BOUNDS);
-		int hh = get_header_height();
-		int nat_hdr = pHeaderCtrl ? rcHeader.Height() : 0;
-		if (ok && dri.top != hh)
-			logWrite(_T("[gap] topIdx=%d itemTop=%d itemBot=%d itemH=%d | header_get=%d header_native=%d | item0Top=%d item0H=%d lineH=%d"),
-				dtop, dri.top, dri.bottom, dri.Height(), hh, nat_hdr, dri0.top, dri0.Height(), m_line_height);
 	}
 
 	if (m_scrollbar_setup)
@@ -6161,12 +6146,6 @@ void CVtListCtrlEx::sync_scrollbar()
 	int content_view_w = rc.Width();
 	int avail_rows = (m_line_height > 0) ? max(0, (rc.Height() - header) / m_line_height) : GetCountPerPage();
 	int visible = avail_rows;
-
-	//logWrite(_T("[sync] rc=(%d,%d,%d,%d) W=%d H=%d header=%d colcnt=%d total_col_w=%d content_view_w=%d total=%d | need_v=%d need_h=%d reserve=%d vis=%d hwndV=%d hwndH=%d vVis=%d hVis=%d"),
-	//	rc.left, rc.top, rc.right, rc.bottom, rc.Width(), rc.Height(), header, col_count, total_col_width, content_view_w, total,
-	//	(int)need_v, (int)need_h, m_bottom_reserve, visible,
-	//	(int)::IsWindow(m_scrollbar.m_hWnd), (int)::IsWindow(m_scrollbar_h.m_hWnd),
-	//	(int)(::IsWindow(m_scrollbar.m_hWnd) && m_scrollbar.IsWindowVisible()), (int)(::IsWindow(m_scrollbar_h.m_hWnd) && m_scrollbar_h.IsWindowVisible()));
 
 	//세로 scrollbar — 우측 NC 띠(parent child). [rc.right, rc.right+gw] × content 높이를 parent 좌표로 배치.
 	if (::IsWindow(m_scrollbar.m_hWnd))

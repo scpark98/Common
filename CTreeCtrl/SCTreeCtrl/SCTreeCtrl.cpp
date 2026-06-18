@@ -1121,7 +1121,7 @@ HTREEITEM CSCTreeCtrl::find_item(const CString& label, HTREEITEM hItem)
 	if (hItem)
 	{
 		cur_label = GetItemText(hItem);
-		TRACE(_T("%s\n"), cur_label);
+		//TRACE(_T("%s\n"), cur_label);
 		if (cur_label == label)
 			return hItem;
 
@@ -2682,7 +2682,7 @@ bool CSCTreeCtrl::load_from_string(CString text)
 				hItem = InsertItem(label, img_index, img_index, (m_use_root ? m_root_item : TVI_ROOT));
 			else
 				hItem = InsertItem(label, (m_use_root ? m_root_item : TVI_ROOT));
-			TRACE(_T("hItem = %p, label = %s\n"), hItem, label);
+			//TRACE(_T("hItem = %p, label = %s\n"), hItem, label);
 
 			prev_indent = 0;
 			continue;
@@ -2694,7 +2694,7 @@ bool CSCTreeCtrl::load_from_string(CString text)
 				hItem = InsertItem(label, img_index, img_index, hItem);
 			else
 				hItem = InsertItem(label, hItem);
-			TRACE(_T("hItem = %p, label = %s\n"), hItem, label);
+			//TRACE(_T("hItem = %p, label = %s\n"), hItem, label);
 
 			prev_indent = tab_count;
 		}
@@ -2706,7 +2706,7 @@ bool CSCTreeCtrl::load_from_string(CString text)
 				hItem = InsertItem(label, img_index, img_index, hItem);
 			else
 				hItem = InsertItem(label, hItem);
-			TRACE(_T("hItem = %p, label = %s\n"), hItem, label);
+			//TRACE(_T("hItem = %p, label = %s\n"), hItem, label);
 		}
 		//전보다 적으면 (prev_index-tabCount) * parent의 sibling이다.
 		else if (tab_count < prev_indent)

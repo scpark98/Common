@@ -1299,6 +1299,10 @@ int CSubtitle::get_subtitle_range(int pos, int &start, int &end)
 	{
 		if (pos < m_subtitle[i].start)
 		{
+			//pos 가 첫 자막보다 앞이면 i-1 == -1 → deque 음수 인덱스 OOB. 반복할 현재 자막 없음.
+			if (i == 0)
+				return -1;
+
 			start = m_subtitle[i-1].start;
 
 			if (m_subtitle[i-1].end > start)
@@ -1314,7 +1318,14 @@ int CSubtitle::get_subtitle_range(int pos, int &start, int &end)
 		}
 	}
 
-	return -1;
+	//루프 종료 = pos 가 모든 자막 start 이후 = 마지막 자막이 현재 자막.
+	//(마지막 자막엔 '다음 자막' 이 없어 위 루프가 못 잡으므로 여기서 처리)
+	{
+		int last = (int)m_subtitle.size() - 1;
+		start = m_subtitle[last].start;
+		end = m_subtitle[last].end;
+		return last;
+	}
 }
 
 //라인 단위로 삭제한다. sentence_index가 < 0이면 sub_index를 삭제한다.

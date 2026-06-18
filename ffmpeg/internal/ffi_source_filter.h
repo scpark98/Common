@@ -141,6 +141,7 @@ namespace ffi
 		HRESULT DecideBufferSize(IMemAllocator* pAlloc, ALLOCATOR_PROPERTIES* pProperties) override;
 		HRESULT OnThreadCreate() override;
 		HRESULT OnThreadDestroy() override;
+		HRESULT DoBufferProcessingLoop() override;	//(측정) 로직은 stock 과 동일 + park 단계 기록.
 
 		//video pin 의 on_change_start 에서 호출 — flush + new_segment.
 		void	on_seek_flush(REFERENCE_TIME rtStart);
@@ -196,6 +197,10 @@ namespace ffi
 		//get_track_pos 의 source 로 사용. graph clock 은 wall clock 진행이라 rate 변경 시 미디어 진행과 어긋남.
 		//이 값은 atempo input frame 의 pts 라 *원본 미디어 시점 그대로* — rate 무관 정확.
 		std::atomic<int64_t> m_last_input_pts_ms{ -1 };
+
+		//(측정) streaming thread 가 현재 어느 단계에 park 됐는지 — 0=기타/wait, 1=GetDeliveryBuffer, 2=FillBuffer, 3=Deliver.
+		//on_seek_flush 가 Stop 직전 읽어 잔존 ~5.9ms 가 GetDeliveryBuffer vs Deliver 중 어디인지 확정.
+		std::atomic<int> m_audio_loop_state{ 0 };
 
 		//[seekgap diag] seek 후 첫 N fill 의 실제 delivery 타이밍·진폭 측정 — 오디오 끊김 원인이
 		//source 측(무음/지연 delivery)인지 downstream(DSound 재프라임)인지 격리용. on_seek_flush 가 t0/카운트 set.

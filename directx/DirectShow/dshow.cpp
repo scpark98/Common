@@ -3548,10 +3548,10 @@ void CDShow::set_track_pos(double pos, bool seek_to_keyframe)
 		REFERENCE_TIME post_pos = 0;
 		m_pMS->GetCurrentPosition(&post_pos);
 
-		//logWrite(_T("[seek/t0] SetPositions pos=%.0fms hr=0x%08x flags=0x%08x setpos_us=%lld pre_pos=%.0fms post_pos=%.0fms"),
-			//pos, hr, flags,
-			//(long long)((qpc_t1.QuadPart - qpc_t0.QuadPart) * 1000000LL / qpc_freq.QuadPart),
-			//(double)pre_pos / 10000.0, (double)post_pos / 10000.0);
+		logWrite(_T("[seek/t0] SetPositions pos=%.0fms hr=0x%08x flags=0x%08x setpos_us=%lld pre_pos=%.0fms post_pos=%.0fms"),
+			pos, hr, flags,
+			(long long)((qpc_t1.QuadPart - qpc_t0.QuadPart) * 1000000LL / qpc_freq.QuadPart),
+			(double)pre_pos / 10000.0, (double)post_pos / 10000.0);
 	}
 
 	//seek target cache — get_track_pos 가 INTERMEDIATE transition 중에 cache 반환 (B→A→B 깜빡임 회피).
@@ -3619,9 +3619,9 @@ void CDShow::set_track_pos(double pos, bool seek_to_keyframe)
 					::Sleep(10);
 				}
 
-				//logWrite(_T("[seek/t1] redraw_us=%lld total_advance_us=%lld (T0→clock@target)"),
-					//(long long)((qpc_t3.QuadPart - qpc_t2.QuadPart) * 1000000LL / qpc_freq.QuadPart),
-					//(long long)advance_us);
+				logWrite(_T("[seek/t1] redraw_us=%lld total_advance_us=%lld (T0→clock@target)"),
+					(long long)((qpc_t3.QuadPart - qpc_t2.QuadPart) * 1000000LL / qpc_freq.QuadPart),
+					(long long)advance_us);
 			}
 		}
 	}

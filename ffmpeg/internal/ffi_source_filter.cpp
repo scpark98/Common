@@ -173,9 +173,9 @@ namespace ffi
 
 		auto us = [&](const LARGE_INTEGER& a, const LARGE_INTEGER& b) -> long long
 			{ return (b.QuadPart - a.QuadPart) * 1000000LL / pf.QuadPart; };
-		//logWrite(_T("[ffi/src/seek_prof] decoder.seek=%lld beginflush=%lld stop=%lld endflush=%lld pause=%lld audioflush=%lld | total=%lldus thr=%d"),
-			//us(t_enter, t_seek), us(t_seek, t_bf), us(t_bf, t_stop), us(t_stop, t_ef),
-			//us(t_ef, t_pause), us(t_pause, t_audio), us(t_enter, t_audio), thr ? 1 : 0);
+		logWrite(_T("[ffi/src/seek_prof] decoder.seek=%lld beginflush=%lld stop=%lld endflush=%lld pause=%lld audioflush=%lld | total=%lldus thr=%d"),
+			us(t_enter, t_seek), us(t_seek, t_bf), us(t_bf, t_stop), us(t_stop, t_ef),
+			us(t_ef, t_pause), us(t_pause, t_audio), us(t_enter, t_audio), thr ? 1 : 0);
 
 		//logWrite(_T("[ffi/src] on_change_start → seek %.0fms + %s (NewSegment 0..%lld)"),
 			//pos_ms,
@@ -980,6 +980,11 @@ namespace ffi
 				{
 					//video first emit 아직 안 됨 — frame 다시 큐 앞에 못 넣음. discard + wait.
 					av_frame_free(&frame);
+					//seek/stop 중이면 anchor-wait 를 즉시 중단 — 안 그러면 다음 seek 의 Stop() 이 이 wait(최대 200ms,
+					//searching 중 무한)에 걸려 수 ms 블록(parked=2). 아래 audio_queue wait 와 동일한 abort 패턴.
+					Command pending;
+					if (CheckRequest(&pending))
+						return S_FALSE;
 					Sleep(5);
 					if (searching)
 						wait_anchor_ms = 0;	//스캔 중 — 타이머 리셋. 스캔 종료(첫 video 디코드) 후 200ms grace(decode→emit gap 흡수).
@@ -1269,6 +1274,67 @@ namespace ffi
 		return NOERROR;
 	}
 
+	//(측정) stock CSourceStream::DoBufferProcessingLoop 과 로직 동일 — m_audio_loop_state 만 단계별 기록.
+	//on_seek_flush 가 Stop 직전 이 값을 읽어 잔존 ~5.9ms 가 GetDeliveryBuffer vs Deliver 중 어디서 park 인지 확정.
+	HRESULT CFFiAudioStream::DoBufferProcessingLoop()
+	{
+		Command com;
+		OnThreadStartPlay();
+		do
+		{
+			while (!CheckRequest(&com))
+			{
+				IMediaSample* pSample;
+
+				m_audio_loop_state.store(1);
+				HRESULT hr = GetDeliveryBuffer(&pSample, NULL, NULL, 0);
+
+				if (FAILED(hr))
+				{
+					m_audio_loop_state.store(0);
+					Sleep(1);
+					continue;
+				}
+
+				m_audio_loop_state.store(2);
+				hr = FillBuffer(pSample);
+
+				if (hr == S_OK)
+				{
+					m_audio_loop_state.store(3);
+					hr = Deliver(pSample);
+					m_audio_loop_state.store(0);
+
+					pSample->Release();
+					if (hr != S_OK)
+						return S_OK;
+				}
+				else if (hr == S_FALSE)
+				{
+					m_audio_loop_state.store(0);
+					pSample->Release();
+					DeliverEndOfStream();
+					return S_OK;
+				}
+				else
+				{
+					m_audio_loop_state.store(0);
+					pSample->Release();
+					DeliverEndOfStream();
+					m_pFilter->NotifyEvent(EC_ERRORABORT, hr, 0);
+					return hr;
+				}
+			}
+
+			if (com == CMD_RUN || com == CMD_PAUSE)
+				Reply(NOERROR);
+			else if (com != CMD_STOP)
+				Reply((DWORD)E_UNEXPECTED);
+		} while (com != CMD_STOP);
+
+		return S_FALSE;
+	}
+
 	void CFFiAudioStream::on_seek_flush(REFERENCE_TIME rtStart)
 	{
 		REFERENCE_TIME rtStop = m_pSource ?
@@ -1299,6 +1365,7 @@ namespace ffi
 		//streaming 중인 경우만 Stop/Flush/Pause cycle.
 		a2 = a3 = a4 = a1;
 		bool athr = ThreadExists();
+		int parked = m_audio_loop_state.load();	//(측정) Stop 전 streaming thread 가 park 된 단계.
 		if (athr)
 		{
 			DeliverBeginFlush();
@@ -1322,8 +1389,8 @@ namespace ffi
 
 		auto aus = [&](const LARGE_INTEGER& x, const LARGE_INTEGER& y) -> long long
 			{ return (y.QuadPart - x.QuadPart) * 1000000LL / apf.QuadPart; };
-		//logWrite(_T("[ffi/src/audio/seek_prof] initfilter=%lld beginflush=%lld stop=%lld endflush+pause=%lld | total=%lldus thr=%d"),
-			//aus(a0, a1), aus(a1, a2), aus(a2, a3), aus(a3, a4), aus(a0, a5), athr ? 1 : 0);
+		logWrite(_T("[ffi/src/audio/seek_prof] initfilter=%lld beginflush=%lld stop=%lld endflush+pause=%lld | total=%lldus thr=%d parked=%d(1=GDB,2=Fill,3=Deliver)"),
+			aus(a0, a1), aus(a1, a2), aus(a2, a3), aus(a3, a4), aus(a0, a5), athr ? 1 : 0, parked);
 
 		//[seekgap diag] resume 시점(t0)부터 첫 15 fill 의 delivery 타이밍 측정 시작.
 		m_seekgap_qpc.store(a5.QuadPart);

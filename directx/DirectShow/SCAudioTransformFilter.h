@@ -96,6 +96,7 @@ public:
 //Internal — pin 에서 호출.
 	IFilterGraph*			get_graph() { return m_pGraph; }
 	FILTER_STATE			get_state() { return m_state; }
+	bool					is_flushing() { return m_flushing.load(); }
 	const WAVEFORMATEX*		get_wave_format() { return m_wfx_set ? (const WAVEFORMATEX*)&m_wfx_ext : NULL; }
 	//WAVEFORMATEXTENSIBLE 의 SubFormat 을 포함해 전체 cbFmt byte 까지 복사. WFEX subtype 검사를 위해 필수.
 	void					set_wave_format(const BYTE* fmt, ULONG cbFmt);

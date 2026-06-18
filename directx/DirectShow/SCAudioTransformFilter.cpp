@@ -778,10 +778,23 @@ STDMETHODIMP CSCAudioTransformInputPin::Receive(IMediaSample* pSample)
 	if (!pAlloc)
 		return E_FAIL;
 
+	//blocking GetBuffer(...,0) 금지 — 16-buffer 가 다 in-flight 면 ~1버퍼 주기(~5.9ms) 블록한다. 이게 소스의
+	//Deliver→이 Receive 를 잡아, seek 시 on_seek_flush 의 Stop() 이 그만큼 기다리게 해 오디오 끊김의 원인이 됐다.
+	//AM_GBF_NOWAIT 폴링 + m_flushing 체크로 in-progress 블록을 ~1ms 안에 abort. allocator Decommit(=silence 회귀)·
+	//렌더러(=영상 stutter 회귀) 를 안 건드리고, flush 중엔 기존 enqueue_sample 과 동일하게 sample drop.
 	IMediaSample* pOur = NULL;
-	HRESULT hr = pAlloc->GetBuffer(&pOur, NULL, NULL, 0);
-	if (FAILED(hr) || !pOur)
-		return hr;
+	HRESULT hr;
+	for (;;)
+	{
+		hr = pAlloc->GetBuffer(&pOur, NULL, NULL, AM_GBF_NOWAIT);
+		if (SUCCEEDED(hr) && pOur)
+			break;
+		if (m_pFilter->is_flushing())
+			return S_OK;
+		if (m_pFilter->get_state() == State_Stopped)
+			return E_UNEXPECTED;
+		Sleep(1);
+	}
 
 	BYTE* pInBuf = NULL;
 	pSample->GetPointer(&pInBuf);

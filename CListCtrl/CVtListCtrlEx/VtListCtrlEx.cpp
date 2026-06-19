@@ -6005,7 +6005,10 @@ void CVtListCtrlEx::setup_scrollbar()
 	//수동 동기화(sync_header_h_offset). native scrollbar 시각화는 OnNcCalcSize override 가 단독 차단.
 	//WS_VSCROLL 은 유지 — strip 하면 native 가 세로 max scroll 을 top-align(첫 항목 flush)에서 클램프해
 	//마지막 항목이 항상 partial 로 잘린다. 유지하면 native 가 정상 bottom-align(마지막 항목 flush)한다.
-	ModifyStyle(WS_HSCROLL, WS_CLIPCHILDREN, SWP_FRAMECHANGED);
+	//WS_CLIPSIBLINGS 추가 — overlay 스크롤바는 부모 dialog 의 child(=listctrl 의 형제)다. 이 비트가 없으면
+	//listctrl 자신의 paint(예: set_color_theme 의 RedrawWindow)가 형제 바 영역까지 그려 덮는다 → 테마 변경 시
+	//바가 사라지고 resize/hover 전까지 안 보이던 증상. 켜면 listctrl paint 가 visible 한 형제 바를 자동 clip.
+	ModifyStyle(WS_HSCROLL, WS_CLIPCHILDREN | WS_CLIPSIBLINGS, SWP_FRAMECHANGED);
 
 	//빈 영역 cr_back 처리 — native 가 자체 erase 시 사용.
 	SetBkColor(m_theme.cr_back.ToCOLORREF());

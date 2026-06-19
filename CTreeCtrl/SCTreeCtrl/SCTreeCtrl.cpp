@@ -3679,17 +3679,9 @@ void CSCTreeCtrl::OnNMCustomDraw(NMHDR* pNMHDR, LRESULT* pResult)
 			if (m_bDragging && m_hInsertMarkItem && m_dropPosition != drop_on_item)
 				draw_insert_mark(&dc);
 
-			//V/H overlay 가 만나는 우측 하단 corner — 탐색기처럼 컨트롤 배경색(cr_back)으로 칠한다.
-			bool vis_v = ::IsWindow(m_scrollbar.GetSafeHwnd()) && m_scrollbar.IsWindowVisible();
-			bool vis_h = ::IsWindow(m_scrollbar_h.GetSafeHwnd()) && m_scrollbar_h.IsWindowVisible();
-			if (vis_v && vis_h)
-			{
-				CRect rcClient2;
-				GetClientRect(&rcClient2);
-				CRect rcCorner(rcClient2.right - m_scrollbar.get_width(), rcClient2.bottom - m_scrollbar.get_width(),
-							   rcClient2.right, rcClient2.bottom);
-				dc.FillSolidRect(&rcCorner, m_theme.cr_back.ToCOLORREF());
-			}
+			//우하단 코너는 OnNcPaint 가 NC 띠에서 cr_back 으로 칠한다(listctrl 동일). 여기서 client DC 로 다시 칠하면
+			//NC 로 gw 축소된 GetClientRect 기준이라 진짜 코너보다 gw 위(세로바 바닥)에 엉뚱한 사각형이 생긴다
+			//(listctrl 5f90861 에서 제거한 rcCornerBottom 잔재와 동일). cr_back 과 트랙색이 대비되는 테마에서만 노출.
 			*pResult = CDRF_DODEFAULT;
 			break;
 		}
@@ -5104,11 +5096,16 @@ void CSCTreeCtrl::OnNcPaint()
 		GetWindowRect(&rc);
 		rc.OffsetRect(-rc.TopLeft());
 
-		//V/H overlay 가 만나는 우하단 코너 — 가로바를 세로바 너비만큼 줄여 비워둔 자리를 cr_back 으로 채운다(탐색기/listctrl 동일).
-		if (m_v_visible_state && m_h_visible_state)
+		//하단 NC 띠(가로바 자리 + 우하단 코너)를 border 1px 안쪽으로 풀폭 채움 — 가로바/세로바가 그 위에 그려지고
+		//코너는 cr_back 으로 남는다(listctrl 5f90861 와 동일 처리). 코너만 gw×gw 로 부분 fill 하면, m_draw_border 시
+		//OnNcCalcSize 의 1px 인셋 때문에 실제 client 바닥(H-1-gw)과 fill 시작(H-gw)이 1px 어긋나 코너 top/left 변에
+		//native client edge 1px 라인이 노출된다(이미지 #49 의 검은 ⌐). 풀폭·border-반영 fill 이 그 라인을 덮는다.
+		int bottom_band = m_h_visible_state ? m_scrollbar.get_width() : 0;
+		if (bottom_band > 0)
 		{
-			CRect rcCorner(rc.right - m_scrollbar.get_width(), rc.bottom - m_scrollbar.get_width(), rc.right, rc.bottom);
-			dc.FillSolidRect(&rcCorner, m_theme.cr_back.ToCOLORREF());
+			int b = m_draw_border ? 1 : 0;
+			CRect band(b, rc.bottom - b - bottom_band, rc.right - b, rc.bottom - b);
+			dc.FillSolidRect(&band, m_theme.cr_back.ToCOLORREF());
 		}
 
 		if (m_draw_border)

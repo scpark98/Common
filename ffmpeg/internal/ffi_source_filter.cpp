@@ -466,7 +466,7 @@ namespace ffi
 			Sleep(2);
 			wait_v_ms += 2;
 			if (wait_v_ms == 500 || wait_v_ms == 2000 || wait_v_ms == 5000)
-				;//logWrite(_T("[ffi/src/video/diag] FillBuffer waiting %dms queue empty"), wait_v_ms);
+				logWrite(_T("[ffi/src/video/diag] FillBuffer waiting %dms queue empty (freeze 진단)"), wait_v_ms);
 		}
 		if (wait_v_ms >= 100)
 			;//logWrite(_T("[ffi/src/video/diag] wait=%dms frame_pts=%lld seg_rt=%lld"),
@@ -567,6 +567,16 @@ namespace ffi
 		if (fps_for_stop <= 0.0) fps_for_stop = 30.0;
 		REFERENCE_TIME rtStop = rtStart + (REFERENCE_TIME)(10000000.0 / fps_for_stop);
 
+		//A/V stretch — audio 가 pts 보다 ~9% 많은 샘플을 자연재생(무리샘플)하면 ~stretch 배 느려진다.
+		//video 의 segment-local rtStart 을 같은 비율로 늘려 그 느린 오디오에 시점 정렬(둘 다 ~0.91× → 싱크).
+		//audio 가 측정 전(처음 ~0.7s)이거나 정상 파일이면 stretch≈0/1.0 → 무변경.
+		double av_stretch = m_pSource->av_stretch();
+		if (av_stretch > 1.005)	//정상 파일은 ~1.000(미측정 0 포함) → 미적용. 0.5% 초과(잉여샘플 파일)만 stretch.
+		{
+			rtStart = (REFERENCE_TIME)((double)rtStart * av_stretch);
+			rtStop	= (REFERENCE_TIME)((double)rtStop  * av_stretch);
+		}
+
 		//rate scaling — graph IMediaSeeking::SetRate → ChangeRate 콜백을 통해 source 의 m_playback_rate 갱신.
 		const double rate = m_pSource->playback_rate();
 		if (rate > 0.0 && rate != 1.0)
@@ -587,6 +597,16 @@ namespace ffi
 				int64_t pts_ms = av_rescale_q(frame->pts, video_tb, AVRational{1, 1000});
 				m_last_emitted_pts_ms.store(pts_ms);
 			}
+		}
+
+		//(측정) A/V drift — video 타임라인(실제 video pts 기반 rtStart). audio 의 sample_count·pts 타임라인과 비교해
+		//어느 클럭이 진짜 콘텐츠 시간인지 확정. v_rtStart_ms = segment-local(seek 기준 0), v_pts_ms = 절대 미디어 pts.
+		{
+			static thread_local int s_vfill = 0;
+			if ((++s_vfill % 120) == 0)
+				logWrite(_T("[ffi/src/avsync/v] v_rtStart_ms=%lld v_pts_ms=%lld sc=%lld"),
+					(long long)(m_last_rtStart / 10000), (long long)m_last_emitted_pts_ms.load(),
+					(long long)m_sample_count);
 		}
 
 		//flush 후 첫 sample 에 Discontinuity flag — renderer 의 internal state reset 알림.
@@ -962,6 +982,7 @@ namespace ffi
 
 		AVFrame* frame = NULL;
 		int wait_ms = 0;
+		int total_anchor_wait = 0;	//(freeze 진단) video anchor 대기 누적 — searching 중엔 wait_anchor_ms 가 리셋돼 누적 안 보임.
 		while (true)
 		{
 			frame = dec.pop_audio_frame();
@@ -986,6 +1007,10 @@ namespace ffi
 					if (CheckRequest(&pending))
 						return S_FALSE;
 					Sleep(5);
+					total_anchor_wait += 5;
+					if (total_anchor_wait == 500 || total_anchor_wait == 2000 || total_anchor_wait == 5000)
+						logWrite(_T("[ffi/src/audio/diag] anchor wait %dms (video first emit 대기, searching=%d) (freeze 진단)"),
+							total_anchor_wait, searching ? 1 : 0);
 					if (searching)
 						wait_anchor_ms = 0;	//스캔 중 — 타이머 리셋. 스캔 종료(첫 video 디코드) 후 200ms grace(decode→emit gap 흡수).
 					else
@@ -1026,6 +1051,19 @@ namespace ffi
 						//audio_skipped, (long long)frame->pts, (long long)video_anchor, (long long)sync_delay,
 						//(long long)m_audio_sync_skipped_rt, (long long)(sync_delay < 0 ? -sync_delay : 0));
 
+				//(측정) seek 직후 첫 10 frame raw — nb_samples / frame 자체 sr / ctx sr / pts / timebase.
+				//pts delta 와 nb_samples 로 "실제 미디어-pts 1초당 샘플수" 산출 → swr in_rate 교정값 확정.
+				{
+					static thread_local int s_raw = 0;
+					if (s_raw < 10)
+					{
+						++s_raw;
+						logWrite(_T("[ffi/src/avsync/raw] #%d nb_samples=%d frame_sr=%d ctx_sr=%d pts=%lld tb=%d/%d"),
+							s_raw, frame->nb_samples, frame->sample_rate, m_out_sample_rate,
+							(long long)frame->pts, audio_tb.num, audio_tb.den);
+					}
+				}
+
 				//get_track_pos 의 source — 원본 미디어 시점 (audio decoder input PTS). rate 무관.
 				if (frame->pts != AV_NOPTS_VALUE && audio_tb.num > 0 && audio_tb.den > 0)
 				{
@@ -1049,7 +1087,7 @@ namespace ffi
 			Sleep(2);
 			wait_ms += 2;
 			if (wait_ms == 500 || wait_ms == 2000 || wait_ms == 5000)
-				;//logWrite(_T("[ffi/src/audio/diag] FillBuffer waiting %dms audio_queue empty"), wait_ms);
+				logWrite(_T("[ffi/src/audio/diag] FillBuffer waiting %dms audio_queue empty (freeze 진단)"), wait_ms);
 		}
 
 		BYTE* pData = NULL;
@@ -1064,6 +1102,30 @@ namespace ffi
 		//swr_convert — frame (planar / 다양한 fmt) → S16 interleaved.
 		int max_out_samples = buffer_size / (m_out_channels * 2);	//S16 = 2 bytes/sample
 		uint8_t* out_planes[1] = { pData };
+
+		//A/V stretch (누적 연속 보정) — 이 파일은 audio 의 "pts 1초당 실제 샘플수"가 reported sample_rate(48000)보다
+		//~9% 많다(주기적 짧은 pts). 오디오는 *리샘플하지 않고* 모든 샘플을 48000 으로 재생해야 음정이 자연스럽다
+		//(PotPlayer 동일) → 자연 재생이 ~stretch 배 느려진다(0.91×). video 를 그만큼 늦춰 A/V 를 맞춘다.
+		//stretch = 누적(sample_count 재생시간 / apts 콘텐츠시간) = audio 가 실제로 늘어진 비율. *누적값* 이라
+		//run 마다 흔들리는 단발측정과 달리 수렴·자기보정 → 긴 파일에서도 drift 없음. 정상 파일은 ≈1.0 → 미적용(회귀 0).
+		if (m_avsync_anchor_apts_rt != LLONG_MIN && frame->pts != AV_NOPTS_VALUE && !dec.unreliable_video_pts()
+			&& audio_tb.num > 0 && audio_tb.den > 0 && m_sample_count > 0
+			&& m_pSource && m_pSource->playback_rate() == 1.0)	//배속 중엔 atempo 가 sample_count 변형 → 측정 오염. 정상속도만.
+		{
+			int64_t cur_pts_rt = av_rescale_q(frame->pts, audio_tb, AVRational{1, 10000000});
+			int64_t span_rt	   = cur_pts_rt - m_avsync_anchor_apts_rt;
+			if (span_rt >= 10000000 && m_pSource)	//1s 이상 누적 후부터 안정. 그 전엔 av_stretch=0 → video 무변경.
+			{
+				//누적 비율을 *항상* 갱신 → 정상 파일은 ~1.000 으로 수렴하며 계속 추종(일시 transient 에 stuck 안 됨).
+				//video 측 게이트(av_stretch>1.005)가 적용 여부 결정 → 정상 파일(~1.000)은 video 영원히 무변경.
+				double stretch = (double)m_sample_count * 10000000.0 / ((double)m_out_sample_rate * (double)span_rt);
+				m_pSource->set_av_stretch(stretch);
+				static thread_local int s_stretch_log = 0;
+				if ((s_stretch_log++ % 200) == 0)
+					logWrite(_T("[ffi/src/avsync] video_stretch=%.4f (cumulative, sc=%lld span_ms=%lld)"),
+						stretch, (long long)m_sample_count, (long long)(span_rt / 10000));
+			}
+		}
 
 		//손상 구간 깨진 frame 방어 — SEH 로 swr_convert 의 AV 를 잡고, 실패(-1) 면 무음(0 sample)으로 처리해
 		//스트림을 끊지 않는다(E_FAIL = DeliverEndOfStream → 재생 중단). garbage 구간 무음 후 정상 구간 자동 복구.
@@ -1221,6 +1283,7 @@ namespace ffi
 					int64_t sync_delay = m_pSource ? m_pSource->audio_sync_delay_rt() : 0;
 					m_audio_offset_rt = audio_pts_rt - (video_first - sync_delay);
 					m_audio_offset_set = true;
+					m_avsync_anchor_apts_rt = audio_pts_rt;	//(측정) drift 기준 — 첫 emit 실제 audio PTS.
 				}
 			}
 			rtStart = m_audio_offset_rt +
@@ -1247,6 +1310,20 @@ namespace ffi
 		}
 		m_sample_count += out_samples;
 		REFERENCE_TIME rtStop = rtStart + (REFERENCE_TIME)((double)out_samples * 10000000.0 / m_out_sample_rate);
+
+		//(측정) A/V drift — sample_count 진행 vs 실제 audio PTS 진행. 둘이 벌어지면 audio 가 video 대비 빠름/느림.
+		//sc_ms = sample_count 기반(=rtStart 의 offset 제외분), apts_ms = 실제 audio PTS 가 anchor 이후 진행한 시간.
+		//diff(=apts-sc) 가 0 근처면 정상, 선형 증가/감소면 그 부호·기울기가 drift 방향·속도.
+		if ((s_fill_count % 200) == 0 && m_avsync_anchor_apts_rt != LLONG_MIN
+			&& frame->pts != AV_NOPTS_VALUE && audio_tb.num > 0 && audio_tb.den > 0)
+		{
+			int64_t cur_apts_rt = av_rescale_q(frame->pts, audio_tb, AVRational{1, 10000000});
+			long long sc_ms = (long long)((rtStart - m_audio_offset_rt) / 10000);
+			long long apts_ms = (long long)((cur_apts_rt - m_avsync_anchor_apts_rt) / 10000);
+			long long a_pts_abs_ms = (long long)av_rescale_q(frame->pts, audio_tb, AVRational{1, 1000});
+			logWrite(_T("[ffi/src/avsync] sc_ms=%lld apts_ms=%lld diff(apts-sc)=%lldms a_pts_abs_ms=%lld sr=%d sc=%lld"),
+				sc_ms, apts_ms, apts_ms - sc_ms, a_pts_abs_ms, m_out_sample_rate, (long long)m_sample_count);
+		}
 
 		pSample->SetTime(&rtStart, &rtStop);
 
@@ -1377,6 +1454,7 @@ namespace ffi
 		m_sample_count = 0;
 		m_audio_offset_rt = 0;
 		m_audio_offset_set = false;	  //다음 FillBuffer 첫 frame 시 video_first_emit_pts_rt 와 비교 후 set.
+		m_avsync_anchor_apts_rt = LLONG_MIN;	//(측정) drift anchor — seek 마다 재설정.
 		m_audio_sync_skipped_rt = 0;  //NOPTS audio_sync 빠르게-skip 누적 — 새 segment 시작이므로 재계산.
 		//logWrite(_T("[ffi/src/audio/sync] on_seek_flush reset sample_count=0 (athr=%d, post-Stop)"), athr ? 1 : 0);
 		if (athr)

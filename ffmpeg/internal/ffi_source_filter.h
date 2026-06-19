@@ -202,6 +202,16 @@ namespace ffi
 		//on_seek_flush 가 Stop 직전 읽어 잔존 ~5.9ms 가 GetDeliveryBuffer vs Deliver 중 어디인지 확정.
 		std::atomic<int> m_audio_loop_state{ 0 };
 
+		//(측정) A/V drift — audio rtStart 가 sample_count 누적(=출력 샘플수/샘플레이트)인데 video 는 실제 PTS.
+		//실제 audio PTS 진행과 sample_count 진행이 어긋나면 audio 가 점점 빠르거나 느려진다. offset-set 시점의
+		//실제 audio PTS(rt)를 anchor 로 저장해, 이후 (실제PTS진행 - sample_count진행) diff 를 주기 로깅한다.
+		int64_t			m_avsync_anchor_apts_rt = LLONG_MIN;
+
+		//A/V drift 보정 — 일부 컨테이너는 audio 의 "pts 1초당 실제 샘플수"가 reported sample_rate 와 다르다
+		//(주기적 짧은 pts). 재생 시작 첫 ~0.7s 동안 실제 rate(samples/pts-second)를 한 번 측정해 저장하고,
+		//이후 고정 비율로 swr 리샘플해 audio 가 pts(=video=real-time)를 따르게 한다. 0=미측정. 미디어 1회만 측정.
+		double			m_audio_truerate = 0.0;
+
 		//[seekgap diag] seek 후 첫 N fill 의 실제 delivery 타이밍·진폭 측정 — 오디오 끊김 원인이
 		//source 측(무음/지연 delivery)인지 downstream(DSound 재프라임)인지 격리용. on_seek_flush 가 t0/카운트 set.
 		std::atomic<long long> m_seekgap_qpc{ 0 };
@@ -261,6 +271,12 @@ namespace ffi
 		//audio pin 없으면 -1.
 		int64_t		   audio_current_pts_ms() const;
 
+		//A/V stretch — audio 의 "pts 1초당 실제 샘플수 / reported sample_rate" 비율(≈1.0=정상). 1 보다 크면 이 파일은
+		//오디오 샘플이 pts 보다 많아(주기적 짧은 pts) 모든 샘플 자연재생 시 ~ratio 배 느려진다(PotPlayer 와 동일).
+		//그 자연 재생에 video 를 맞추려고 video FillBuffer 가 rtStart 을 이 비율로 stretch 한다. audio 가 첫 측정 후 set.
+		void		   set_av_stretch(double r) { m_av_stretch.store(r); }
+		double		   av_stretch() const { return m_av_stretch.load(); }
+
 	private:
 		CDecoder		 m_decoder;
 		CFFiVideoStream* m_pVideoStream = nullptr;
@@ -269,5 +285,6 @@ namespace ffi
 		std::atomic<double>	 m_playback_rate{1.0};
 		std::atomic<bool>	 m_frame_step_mode{false};	//frame step seek 동안만 true (budget 비활성).
 		std::atomic<bool>	 m_seek_keyframe_mode{true};	//기본 true — 응답성 우선. UI 옵션 추가 시 reg 에서 load.
+		std::atomic<double>	 m_av_stretch{0.0};			//0=미측정(=stretch 없음). >1 이면 video rtStart 을 그만큼 늘림.
 	};
 }

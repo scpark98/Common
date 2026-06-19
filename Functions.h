@@ -581,6 +581,13 @@ struct	NETWORK_INFO
 	//도스창이 계속 남아있다.
 	//또한 이 방식은 도스창이 표시되었다가 사라지는 부작용이 있다. 도스창 표시가 불필요하다면 위의 run_process()를 사용해야 한다.
 	CString		run_process(CString cmd);
+
+	//cmd 창에 입력하는 명령을 그대로 수행하고(내장 명령·실제 exe·파이프·리다이렉트 모두) 그 표준출력+표준에러를
+	//문자열로 돌려준다. DOS 창은 뜨지 않는다. run_process() 의 한계(데드락·잘림·창 표시)를 모두 해결한 버전:
+	// - 항상 "cmd.exe /c <cmd>" 로 실행 → cmd 창과 동일한 의미 (popen 방식과 같되 창이 없음)
+	// - 자식과 동시에 파이프를 드레인 → 출력 크기와 무관하게 데드락 없음 (systeminfo/tasklist 도 안전)
+	// - 콘솔 OEM 코드페이지로 변환 → 한글 깨짐 없음.  끝나지 않는 대화형 명령(ping -t, pause, more)은 부적합.
+	CString		run_command(CString cmd, DWORD timeout_ms = INFINITE);
 	extern		void* g_wow64_preset;
 	void		Wow64Disable(bool disable = true);
 
@@ -1304,7 +1311,9 @@ struct	NETWORK_INFO
 	size_t		read_raw(CString sfile, uint8_t *dst, size_t size);
 	bool		save2raw(CString sfile, uint8_t *data, size_t size);
 	int			RenameFiles(CString folder, CString oldName, CString newName, bool overwrite = false, bool bWholename = true, bool bRecursive = false);
-	bool		delete_file(CString fullpath, bool bTrashCan = false);
+	bool		delete_file(CString fullpath, bool trash_can = true);
+	//pattern 예: "D:\\Downloads\\ManualLauncher*.exe"
+	void		delete_files(const CString& pattern, bool trash_can = true);
 	int			get_text_encoding(CString sfile);
 	//파일을 읽어서 CString으로 리턴한다. max_length < 0이면 전체 파일을 읽어서 리턴한다.
 	//encoding < 0이면 encoding 방식을 자동 판별하여 읽어온다.

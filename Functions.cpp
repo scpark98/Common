@@ -6262,9 +6262,9 @@ std::deque<CString>	FindFilesWithExtensions(CString folder, CString fileTitle, C
 	return result;
 }
 
-bool delete_file(CString fullpath, bool bTrashCan)
+bool delete_file(CString fullpath, bool trash_can)
 {
-	if (!bTrashCan)
+	if (!trash_can)
 		return DeleteFile(fullpath);
 
 	SHFILEOPSTRUCT FileOp = {0};
@@ -6289,6 +6289,24 @@ bool delete_file(CString fullpath, bool bTrashCan)
 		return true;
 
 	return false;
+}
+
+//pattern 예: "D:\\Downloads\\ManualLauncher*.exe"
+void delete_files(const CString& pattern, bool trash_can)
+{
+	CString dir = pattern.Left(pattern.ReverseFind(_T('\\')) + 1);
+	WIN32_FIND_DATA fd;
+	HANDLE h = FindFirstFile(pattern, &fd);
+	if (h == INVALID_HANDLE_VALUE)
+		return;
+	do {
+		if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+			continue;
+		CString full = dir + fd.cFileName;
+		SetFileAttributes(full, FILE_ATTRIBUTE_NORMAL);   // del /f 와 동등: 읽기전용 해제
+		delete_file(full, trash_can);
+	} while (FindNextFile(h, &fd));
+	FindClose(h);
 }
 
 //forward decl — definition 은 get_text_encoding 아래.
@@ -7804,20 +7822,34 @@ bool BrowseForFolder(HWND hwndOwner, TCHAR* lpszTitle, CString& strSelectedFolde
 //FOLDERID_Downloads, FOLDERID_Documents, ...
 CString get_known_folder(KNOWNFOLDERID folderID)
 {
-	PWSTR path = NULL;
+	// SHGetKnownFolderPath는 Vista 이상에서만 shell32.dll에 존재한다.
+	// XP 호환 빌드에서 직접 호출하면 정적 import가 생겨 XP에서 로드 자체가 실패하므로
+	// GetProcAddress로 런타임 바인딩한다(있으면 Vista+, 없으면 XP).
+	// 컴파일 분기(#ifdef)로 처리하면 XP 툴셋 빌드 시 Vista+ 사용자에서도
+	// SHGetKnownFolderPath를 못 불러 옮겨진 Downloads 폴더를 못 찾는 문제가 있다.
+	typedef HRESULT (WINAPI *pfn_SHGetKnownFolderPath)(REFKNOWNFOLDERID, DWORD, HANDLE, PWSTR*);
 
-#ifndef _USING_V110_SDK71_
-	SHGetKnownFolderPath(folderID, 0, NULL, &path);
-#else
-	if (folderID == FOLDERID_Downloads)
+	HMODULE shell = ::GetModuleHandle(_T("shell32.dll"));
+	pfn_SHGetKnownFolderPath fn = shell
+		? (pfn_SHGetKnownFolderPath)::GetProcAddress(shell, "SHGetKnownFolderPath") : NULL;
+
+	if (fn)
 	{
-		CString download_folder = get_known_folder(CSIDL_PROFILE) + _T("\\Downloads");
-		return download_folder;
+		PWSTR path = NULL;
+		CString result;
+		if (SUCCEEDED(fn(folderID, 0, NULL, &path)) && path)
+		{
+			result = path;
+			::CoTaskMemFree(path);	//이 API가 할당한 버퍼는 반드시 해제
+		}
+		return result;
 	}
 
-#endif
+	//여기 도달 = XP. Downloads는 셸 폴더 개념이 없어 "내 문서\Downloads"로 대체.
+	if (folderID == FOLDERID_Downloads)
+		return get_known_folder(CSIDL_PERSONAL) + _T("\\Downloads");
 
-	return path;
+	return _T("");
 }
 
 CString get_known_folder(int csidl)
@@ -13304,36 +13336,34 @@ CString run_process(CString exePath, bool wait_process_exit, bool return_after_f
 		//exePath = _T("/c ") + exePath;
 	}
 
-	// CreateProcessW 가 lpCommandLine 버퍼를 수정할 수 있어
-	// CString 내부 버퍼를 const-cast 로 전달하면 ref-counting 이 깨진다.
-	// 별도 가변 버퍼로 복사 후 전달.
-	std::vector<TCHAR> cmdLine(exePath.GetLength() + 1);
-	_tcscpy_s(cmdLine.data(), cmdLine.size(), (LPCTSTR)exePath);
+	// CreateProcessW 가 lpCommandLine 버퍼를 수정할 수 있어 CString 내부 버퍼를
+	// const-cast 로 전달하면 ref-counting 이 깨진다. 별도 가변 버퍼로 복사 후 전달.
+	auto make_cmdline = [](const CString& s) {
+		std::vector<TCHAR> v(s.GetLength() + 1);
+		_tcscpy_s(v.data(), v.size(), (LPCTSTR)s);
+		return v;
+	};
 
-	// Start the child process.
-	if (!CreateProcess(NULL,
-		cmdLine.data(),	// Command line (writable buffer; CreateProcessW 가 수정 가능)
-		NULL,           // Process handle not inheritable
-		NULL,           // Thread handle not inheritable
-		TRUE,          // Set handle inheritance to FALSE
-		CREATE_NEW_CONSOLE,              // No creation flags
-		NULL,           // Use parent's environment block
-		NULL,           // Use parent's starting directory
-		&si,            // Pointer to STARTUPINFO structure
-		&pi)           // Pointer to PROCESS_INFORMATION structure
-		)
+	// del/dir/copy 등은 cmd.exe 내장 명령이라 실제 .exe 가 없어 1차 CreateProcess 가
+	// ERROR_FILE_NOT_FOUND(2) 로 실패한다. 그 사유로 실패하면 "cmd.exe /c <cmd>" 로 감싸
+	// 재시도한다(taskkill.exe·sc.exe 등 실제 exe 는 1차에서 성공해 그대로 동작).
+	// CREATE_NO_WINDOW: 콘솔 창을 만들지 않음. (CREATE_NEW_CONSOLE 은 창이 떴다 사라진다.)
+	std::vector<TCHAR> cmdLine = make_cmdline(exePath);
+	BOOL created = CreateProcess(NULL, cmdLine.data(), NULL, NULL, TRUE,
+		CREATE_NO_WINDOW, NULL, NULL, &si, &pi);
 
-	//if (!CreateProcess(NULL,
-	//	(TCHAR*)(const TCHAR*)(exePath),//_T("dir")과 같이 상수값을 직접 주면 실패.	// Command line
-	//	NULL,           // Process handle not inheritable
-	//	NULL,           // Thread handle not inheritable
-	//	TRUE,          // Set handle inheritance to FALSE
-	//	CREATE_NEW_CONSOLE,              // No creation flags
-	//	NULL,           // Use parent's environment block
-	//	NULL,           // Use parent's starting directory 
-	//	&si,            // Pointer to STARTUPINFO structure
-	//	&pi)           // Pointer to PROCESS_INFORMATION structure
-	//	)
+	if (!created)
+	{
+		DWORD err = GetLastError();
+		if (err == ERROR_FILE_NOT_FOUND || err == ERROR_PATH_NOT_FOUND)
+		{
+			cmdLine = make_cmdline(_T("cmd.exe /c ") + exePath);
+			created = CreateProcess(NULL, cmdLine.data(), NULL, NULL, TRUE,
+				CREATE_NO_WINDOW, NULL, NULL, &si, &pi);
+		}
+	}
+
+	if (!created)
 	{
 		TRACE(_T("error = %s\n"), get_error_str(GetLastError()));
 		Wow64Disable(false);
@@ -13384,6 +13414,83 @@ CString run_process(CString exePath, bool wait_process_exit, bool return_after_f
 
 	result.Replace(_T("\r\n"), _T("\n"));
 
+	return result;
+}
+
+//cmd 창에 친 명령을 그대로 수행하고 표준출력+표준에러를 문자열로 돌려준다. (선언부 주석 참고)
+CString run_command(CString cmd, DWORD timeout_ms /*= INFINITE*/)
+{
+	CString result;
+
+	SECURITY_ATTRIBUTES sa = { sizeof(sa) };
+	sa.bInheritHandle = TRUE;
+	sa.lpSecurityDescriptor = NULL;
+
+	HANDLE rd = NULL, wr = NULL;
+	if (!CreatePipe(&rd, &wr, &sa, 0))
+		return result;
+
+	//읽기 끝(rd)은 자식이 상속하지 않게 한다 → 자식 종료 시 ReadFile 가 EOF 를 정확히 감지.
+	SetHandleInformation(rd, HANDLE_FLAG_INHERIT, 0);
+
+	STARTUPINFO si = { sizeof(si) };
+	si.dwFlags = STARTF_USESTDHANDLES | STARTF_USESHOWWINDOW;
+	si.wShowWindow = SW_HIDE;
+	si.hStdOutput = wr;
+	si.hStdError = wr;
+	si.hStdInput = NULL;
+
+	PROCESS_INFORMATION pi = {};
+
+	//cmd 창과 동일한 의미가 되도록 "cmd.exe /s /c" 로 감싼다(내장 명령·파이프·리다이렉트 모두 처리).
+	//명령 전체를 한 겹 더 따옴표로 감싸고 /s 를 주면, cmd 는 "맨 앞·맨 뒤 따옴표만 제거"하므로
+	//원본의 내부 따옴표·풀경로("C:\..\x.exe" 처럼 따옴표로 시작하는 명령)가 그대로 보존된다.
+	//(/s 없이 /c 만 쓰면 따옴표로 시작하는 명령의 앞뒤 따옴표가 잘려 경로가 깨진다.)
+	//CreateProcessW 가 lpCommandLine 을 수정할 수 있으므로 가변 버퍼로 전달.
+	CString full = _T("cmd.exe /s /c \"") + cmd + _T("\"");
+	std::vector<TCHAR> cmdLine(full.GetLength() + 1);
+	_tcscpy_s(cmdLine.data(), cmdLine.size(), (LPCTSTR)full);
+
+	BOOL ok = CreateProcess(NULL, cmdLine.data(), NULL, NULL, TRUE,
+		CREATE_NO_WINDOW, NULL, NULL, &si, &pi);
+
+	//부모가 쥔 쓰기 핸들은 즉시 닫는다. 안 닫으면 자식이 끝나도 ReadFile 가 EOF 를 못 본다.
+	CloseHandle(wr);
+
+	if (!ok)
+	{
+		CloseHandle(rd);
+		return result;
+	}
+
+	//자식과 동시에 파이프를 드레인 → 64KB 버퍼가 차서 생기는 데드락이 없다(출력 크기 무관).
+	//읽은 dwRead 바이트만 정확히 모으므로 over-read 도 없다.
+	std::string bytes;
+	char buf[8192];
+	DWORD dwRead = 0;
+	while (ReadFile(rd, buf, sizeof(buf), &dwRead, NULL) && dwRead > 0)
+		bytes.append(buf, dwRead);
+
+	WaitForSingleObject(pi.hProcess, timeout_ms);
+
+	CloseHandle(rd);
+	CloseHandle(pi.hThread);
+	CloseHandle(pi.hProcess);
+
+	//콘솔 출력은 OEM 코드페이지다. 전체 바이트를 모은 뒤 한 번에 변환해야
+	//멀티바이트 문자가 청크 경계에서 잘리지 않는다(한글 깨짐 방지).
+	if (!bytes.empty())
+	{
+		int wlen = MultiByteToWideChar(CP_OEMCP, 0, bytes.data(), (int)bytes.size(), NULL, 0);
+		if (wlen > 0)
+		{
+			std::vector<wchar_t> wbuf(wlen);
+			MultiByteToWideChar(CP_OEMCP, 0, bytes.data(), (int)bytes.size(), wbuf.data(), wlen);
+			result = CString(wbuf.data(), wlen);
+		}
+	}
+
+	result.Replace(_T("\r\n"), _T("\n"));
 	return result;
 }
 

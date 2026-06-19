@@ -11,6 +11,8 @@
 #   - UTF-8 BOM  -> skip (already safe)
 #   - UTF-16     -> skip (.rc/resource.h, VS-managed)
 #   - pure ASCII -> skip (identical in CP949 and UTF-8; no corruption risk)
+#   - RC-included headers (targetver.h) -> skip by name (rc.exe needs an RC-friendly
+#     encoding; a Korean .h converted to UTF-8 BOM made rc.exe fail with RC 0x40)
 #   - non-ASCII, no BOM: valid UTF-8 -> add BOM; else decode CP949 -> re-encode UTF-8 + BOM
 # Build output dirs are excluded. Idempotent; silent unless it changes something.
 
@@ -73,6 +75,11 @@ end_of_line = crlf
 # --- 2. Convert CP949 / BOM-less sources to UTF-8 BOM -------------------------
 $exts = @('.cpp', '.h', '.hpp', '.c', '.cc', '.cxx', '.inl', '.ipp')
 $skipDirs = @('\x64\', '\win32\', '\debug\', '\release\', '\.vs\', '\ipch\', '\obj\')
+# Headers that are #include'd by a .rc must keep an RC-friendly encoding. rc.exe chokes
+# when such a Korean .h is converted to UTF-8 BOM (e.g. a stray doxygen '@' surfaced as
+# "unknown character '0x40'" and aborted the RC preprocessor). Never convert these,
+# regardless of their current encoding (compare by file name, case-insensitive).
+$skipNames = @('targetver.h')
 $bom = [byte[]](0xEF, 0xBB, 0xBF)
 $utf8Strict = New-Object Text.UTF8Encoding($false, $true)   # throwOnInvalidBytes
 $cp949 = [Text.Encoding]::GetEncoding(949)
@@ -86,6 +93,7 @@ foreach ($f in $files) {
     $skip = $false
     foreach ($d in $skipDirs) { if ($low.Contains($d)) { $skip = $true; break } }
     if ($skip) { continue }
+    if ($skipNames -contains $f.Name.ToLower()) { continue }
 
     $bytes = [IO.File]::ReadAllBytes($f.FullName)
     if ($bytes.Length -lt 1) { continue }

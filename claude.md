@@ -510,6 +510,8 @@ non-empty 결과가 있으면 **편집 시작 전에** 사용자에게 통지:
 
 **한계 — 컴파일 플래그는 훅에 넣지 않는다**: `/source-charset:utf-8` 은 소스가 *전부* UTF-8 일 때만 안전하다. 부모 폴더(`D:\1.Projects_C++`)에 두면 아직 CP949 가 남은 형제 프로젝트가 컴파일 시점에 깨진다. 따라서 컴파일 플래그(`/source-charset:utf-8 /execution-charset:.949`)는 소스를 UTF-8 로 정리한 프로젝트의 `.vcxproj` 또는 그 프로젝트 루트 `Directory.Build.props` 에만 개별 적용.
 
+**한계 — `.rc` 가 include 하는 `.h` 는 변환하면 안 된다 (2026-06-19)**: 훅은 UTF-16 인 `.rc`/`resource.h` 만 스킵할 뿐, **`.rc` 가 `#include` 하는 평범한 `.h`(대표적으로 `targetver.h`)는 한글이 들어 있으면 UTF-8 BOM 으로 변환한다.** 그런데 rc.exe 는 이 헤더도 읽으므로, 변환된 헤더 상단의 doxygen 주석 `@file`/`@brief` 의 `@` 가 `unknown character '0x40'` 로 떠 RC 전처리가 중단되고(`RC terminating after preprocessor errors`), 그 여파로 `CMFCOutlookBarTabCtrl 정의되지 않음` 같은 연쇄 에러가 따라온다. (cl.exe 는 UTF-8 BOM 을 잘 처리하지만 rc.exe 는 민감하다.) **조치**: ① 훅에 `$skipNames = @('targetver.h')` 추가 — 이름이 일치하는 RC-include 헤더는 인코딩 불문 변환 제외. ② 이미 깨진 `targetver.h` 는 표준 형태의 **pure ASCII** 로 되돌리면(한글 주석 제거) 훅이 자동 스킵(순수 ASCII)하고 rc.exe 도 영구 안전. 사례: 2026-06-19 `KoinoViewer\targetver.h`.
+
 ### 설치 방식 두 가지 — 상황에 따라 선택
 
 이 한글 손상은 특정 머신·특정 사람 문제가 아니다. 한국어 Windows 에서 CP949 소스를 Claude 로 편집하는 **누구에게나** 발생한다 — 집/회사 머신, 그리고 **다른 개발자 PC** 모두. 두 가지 배포 방식이 있다:

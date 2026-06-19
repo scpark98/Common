@@ -516,10 +516,24 @@ non-empty 결과가 있으면 **편집 시작 전에** 사용자에게 통지:
 
 | 방식 | 적용 범위 | 배포 | 적합 |
 |---|---|---|---|
-| **A. user-scope** (`~/.claude`) | 그 머신에서 여는 *모든* C++ 프로젝트 | git 동기화 안 됨 → 머신마다 1회 수동 설치 | 내 머신들(집·회사) |
+| **A. user-scope** (`~/.claude`) | 그 머신에서 여는 *모든* C++ 프로젝트 | git 동기화 안 됨 → 머신마다 1회 수동 설치 | (구) 내 머신들 |
 | **B. project-scope** (프로젝트 repo 의 `.claude/`) | 그 *프로젝트 한정*, 그러나 clone 한 **모든 개발자 자동 적용** | repo 에 커밋 → 팀 전체 배포 | 다른 개발자와 공유하는 프로젝트 |
+| **C. Common 동기화** (`Common\hooks` + `~/.claude` 등록) | 그 머신에서 여는 *모든* C++ 프로젝트 | **스크립트는 git 동기화**, settings.json 등록만 머신당 1회 | **내 집·회사 머신 (권장, 2026-06-19~)** |
 
-둘은 배타적이지 않다. 내 머신엔 A, 팀 공유 프로젝트엔 B 를 함께 둬도 무방 (둘 다 돌아도 멱등이라 중복 변환 없음).
+둘은 배타적이지 않다. 내 머신엔 C, 팀 공유 프로젝트엔 B 를 함께 둬도 무방 (둘 다 돌아도 멱등이라 중복 변환 없음).
+
+#### 방식 C — Common 동기화 (권장, 내 집·회사 머신) — 2026-06-19~
+
+방식 A 는 `~/.claude` 가 git 동기화되지 않아 머신마다 스크립트를 *따로* 관리해야 한다 (한쪽에서 버그픽스해도 다른 쪽엔 반영 안 됨). 대신 **훅 스크립트를 Common repo 에 두고** settings.json 만 거기를 가리키게 하면, 스크립트 수정이 양쪽 머신에 git 으로 자동 전파된다.
+
+- **훅 스크립트**: `D:\1.Projects_C++\Common\hooks\ensure-cpp-encoding.ps1` (git 동기화). 방식 A 스크립트 + **솔루션 폴더 인식 수정** 포함 — cwd 에 `.sln` 만 있고 `.vcxproj` 는 하위 폴더(멀티 프로젝트 솔루션)인 경우도 보호한다. (기존 방식 A 는 cwd 직속 `.vcxproj` 만 비재귀로 검사해 이런 솔루션을 통째로 누락했음. 실제 누락 사례: `filetransfer_lmm\File Transfer` — cwd 에 `.sln` 만 있고 `.vcxproj` 는 `nFTDServer\`,`nFTDClient\` 하위.)
+- **settings.json 등록**: `~/.claude/settings.json` 의 SessionStart command `-File` 를 위 Common 경로로 지정. settings.json 은 git 동기화가 안 되므로 **머신마다 1회** 맞춰야 하며, 이를 위한 멱등 설치 스크립트 제공:
+  ```
+  powershell -NoProfile -ExecutionPolicy Bypass -File "D:\1.Projects_C++\Common\hooks\install-hook.ps1"
+  ```
+  (settings.json 을 JSON 재직렬화 없이 *문자열 치환만* 하므로 한글 경로 등 나머지를 바이트 보존. 이미 Common 을 가리키면 아무 작업도 안 함.)
+
+**Claude 자동 부트스트랩 (사용자 수동 실행 불필요)**: 이 `Common/claude.md` 가 로드된 세션을 시작할 때, `~/.claude/settings.json` 이 아직 Common hook(`...\Common\hooks\ensure-cpp-encoding.ps1`)을 가리키지 않으면 Claude 가 위 `install-hook.ps1` 을 한 번 실행해 등록을 맞춘다. 등록은 *다음* 세션의 SessionStart 부터 효력이 생긴다(현 세션의 SessionStart 는 이미 지난 뒤). 단 이 지시는 **이 파일이 import 되어 로드된 프로젝트에서만** 작동하므로(프로젝트 루트 claude.md 의 `@../../../Common/claude.md` 등), Common 을 import 하지 않는 프로젝트에서는 위 설치 명령을 1회 수동 실행한다.
 
 #### 방식 A — user-scope (머신마다 1회, `~/.claude` 는 git 동기화 안 됨)
 

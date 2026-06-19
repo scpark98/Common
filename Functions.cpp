@@ -10694,20 +10694,28 @@ CString	get_windows_version_string(bool detail)
 			case PRODUCT_CORE_SINGLELANGUAGE:
 				sType = _T("Home Single Language");
 				break;
-			case PRODUCT_EDUCATION:
-				sType = _T("Education");
-				break;
-			case PRODUCT_EDUCATION_N:
-				sType = _T("Education N");
-				break;
 			case PRODUCT_PROFESSIONAL_N:
 				sType = _T("Professional N");
 				break;
-			case PRODUCT_PRO_WORKSTATION:
-				sType = _T("Pro for Workstations");
-				break;
 			case PRODUCT_ENTERPRISE_N:
 				sType = _T("Enterprise N");
+				break;
+#endif
+			//아래는 Windows 10 시대에 추가된 상수라 XP 툴셋(7.1A SDK)에는 없음.
+			//PRODUCT_CORE 가드만으로는 안 걸러지므로 상수별로 개별 가드한다.
+#if defined(PRODUCT_EDUCATION)
+			case PRODUCT_EDUCATION:
+				sType = _T("Education");
+				break;
+#endif
+#if defined(PRODUCT_EDUCATION_N)
+			case PRODUCT_EDUCATION_N:
+				sType = _T("Education N");
+				break;
+#endif
+#if defined(PRODUCT_PRO_WORKSTATION)
+			case PRODUCT_PRO_WORKSTATION:
+				sType = _T("Pro for Workstations");
 				break;
 #endif
 		}

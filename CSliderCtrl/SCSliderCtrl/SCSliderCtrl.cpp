@@ -913,29 +913,38 @@ void CSCSliderCtrl::OnPaint()
 	{
 		if (m_use_bookmark)
 		{
+			//역삼각형(▽) 북마크 마커 — GDI+ 안티앨리어싱 채움 + 채움색을 어둡게 한 1px 외곽선(겹쳐도 경계 또렷).
+			//인접 북마크가 hover(current) 마커를 덮지 않도록 일반 북마크를 먼저, current 를 맨 위에 마지막으로 그린다.
+			Gdiplus::Graphics g(dc.GetSafeHdc());
+			g.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
+
+			const int tip_y = cy - 6;	//아래 꼭지점 (기존 위치 유지)
+			const int half  = 4;		//윗변 반폭
+			const int hgt   = 5;		//삼각형 높이
+
+			auto draw_marker = [&](int px, Gdiplus::Color cr)
+			{
+				Gdiplus::PointF pts[3] = {
+					Gdiplus::PointF((Gdiplus::REAL)(px - half), (Gdiplus::REAL)(tip_y - hgt)),
+					Gdiplus::PointF((Gdiplus::REAL)(px + half), (Gdiplus::REAL)(tip_y - hgt)),
+					Gdiplus::PointF((Gdiplus::REAL)px,          (Gdiplus::REAL)tip_y),
+				};
+				Gdiplus::SolidBrush brush(cr);
+				g.FillPolygon(&brush, pts, 3);
+
+				Gdiplus::Pen pen(Gdiplus::Color(cr.GetA(), cr.GetR() / 2, cr.GetG() / 2, cr.GetB() / 2), 1.0f);
+				g.DrawPolygon(&pen, pts, 3);
+			};
+
 			for (i = 0; i < m_bookmark.size(); i++)
 			{
-				pxpos = Pos2Pixel(m_bookmark[i].pos);
-				//dc.FillSolidRect(pxpos-2, cy-8, 4, 4, (i == m_cur_bookmark ? m_crBookmarkCurrent : m_crBookmark));
-				CPen pen(PS_SOLID, 1, (i == m_cur_bookmark ? enable_color(m_cr_bookmark_current).ToCOLORREF() : enable_color(m_cr_bookmark).ToCOLORREF()));
-				CPen* pOldPen = (CPen*)dc.SelectObject(&pen);
-				dc.SetPixel(pxpos, cy - 5, (i == m_cur_bookmark ? enable_color(m_cr_bookmark_current).ToCOLORREF() : enable_color(m_cr_bookmark).ToCOLORREF()));
-
-				for (int j = 1; j < 5; j++)
-				{
-					if (j == 4)
-					{
-						dc.MoveTo(pxpos - j + 1, cy - 5 - j);
-						dc.LineTo(pxpos + j - 0, cy - 5 - j);	//역삼각형
-					}
-					else
-					{
-						dc.MoveTo(pxpos - j, cy - 5 - j);
-						dc.LineTo(pxpos + j + 1, cy - 5 - j);	//역삼각형
-					}
-				}
-				dc.SelectObject(pOldPen);
+				if ((int)i == m_cur_bookmark)
+					continue;
+				draw_marker(Pos2Pixel(m_bookmark[i].pos), enable_color(m_cr_bookmark));
 			}
+
+			if (m_cur_bookmark >= 0 && m_cur_bookmark < (int)m_bookmark.size())
+				draw_marker(Pos2Pixel(m_bookmark[m_cur_bookmark].pos), enable_color(m_cr_bookmark_current));
 		}
 
 		//구간 반복 bracket — 다른 element 가 덮지 못하도록 OnPaint 의 *맨 마지막* 으로 이동됨 (아래 progress_border 다음 블록 참조).

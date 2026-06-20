@@ -246,6 +246,7 @@ namespace ffi
 
 		//EOF — av_read_frame AVERROR_EOF 도달 시 set, seek 시 clear. FillBuffer 가 EOS 인지 vs 일시 starve 구분.
 		std::atomic<bool>		m_eof{false};
+		bool					m_eof_flushed = false;	//EOF 시 디코더 reorder 버퍼 flush(NULL drain)를 1회만 수행하기 위한 가드. seek 시 false 로 리셋.
 
 		//Segment baseline rt — worker 의 av_seek_frame 처리 후 generation ++ 와 동시에 갱신.
 		//FillBuffer 의 rt 계산이 generation tag 와 같은 시점의 segment 사용 → race 없음.

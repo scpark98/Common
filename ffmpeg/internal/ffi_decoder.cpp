@@ -887,6 +887,7 @@ namespace ffi
 		//재기동돼 is_eof()==true && queue==0 (방금 비움) 을 보고 spurious EndOfStream 을 deliver → 중복 EC_COMPLETE →
 		//반복재생이 한 사이클에 2번 발화 + 오디오 렌더러 연속 flush 로 "띡" 글리치. seek = "더 이상 EOF 아님" 이므로 여기서 해제.
 		m_eof.store(false);
+		m_eof_flushed = false;
 
 		{
 			std::unique_lock<std::mutex> lk(m_mtx_queue);
@@ -1448,14 +1449,15 @@ namespace ffi
 						av_packet_free(&probe);
 						//확정 seek_ts 로 복귀 — probe 가 demuxer 를 전진시켰으므로.
 						hr_seek = avformat_seek_file(m_fmt, m_video_stream_idx, INT64_MIN, seek_ts, seek_ts, AVSEEK_FLAG_BACKWARD);
-						//logWrite(_T("[ffi/dec/exact] backward probe attempts=%d final_seek_ts=%lld target=%lld"),
-							//probe_attempts, (long long)seek_ts, (long long)target_pts);
+						logWrite(_T("[seek/diag] exact target_pts=%lld final_seek_ts=%lld probe_attempts=%d hr=%d"),
+							(long long)target_pts, (long long)seek_ts, probe_attempts, hr_seek);
 						m_kf_skip_active = false;
 					}
 					avcodec_flush_buffers(m_video_ctx);
 					if (m_audio_ctx)
 						avcodec_flush_buffers(m_audio_ctx);
 					m_eof.store(false);	  //seek 후 새 위치부터 재생 — EOF 상태 해제.
+					m_eof_flushed = false;
 
 					::QueryPerformanceCounter(&qpc_t1);
 					long long seek_us = (qpc_t1.QuadPart - qpc_t0.QuadPart) * 1000000LL / qpc_freq.QuadPart;
@@ -1519,10 +1521,95 @@ namespace ffi
 					if (m_audio_ctx)
 						avcodec_flush_buffers(m_audio_ctx);
 					m_eof.store(false);
+					m_eof_flushed = false;
 					//logWrite(_T("[ffi/dec/kf] forward keyframe not found before EOF → backward fallback target_pts=%lld"),
 						//(long long)m_kf_skip_target_pts);
 					continue;
 				}
+				//EOF — flag set 전에 디코더 reorder 버퍼를 flush(NULL packet drain)해 남은 끝 프레임을 큐에 push.
+				//이게 없으면 HW(D3D11VA) h264 디코더가 들고 있던 마지막 수~수십 프레임이 유실 → 끝부분 재생 안 됨
+				//(외부 플레이어는 EOF 시 flush 하므로 풀 재생). flush 는 EOF 당 1회만 (m_eof_flushed 가드, seek 시 리셋).
+				if (!m_eof_flushed)
+				{
+					m_eof_flushed = true;
+
+					if (m_video_ctx)
+					{
+						avcodec_send_packet(m_video_ctx, NULL);	//flush 신호.
+						for (;;)
+						{
+							AVFrame* frame = av_frame_alloc();
+							if (avcodec_receive_frame(m_video_ctx, frame) < 0)
+							{
+								av_frame_free(&frame);
+								break;
+							}
+
+							AVFrame* out_frame = frame;
+							if (m_hw_pix_fmt != AV_PIX_FMT_NONE && (AVPixelFormat)frame->format == m_hw_pix_fmt)
+							{
+								AVPixelFormat sw_fmt = AV_PIX_FMT_NV12;
+								if (frame->hw_frames_ctx)
+								{
+									AVHWFramesContext* hwfc = (AVHWFramesContext*)frame->hw_frames_ctx->data;
+									if (hwfc && hwfc->sw_format != AV_PIX_FMT_NONE)
+										sw_fmt = hwfc->sw_format;
+								}
+								AVFrame* sw_frame = av_frame_alloc();
+								sw_frame->format = sw_fmt;
+								sw_frame->width	 = frame->width;
+								sw_frame->height = frame->height;
+								if (av_frame_get_buffer(sw_frame, 32) < 0)
+								{
+									av_frame_free(&sw_frame);
+									av_frame_free(&frame);
+									continue;
+								}
+								if (av_hwframe_transfer_data(sw_frame, frame, 0) >= 0)
+								{
+									sw_frame->pts	  = frame->pts;
+									sw_frame->pkt_dts = frame->pkt_dts;
+									sw_frame->flags	  = frame->flags;
+									av_frame_free(&frame);
+									out_frame = sw_frame;
+								}
+								else
+								{
+									av_frame_free(&sw_frame);
+									av_frame_free(&frame);
+									continue;
+								}
+							}
+
+							out_frame->opaque = (void*)(intptr_t)m_seek_generation.load();
+							{
+								std::unique_lock<std::mutex> lk(m_mtx_queue);
+								m_video_queue.push_back(out_frame);
+							}
+							m_cv_queue.notify_one();
+						}
+					}
+
+					if (m_audio_ctx)
+					{
+						avcodec_send_packet(m_audio_ctx, NULL);
+						for (;;)
+						{
+							AVFrame* frame = av_frame_alloc();
+							if (avcodec_receive_frame(m_audio_ctx, frame) < 0)
+							{
+								av_frame_free(&frame);
+								break;
+							}
+							{
+								std::unique_lock<std::mutex> lk(m_mtx_queue);
+								m_audio_queue.push_back(frame);
+							}
+							m_cv_queue.notify_one();
+						}
+					}
+				}
+
 				//EOF — flag set. queue 비면 source FillBuffer 가 S_FALSE 반환 → DeliverEndOfStream → renderer EC_COMPLETE 발화.
 				//seek 가 오면 av_seek_frame 처리 시 clear.
 				m_eof.store(true);
@@ -1759,8 +1846,8 @@ namespace ffi
 						::QueryPerformanceFrequency(&qpc_freq);
 						::QueryPerformanceCounter(&qpc_now);
 						long long us = (qpc_now.QuadPart - m_seek_done_qpc) * 1000000LL / qpc_freq.QuadPart;
-						//logWrite(_T("[ffi/dec/seek] seek→first_video_frame us=%lld pts=%lld"),
-							//us, (long long)out_frame->pts);
+						logWrite(_T("[seek/diag] seek→first_video_frame us=%lld pts=%lld"),
+							us, (long long)out_frame->pts);
 						m_first_frame_after_seek = true;
 					}
 				}

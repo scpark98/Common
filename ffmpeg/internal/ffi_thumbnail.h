@@ -37,16 +37,29 @@ namespace ffi
 		//미디어 길이(ms). 모르면 0.
 		double	duration_ms() const;
 
-		//time_ms 의 직전 키프레임 1장을 디코드해 out 에 채운다. target_width = 결과 폭(종횡비 유지, 짝수 정렬).
-		//성공 시 true, 실패 시 false(out 미변경). 키프레임만 디코드라 정확 위치가 아닌 *근처* 프레임.
-		bool	grab(double time_ms, int target_width, CSCGdiplusBitmap& out);
+		//time_ms 위치 프레임 1장을 디코드해 out 에 채운다. target_width = 결과 폭(종횡비 유지, 짝수 정렬).
+		//성공 시 true, 실패 시 false(out 미변경).
+		//exact=false(기본): 직전 키프레임 1장만 디코드 → 빠르나 long-GOP 에선 *근처* 프레임(프리뷰 hover 용).
+		//exact=true: 키프레임 seek 후 목표 pts 까지 forward decode → 정확 시각 프레임(멀티캡처/내보내기용, 느림).
+		bool	grab(double time_ms, int target_width, CSCGdiplusBitmap& out, bool exact = false);
+
+		//순차 추출 — 조밀·연속 시각(예: 비디오 내보내기의 fps 프레임)을 빠르게. seek_sequential 1회 후
+		//target_ms 를 증가시키며 next_frame 반복. 각 소스 프레임을 1회만 디코드(매번 seek 하는 grab(exact) 보다 훨씬 빠름).
+		bool	seek_sequential(double start_ms);
+		bool	next_frame(double target_ms, int target_width, CSCGdiplusBitmap& out);
 
 	private:
 		void	free_sws();
+		bool	scale_frame(AVFrame* frame, int target_width, CSCGdiplusBitmap& out);	//AVFrame → BGRA DIB(out).
 
 		AVFormatContext*	m_fmt		= nullptr;
 		AVCodecContext*		m_vctx		= nullptr;
 		int					m_video_idx = -1;
+
+		//순차 디코드(next_frame) 상태 — 호출 간 유지되는 packet/frame + EOF 플래그.
+		AVPacket*			m_seq_pkt	= nullptr;
+		AVFrame*			m_seq_frame	= nullptr;
+		bool				m_seq_eof	= false;
 
 		//sws context 캐시 — 같은 src/dst 조합이면 재사용 (hover 연속 호출 시 매번 alloc/free 회피).
 		SwsContext*			m_sws		 = nullptr;

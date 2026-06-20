@@ -236,6 +236,36 @@ static WORD key_name_to_vk(const CString& token)
 		}
 	}
 
+	//넘버패드 — "Numpad +", "Numpad -", "Numpad *", "Numpad /", "Numpad .", "Numpad 0"~"Numpad 9".
+	//숫자열/기호열의 같은 글자와는 다른 VK (VK_ADD/VK_SUBTRACT/VK_NUMPAD0.. 등) 라 별도 매핑이 필요하다.
+	if (u.Find(_T("NUMPAD")) == 0)
+	{
+		CString pad = u.Mid(6);
+		pad.Trim();
+		if (pad.GetLength() == 1)
+		{
+			TCHAR c = pad[0];
+			if (c >= _T('0') && c <= _T('9'))
+				return (WORD)(VK_NUMPAD0 + (c - _T('0')));
+
+			switch (c)
+			{
+				case _T('+'):
+					return VK_ADD;
+				case _T('-'):
+					return VK_SUBTRACT;
+				case _T('*'):
+					return VK_MULTIPLY;
+				case _T('/'):
+					return VK_DIVIDE;
+				case _T('.'):
+					return VK_DECIMAL;
+				default:
+					break;
+			}
+		}
+	}
+
 	static const struct { LPCTSTR name; WORD vk; } map[] =
 	{
 		{ _T("LEFT"),		VK_LEFT },		{ _T("RIGHT"),		VK_RIGHT },

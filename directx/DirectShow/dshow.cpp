@@ -2964,11 +2964,15 @@ int CDShow::load_media_internal_ffmpeg(CString sfile, CWnd* pParent)
 	// - MPEG4: internal SW decode + 인덱스 pts-seek 가 빠르게 동작함을 검증(2026-06-13). 특히 부분 다운로드 AVI 는
 	//   LAV 가 수십초 freeze(바이트 스캔)인데 internal 은 즉시 seek → mpeg4 는 internal 사용.
 	// - seek 인덱스 없는 파일(끝부분 idx1 누락 AVI 등): byte 추정 seek(m_seek_index)로 internal 이 즉시 이동 → internal 유지.
+	// - MSMPEG4V2/V3 (MS-MPEG4 v2/v3, AVI 의 MP42/MP43/DIV3): 표준 SW codec — internal 이 정확히 디코드.
+	//   LAV 는 일부 AVI 에서 fps 를 2배(예: 15→29.97)로 잘못 보고해 프레임수/시간계가 어긋남 → internal 로 정확.
 	// - 그 외 SW codec(VC1/WMV 등): 아직 LAV fallback.
 	if (!pFFi->decoder().has_hw_accel())
 	{
 		std::wstring codec = pFFi->decoder().video_codec_name();
-		const bool safe_sw = (codec == L"MJPEG") || (codec == L"MPEG4") || pFFi->decoder().no_seek_index();
+		const bool safe_sw = (codec == L"MJPEG") || (codec == L"MPEG4") ||
+			(codec == L"MSMPEG4V2") || (codec == L"MSMPEG4V3") ||
+			pFFi->decoder().no_seek_index();
 		if (!safe_sw)
 		{
 			//logWrite(_T("[internal] no HW accel for codec=%s — fallback to LAV path"), codec.c_str());
@@ -3473,7 +3477,20 @@ double CDShow::get_track_pos()
 	if (!m_pGB || !m_pMP)
 		return 0.0;
 
-	//rate 무관 *원본 미디어 시점* — audio chain 의 input PTS 를 source 로. graph clock 은 wall clock 기반이라
+	//일시정지/transition 중에는 seek·step 목표(m_last_track_pos_ms)를 그대로 반환 — 표시 프레임 = 그 목표다.
+	//위치 source(video pin last_emitted, graph GetCurrentPosition)는 둘 다 *렌더러에 deliver 된* 프레임 기준이라,
+	//seek 후 디코더가 렌더러 큐를 채우면(decode-ahead) 표시 프레임보다 큐 깊이(예: 15프레임=1초)만큼 앞선 값을 준다.
+	//일시정지면 렌더러가 소비를 안 해 그 차이가 굳어 seek-to-0 이 frame 15 로 보였다(오디오 없는 미디어도 video 경로라 동일).
+	//set_track_pos / step_frame 이 m_last_track_pos_ms 를 표시 목표로 갱신하므로 그것이 정확한 표시 위치.
+	if (m_pMC)
+	{
+		OAFilterState fs = State_Stopped;
+		HRESULT hr_s = m_pMC->GetState(0, &fs);
+		if (hr_s == VFW_S_STATE_INTERMEDIATE || fs == State_Paused)
+			return m_last_track_pos_ms;
+	}
+
+	//재생 중 — rate 무관 *원본 미디어 시점* — audio chain 의 input PTS 를 source 로. graph clock 은 wall clock 기반이라
 	//rate 변경 시 IMediaPosition::get_CurrentPosition 이 미디어 진행과 어긋남 (컨트롤바·자막 mismatch).
 	//(1) internal path : ffi audio pin 의 last_input_pts_ms (atempo input frame 의 원본 PTS).
 	//(2) LAV path     : SCAudioTimeStretch 의 anchor + processed input samples.
@@ -3759,6 +3776,7 @@ void CDShow::step_frame(bool forward)
 				//IVideoFrameStep 는 표시를 정확히 1프레임 전진 → anchor 도 1프레임 전진. track_pos 재읽기 금지
 				//(IVideoFrameStep 중 audio 가 video 를 못 따라와 stale → 다음 backward 가 stale 위치로 점프하던 원인).
 				m_step_anchor_ms += interval_ms;
+				m_last_track_pos_ms = m_step_anchor_ms;	//일시정지 표시 위치 = 스텝 목표 (get_track_pos 가 paused 시 반환).
 				return;
 			}
 		}
@@ -3787,6 +3805,7 @@ void CDShow::step_frame(bool forward)
 	}
 
 	m_pMP->put_CurrentPosition(m_step_anchor_ms / 1000.0);
+	m_last_track_pos_ms = m_step_anchor_ms;	//일시정지 표시 위치 = 스텝 목표 (put_CurrentPosition 은 m_last_track_pos_ms 갱신 안 함).
 
 	if (m_pFFiSource)
 	{
@@ -4100,7 +4119,7 @@ bool CDShow::capture_frame(CSCGdiplusBitmap& out)
 	return ok;
 }
 
-bool CDShow::grab_preview_frame(double time_ms, int target_width, CSCGdiplusBitmap& out)
+bool CDShow::grab_preview_frame(double time_ms, int target_width, CSCGdiplusBitmap& out, bool exact)
 {
 	//트랙 hover 프리뷰 — 메인 그래프(렌더러/디코더)와 무관하게 독립 ffmpeg 디코더로 그 위치 프레임 추출.
 	//capture_frame 과 달리 재생을 멈추지/움직이지 않음. SW 디코드라 메인 HW 디코더와 contention 없음.
@@ -4128,7 +4147,7 @@ bool CDShow::grab_preview_frame(double time_ms, int target_width, CSCGdiplusBitm
 		m_preview_thumb = thumb;
 		m_preview_thumb_path = path;
 	}
-	return thumb->grab(time_ms, target_width, out);
+	return thumb->grab(time_ms, target_width, out, exact);
 }
 
 void CDShow::free_preview_thumb()

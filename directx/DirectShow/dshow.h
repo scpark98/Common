@@ -218,7 +218,7 @@ public:
 
 	//트랙 hover 프리뷰용 — 메인 재생과 무관하게 독립 디코더로 time_ms 의 키프레임 1장을 target_width 폭 비트맵으로.
 	//재생 상태를 바꾸지 않음. 성공 시 true. (정확 위치가 아닌 직전 키프레임 — 프리뷰엔 충분.)
-	bool			grab_preview_frame(double time_ms, int target_width, CSCGdiplusBitmap& out);
+	bool			grab_preview_frame(double time_ms, int target_width, CSCGdiplusBitmap& out, bool exact = false);	//exact=true: 정확 시각 프레임(멀티캡처/내보내기). false: 키프레임(프리뷰 hover, 빠름).
 	void			free_preview_thumb();	//hover 프리뷰 keep-open 추출기 해제. close_media/소멸자에서 호출.
 
 	std::deque<CMediaStream> m_video_stream;

@@ -285,6 +285,14 @@ public:
 	//mode : -1(toggle), 0(none), 1(ratio mode)
 	void			set_aspect_ratio_mode(int mode);
 
+	//표시 비율 강제(임시, 저장 안 함) — m_forced_aspect>0 이면 영상을 그 비율(예: 4.0/3.0)로 늘려 표시. 0 = 소스 비율.
+	//m_keep_aspect=false 면 비율 무시하고 창에 꽉 채움(stretch). close_media 에서 리셋 → 매 미디어 원본 비율로 시작.
+	//현재 MPC Video Renderer 경로(set_video_position 의 IBasicVideo dest)에 적용. 설정 즉시 재적용.
+	void			set_forced_aspect(double ar);
+	void			set_keep_aspect(bool keep);
+	double			get_forced_aspect() { return m_forced_aspect; }
+	bool			is_keep_aspect() { return m_keep_aspect; }
+
 	bool			get_video_mirror() { return m_mirror; }
 	bool			get_video_flip() { return m_flip; }
 
@@ -476,6 +484,8 @@ protected:
 	bool			m_mirror;
 	bool			m_flip;
 	int				m_video_rotation = 0;	//0 / 90 / 180 / 270 (가로/세로 전환은 0↔90 토글). MPCVR rotation.
+	double			m_forced_aspect = 0.0;	//표시 강제 비율(0 = 소스 비율). set_forced_aspect.
+	bool			m_keep_aspect = true;	//false = 비율 무시하고 창에 꽉 채움(stretch). set_keep_aspect.
 
 	//MPCVR pan&scan 누적 state — base aspect-preserve dest rect 위에 적용되는 normalized 변환.
 	//(0,0,1,1) = identity (변환 없음). 음/양수 외삽 가능 (zoom in 시 -0.1, 1.1).

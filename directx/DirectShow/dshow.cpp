@@ -1365,6 +1365,9 @@ CDShow::~CDShow()
 
 void CDShow::close_media()
 {
+	m_forced_aspect = 0.0;	//표시 비율은 저장 안 함 — 다음 미디어는 원본 비율로 시작.
+	m_keep_aspect = true;
+
 	free_preview_thumb();	//hover 프리뷰 keep-open 추출기 해제 (정의는 ffi_thumbnail.h include 뒤 — 여기선 선언만으로 호출).
 
 	teardown_subtitle_grabber();
@@ -3308,20 +3311,25 @@ void CDShow::set_video_position(CRect r)
 				eff_vh = m_video_size.cx;
 			}
 
-			if (eff_vw > 0 && eff_vh > 0 && win_w > 0 && win_h > 0)
+			//표시 비율 — 강제 비율(m_forced_aspect>0)이 있으면 그것, 없으면 소스 비율. 소스를 이 비율 프레임에 늘려 맞춘다.
+			float disp_ar = (eff_vh > 0) ? (float)eff_vw / (float)eff_vh : 0.0f;
+			if (m_forced_aspect > 0.0)
+				disp_ar = (float)m_forced_aspect;
+
+			//m_keep_aspect=false 면 letterbox 없이 창에 꽉 채움(vid 초기값 = 전체 window 유지).
+			if (m_keep_aspect && disp_ar > 0.0f && win_w > 0 && win_h > 0)
 			{
-				const float src_ar = (float)eff_vw / (float)eff_vh;
 				const float win_ar = (float)win_w / (float)win_h;
-				if (win_ar > src_ar)
+				if (win_ar > disp_ar)
 				{
 					vid_h = win_h;
-					vid_w = (int)(win_h * src_ar + 0.5f);
+					vid_w = (int)(win_h * disp_ar + 0.5f);
 					vid_x = (win_w - vid_w) / 2;
 				}
 				else
 				{
 					vid_w = win_w;
-					vid_h = (int)(win_w / src_ar + 0.5f);
+					vid_h = (int)(win_w / disp_ar + 0.5f);
 					vid_y = (win_h - vid_h) / 2;
 				}
 			}
@@ -4169,6 +4177,20 @@ void CDShow::set_aspect_ratio_mode(int mode)
 	}
 
 	m_pVMRWC->SetAspectRatioMode(ratio_mode);
+}
+
+void CDShow::set_forced_aspect(double ar)
+{
+	m_forced_aspect = (ar > 0.0) ? ar : 0.0;
+	if (!m_last_video_position_rect.IsRectEmpty())
+		set_video_position(m_last_video_position_rect);
+}
+
+void CDShow::set_keep_aspect(bool keep)
+{
+	m_keep_aspect = keep;
+	if (!m_last_video_position_rect.IsRectEmpty())
+		set_video_position(m_last_video_position_rect);
 }
 
 void CDShow::show_subtitle_property_page()

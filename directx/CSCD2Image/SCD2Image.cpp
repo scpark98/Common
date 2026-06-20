@@ -365,6 +365,54 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 	return hr;
 }
 
+HRESULT CSCD2Image::add_frame_from_raw(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d2context, void* data, int width, int height, int channel, int delay_ms)
+{
+	if (!pWICFactory || !d2context || !data || width <= 0 || height <= 0)
+		return E_INVALIDARG;
+
+	m_pWICFactory = pWICFactory;
+	m_d2dc = d2context;
+
+	WICPixelFormatGUID guid = GUID_WICPixelFormat32bppBGRA;
+	switch (channel)
+	{
+		case 1:	guid = GUID_WICPixelFormat8bppIndexed;	break;
+		case 2:	guid = GUID_WICPixelFormat16bppBGR565;	break;
+		case 3:	guid = GUID_WICPixelFormat24bppBGR;		break;
+	}
+
+	IWICBitmap* pWicBitmap = NULL;
+	IWICFormatConverter* pFormatConverter = NULL;
+	ComPtr<ID2D1Bitmap1> img;
+
+	//항상 PBGRA(premultiplied)로 변환 후 D2D 비트맵 생성 — save_gif/webp 의 read-back cpuBitmap(PBGRA)과 포맷 일치.
+	//CreateBitmapFromMemory 의 WIC 비트맵은 DPI 가 0/미정일 수 있어 D2D GetSize()(=DIP)가 0 이 됨 → 96 으로 강제.
+	HRESULT hr = pWICFactory->CreateBitmapFromMemory(width, height, guid,
+		width * channel, width * height * channel, (BYTE*)data, &pWicBitmap);
+	if (SUCCEEDED(hr) && pWicBitmap)
+		pWicBitmap->SetResolution(96.0, 96.0);
+	if (SUCCEEDED(hr))
+		hr = pWICFactory->CreateFormatConverter(&pFormatConverter);
+	if (SUCCEEDED(hr) && pFormatConverter)
+		hr = pFormatConverter->Initialize(pWicBitmap, GUID_WICPixelFormat32bppPBGRA, WICBitmapDitherTypeNone, NULL, 0.0f, WICBitmapPaletteTypeMedianCut);
+	if (SUCCEEDED(hr) && pFormatConverter)
+		hr = d2context->CreateBitmapFromWicBitmap(pFormatConverter, 0, &img);
+
+	if (pFormatConverter)
+		pFormatConverter->Release();
+	if (pWicBitmap)
+		pWicBitmap->Release();
+
+	if (img)
+	{
+		m_img.push_back(std::move(img));
+		m_frame_delay.push_back(delay_ms);
+		return S_OK;
+	}
+
+	return FAILED(hr) ? hr : E_FAIL;
+}
+
 HRESULT CSCD2Image::extract_exif_info(IWICBitmapDecoder* pDecoder)
 {
 	HRESULT	hr = S_FALSE;
@@ -1446,10 +1494,10 @@ HRESULT CSCD2Image::save_webp(LPCTSTR path, ...)
 
 	va_list args;
 	va_start(args, path);
-	va_end(args);
 
 	CString filename;
 	filename.FormatV(path, args);
+	va_end(args);
 
 	int width = get_width();
 	int height = get_height();
@@ -1476,13 +1524,18 @@ HRESULT CSCD2Image::save_webp(LPCTSTR path, ...)
 		};
 
 		ComPtr<ID2D1Bitmap1> cpuBitmap;
-		m_d2dc->CreateBitmap(
+		HRESULT hr_cpu = m_d2dc->CreateBitmap(
 			D2D1::SizeU(width, height),
 			nullptr,
 			0,
 			&props,
 			&cpuBitmap
 		);
+		if (FAILED(hr_cpu) || !cpuBitmap || !m_img[i])
+		{
+			hr = FAILED(hr_cpu) ? hr_cpu : E_POINTER;
+			break;
+		}
 
 		cpuBitmap->CopyFromBitmap(nullptr, m_img[i].Get(), nullptr);
 
@@ -1555,10 +1608,10 @@ HRESULT CSCD2Image::save_gif(LPCTSTR path, ...)
 
 	va_list args;
 	va_start(args, path);
-	va_end(args);
 
 	CString filename;
 	filename.FormatV(path, args);
+	va_end(args);
 
 	int width = (int)get_width();
 	int height = (int)get_height();

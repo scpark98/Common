@@ -126,6 +126,10 @@ public:
 	ID2D1Bitmap1*			get_frame_img(int index);
 	HRESULT					set_frame_img(ID2D1Bitmap1* img);
 
+	//raw 픽셀 한 장을 *프레임으로 추가* (multi-frame gif/webp 빌드용). load 와 달리 기존 프레임을 지우지 않는다.
+	//channel: 4=BGRA, 3=BGR, 2=BGR565, 1=8bpp indexed. delay_ms = 이 프레임 표시 시간(애니메이션).
+	HRESULT					add_frame_from_raw(IWICImagingFactory2* WICfactory, ID2D1DeviceContext* d2context, void* data, int width, int height, int channel, int delay_ms);
+
 	std::deque<ComPtr<ID2D1Bitmap1>>* get_img_list() { return &m_img; };
 	std::deque<int>*		get_frame_delay_list() { return &m_frame_delay; }
 	bool					set_frame_delay(int index, int delay_ms);

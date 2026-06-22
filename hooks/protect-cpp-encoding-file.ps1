@@ -31,7 +31,12 @@ try {
 if (-not $path) { exit 0 }
 if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { exit 0 }   # new file -> nothing to convert
 
-$exts = @('.cpp', '.h', '.hpp', '.c', '.cc', '.cxx', '.inl', '.ipp')
+# C/C++ sources + BOM-harmless text docs. Allowlist (NOT denylist) so binaries
+# (.png/.lib/.dll/.ico/.exe...) are never CP949-misdecoded and destroyed. Excluded on
+# purpose: .rc/.rc2 (VS keeps UTF-16) and BOM-hostile text (.bat/.cmd/.sh shebang,
+# strict .json/.yaml parsers) -- a BOM there breaks the file.
+$exts = @('.cpp', '.h', '.hpp', '.c', '.cc', '.cxx', '.inl', '.ipp',
+          '.txt', '.md', '.markdown', '.log', '.csv', '.ini', '.xml', '.html', '.htm')
 $ext = [IO.Path]::GetExtension($path).ToLower()
 if ($exts -notcontains $ext) { exit 0 }
 

@@ -1070,6 +1070,12 @@ namespace ffi
 					int64_t pts_ms = av_rescale_q(frame->pts, audio_tb, AVRational{1, 1000});
 					m_last_input_pts_ms.store(pts_ms);
 				}
+				//트랙이동 후 오디오 무음(잠깐 안 들림) 측정 — 이 FillBuffer 가 첫 deliverable audio frame 에 닿기까지
+				//대기/skip 한 양. 정상 재생 중엔 셋 다 0 이라 로그 안 남고, seek 직후 첫 frame 에만 1 줄.
+				//무음 길이 ≈ anchor_wait(video first emit 대기) + queue_wait(audio 큐 refill 대기). audio_skipped 는 over-skip 진단.
+				if (total_anchor_wait > 0 || wait_ms > 0 || audio_skipped > 0)
+					logWrite(_T("[ffi/src/audio/seekgap] anchor_wait=%dms queue_wait=%dms audio_skipped=%d"),
+						total_anchor_wait, wait_ms, audio_skipped);
 				break;
 			}
 			if (!dec.is_running())
@@ -1342,8 +1348,8 @@ namespace ffi
 			::QueryPerformanceCounter(&qn);
 			long long t0 = m_seekgap_qpc.load();
 			long long ms = t0 ? (qn.QuadPart - t0) * 1000LL / qf.QuadPart : -1;
-			//logWrite(_T("[ffi/src/audio/seekgap] +%lldms fill_after_seek=%d max_abs=%d rtStart_ms=%lld samples=%d sc=%lld"),
-				//ms, (16 - seekgap_left), (int)seekgap_mx, (long long)(rtStart / 10000), out_samples, (long long)m_sample_count);
+			logWrite(_T("[ffi/src/audio/seekgap] +%lldms fill_after_seek=%d max_abs=%d rtStart_ms=%lld samples=%d sc=%lld"),
+				ms, (16 - seekgap_left), (int)seekgap_mx, (long long)(rtStart / 10000), out_samples, (long long)m_sample_count);
 			m_seekgap_remaining.store(seekgap_left - 1);
 		}
 

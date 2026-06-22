@@ -1797,6 +1797,9 @@ int CSCSliderCtrl::get_near_bookmark(int pos, bool forward)
 	int i;
 	int index = -1;
 
+	if (m_bookmark.size() == 0)
+		return index;
+
 	if (m_bookmark.size() == 1)
 	{
 		if ((forward && (pos < m_bookmark[0].pos)) ||

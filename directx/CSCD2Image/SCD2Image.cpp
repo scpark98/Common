@@ -215,7 +215,7 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 	return load(pWICFactory, d2context, pDecoder, auto_play);
 }
 
-HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d2context, CString path, bool auto_play)
+HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d2context, CString path, bool auto_play, bool first_frame_only)
 {
 	//while (!stop())
 	//	Wait(10);
@@ -272,7 +272,7 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 		if (FAILED(hr) || !pDecoder)
 			return hr;
 
-		hr = load(pWICFactory, d2context, pDecoder.Get(), false);
+		hr = load(pWICFactory, d2context, pDecoder.Get(), false, first_frame_only);
 		// 블록을 벗어나면 pDecoder → stream 순서로 자동 해제되어
 		// WIC WebP 코덱이 유지하던 참조 체인이 완전히 끊김
 	}
@@ -747,7 +747,7 @@ CString CSCD2Image::get_exif_str()
 //일부 animated gif의 경우 이전 프레임 이미지에서 변경된 이미지만 저장하고 있는 경우도 있으므로
 //아래 코드를 참조하여 보완 필요.
 //https://github.com/microsoft/DirectXTex/blob/main/Texassemble/AnimatedGif.cpp
-HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d2context, IWICBitmapDecoder* pDecoder, bool auto_play)
+HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d2context, IWICBitmapDecoder* pDecoder, bool auto_play, bool first_frame_only)
 {
 	std::lock_guard<std::recursive_mutex> lock(g_d2d_dc_mutex);
 
@@ -805,7 +805,8 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 	UINT stride;
 
 	//frame_count = 1인 일반 이미지들도 아래의 for문으로 공통 처리하려니 예외적인 경우가 많아 별도 처리함.
-	if (frame_count == 1)
+	//first_frame_only=true 면 다중 프레임(gif/webp)도 이 단일 프레임 경로로 0번만 디코딩한다.
+	if (frame_count == 1 || first_frame_only)
 	{
 		_M(hr, pWICFactory->CreateFormatConverter(pConverter.GetAddressOf()));
 		_M(hr, pDecoder->GetFrame(0, pFrameDecode.GetAddressOf()));

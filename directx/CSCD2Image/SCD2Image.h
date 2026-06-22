@@ -109,7 +109,8 @@ public:
 	void					release();
 
 	//load external image
-	HRESULT					load(IWICImagingFactory2* WICfactory, ID2D1DeviceContext* d2context, CString path, bool auto_play = true);
+	//first_frame_only=true 면 gif/webp 등 다중 프레임도 0번 프레임만 디코딩(애니메이션 디코딩 비용 회피).
+	HRESULT					load(IWICImagingFactory2* WICfactory, ID2D1DeviceContext* d2context, CString path, bool auto_play = true, bool first_frame_only = false);
 
 	//load resource image
 	HRESULT					load(IWICImagingFactory2* WICfactory, ID2D1DeviceContext* d2context, UINT resource_id, CString type = _T("PNG"), bool auto_play = true);
@@ -306,7 +307,7 @@ protected:
 	HRESULT					extract_exif_info(IWICBitmapDecoder* pDecoder);
 
 
-	HRESULT					load(IWICImagingFactory2* WICfactory, ID2D1DeviceContext* d2context, IWICBitmapDecoder* pDecoder, bool auto_play = true);
+	HRESULT					load(IWICImagingFactory2* WICfactory, ID2D1DeviceContext* d2context, IWICBitmapDecoder* pDecoder, bool auto_play = true, bool first_frame_only = false);
 
 	D2D1_BITMAP_INTERPOLATION_MODE m_interpolation_mode = D2D1_BITMAP_INTERPOLATION_MODE_LINEAR;
 

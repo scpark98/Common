@@ -6,10 +6,10 @@
 //webp(애니메이션) 지원은 기본 ON. webp lib 이 없는 타깃(예: Win32 빌드 — 현재 webp lib 은 x64 전용)에서는
 //SCD2IMAGE_NO_WEBP 를 정의해 webp 코드/링크를 제외한다. 정적 이미지(jpg/png/gif/tiff)는 영향 없음.
 #ifndef SCD2IMAGE_NO_WEBP
-#include <webp/mux.h>
-#include <webp/demux.h>
-#include <webp/encode.h>
-#include <webp/decode.h>
+#include <mux.h>
+#include <demux.h>
+#include <encode.h>
+#include <decode.h>
 #endif
 
 #include "../../SCGdiplusBitmap.h"

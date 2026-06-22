@@ -40,10 +40,15 @@ public:
 	void			set_radius(float r) { m_radius = r; }
 	float			get_radius() const { return m_radius; }	// 월드 단위 반지름
 
+	// true = 여분(아웃라인 밖 배경) 드론. 렌더에서 색모드 recolor·그리기 제외(검정 invisible). 총 개수·모핑엔 포함.
+	void			set_unused(bool unused) { m_unused = unused; }
+	bool			is_unused() const { return m_unused; }
+
 private:
 	SCDVec3			m_pos;
 	Gdiplus::Color	m_color = Gdiplus::Color(255, 255, 255, 255);
 	float			m_radius = 5.f;
+	bool			m_unused = false;
 };
 
 // Y축(수직) 기준 회전 = 좌우 회전. 포메이션 전체가 제자리에서 도는 효과를 낸다.

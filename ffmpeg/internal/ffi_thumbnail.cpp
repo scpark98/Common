@@ -124,6 +124,11 @@ namespace ffi
 		//   forward decode 로 정확 시각까지 가면 long-GOP 에선 hover 마다 수백 프레임 디코드 → 느림.
 		//exact=true(멀티캡처/내보내기): 키프레임 이후 목표 pts(ts) 이상이 될 때까지 forward decode 하여 정확 시각 프레임 채택.
 		//   (안 그러면 1초 간격 요청이 같은 키프레임에 떨어져 동일 프레임이 중복 저장됨.)
+		//거짓 keyframe 인덱스(모든 packet 이 key)인 파일은 av_seek 착지가 실제로는 P-프레임 → 참조 없는 회색 프레임이 된다.
+		//프리뷰에서 실제 I-프레임(pict_type==I)이 나올 때까지 디코드해 회색을 회피한다. 정상 파일은 seek 가 실제 키프레임에
+		//착지하므로 첫 프레임이 I → 1장만 디코드(기존과 동일, 회귀 0). 손상 구간에서 I 가 안 오면 hover 멈춤 방지로 상한에서 중단.
+		const int preview_decode_cap = 300;
+		int decoded = 0;
 		bool got = false;
 		while (!got && av_read_frame(m_fmt, pkt) >= 0)
 		{
@@ -131,10 +136,15 @@ namespace ffi
 			{
 				while (avcodec_receive_frame(m_vctx, frame) >= 0)
 				{
+					++decoded;
 					if (!exact)
 					{
-						got = true;	//첫 디코드 프레임(= 키프레임) 사용.
-						break;
+						if (frame->pict_type == AV_PICTURE_TYPE_I || decoded >= preview_decode_cap)
+						{
+							got = true;	//첫 실제 I-프레임(또는 상한) 사용.
+							break;
+						}
+						continue;	//아직 실 I 전 — 계속 디코드(회색 P-프레임 건너뜀).
 					}
 					int64_t pts = (frame->best_effort_timestamp != AV_NOPTS_VALUE) ? frame->best_effort_timestamp : frame->pts;
 					if (pts == AV_NOPTS_VALUE || pts >= ts)

@@ -1459,6 +1459,10 @@ namespace ffi
 					m_eof.store(false);	  //seek 후 새 위치부터 재생 — EOF 상태 해제.
 					m_eof_flushed = false;
 
+					//seek 후 첫 실제 I-프레임 전까지 emit 보류 — 거짓 keyframe 인덱스 파일에서 노이즈 차단.
+					m_drop_until_real_i = true;
+					m_drop_i_count = 0;
+
 					::QueryPerformanceCounter(&qpc_t1);
 					long long seek_us = (qpc_t1.QuadPart - qpc_t0.QuadPart) * 1000000LL / qpc_freq.QuadPart;
 
@@ -1522,6 +1526,8 @@ namespace ffi
 						avcodec_flush_buffers(m_audio_ctx);
 					m_eof.store(false);
 					m_eof_flushed = false;
+					m_drop_until_real_i = true;	//backward 재seek 후에도 첫 실제 I-프레임부터 emit.
+					m_drop_i_count = 0;
 					//logWrite(_T("[ffi/dec/kf] forward keyframe not found before EOF → backward fallback target_pts=%lld"),
 						//(long long)m_kf_skip_target_pts);
 					continue;
@@ -1812,10 +1818,11 @@ namespace ffi
 						}
 						if (xfer >= 0)
 						{
-							//pts / flags 보존
+							//pts / flags / pict_type 보존 (pict_type 은 drop_until_real_i 판정에 필요)
 							sw_frame->pts = frame->pts;
 							sw_frame->pkt_dts = frame->pkt_dts;
 							sw_frame->flags = frame->flags;
+							sw_frame->pict_type = frame->pict_type;
 							av_frame_free(&frame);
 							out_frame = sw_frame;
 						}
@@ -1824,6 +1831,21 @@ namespace ffi
 							av_frame_free(&sw_frame);
 							av_frame_free(&frame);
 							continue;	//skip this frame
+						}
+					}
+
+					//[손상 keyframe 인덱스 보호] seek 후 첫 실제 I-프레임 전까지는 노이즈 프레임이므로 emit 보류.
+					//정상 파일은 첫 프레임이 I 라 즉시 통과(회귀 0). I 가 상한까지 안 오면 freeze 방지로 그대로 emit.
+					if (m_drop_until_real_i)
+					{
+						if (out_frame->pict_type == AV_PICTURE_TYPE_I)
+							m_drop_until_real_i = false;
+						else if (++m_drop_i_count > drop_until_i_limit)
+							m_drop_until_real_i = false;	//손상 구간 — freeze 방지로 그대로 emit.
+						else
+						{
+							av_frame_free(&out_frame);
+							continue;	//아직 실 I-프레임 전 — 참조 없는 노이즈 프레임 폐기.
 						}
 					}
 

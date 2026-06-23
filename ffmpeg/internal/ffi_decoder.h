@@ -295,6 +295,14 @@ namespace ffi
 		//이번 seek 의 스캔이 손상 구간을 거쳤는지(bound bail 또는 stall 재진입). 복구 시 audio decoder 재생성 트리거. seek 마다 리셋.
 		bool					m_did_garbage_scan = false;
 
+		//[손상 keyframe 인덱스 보호] 일부 깨진 리먹스(예: VC-1 MKV)는 *모든* packet 을 keyframe 으로 거짓 표시한다.
+		//그러면 keyframe-seek 가 실제로는 P-프레임에서 디코드를 시작 → 참조 없는 노이즈가 다음 진짜 I-프레임까지 보인다.
+		//seek 후 첫 *실제* I-프레임(pict_type==I)이 나올 때까지 디코드만 하고 emit 보류(PotPlayer 식). 정상 파일은
+		//seek 후 첫 프레임이 이미 I 라 즉시 통과 → 회귀 0. 손상 구간에서 I 가 오래 안 오면 freeze 방지로 상한 초과 시 그대로 emit.
+		bool					m_drop_until_real_i = false;
+		int						m_drop_i_count = 0;
+		static const int		drop_until_i_limit = 300;	//≈10s(30fps) — 정상 GOP 수 배. 초과 시 freeze 대신 그대로 emit.
+
 		//frame queue
 		std::mutex				m_mtx_queue;
 		std::condition_variable m_cv_queue;		//worker 가 queue 비울 때 ↔ UI 가 pop 할 때 양방향 wake.

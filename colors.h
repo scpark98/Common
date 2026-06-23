@@ -262,6 +262,10 @@ Gdiplus::Color	get_color(COLORREF rgb);
 //기준색이 어두운 계열이면 그보다 offset만큼 좀 더 밝은 색을 리턴한다.
 Gdiplus::Color	get_weak_color(Gdiplus::Color cr, int offset = 32);
 
+//발광색 정규화: 가장 큰 채널을 255 로 끌어올려(max-channel stretch) 어두운 색도 또렷이 보이게 한다.
+//min_peak 은 분모 최소값(과증폭 방지) — 모든 채널이 min_peak 이하인 매우 어두운 색의 폭주를 막는다.
+Gdiplus::Color	get_normalized_bright_color(Gdiplus::Color cr, int min_peak = 40);
+
 //어떤 색의 ratio 배 색 (검정 기준 스케일). 각 RGB 채널 × ratio, alpha 보존, 0..255 clamp.
 //ratio=1.0 → 원색, 0.8 → 80% 밝기(더 어둡게), 1.2 → 120%(더 밝게).
 //"어떤 색의 80%" 의 가장 일반적 의미(밝기 80%) 가 이것이다.

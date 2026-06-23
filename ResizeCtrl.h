@@ -72,19 +72,6 @@ https://stackoverflow.com/questions/39731497/create-window-without-titlebar-with
 
 class CResizeArray;
 
-struct CResizeInfo
-{
-	int ctlID;  // Specifies the identifier of the control 
-	int left;   // Specifies the  change in the position of the left edge 
-				// of the object relative to the total change in the parent window뭩 width. 
-	int top;    // Specifies the  change in the position of the top 
-				// of the object relative to the total change in the parent window뭩 height.
-	int width;  // Specifies the  change in the width of the object 
-				// relative to the total change in the parent window뭩 width.
-	int height; // Specifies the  change in the height of the object 
-				// relative to the total change in the parent window뭩 height.
-};
-
 class CResizeCtrl
 {
 public:
@@ -125,13 +112,8 @@ public:
 	// height - Specifies the  change in the height of the object 
 	//          relative to the total change in the parent window뭩 height.
 
-	BOOL Add(HWND hWndCtl, int ctrlID, int left, int top, int width, int height);
+	BOOL Add(HWND hWndCtl, int left, int top, int width, int height);
 	BOOL Add(int ctrlID, int left, int top, int width, int height);
-	BOOL Add(CWnd * wndCtl, int ctrlID, int left, int top, int width, int height);
-
-	// resizeInfo is a null terminated array of CResizeInfo
-
-	BOOL Add(const CResizeInfo * resizeInfo);
 
 	//
 	// Remove Method

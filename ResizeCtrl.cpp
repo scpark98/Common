@@ -247,45 +247,17 @@ BOOL CResizeCtrl::GetGripEnabled() const
 	return m_gripEnabled;
 }
 
-// resizeInfo is a null terminated array of CResizeInfo
-
-BOOL CResizeCtrl::Add(const CResizeInfo * resizeInfo)
-{
-	ASSERT (m_array);
-
-	BOOL result = TRUE;
-	while(result == TRUE && resizeInfo->ctlID > 0)
-	{
-		result &= Add(resizeInfo->ctlID,
-			resizeInfo->left,
-			resizeInfo->top,
-			resizeInfo->width,
-			resizeInfo->height);
-		resizeInfo++;               
-	}
-	return result;
-}
-
 BOOL CResizeCtrl::Add(int ctrlID,  int left, int top, int width, int height)
 {
 	ASSERT (m_array);
 
-	return Add(::GetDlgItem(m_hWndParent, ctrlID), ctrlID, left, top, width, height);
+	return Add(::GetDlgItem(m_hWndParent, ctrlID), left, top, width, height);
 }
 
-BOOL CResizeCtrl::Add(CWnd * wndCtrl, int ctrlID, int left, int top, int width, int height)
+BOOL CResizeCtrl::Add(HWND hWndCtl, int left, int top, int width, int height)
 {
 	ASSERT (m_array);
-
-	if(wndCtrl)
-		return Add(wndCtrl->GetSafeHwnd(), wndCtrl->GetDlgCtrlID(), left, top, width, height);
-	return FALSE;
-
-}
-
-BOOL CResizeCtrl::Add(HWND hWndCtl, int ctrlID, int left, int top, int width, int height)
-{
-	ASSERT (m_array);
+	const int ctrlID = ::GetDlgCtrlID(hWndCtl);	// 진단 메시지용 ID(컨트롤 식별·저장엔 HWND만 사용)
 	CString str = _T("");
 
 	if(left < 0 || left > m_maxPart)

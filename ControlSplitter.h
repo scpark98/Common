@@ -82,10 +82,12 @@ public:
 
 	void AddToTopOrLeftCtrls(CControlItem ctrl);
 	void AddToTopOrLeftCtrls(UINT id, int min_cx = 0, int min_cy = 0, UINT flag = SPF_TOP | SPF_LEFT | SPF_RIGHT | SPF_BOTTOM);
+	void AddToTopOrLeftCtrls(CWnd* pWnd, int min_cx = 0, int min_cy = 0, UINT flag = SPF_TOP | SPF_LEFT | SPF_RIGHT | SPF_BOTTOM);
 
 	//어떤 컨트롤은 스플리터와 함께 움직여야 한다. 양쪽 모두 줘야한다.
 	void AddToBoth(CControlItem ctr);
 	void AddToBoth(UINT id, int min_cx = 0, int min_cy = 0, UINT flag = SPF_TOP | SPF_LEFT | SPF_RIGHT | SPF_BOTTOM);
+	void AddToBoth(CWnd* pWnd, int min_cx = 0, int min_cy = 0, UINT flag = SPF_TOP | SPF_LEFT | SPF_RIGHT | SPF_BOTTOM);
 
 
 	//컨트롤을 hide시키면 제어를 할 수 없으므로 show 시키되 배경색으로 칠해줘야 UI에서 감출 수 있다.

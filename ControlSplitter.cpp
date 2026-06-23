@@ -419,9 +419,21 @@ void CControlSplitter::AddToBoth(UINT id, int min_cx, int min_cy, UINT flag)
 	AddToBottomOrRightCtrls(id, min_cx, min_cy, flag);
 }
 
+void CControlSplitter::AddToBoth(CWnd* pWnd, int min_cx, int min_cy, UINT flag)
+{
+	AddToTopOrLeftCtrls(pWnd, min_cx, min_cy, flag);
+	AddToBottomOrRightCtrls(pWnd, min_cx, min_cy, flag);
+}
+
 void CControlSplitter::AddToTopOrLeftCtrls(UINT id, int min_cx, int min_cy, UINT flag)
 {
 	m_vtTopLeftControls.push_back(CControlItem(GetParent()->GetDlgItem(id), min_cx, min_cy, flag));
+}
+
+// ID 없는 동적 컨트롤 등록용(예: 런타임 생성한 CSCThumbCtrl). CControlItem 경로로 보내 m_rectMax 보정까지 수행.
+void CControlSplitter::AddToTopOrLeftCtrls(CWnd* pWnd, int min_cx, int min_cy, UINT flag)
+{
+	AddToTopOrLeftCtrls(CControlItem(pWnd, min_cx, min_cy, flag));
 }
 
 void CControlSplitter::AddToTopOrLeftCtrls(CControlItem ctrl)

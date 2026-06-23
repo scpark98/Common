@@ -67,6 +67,12 @@ inline SCDVec3 rotate_x(const SCDVec3& p, float angle_rad)
 	return SCDVec3{ p.x, p.y * c - p.z * s, p.y * s + p.z * c };
 }
 
+// 두 월드 좌표 선형 보간(모핑 경로 계산용).
+inline SCDVec3 lerp3(const SCDVec3& a, const SCDVec3& b, float t)
+{
+	return SCDVec3{ a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t, a.z + (b.z - a.z) * t };
+}
+
 // 간단한 핀홀 원근 카메라. 뷰어는 원점에서 -z 쪽으로 distance 만큼 떨어져 +z 를 바라본다.
 // z 가 클수록(멀수록) 작게, 작을수록(가까울수록) 크게 보인다.
 struct SCDCamera

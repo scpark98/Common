@@ -988,6 +988,17 @@ Gdiplus::Color lerp_color(Gdiplus::Color a, Gdiplus::Color b, float t)
 		static_cast<BYTE>(static_cast<int>(a.GetB()) + static_cast<int>((static_cast<int>(b.GetB()) - static_cast<int>(a.GetB())) * t + 0.5f)));
 }
 
+Gdiplus::Color get_normalized_bright_color(Gdiplus::Color cr, int min_peak)
+{
+	const int R = cr.GetR(), G = cr.GetG(), B = cr.GetB();
+	const int peak = (std::max)(min_peak, (std::max)(R, (std::max)(G, B)));
+	const double k = 255.0 / peak;
+	return Gdiplus::Color(255,
+		(BYTE)(std::min)(255, (int)(R * k)),
+		(BYTE)(std::min)(255, (int)(G * k)),
+		(BYTE)(std::min)(255, (int)(B * k)));
+}
+
 COLORREF gpColor2RGB(Gdiplus::Color cr)
 {
 	return RGB(cr.GetRed(), cr.GetGreen(), cr.GetBlue());

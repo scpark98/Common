@@ -2383,6 +2383,101 @@ Gdiplus::Color CSCD2Image::get_pixel(int x, int y)
 	return Gdiplus::Color(a, r, g, b);
 }
 
+void CSCD2Image::detect_grid(std::vector<int>& vsep, std::vector<int>& hsep, int black_tol, float line_ratio)
+{
+	vsep.clear();
+	hsep.clear();
+	if (m_data == nullptr)
+		return;
+
+	int width = (int)get_width();
+	int height = (int)get_height();
+	if (width <= 0 || height <= 0)
+		return;
+
+	//m_data 는 load() 에서 무조건 32bpp BGRA 로 채워진다(get_pixel 과 동일하게 stride = 4*width).
+	int stride = 4 * width;
+	std::vector<int> col_black(width, 0);
+	std::vector<int> row_black(height, 0);
+	for (int y = 0; y < height; y++)
+	{
+		const uint8_t* s = m_data + y * stride;
+		for (int x = 0; x < width; x++)
+		{
+			int b = s[x * 4], g = s[x * 4 + 1], r = s[x * 4 + 2];
+			if (max(r, max(g, b)) <= black_tol)
+			{
+				col_black[x]++;
+				row_black[y]++;
+			}
+		}
+	}
+
+	//검정 비율이 line_ratio 초과인 연속 구간을 한 구분선으로 묶어 중심 좌표를 기록.
+	for (int pass = 0; pass < 2; pass++)
+	{
+		const std::vector<int>& black = (pass == 0) ? col_black : row_black;
+		int total = (pass == 0) ? height : width;
+		std::vector<int>& seps = (pass == 0) ? vsep : hsep;
+
+		int run_start = -1;
+		int n = (int)black.size();
+		for (int i = 0; i < n; i++)
+		{
+			bool is_sep = ((float)black[i] / total) > line_ratio;
+			if (is_sep && run_start < 0)
+				run_start = i;
+			if ((!is_sep || i == n - 1) && run_start >= 0)
+			{
+				int end = is_sep ? i : i - 1;
+				seps.push_back((run_start + end) / 2);
+				run_start = -1;
+			}
+		}
+	}
+}
+
+Gdiplus::Bitmap* CSCD2Image::get_sub_gdiplus(CRect r)
+{
+	if (m_data == nullptr)
+		return nullptr;
+
+	int width = (int)get_width();
+	int height = (int)get_height();
+	if (width <= 0 || height <= 0)
+		return nullptr;
+
+	r.left   = max(0, min(r.left,   width));
+	r.top    = max(0, min(r.top,    height));
+	r.right  = max(0, min(r.right,  width));
+	r.bottom = max(0, min(r.bottom, height));
+
+	int rw = r.Width();
+	int rh = r.Height();
+	if (rw <= 0 || rh <= 0)
+		return nullptr;
+
+	Gdiplus::Bitmap* out = new Gdiplus::Bitmap(rw, rh, PixelFormat32bppARGB);
+	Gdiplus::Rect lock(0, 0, rw, rh);
+	Gdiplus::BitmapData bd;
+	if (out->LockBits(&lock, Gdiplus::ImageLockModeWrite, PixelFormat32bppARGB, &bd) != Gdiplus::Ok)
+	{
+		delete out;
+		return nullptr;
+	}
+
+	int stride = 4 * width;
+	for (int y = 0; y < rh; y++)
+	{
+		const uint8_t* src = m_data + (r.top + y) * stride + r.left * 4;
+		uint8_t* dst = (uint8_t*)bd.Scan0 + y * bd.Stride;
+		memcpy(dst, src, (size_t)rw * 4);
+	}
+	out->UnlockBits(&bd);
+
+	return out;
+}
+
 int CSCD2Image::count_color_used(int top_n, bool ignore_alpha)
 {
 	if (m_data == nullptr)

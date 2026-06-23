@@ -144,6 +144,15 @@ public:
 	
 	Gdiplus::Color			get_pixel(int x, int y);
 
+	//완전 검정 구분선(테두리)로 격자 검출 — CSCGdiplusBitmap::detect_grid 와 동일 알고리즘을 0번 프레임 raw(m_data)에서 수행.
+	//vsep=세로 구분선 x좌표들, hsep=가로 구분선 y좌표들(각 구분선 중심). 셀 = (vsep.size()-1) × (hsep.size()-1).
+	//black_tol = "완전 검정" 허용오차, line_ratio = 한 줄을 구분선으로 볼 검정 픽셀 비율.
+	void					detect_grid(std::vector<int>& vsep, std::vector<int>& hsep, int black_tol = 24, float line_ratio = 0.80f);
+
+	//0번 프레임의 r 영역(right/bottom exclusive)을 새 Gdiplus::Bitmap(32bppARGB)으로 추출해 반환. 호출자가 delete.
+	//OCR(sc_win_ocr)·레이어드 미리보기처럼 GDI+ 비트맵을 요구하는 곳에서 표시 이미지 일부를 가져올 때 사용. 실패 시 nullptr.
+	Gdiplus::Bitmap*		get_sub_gdiplus(CRect r);
+
 	//이미지의 색상별 픽셀 수를 센다. 결과는 m_color_used 에 빈도 내림차순으로 저장.
 	//top_n > 0 이면 상위 top_n 개만 남긴다(0 = 전체). ignore_alpha = true 면 alpha 무시(RGB 만 키).
 	//반환 = 사용된 서로 다른 색상 개수. (get_alpha_pixel_count 와 동일하게 0번 프레임의 m_data 대상)

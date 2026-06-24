@@ -58,6 +58,9 @@ bool CSCPropertyCtrl::create(CWnd* parent, int left, int top, int width, int hei
 	m_font.CreateFont(-13, 0, 0, 0, FW_NORMAL, 0, 0, 0, DEFAULT_CHARSET,
 		OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY,
 		DEFAULT_PITCH | FF_DONTCARE, _T("Segoe UI"));
+	m_font_bold.CreateFont(-13, 0, 0, 0, FW_BOLD, 0, 0, 0, DEFAULT_CHARSET,
+		OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY,
+		DEFAULT_PITCH | FF_DONTCARE, _T("Segoe UI"));
 
 	return true;
 }
@@ -65,16 +68,16 @@ bool CSCPropertyCtrl::create(CWnd* parent, int left, int top, int width, int hei
 void CSCPropertyCtrl::set_color_theme(const CSCColorTheme& theme, bool invalidate)
 {
 	m_theme.copy_colors_from(theme);
-	for (prop_row& r : m_rows)			// 이미 생성된 자식에도 전파
-		if (r.ctrl && r.ctrl->GetSafeHwnd())
-		{
-			r.ctrl->set_color_theme(m_theme, false);
-			if (r.type != row_type::color && r.type != row_type::info)
+	for (prop_row& row : m_rows)			// 이미 생성된 자식에도 전파
+		for (prop_cell& c : row.cells)
+			if (c.ctrl && c.ctrl->GetSafeHwnd())
 			{
-				r.ctrl->set_edit_text_color(m_theme.cr_text);
-				r.ctrl->set_edit_back_color(m_theme.cr_back_alternate);
+				c.ctrl->set_color_theme(m_theme, false);
+				// set_color_theme 가 색을 되돌리므로 다시 적용. 값 컨트롤은 모두 투명(박스/라벨은 패널이 그림).
+				c.ctrl->set_transparent(true, field_back_color());
+				c.ctrl->set_edit_text_color(m_theme.cr_text_selected);	// 값 / color RGB·alpha 텍스트 밝음
+				c.ctrl->set_edit_back_color(field_back_color());
 			}
-		}
 	if (invalidate && GetSafeHwnd())
 		Invalidate(FALSE);
 }
@@ -85,53 +88,88 @@ void CSCPropertyCtrl::begin()
 	destroy_controls();
 	m_rows.clear();
 	m_cur_section = -1;
+	m_open_line = -1;
 }
 
 void CSCPropertyCtrl::section(const CString& title, bool expanded)
 {
-	prop_row r;
-	r.type = row_type::section;
-	r.label = title;
-	r.expanded = expanded;
-	m_rows.push_back(r);
+	m_open_line = -1;	// 섹션 시작 시 열린 라인 닫기
+
+	prop_row row;
+	row.is_section = true;
+	row.section_title = title;
+	row.expanded = expanded;
+	m_rows.push_back(std::move(row));
 	m_cur_section = static_cast<int>(m_rows.size()) - 1;
 	m_rows.back().section_index = m_cur_section;
 }
 
+void CSCPropertyCtrl::begin_row()
+{
+	prop_row row;
+	row.is_section = false;
+	row.section_index = m_cur_section;
+	m_rows.push_back(std::move(row));
+	m_open_line = static_cast<int>(m_rows.size()) - 1;
+}
+
+void CSCPropertyCtrl::end_row()
+{
+	m_open_line = -1;
+}
+
+CSCPropertyCtrl::prop_cell& CSCPropertyCtrl::add_cell(field_type type, const CString& label)
+{
+	// begin_row() 로 열린 라인이 있으면 그 라인에 셀 추가, 없으면 셀 하나짜리 라인을 새로 만든다.
+	if (m_open_line >= 0 && m_open_line < static_cast<int>(m_rows.size()))
+	{
+		prop_row& row = m_rows[m_open_line];
+		row.cells.emplace_back();
+		prop_cell& c = row.cells.back();
+		c.type = type;
+		c.label = label;
+		return c;
+	}
+
+	prop_row row;
+	row.is_section = false;
+	row.section_index = m_cur_section;
+	row.cells.emplace_back();
+	row.cells.back().type = type;
+	row.cells.back().label = label;
+	m_rows.push_back(std::move(row));
+	return m_rows.back().cells.back();
+}
+
 void CSCPropertyCtrl::add_text(const CString& label, CString* value)
 {
-	prop_row r; r.type = row_type::text; r.label = label; r.p_text = value; r.section_index = m_cur_section;
-	m_rows.push_back(r);
+	add_cell(field_type::text, label).p_text = value;
 }
 void CSCPropertyCtrl::add_int(const CString& label, int* value)
 {
-	prop_row r; r.type = row_type::integer; r.label = label; r.p_int = value; r.section_index = m_cur_section;
-	m_rows.push_back(r);
+	add_cell(field_type::integer, label).p_int = value;
 }
 void CSCPropertyCtrl::add_real(const CString& label, float* value)
 {
-	prop_row r; r.type = row_type::real; r.label = label; r.p_real = value; r.section_index = m_cur_section;
-	m_rows.push_back(r);
+	add_cell(field_type::real, label).p_real = value;
 }
 void CSCPropertyCtrl::add_bool(const CString& label, bool* value)
 {
-	prop_row r; r.type = row_type::boolean; r.label = label; r.p_bool = value; r.section_index = m_cur_section;
-	m_rows.push_back(r);
+	add_cell(field_type::boolean, label).p_bool = value;
 }
 void CSCPropertyCtrl::add_color(const CString& label, Gdiplus::Color* value)
 {
-	prop_row r; r.type = row_type::color; r.label = label; r.p_color = value; r.section_index = m_cur_section;
-	m_rows.push_back(r);
+	add_cell(field_type::color, label).p_color = value;
 }
 void CSCPropertyCtrl::add_combo(const CString& label, int* index, const std::vector<CString>& options)
 {
-	prop_row r; r.type = row_type::combo; r.label = label; r.p_index = index; r.options = options; r.section_index = m_cur_section;
-	m_rows.push_back(r);
+	prop_cell& c = add_cell(field_type::combo, label);
+	c.p_index = index;
+	c.options = options;
 }
 void CSCPropertyCtrl::add_info(const CString& label, const CString& text)
 {
-	prop_row r; r.type = row_type::info; r.label = label; r.info_text = text; r.section_index = m_cur_section;
-	m_rows.push_back(r);
+	add_cell(field_type::info, label).info_text = text;
 }
 
 void CSCPropertyCtrl::end()
@@ -144,8 +182,9 @@ void CSCPropertyCtrl::end()
 
 void CSCPropertyCtrl::refresh()
 {
-	for (prop_row& r : m_rows)
-		sync_value(r);
+	for (prop_row& row : m_rows)
+		for (prop_cell& c : row.cells)
+			sync_value(c);
 	if (GetSafeHwnd())
 		Invalidate(FALSE);
 }
@@ -153,9 +192,10 @@ void CSCPropertyCtrl::refresh()
 // ── 자식 컨트롤(CSCStatic) 관리 ────────────────────────────────────────────
 void CSCPropertyCtrl::destroy_controls()
 {
-	for (prop_row& r : m_rows)
-		if (r.ctrl && r.ctrl->GetSafeHwnd())
-			r.ctrl->DestroyWindow();
+	for (prop_row& row : m_rows)
+		for (prop_cell& c : row.cells)
+			if (c.ctrl && c.ctrl->GetSafeHwnd())
+				c.ctrl->DestroyWindow();
 }
 
 void CSCPropertyCtrl::ensure_controls()
@@ -163,103 +203,175 @@ void CSCPropertyCtrl::ensure_controls()
 	if (!GetSafeHwnd())
 		return;
 
-	CRect rc;
-	GetClientRect(rc);
-	const int label_w = (rc.Width() - 2 * m_pad) * m_label_ratio / 100;	// 컬럼 정렬용 라벨 폭
-
 	UINT id = 100;
-	for (prop_row& r : m_rows)
+	for (prop_row& row : m_rows)
 	{
-		if (!uses_static(r.type))
+		if (row.is_section)
 			continue;
-		if (r.ctrl && r.ctrl->GetSafeHwnd())
+
+		for (prop_cell& c : row.cells)
 		{
-			++id;
-			continue;
-		}
-
-		const bool is_color = (r.type == row_type::color);
-
-		r.ctrl = std::make_shared<CSCStatic>();
-		// color: "_color picker_" 캡션 → swatch+RGB, swatch 클릭 시 색 대화상자. 라벨은 패널이 그림.
-		// 그 외(text/int/real/info): CSCStatic 이 label+value 를 직접 표시(UXStudio 방식). 값은 m_use_edit 일 때만 그려진다.
-		const LPCTSTR caption = is_color ? _T("_color picker_") : static_cast<LPCTSTR>(r.label);
-		r.ctrl->create(caption, WS_CHILD | SS_NOTIFY, CRect(0, 0, 10, 10), this, id++);
-		r.ctrl->set_color_theme(m_theme, false);
-
-		// 값(RGB/숫자) 텍스트·편집 색 — 다크 패널 대비 보장(빠지면 색이 묻힘).
-		r.ctrl->set_edit_text_color(m_theme.cr_text);
-		r.ctrl->set_edit_back_color(m_theme.cr_back_alternate);
-
-		if (is_color)
-		{
-			// "_color picker_" 모드 — swatch 클릭 핸들러가 m_use_edit 게이트 안에 있으므로 켜야 동작.
-			r.ctrl->set_use_edit(true);
-		}
-		else
-		{
-			r.ctrl->set_label_width(label_w);	// label 컬럼 고정 → 값 시작 위치 항목마다 일치
-			if (r.type != row_type::info)		// info 는 읽기 전용(라벨만). 편집 행만 set_use_edit.
+			if (!prop_cell::uses_static(c.type))
+				continue;
+			if (c.ctrl && c.ctrl->GetSafeHwnd())
 			{
-				// 값/편집을 좌측 정렬 → swatch·콤보 텍스트의 left 와 동일 위치에서 시작.
-				r.ctrl->set_use_edit(true, ES_LEFT);
-				r.ctrl->set_value_halign(DT_LEFT);
-				if (r.type == row_type::integer || r.type == row_type::real)
-					r.ctrl->set_use_updown_key(true, r.type == row_type::real ? 0.1f : 1.0f);
+				++id;
+				continue;
 			}
+
+			const bool is_color = (c.type == field_type::color);
+
+			c.ctrl = std::make_shared<CSCStatic>();
+			// 박스와 라벨은 모두 패널이 그린다. CSCStatic 은 투명으로 두고 '값'만 박스 위에 얹는다.
+			// 이렇게 해야 라벨(패널)과 값(컨트롤)의 세로정렬·여백이 한 곳에서 통일된다.
+			//  - color : caption "_color picker_" → swatch+RGB 를 값 영역에 그림.
+			//  - 그 외 : caption=" "(공백). CSCStatic 은 caption 이 비면 값을 안 그리므로, 보이지 않는 공백을
+			//            caption 으로 줘 값(set_text_value)이 세로 가운데로 그려지게 한다.
+			const LPCTSTR caption = is_color ? _T("_color picker_") : _T(" ");
+			c.ctrl->create(caption, WS_CHILD | SS_NOTIFY, CRect(0, 0, 10, 10), this, id++);
+			c.ctrl->set_color_theme(m_theme, false);
+			c.ctrl->set_transparent(true, field_back_color());	// 패널이 그린 박스가 비쳐 보이게
+			c.ctrl->set_edit_text_color(m_theme.cr_text_selected);		// 값 / color 의 "R,G,B"·alpha 텍스트 밝게(읽히게)
+			c.ctrl->set_edit_back_color(field_back_color());
+
+			if (is_color)
+			{
+				c.ctrl->set_use_edit(true);
+			}
+			else
+			{
+				c.ctrl->set_use_edit(true, ES_LEFT);
+				c.ctrl->set_value_halign(DT_LEFT);
+				c.ctrl->set_label_width(2);					// 값을 값 영역 좌측에 거의 붙여 시작(공백 caption 보정)
+				if (c.type == field_type::integer || c.type == field_type::real)
+					c.ctrl->set_use_updown_key(true, c.type == field_type::real ? 0.1f : 1.0f);
+			}
+
+			sync_value(c);
 		}
-		sync_value(r);
 	}
 }
 
-void CSCPropertyCtrl::sync_value(prop_row& r)
+void CSCPropertyCtrl::sync_value(prop_cell& c)
 {
-	if (!r.ctrl || !r.ctrl->GetSafeHwnd())
+	if (!c.ctrl || !c.ctrl->GetSafeHwnd())
 		return;
-	switch (r.type)
+
+	switch (c.type)
 	{
-	case row_type::text:
-		r.ctrl->set_text_value(r.p_text ? *r.p_text : CString());
+	case field_type::text:
+		c.ctrl->set_text_value(c.p_text ? *c.p_text : CString());
 		break;
-	case row_type::integer:
+	case field_type::integer:
 	{
-		CString s; if (r.p_int) s.Format(_T("%d"), *r.p_int);
-		r.ctrl->set_text_value(s);
+		CString s;
+		if (c.p_int)
+			s.Format(_T("%d"), *c.p_int);
+		c.ctrl->set_text_value(s);
 		break;
 	}
-	case row_type::real:
+	case field_type::real:
 	{
-		CString s; if (r.p_real) s.Format(_T("%g"), *r.p_real);
-		r.ctrl->set_text_value(s);
+		CString s;
+		if (c.p_real)
+			s.Format(_T("%g"), *c.p_real);
+		c.ctrl->set_text_value(s);
 		break;
 	}
-	case row_type::color:
-		if (r.p_color)
-			r.ctrl->set_text_color(*r.p_color);	// "_color picker_" 모드의 swatch 색 = m_theme.cr_text
+	case field_type::color:
+		if (c.p_color)
+			c.ctrl->set_text_color(*c.p_color);	// "_color picker_" 모드의 swatch 색
 		break;
-	case row_type::info:
-		r.ctrl->set_text_value(r.info_text);
+	case field_type::info:
+		c.ctrl->set_text_value(c.info_text);
 		break;
 	default:
 		break;
 	}
 }
 
-int CSCPropertyCtrl::find_row_by_ctrl(const CWnd* pCtrl) const
+CSCPropertyCtrl::prop_cell* CSCPropertyCtrl::find_cell_by_ctrl(const CWnd* pCtrl)
 {
-	for (int i = 0; i < static_cast<int>(m_rows.size()); ++i)
-		if (m_rows[i].ctrl && m_rows[i].ctrl.get() == pCtrl)
-			return i;
-	return -1;
+	for (prop_row& row : m_rows)
+		for (prop_cell& c : row.cells)
+			if (c.ctrl && c.ctrl.get() == pCtrl)
+				return &c;
+	return nullptr;
 }
 
-CRect CSCPropertyCtrl::value_rect(const CRect& row_rect) const
+// 필드 박스 채움: 패널 배경보다 약간 밝게(테두리 없이도 박스가 보이도록). dark 테마 cr_back=(37,37,38).
+Gdiplus::Color CSCPropertyCtrl::field_back_color() const
 {
-	const int label_w = (row_rect.Width() - 2 * m_pad) * m_label_ratio / 100;
-	return CRect(row_rect.left + m_pad + label_w, row_rect.top, row_rect.right - m_pad, row_rect.bottom);
+	return get_color(m_theme.cr_back, 18);
 }
 
-// ── 레이아웃(세로 누적 + 자식 위치) ─────────────────────────────────────────
+// 박스 안 라벨(prefix)·값 색. Figma 측정값(side-by-side 캡처): 라벨/값 모두 ≈ (237,237,237) 거의 흰색.
+// cr_text(212)는 렌더 후 ~190 회색으로 보여 어두웠음 → 거의 흰색 슬롯 cr_text_selected(241)로 맞춤.
+Gdiplus::Color CSCPropertyCtrl::field_label_color() const
+{
+	return m_theme.cr_text_selected;
+}
+
+int CSCPropertyCtrl::measure_label_width(const CString& text) const
+{
+	if (!GetSafeHwnd() || text.IsEmpty())
+		return 0;
+	CClientDC dc(const_cast<CSCPropertyCtrl*>(this));
+	CFont* old = dc.SelectObject(const_cast<CFont*>(&m_font));
+	const CSize sz = dc.GetTextExtent(text);
+	dc.SelectObject(old);
+	return sz.cx;
+}
+
+CRect CSCPropertyCtrl::cell_value_rect(const CRect& cell_rc, int label_w) const
+{
+	return CRect(cell_rc.left + label_w, cell_rc.top, cell_rc.right, cell_rc.bottom);
+}
+
+// ── 레이아웃(세로 누적 + 셀 분할 + 자식 위치) ───────────────────────────────
+void CSCPropertyCtrl::position_cell_ctrl(prop_cell& c)
+{
+	if (!c.ctrl || !c.ctrl->GetSafeHwnd())
+		return;
+
+	// 박스/라벨은 패널이 그리므로 투명 컨트롤은 값 영역(라벨 다음)에만 둔다.
+	CRect box = c.rect;
+	box.OffsetRect(0, -m_scroll_y);
+	box.DeflateRect(0, m_field_vmargin);
+	box.left  += c.label_w;
+	box.right -= m_field_round;	// 우측 라운드 코너를 투명 컨트롤이 사각으로 덮지 않게
+	c.ctrl->MoveWindow(box);
+	c.ctrl->ShowWindow(SW_SHOW);
+}
+
+void CSCPropertyCtrl::layout_cells(prop_row& row)
+{
+	const int n = static_cast<int>(row.cells.size());
+	if (n == 0)
+		return;
+
+	const int content_left  = row.rect.left + m_pad;
+	const int content_right = row.rect.right - m_pad;
+	const int total = (std::max)(0, content_right - content_left);
+	const int gap = (n > 1) ? m_cell_gap : 0;					// 셀(필드) 사이 가로 간격
+	const int cell_w = (total - (n - 1) * gap) / n;
+
+	for (int i = 0; i < n; ++i)
+	{
+		prop_cell& c = row.cells[i];
+		const int cl = content_left + i * (cell_w + gap);
+		const int cr = (i == n - 1) ? content_right : cl + cell_w;	// 마지막 셀이 나머지 폭 흡수
+		c.rect = CRect(cl, row.rect.top, cr, row.rect.bottom);		// 스크롤 적용 전(패널 콘텐츠 좌표)
+
+		// 라벨 컬럼 폭: 단일 셀 행은 공통 폭(값 left 정렬용), 여러 셀이면 셀별 측정값. 둘 다 셀폭 상한 cap.
+		const int cap = c.rect.Width() * m_label_ratio / 100;
+		const int measured = m_field_lpad + measure_label_width(c.label) + m_label_gap;
+		c.label_w = (n == 1) ? (std::min)(m_shared_label_w, cap) : (std::min)(measured, cap);
+
+		position_cell_ctrl(c);
+	}
+}
+
 void CSCPropertyCtrl::layout()
 {
 	if (!GetSafeHwnd())
@@ -268,53 +380,48 @@ void CSCPropertyCtrl::layout()
 	GetClientRect(rc);
 	const int W = rc.Width();
 
+	// 단일 셀 행들의 공통 라벨 폭 = 가장 긴 라벨 + 간격 → 값 필드 left 가 한 줄로 정렬된다.
+	int max_label = 0;
+	for (const prop_row& row : m_rows)
+		if (!row.is_section && row.cells.size() == 1)
+			max_label = (std::max)(max_label, measure_label_width(row.cells[0].label));
+	m_shared_label_w = m_field_lpad + max_label + m_label_gap;	// 라벨 왼쪽여백 + 가장 긴 라벨 + 간격
+
 	int y = 0;
-	for (prop_row& r : m_rows)
+	bool seen_section = false;
+	for (prop_row& row : m_rows)
 	{
-		if (r.type == row_type::section)
+		if (row.is_section)
 		{
-			r.visible = true;
-			r.rect = CRect(0, y, W, y + m_section_h);
+			if (seen_section)		// 첫 섹션 제외하고 위에 여백 → 카테고리를 위 항목과 떨어뜨림
+				y += m_section_gap;
+			seen_section = true;
+
+			row.visible = true;
+			row.rect = CRect(0, y, W, y + m_section_h);
 			y += m_section_h;
-		}
-		else
-		{
-			const bool exp = (r.section_index >= 0 && r.section_index < static_cast<int>(m_rows.size()))
-				? m_rows[r.section_index].expanded : true;
-			if (exp)
-			{
-				r.visible = true;
-				r.rect = CRect(0, y, W, y + m_row_h);
-				y += m_row_h;
-			}
-			else
-			{
-				r.visible = false;
-				r.rect = CRect(0, y, W, y);
-			}
+			continue;
 		}
 
-		// 값 행 자식 위치/표시.
-		if (r.ctrl && r.ctrl->GetSafeHwnd())
+		const bool exp = (row.section_index >= 0 && row.section_index < static_cast<int>(m_rows.size()))
+			? m_rows[row.section_index].expanded : true;
+
+		if (!exp)
 		{
-			if (r.visible)
-			{
-				CRect rr = r.rect;
-				rr.OffsetRect(0, -m_scroll_y);
-				// color 는 라벨을 패널이 그리므로 값 컬럼만, 그 외는 label+value 를 CSCStatic 이 그리므로 콘텐츠 전체.
-				CRect cr = (r.type == row_type::color)
-					? value_rect(rr)
-					: CRect(rr.left + m_pad, rr.top, rr.right - m_pad, rr.bottom);
-				cr.DeflateRect(0, 2);
-				r.ctrl->MoveWindow(cr);
-				r.ctrl->ShowWindow(SW_SHOW);
-			}
-			else
-			{
-				r.ctrl->ShowWindow(SW_HIDE);
-			}
+			row.visible = false;
+			row.rect = CRect(0, y, W, y);
+			for (prop_cell& c : row.cells)
+				if (c.ctrl && c.ctrl->GetSafeHwnd())
+					c.ctrl->ShowWindow(SW_HIDE);
+			continue;
 		}
+
+		row.visible = true;
+		row.rect = CRect(0, y, W, y + m_row_h);
+		y += m_row_h;
+		layout_cells(row);
 	}
+
 	m_content_h = y;
 	clamp_scroll();
 }
@@ -329,7 +436,7 @@ void CSCPropertyCtrl::clamp_scroll()
 	m_scroll_y = (std::max)(0, (std::min)(maxs, m_scroll_y));
 }
 
-int CSCPropertyCtrl::hit_test(CPoint pt) const
+int CSCPropertyCtrl::hit_test_row(CPoint pt) const
 {
 	const CPoint cp(pt.x, pt.y + m_scroll_y);
 	for (int i = 0; i < static_cast<int>(m_rows.size()); ++i)
@@ -342,7 +449,7 @@ void CSCPropertyCtrl::toggle_section(int row_index)
 {
 	if (row_index < 0 || row_index >= static_cast<int>(m_rows.size()))
 		return;
-	if (m_rows[row_index].type != row_type::section)
+	if (!m_rows[row_index].is_section)
 		return;
 	m_rows[row_index].expanded = !m_rows[row_index].expanded;
 	layout();
@@ -366,69 +473,79 @@ void CSCPropertyCtrl::draw_caret(CDC& dc, const CRect& box, bool expanded, COLOR
 		p[1] = CPoint(c.x - 2, c.y + 4);
 		p[2] = CPoint(c.x + 3, c.y);
 	}
-	CBrush br(cr); CPen pen(PS_SOLID, 1, cr);
-	CBrush* ob = dc.SelectObject(&br); CPen* op = dc.SelectObject(&pen);
+	CBrush br(cr);
+	CPen pen(PS_SOLID, 1, cr);
+	CBrush* ob = dc.SelectObject(&br);
+	CPen* op = dc.SelectObject(&pen);
 	dc.Polygon(p, 3);
-	dc.SelectObject(ob); dc.SelectObject(op);
+	dc.SelectObject(ob);
+	dc.SelectObject(op);
 }
 
 void CSCPropertyCtrl::draw_tri_down(CDC& dc, const CRect& box, COLORREF cr)
 {
 	const CPoint c = box.CenterPoint();
 	CPoint p[3] = { CPoint(c.x - 4, c.y - 2), CPoint(c.x + 4, c.y - 2), CPoint(c.x, c.y + 3) };
-	CBrush br(cr); CPen pen(PS_SOLID, 1, cr);
-	CBrush* ob = dc.SelectObject(&br); CPen* op = dc.SelectObject(&pen);
+	CBrush br(cr);
+	CPen pen(PS_SOLID, 1, cr);
+	CBrush* ob = dc.SelectObject(&br);
+	CPen* op = dc.SelectObject(&pen);
 	dc.Polygon(p, 3);
-	dc.SelectObject(ob); dc.SelectObject(op);
+	dc.SelectObject(ob);
+	dc.SelectObject(op);
 }
 
 void CSCPropertyCtrl::draw_section(CDC& dc, const prop_row& r, const CRect& rc)
 {
-	dc.FillSolidRect(rc, m_theme.cr_back_alternate.ToCOLORREF());
+	// 카테고리 헤더: 배경 밴드 없이 굵은 글씨. 위쪽 얇은 구분선으로 이전 항목과 분리.
+	dc.FillSolidRect(CRect(rc.left, rc.top, rc.right, rc.top + 1), m_theme.cr_border_inactive.ToCOLORREF());
 
 	CRect caret(rc.left + m_pad, rc.top, rc.left + m_pad + 12, rc.bottom);
 	draw_caret(dc, caret, r.expanded, m_theme.cr_text.ToCOLORREF());
 
+	CFont* old = dc.SelectObject(&m_font_bold);
 	CRect tr(caret.right + 6, rc.top, rc.right - m_pad, rc.bottom);
 	dc.SetTextColor(m_theme.cr_text.ToCOLORREF());
-	dc.DrawText(r.label, tr, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
-
-	dc.FillSolidRect(CRect(rc.left, rc.bottom - 1, rc.right, rc.bottom), m_theme.cr_border_inactive.ToCOLORREF());
+	dc.DrawText(r.section_title, tr, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+	dc.SelectObject(old);
 }
 
-void CSCPropertyCtrl::draw_row_label(CDC& dc, const prop_row& r, const CRect& rc)
+void CSCPropertyCtrl::draw_cell_label(CDC& dc, const prop_cell& c, const CRect& cell_rc)
 {
-	const int label_w = (rc.Width() - 2 * m_pad) * m_label_ratio / 100;
-	CRect lr(rc.left + m_pad, rc.top, rc.left + m_pad + label_w, rc.bottom);
-	dc.SetTextColor(m_theme.cr_text.ToCOLORREF());	// CSCStatic 라벨(cr_text)과 동일 밝기로 일관
-	dc.DrawText(r.label, lr, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
+	// 박스 안 흐린 라벨(prefix). 왼쪽 여백 + 세로 가운데. 모든 셀의 라벨을 여기 한 곳에서 통일되게 그린다.
+	CRect lr(cell_rc.left + m_field_lpad, cell_rc.top, cell_rc.left + c.label_w, cell_rc.bottom);
+	dc.SetTextColor(field_label_color().ToCOLORREF());
+	dc.DrawText(c.label, lr, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
 }
 
-void CSCPropertyCtrl::draw_widget(CDC& dc, const prop_row& r, const CRect& rc)
+void CSCPropertyCtrl::draw_widget(CDC& dc, const prop_cell& c, const CRect& cell_rc)
 {
-	const CRect vr = value_rect(rc);
+	// 값은 라벨 컬럼 다음(=text 필드 값과 같은 x)에서 시작. 우측은 화살표 여백만 남긴다.
+	CRect vr = cell_value_rect(cell_rc, c.label_w);
+	vr.right -= 6;
 	dc.SetTextColor(m_theme.cr_text.ToCOLORREF());
 
-	if (r.type == row_type::boolean)
+	if (c.type == field_type::boolean)
 	{
-		const bool v = r.p_bool && *r.p_bool;
+		const bool v = c.p_bool && *c.p_bool;
 		const int cyc = vr.CenterPoint().y;
 		CRect bx(vr.left, cyc - 8, vr.left + 16, cyc + 8);
 		dc.FillSolidRect(bx, (v ? m_theme.cr_back_selected : m_theme.cr_back_alternate).ToCOLORREF());
 		dc.Draw3dRect(bx, m_theme.cr_border_inactive.ToCOLORREF(), m_theme.cr_border_inactive.ToCOLORREF());
 		if (v)
 		{
-			CRect t(bx); t.DeflateRect(4, 4);
+			CRect t(bx);
+			t.DeflateRect(4, 4);
 			dc.FillSolidRect(t, m_theme.cr_text.ToCOLORREF());
 		}
 	}
-	else if (r.type == row_type::combo)
+	else if (c.type == field_type::combo)
 	{
 		CRect ar(vr.right - 14, vr.top, vr.right, vr.bottom);
 		draw_tri_down(dc, ar, m_theme.cr_text_dim.ToCOLORREF());
 		CString s;
-		if (r.p_index && *r.p_index >= 0 && *r.p_index < static_cast<int>(r.options.size()))
-			s = r.options[*r.p_index];
+		if (c.p_index && *c.p_index >= 0 && *c.p_index < static_cast<int>(c.options.size()))
+			s = c.options[*c.p_index];
 		CRect tr(vr.left, vr.top, ar.left - 4, vr.bottom);
 		dc.DrawText(s, tr, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
 	}
@@ -445,27 +562,49 @@ void CSCPropertyCtrl::OnPaint()
 	CFont* old_font = dc.SelectObject(&m_font);
 	dc.SetBkMode(TRANSPARENT);
 
-	for (const prop_row& r : m_rows)
+	Gdiplus::Graphics g(dc.GetSafeHdc());
+	g.SetSmoothingMode(Gdiplus::SmoothingMode::SmoothingModeAntiAlias);
+
+	for (const prop_row& row : m_rows)
 	{
-		if (!r.visible)
+		if (!row.visible)
 			continue;
-		CRect rr = r.rect;
+
+		CRect rr = row.rect;
 		rr.OffsetRect(0, -m_scroll_y);
 		if (rr.bottom < 0 || rr.top > rc.bottom)
 			continue;
 
-		if (r.type == row_type::section)
+		if (row.is_section)
 		{
-			draw_section(dc, r, rr);
+			draw_section(dc, row, rr);
+			continue;
 		}
-		else if (r.type == row_type::color || r.type == row_type::boolean || r.type == row_type::combo)
+
+		for (const prop_cell& c : row.cells)
 		{
-			// 라벨은 패널이 그림. color 는 값 컬럼을 CSCStatic 이, bool/combo 는 위젯을 패널이 그린다.
-			draw_row_label(dc, r, rr);
-			if (r.type == row_type::boolean || r.type == row_type::combo)
-				draw_widget(dc, r, rr);
+			CRect cell_rc = c.rect;
+			cell_rc.OffsetRect(0, -m_scroll_y);
+
+			// 패널이 모든 셀의 라운드 박스(채움만, 테두리 없음) + 흐린 라벨을 그린다.
+			// 값: text/int/real/color 는 CSCStatic(투명)이 박스 위에 얹고, bool/combo/info 는 패널이 그린다.
+			CRect box = cell_rc;
+			box.DeflateRect(0, m_field_vmargin);
+			draw_round_rect(&g, CRect_to_gpRect(box),
+				Gdiplus::Color::Transparent, field_back_color(), m_field_round, 0);
+			draw_cell_label(dc, c, cell_rc);
+
+			if (c.type == field_type::boolean || c.type == field_type::combo)
+			{
+				draw_widget(dc, c, cell_rc);
+			}
+			else if (c.type == field_type::info)
+			{
+				CRect vr = cell_value_rect(cell_rc, c.label_w);
+				dc.SetTextColor(m_theme.cr_text.ToCOLORREF());
+				dc.DrawText(c.info_text, vr, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
+			}
 		}
-		// text/int/real/info: CSCStatic 이 label+value 를 모두 그리므로 패널은 그리지 않음.
 	}
 
 	dc.SelectObject(old_font);
@@ -497,99 +636,107 @@ void CSCPropertyCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 {
 	SetFocus();
 
-	const int i = hit_test(point);
+	const int i = hit_test_row(point);
 	if (i >= 0)
 	{
-		prop_row& r = m_rows[i];
-		switch (r.type)
+		prop_row& row = m_rows[i];
+		if (row.is_section)
 		{
-		case row_type::section:
 			toggle_section(i);
-			break;
-
-		case row_type::boolean:
-			if (r.p_bool)
-			{
-				*r.p_bool = !*r.p_bool;
-				if (on_change) on_change(r.label);
-				Invalidate(FALSE);
-			}
-			break;
-
-		case row_type::combo:		// 값 컬럼 클릭일 때만 드롭다운(라벨 클릭은 무시)
-		{
-			CRect rrc = r.rect;
-			rrc.OffsetRect(0, -m_scroll_y);
-			if (!value_rect(rrc).PtInRect(point))
-				break;
-			if (r.p_index && !r.options.empty())
-			{
-				CMenu menu;
-				menu.CreatePopupMenu();
-				for (int k = 0; k < static_cast<int>(r.options.size()); ++k)
-					menu.AppendMenu(MF_STRING, static_cast<UINT>(k + 1), r.options[k]);
-				if (*r.p_index >= 0 && *r.p_index < static_cast<int>(r.options.size()))
-					menu.CheckMenuRadioItem(0, static_cast<UINT>(r.options.size()) - 1,
-						static_cast<UINT>(*r.p_index), MF_BYPOSITION);
-
-				CRect rr = r.rect;
-				rr.OffsetRect(0, -m_scroll_y);
-				const CRect vr = value_rect(rr);
-				CPoint pt(vr.left, vr.bottom);
-				ClientToScreen(&pt);
-
-				const int cmd = menu.TrackPopupMenu(
-					TPM_RETURNCMD | TPM_LEFTALIGN | TPM_TOPALIGN, pt.x, pt.y, this);
-				if (cmd > 0)
-				{
-					*r.p_index = cmd - 1;
-					if (on_change) on_change(r.label);
-					Invalidate(FALSE);
-				}
-			}
-			break;
 		}
+		else
+		{
+			const CPoint cp(point.x, point.y + m_scroll_y);
+			for (prop_cell& c : row.cells)
+			{
+				if (!c.rect.PtInRect(cp))
+					continue;
 
-		default:	// text/int/real/color/info 는 자식 CSCStatic 이 클릭/편집 처리.
-			break;
+				if (c.type == field_type::boolean)
+				{
+					if (c.p_bool)
+					{
+						*c.p_bool = !*c.p_bool;
+						if (on_change)
+							on_change(c.label);
+						Invalidate(FALSE);
+					}
+				}
+				else if (c.type == field_type::combo)
+				{
+					// 값 컬럼 클릭일 때만 드롭다운(라벨 클릭은 무시).
+					if (!cell_value_rect(c.rect, c.label_w).PtInRect(cp))
+						break;
+					if (c.p_index && !c.options.empty())
+					{
+						CMenu menu;
+						menu.CreatePopupMenu();
+						for (int k = 0; k < static_cast<int>(c.options.size()); ++k)
+							menu.AppendMenu(MF_STRING, static_cast<UINT>(k + 1), c.options[k]);
+						if (*c.p_index >= 0 && *c.p_index < static_cast<int>(c.options.size()))
+							menu.CheckMenuRadioItem(0, static_cast<UINT>(c.options.size()) - 1,
+								static_cast<UINT>(*c.p_index), MF_BYPOSITION);
+
+						CRect vr = cell_value_rect(c.rect, c.label_w);
+						vr.OffsetRect(0, -m_scroll_y);
+						CPoint pt(vr.left, vr.bottom);
+						ClientToScreen(&pt);
+
+						const int cmd = menu.TrackPopupMenu(
+							TPM_RETURNCMD | TPM_LEFTALIGN | TPM_TOPALIGN, pt.x, pt.y, this);
+						if (cmd > 0)
+						{
+							*c.p_index = cmd - 1;
+							if (on_change)
+								on_change(c.label);
+							Invalidate(FALSE);
+						}
+					}
+				}
+				// text/int/real/color/info 는 자식 CSCStatic 이 클릭/편집 처리.
+				break;
+			}
 		}
 	}
 
 	CDialogEx::OnLButtonDown(nFlags, point);
 }
 
-// CSCStatic 값 변경 통지 → 어느 행인지 찾아 바인딩 포인터에 되쓰고 on_change.
+// CSCStatic 값 변경 통지 → 어느 셀인지 찾아 바인딩 포인터에 되쓰고 on_change.
 LRESULT CSCPropertyCtrl::on_message_CSCStatic(WPARAM wParam, LPARAM /*lParam*/)
 {
 	CSCStaticMsg* msg = reinterpret_cast<CSCStaticMsg*>(wParam);
 	if (msg == nullptr)
 		return 0;
 
-	const int i = find_row_by_ctrl(msg->pThis);
-	if (i < 0)
+	prop_cell* pc = find_cell_by_ctrl(msg->pThis);
+	if (pc == nullptr)
 		return 0;
-	prop_row& r = m_rows[i];
+	prop_cell& c = *pc;
 
 	if (msg->msg == CSCStaticMsg::msg_text_value_changed)
 	{
 		const CString s = msg->sValue;
-		switch (r.type)
+		switch (c.type)
 		{
-		case row_type::text:
-			if (r.p_text) *r.p_text = s;
+		case field_type::text:
+			if (c.p_text)
+				*c.p_text = s;
 			break;
-		case row_type::integer:
-			if (r.p_int) *r.p_int = _ttoi(s);
+		case field_type::integer:
+			if (c.p_int)
+				*c.p_int = _ttoi(s);
 			break;
-		case row_type::real:
-			if (r.p_real) *r.p_real = static_cast<float>(_ttof(s));
+		case field_type::real:
+			if (c.p_real)
+				*c.p_real = static_cast<float>(_ttof(s));
 			break;
-		case row_type::color:
-			if (r.p_color)
+		case field_type::color:
+			if (c.p_color)
 			{
 				int cr = 0, cg = 0, cb = 0;
 				if (_stscanf_s(s, _T("%d , %d , %d"), &cr, &cg, &cb) == 3)
-					*r.p_color = Gdiplus::Color(255,
+					*c.p_color = Gdiplus::Color(255,
 						static_cast<BYTE>((std::max)(0, (std::min)(255, cr))),
 						static_cast<BYTE>((std::max)(0, (std::min)(255, cg))),
 						static_cast<BYTE>((std::max)(0, (std::min)(255, cb))));
@@ -599,7 +746,7 @@ LRESULT CSCPropertyCtrl::on_message_CSCStatic(WPARAM wParam, LPARAM /*lParam*/)
 			break;
 		}
 		if (on_change)
-			on_change(r.label);
+			on_change(c.label);
 	}
 	return 0;
 }

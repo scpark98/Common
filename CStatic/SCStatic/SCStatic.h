@@ -16,7 +16,7 @@
 //.ico가 아닌 png 이미지들을 앞에 그려주고 필요에 따라 변경되도록 하기 위해 사용.
 #include "../../SCGdiplusBitmap.h"
 #include "../../data_structure/SCParagraph/SCParagraph.h"
-#include "../../CEdit/SCEdit/SCEdit.h"
+#include "../../CEdit/CSCStaticEdit/SCStaticEdit.h"
 /*
 //scpark
 
@@ -51,7 +51,7 @@ m_static1.set_gradient_color(RED);
   false일 경우는 텍스트의 위치에 따라 아이콘과 이미지의 위치가 변경된다.
 
 [label + value 형태로 사용할 때]
-- set_use_edit(true)를 하면 click으로 편집이 가능해진다. 편집이 시작되면 내부적으로 CEdit 컨트롤이 생성되고 편집이 끝나면 소멸된다.
+- set_use_edit(true)를 하면 click으로 편집이 가능해진다. 편집이 시작되면 내부적으로 CSCStaticEdit 컨트롤이 표시되고 편집이 끝나면 숨겨진다.
 - Resource Editor에서 해당 static의 속성에서 "이미지 가운데 맞춤" 선택, 컨트롤의 높이는 default로 8 DLU로 생성되지만 12 DLU로 조정해준다.
 
 
@@ -97,10 +97,8 @@ public:
 
 	enum CSCStaticMsgs
 	{
+		//color picker 모드는 "R, G, B" (color24) 또는 "R, G, B, A" (color32) 를 sValue 로 전파한다.
 		msg_text_value_changed,
-		//color picker 모드에서 alpha 만 변경된 경우. nValue = alpha (0~255), sValue = 동일 값의 문자열.
-		//text/RGB 변경 시에는 기존 msg_text_value_changed 가 sValue = "R, G, B" 로 전파된다.
-		msg_alpha_value_changed,
 	};
 
 	CSCStatic* pThis = NULL;
@@ -184,18 +182,16 @@ public:
 	void			set_text_value(CString value = _T(""));
 	void			set_text_value(LPCTSTR format, ...);
 
-	//label + value로 표시하는 경우 value 편집할 때 CEdit의 색상을 지정한다.
+	//label + value로 표시하는 경우 value 편집할 때 CSCStaticEdit의 색상을 지정한다.
 	void			set_edit_text_color(Gdiplus::Color cr_edit_text = Gdiplus::Color::Transparent);
 	void			set_edit_back_color(Gdiplus::Color cr_edit_back = Gdiplus::Color::Transparent);
 	void			edit_begin();
 	void			edit_end(bool valid);
-	LRESULT			on_message_CSCEdit(WPARAM wParam, LPARAM lParam);
+	LRESULT			on_message_CSCStaticEdit(WPARAM wParam, LPARAM lParam);
 
-	//color picker 전용. swatch 옆 "R, G, B" 영역 / alpha 영역을 각각 편집한다.
+	//color picker 전용. swatch 옆 "R, G, B" (color24) 또는 "R, G, B, A" (color32) 단일 텍스트를 편집한다.
 	void			edit_begin_color_text();
 	void			edit_end_color_text(bool valid);
-	void			edit_begin_alpha();
-	void			edit_end_alpha(bool valid);
 
 	//편집 중 Shift + Up/Down 또는 Shift + MouseWheel 로 숫자값 증감.
 	//텍스트가 정수/실수로 파싱되는 경우에만 동작 (그 외엔 base 위임).
@@ -219,29 +215,16 @@ public:
 	void			set_valign(DWORD valign);
 
 	//label + value 형태로 표시될 때 value 의 가로 정렬. DT_LEFT|DT_CENTER|DT_RIGHT 중 하나. 기본값 DT_RIGHT.
-	//편집 모드 진입 시 CSCEdit 의 텍스트 정렬에도 자동 반영된다.
+	//편집 모드 진입 시 CSCStaticEdit 의 텍스트 정렬에도 자동 반영된다.
 	void			set_value_halign(DWORD halign);
 
 	//label + value 형태일 때 label 영역의 고정 너비. 0 (기본) 이면 텍스트 길이 + 8 픽셀 자동 계산.
 	//여러 항목을 같은 컬럼에 정렬하려면 동일 값으로 호출. value/edit 의 시작 위치가 일치한다.
 	void			set_label_width(int width) { m_label_width = width; Invalidate(); }
 
-	//color picker 모드 (m_text == "_color picker_") 의 alpha 표시 형식.
-	enum alpha_format_t
-	{
-		alpha_byte		= 0,	//0~255 (Figma 와 다른 toggle, 기본값)
-		alpha_percent,			//0~100% 표기
-	};
-	void			set_alpha_format(alpha_format_t fmt) { m_alpha_format = fmt; Invalidate(); }
+	//color picker 모드 (m_text == "_color picker_") 에서 alpha 표시·편집 여부.
+	//true(=color32) → 값이 "R, G, B, A", false(=color24) → "R, G, B" (alpha 무시·불투명 취급).
 	void			set_show_alpha(bool show) { m_show_alpha = show; Invalidate(); }
-
-	//color picker 의 alpha (0~255) 를 외부에서 설정. CMFCColorDialog 가 alpha 를 다루지 않으므로 보조 setter.
-	void			set_alpha(BYTE a)
-	{
-		Gdiplus::Color& c = m_theme.cr_text;
-		c = Gdiplus::Color(a, c.GetR(), c.GetG(), c.GetB());
-		Invalidate();
-	}
 
 	//텍스트가 실제 출력되는 tight rect. plain/단락 모드 모두 정확. 너비만 필요하면 .Width().
 	CRect			get_text_rect() { return m_text_rect; }
@@ -411,15 +394,15 @@ protected:
 	//너비가 필요하면 m_text_rect.Width() (또는 get_text_extent()) 사용 — 별도 m_text_extent 는 제거됨.
 	CRect			m_text_rect;
 
-	CSCEdit			m_edit;
-	//color picker 모드의 alpha 편집 전용. lazy create.
-	CSCEdit			m_edit_alpha;
+	CSCStaticEdit	m_edit;
 	bool			m_use_edit = false;
 	CString			m_text_value;		//m_use_edit = true이면 label + value로 표시되는데 이 때 value의 내용이 저장된다.
 	int				m_edit_width = 0;	//편집모드일 때 edit의 너비. 이 값이 0이면 (m_text_rect.Width() + 8)부터 edit이 시작된다.
 
-	//color picker 모드 전용 layout 계산. swatch / RGB text / separator x / alpha rect 를 모두 채워준다.
-	void			get_color_picker_layout(CRect& rc_swatch, CRect& rc_text, int& sep_x, CRect& rc_alpha);
+	//color picker 모드 전용 layout 계산. swatch / 값 텍스트 영역.
+	void			get_color_picker_layout(CRect& rc_swatch, CRect& rc_text);
+	//color picker 모드의 값 문자열. m_show_alpha(=color32) 면 "R, G, B, A", 아니면(color24) "R, G, B".
+	CString			format_color_text() const;
 
 	enum ENUM_TIMER
 	{
@@ -482,8 +465,7 @@ protected:
 	//label + value 형태일 때 label 영역의 고정 너비. 0 이면 m_text_rect.Width() + 8 사용.
 	int				m_label_width = 0;
 
-	//color picker 모드의 alpha 표시 옵션.
-	alpha_format_t	m_alpha_format = alpha_byte;
+	//color picker 모드에서 alpha 를 값에 포함할지. true → "R,G,B,A"(color32), false → "R,G,B"(color24).
 	bool			m_show_alpha = true;
 
 	LOGFONT			m_lf;
@@ -571,5 +553,8 @@ public:
 	afx_msg BOOL OnSetCursor(CWnd* pWnd, UINT nHitTest, UINT message);
 	afx_msg void OnDestroy();
 	afx_msg void OnMouseMove(UINT nFlags, CPoint point);
+	//이 컨트롤은 OnPaint 로 외관을 전적으로 자체 그리므로, enable/disable 시 OS 기본 STATIC
+	//프로시저의 disable(회색) 칠을 받지 않는다. base 로 위임하지 않아 회색 칠 자체를 막는다.
+	afx_msg void OnEnable(BOOL bEnable);
 };
 #endif

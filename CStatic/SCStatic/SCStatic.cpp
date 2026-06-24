@@ -63,9 +63,10 @@ BEGIN_MESSAGE_MAP(CSCStatic, CStatic)
 	ON_WM_SIZE()
 	ON_WM_LBUTTONDOWN()
 	ON_WM_SETCURSOR()
-	ON_REGISTERED_MESSAGE(Message_CSCEdit, &CSCStatic::on_message_CSCEdit)
+	ON_REGISTERED_MESSAGE(Message_CSCStaticEdit, &CSCStatic::on_message_CSCStaticEdit)
 	ON_WM_DESTROY()
 	ON_WM_MOUSEMOVE()
+	ON_WM_ENABLE()
 END_MESSAGE_MAP()
 
 BOOL CSCStatic::create(LPCTSTR lpszText, DWORD dwStyle, const RECT& rect, CWnd* pParentWnd, UINT nID)
@@ -652,49 +653,24 @@ void CSCStatic::OnPaint()
 			//m_text_rect를 정확히 계산하기 위함도 있었으나 m_text_rect이 실제 텍스트가 출력되는 영역으로 세팅되는지는
 			//다시 확인이 필요하다.
 
-			//text가 "_color picker_"일 경우는 Figma 의 fill/stroke 항목 처럼
-			//swatch + "R, G, B" + 분리막대 + alpha 의 4 요소로 구성한다.
+			//text가 "_color picker_"일 경우는 swatch + 값("R, G, B"=color24 / "R, G, B, A"=color32)으로 구성한다.
 			if (m_text == _T("_color picker_"))
 			{
-				CRect rc_swatch, rc_text, rc_alpha;
-				int sep_x = 0;
-				get_color_picker_layout(rc_swatch, rc_text, sep_x, rc_alpha);
+				CRect rc_swatch, rc_text;
+				get_color_picker_layout(rc_swatch, rc_text);
 
 				Gdiplus::Color cr = m_theme.cr_text;
 				//swatch 는 alpha=0 이어도 색상이 보여야 의미 있으므로 가시성용으로 alpha 강제 255.
-				//(실제 alpha 는 우측 alpha 영역에서 별도 표시/편집)
 				Gdiplus::Color cr_swatch(255, cr.GetR(), cr.GetG(), cr.GetB());
 				draw_round_rect(&g, CRect_to_gpRect(rc_swatch), Gdiplus::Color::Gray, cr_swatch, 1);
-				//get_text_rect().Width() 가 swatch 우측(=label 폭) 을 갖도록 유지. (이전 m_text_extent 대체)
+				//get_text_rect().Width() 가 swatch 우측(=label 폭) 을 갖도록 유지.
 				m_text_rect.right = m_text_rect.left + rc_swatch.right;
 
-				//"R, G, B" 텍스트 — swatch 직후 좌측정렬. 편집 중이면 m_edit 가 보이므로 텍스트는 그리지 않는다.
+				//값 텍스트 — swatch 직후 좌측정렬. 편집 중이면 m_edit 가 보이므로 텍스트는 그리지 않는다.
 				if (m_edit.GetSafeHwnd() == NULL || !m_edit.IsWindowVisible())
 				{
-					CString rgb;
-					rgb.Format(_T("%d, %d, %d"), cr.GetR(), cr.GetG(), cr.GetB());
 					dc.SetTextColor(m_theme.cr_edit_text.ToCOLORREF());
-					dc.DrawText(rgb, rc_text, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOCLIP);
-				}
-
-				if (m_show_alpha)
-				{
-					//분리막대(1px vertical line) — alpha 영역 좌측에 위치.
-					Gdiplus::Pen sep_pen(Gdiplus::Color(255, 90, 90, 90), 1.0f);
-					int sep_top = rc_swatch.top + 1;
-					int sep_bottom = rc_swatch.bottom - 1;
-					g.DrawLine(&sep_pen, sep_x, sep_top, sep_x, sep_bottom);
-
-					//alpha — 우측정렬. 편집 중이면 m_edit_alpha 가 보이므로 그리지 않는다.
-					if (m_edit_alpha.GetSafeHwnd() == NULL || !m_edit_alpha.IsWindowVisible())
-					{
-						CString alpha_str;
-						if (m_alpha_format == alpha_percent)
-							alpha_str.Format(_T("%d%%"), (int)((cr.GetA() / 255.0) * 100 + 0.5));
-						else
-							alpha_str.Format(_T("%d"), cr.GetA());
-						dc.DrawText(alpha_str, rc_alpha, DT_RIGHT | DT_VCENTER | DT_SINGLELINE | DT_NOCLIP);
-					}
+					dc.DrawText(format_color_text(), rc_text, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOCLIP);
 				}
 			}
 			else if (!m_para.empty())
@@ -830,17 +806,22 @@ void CSCStatic::set_use_edit(bool use, UINT align)
 
 		if (m_edit.m_hWnd == NULL)
 		{
-			DWORD dwStyle = align | /*WS_BORDER |*/ WS_CHILD | ES_AUTOHSCROLL | /*ES_AUTOVSCROLL |*/ ES_MULTILINE;
-			m_edit.create(dwStyle, CRect(0, 0, 1, 1), this, 0);
+			//CSCStaticEdit 는 CStatic 파생이라 ES_ 스타일이 아닌 자체 set_text_align(DT_) 으로 정렬한다.
+			//Create 가 WS_VISIBLE 를 자동 부여하므로, 편집 중에만 보이도록 생성 직후 숨긴다.
+			m_edit.Create(WS_CHILD, CRect(0, 0, 1, 1), this, 0);
+			m_edit.ShowWindow(SW_HIDE);
+
+			DWORD dt_align = (align == ES_CENTER) ? DT_CENTER : (align == ES_RIGHT) ? DT_RIGHT : DT_LEFT;
+			m_edit.set_text_align(dt_align);
 			m_edit.set_font_name(m_lf.lfFaceName);
 			m_edit.set_font_size(get_font_size_from_pixel_size(m_hWnd, m_lf.lfHeight));
 			m_edit.set_font_weight(m_lf.lfWeight);
 			m_edit.set_text_color(m_theme.cr_text);
 			m_edit.set_back_color(m_theme.cr_edit_back);
 
-			//기본 CEdit 은 내부 좌/우 텍스트 margin 이 있어 동일한 left 좌표를 줘도 OnPaint 의 DrawText 결과보다
-			//우측으로 살짝 밀려 표시된다. value 출력 위치와 정확히 일치시키려면 내부 margin 을 0 으로 만든다.
-			m_edit.SendMessage(EM_SETMARGINS, EC_LEFTMARGIN | EC_RIGHTMARGIN, MAKELONG(0, 0));
+			//테두리 없이(원래 CEdit 무테두리) padding 0 → 그려진 value 와 동일한 x 에서 텍스트가 시작된다.
+			m_edit.set_draw_border(false);
+			m_edit.set_padding(0);
 		}
 	}
 	else
@@ -888,18 +869,13 @@ void CSCStatic::edit_begin()
 	CRect r(edit_left, 3, rc.right - 2, rc.bottom - 2);
 	m_edit.MoveWindow(r);
 
-	//m_value_halign(DT_LEFT|DT_CENTER|DT_RIGHT) → ES_LEFT|ES_CENTER|ES_RIGHT 로 매핑하여 edit 정렬을 동기화.
-	//Edit 컨트롤은 정렬 스타일 변경 후 화면에 반영되려면 Invalidate 필요.
-	DWORD es_align = ES_LEFT;
-	if (m_value_halign == DT_CENTER) es_align = ES_CENTER;
-	else if (m_value_halign == DT_RIGHT) es_align = ES_RIGHT;
-	m_edit.ModifyStyle(ES_LEFT | ES_CENTER | ES_RIGHT, es_align);
-	m_edit.Invalidate();
+	//value 가로 정렬(m_value_halign, DT_LEFT|DT_CENTER|DT_RIGHT)을 edit 에 그대로 반영(CSCStaticEdit 는 DT_ 정렬을 직접 사용).
+	m_edit.set_text_align(m_value_halign);
 
 	m_edit.set_text(m_text_value);
 
 	m_edit.ShowWindow(SW_SHOW);
-	m_edit.SetSel(0, -1);
+	m_edit.set_sel(0, -1);
 	m_edit.SetFocus();
 }
 
@@ -909,13 +885,7 @@ void CSCStatic::set_value_halign(DWORD halign)
 
 	//편집 모드가 이미 활성화돼 m_edit 가 보이는 상태라면 즉시 반영.
 	if (m_edit.GetSafeHwnd() && m_edit.IsWindowVisible())
-	{
-		DWORD es_align = ES_LEFT;
-		if (m_value_halign == DT_CENTER) es_align = ES_CENTER;
-		else if (m_value_halign == DT_RIGHT) es_align = ES_RIGHT;
-		m_edit.ModifyStyle(ES_LEFT | ES_CENTER | ES_RIGHT, es_align);
-		m_edit.Invalidate();
-	}
+		m_edit.set_text_align(m_value_halign);
 
 	Invalidate();
 }
@@ -934,44 +904,44 @@ void CSCStatic::edit_end(bool valid)
 	::SendMessage(GetParent()->m_hWnd, Message_CSCStatic, (WPARAM)&msg, 0);
 }
 
-void CSCStatic::get_color_picker_layout(CRect& rc_swatch, CRect& rc_text, int& sep_x, CRect& rc_alpha)
+void CSCStatic::get_color_picker_layout(CRect& rc_swatch, CRect& rc_text)
 {
 	CRect rc;
 	GetClientRect(rc);
 
 	int cy = rc.CenterPoint().y;
 	rc_swatch = CRect(4, cy - 6, 4 + 12, cy + 6);
+	rc_text = CRect(rc_swatch.right + 8, rc.top, rc.right - 4, rc.bottom);
+}
 
-	//alpha 영역 width — "255" (최대 3 자리) 가 우측정렬로 들어갈 만큼.
-	int alpha_width = 28;
-	int right_pad = 4;
-
-	rc_alpha = CRect(rc.right - right_pad - alpha_width, rc.top, rc.right - right_pad, rc.bottom);
-	//분리막대는 alpha 영역 좌측에서 4px 떨어진 곳 — alpha 숫자에 가깝게.
-	sep_x = rc_alpha.left - 4;
-	rc_text = CRect(rc_swatch.right + 8, rc.top, sep_x - 4, rc.bottom);
+//color picker 모드의 값 문자열. m_show_alpha(=color32) 면 "R, G, B, A", 아니면(color24) "R, G, B".
+CString CSCStatic::format_color_text() const
+{
+	Gdiplus::Color c = m_theme.cr_text;
+	CString s;
+	if (m_show_alpha)
+		s.Format(_T("%d, %d, %d, %d"), c.GetR(), c.GetG(), c.GetB(), c.GetA());
+	else
+		s.Format(_T("%d, %d, %d"), c.GetR(), c.GetG(), c.GetB());
+	return s;
 }
 
 void CSCStatic::edit_begin_color_text()
 {
-	CRect rc_swatch, rc_text, rc_alpha;
-	int sep_x = 0;
-	get_color_picker_layout(rc_swatch, rc_text, sep_x, rc_alpha);
+	CRect rc_swatch, rc_text;
+	get_color_picker_layout(rc_swatch, rc_text);
 
-	//text 영역에 m_edit 배치. align 은 좌측.
-	m_edit.ModifyStyle(ES_LEFT | ES_CENTER | ES_RIGHT, ES_LEFT);
+	//swatch 다음 값 영역에 m_edit 배치. align 은 좌측.
+	m_edit.set_text_align(DT_LEFT);
 	CRect r = rc_text;
 	r.top = 3;
 	r.bottom = rc_text.bottom - 2;
 	m_edit.MoveWindow(r);
 
-	Gdiplus::Color c = m_theme.cr_text;
-	CString s;
-	s.Format(_T("%d, %d, %d"), c.GetR(), c.GetG(), c.GetB());
-	m_edit.set_text(s);
+	m_edit.set_text(format_color_text());
 
 	m_edit.ShowWindow(SW_SHOW);
-	m_edit.SetSel(0, -1);
+	m_edit.set_sel(0, -1);
 	m_edit.SetFocus();
 }
 
@@ -986,98 +956,46 @@ void CSCStatic::edit_end_color_text(bool valid)
 	}
 
 	CString s = m_edit.get_text();
-	int r = 0, g = 0, b = 0;
-	//"R, G, B" 또는 "R,G,B" 둘 다 허용.
-	if (_stscanf_s(s, _T("%d , %d , %d"), &r, &g, &b) == 3)
-	{
-		r = max(0, min(255, r));
-		g = max(0, min(255, g));
-		b = max(0, min(255, b));
-		BYTE a = m_theme.cr_text.GetA();
-		m_theme.cr_text = Gdiplus::Color(a, (BYTE)r, (BYTE)g, (BYTE)b);
 
-		m_text_value.Format(_T("%d, %d, %d"), r, g, b);
-		CSCStaticMsg msg(CSCStaticMsg::msg_text_value_changed, this, m_text_value);
-		::SendMessage(GetParent()->m_hWnd, Message_CSCStatic, (WPARAM)&msg, 0);
+	//관대한 파싱 — 구분자(콤마/공백 등)에 무관하게 숫자 토큰만 차례로 추출한다.
+	//필요 개수(color24=3, color32=4)만큼만 읽고, 부족분은 0, 초과분은 무시, 각 값 0~255 clamp.
+	//예: "255 0, 0" → 255,0,0 / "255, 255" → 255,255,0 / "300" → 255.
+	const int want = m_show_alpha ? 4 : 3;
+	int vals[4] = { 0, 0, 0, 0 };
+	int count = 0;
+	const int len = s.GetLength();
+	for (int i = 0; i < len && count < want; )
+	{
+		if (s[i] >= _T('0') && s[i] <= _T('9'))
+		{
+			int v = 0;
+			while (i < len && s[i] >= _T('0') && s[i] <= _T('9'))
+			{
+				v = v * 10 + (s[i] - _T('0'));
+				if (v > 255)
+					v = 255;	//자릿수 폭주 clamp
+				++i;
+			}
+			vals[count++] = v;
+		}
+		else
+			++i;
 	}
 
-	Invalidate();
-}
-
-void CSCStatic::edit_begin_alpha()
-{
-	//lazy create.
-	if (m_edit_alpha.m_hWnd == NULL)
-	{
-		DWORD dwStyle = ES_RIGHT | WS_CHILD | ES_AUTOHSCROLL | ES_MULTILINE;
-		m_edit_alpha.create(dwStyle, CRect(0, 0, 1, 1), this, 0);
-		m_edit_alpha.set_font_name(m_lf.lfFaceName);
-		m_edit_alpha.set_font_size(get_font_size_from_pixel_size(m_hWnd, m_lf.lfHeight));
-		m_edit_alpha.set_font_weight(m_lf.lfWeight);
-		m_edit_alpha.set_text_color(m_theme.cr_edit_text);
-		m_edit_alpha.set_back_color(m_theme.cr_edit_back);
-		m_edit_alpha.SendMessage(EM_SETMARGINS, EC_LEFTMARGIN | EC_RIGHTMARGIN, MAKELONG(0, 0));
-	}
-
-	CRect rc_swatch, rc_text, rc_alpha;
-	int sep_x = 0;
-	get_color_picker_layout(rc_swatch, rc_text, sep_x, rc_alpha);
-
-	CRect r = rc_alpha;
-	r.top = 3;
-	r.bottom = rc_alpha.bottom - 2;
-	m_edit_alpha.MoveWindow(r);
-
-	BYTE a = m_theme.cr_text.GetA();
-	CString s;
-	if (m_alpha_format == alpha_percent)
-		s.Format(_T("%d"), (int)((a / 255.0) * 100 + 0.5));
-	else
-		s.Format(_T("%d"), a);
-	m_edit_alpha.set_text(s);
-
-	m_edit_alpha.ShowWindow(SW_SHOW);
-	m_edit_alpha.SetSel(0, -1);
-	m_edit_alpha.SetFocus();
-}
-
-void CSCStatic::edit_end_alpha(bool valid)
-{
-	m_edit_alpha.ShowWindow(SW_HIDE);
-
-	if (!valid)
+	//유효 숫자가 하나도 없으면(빈/비숫자 입력) 기존 색 유지.
+	if (count == 0)
 	{
 		Invalidate();
 		return;
 	}
 
-	CString s = m_edit_alpha.get_text();
-	s.Trim();
-	if (s.IsEmpty())
-	{
-		Invalidate();
-		return;
-	}
+	//color24 는 alpha 무시 → 불투명(255). color32 는 명시된 alpha(4번째 값)를 쓰되, 생략 시 불투명(255).
+	//(RGB 만 주고 alpha 생략 시 0=투명으로 두면 "색을 줬는데 안 보임" 이라 황당 → 255 가 합당.)
+	BYTE alpha = (m_show_alpha && count >= 4) ? (BYTE)vals[3] : 255;
+	m_theme.cr_text = Gdiplus::Color(alpha, (BYTE)vals[0], (BYTE)vals[1], (BYTE)vals[2]);
 
-	int v = _ttoi(s);
-	BYTE a;
-	if (m_alpha_format == alpha_percent)
-	{
-		v = max(0, min(100, v));
-		a = (BYTE)((v / 100.0) * 255 + 0.5);
-	}
-	else
-	{
-		v = max(0, min(255, v));
-		a = (BYTE)v;
-	}
-
-	Gdiplus::Color c = m_theme.cr_text;
-	m_theme.cr_text = Gdiplus::Color(a, c.GetR(), c.GetG(), c.GetB());
-
-	CString out;
-	out.Format(_T("%d"), (int)a);
-	CSCStaticMsg msg(CSCStaticMsg::msg_alpha_value_changed, this, out, (int)a);
+	m_text_value = format_color_text();
+	CSCStaticMsg msg(CSCStaticMsg::msg_text_value_changed, this, m_text_value);
 	::SendMessage(GetParent()->m_hWnd, Message_CSCStatic, (WPARAM)&msg, 0);
 
 	Invalidate();
@@ -1914,31 +1832,29 @@ void CSCStatic::OnLButtonDown(UINT nFlags, CPoint point)
 	{
 		if (m_text == _T("_color picker_"))
 		{
-			CRect rc_swatch, rc_text, rc_alpha;
-			int sep_x = 0;
-			get_color_picker_layout(rc_swatch, rc_text, sep_x, rc_alpha);
+			CRect rc_swatch, rc_text;
+			get_color_picker_layout(rc_swatch, rc_text);
 
 			if (point.x < rc_swatch.right + 4)
 			{
-				//swatch 클릭 → CSCColorPicker(동적 생성). alpha 는 picker 가 다루지 않으므로 전후 보존.
+				//swatch 클릭 → CSCColorPicker(동적 생성).
 				BYTE prev_a = m_theme.cr_text.GetA();
 				CSCColorPicker picker;
 				if (picker.DoModal(this, m_theme.cr_text, _T("Color Picker")) != IDCANCEL)
 				{
 					Gdiplus::Color sel = picker.get_selected_color();
-					m_theme.cr_text = Gdiplus::Color(prev_a, sel.GetR(), sel.GetG(), sel.GetB());
-					m_text_value.Format(_T("%d, %d, %d"), sel.GetR(), sel.GetG(), sel.GetB());
+					//color32 면 picker 의 alpha 반영, color24 면 alpha 무시 → 불투명(255).
+					BYTE a = m_show_alpha ? sel.GetA() : 255;
+					m_theme.cr_text = Gdiplus::Color(a, sel.GetR(), sel.GetG(), sel.GetB());
+					m_text_value = format_color_text();
 					Invalidate();
 					CSCStaticMsg msg(CSCStaticMsg::msg_text_value_changed, this, m_text_value);
 					::SendMessage(GetParent()->m_hWnd, Message_CSCStatic, (WPARAM)&msg, 0);
 				}
 			}
-			else if (m_show_alpha && point.x >= sep_x)
-			{
-				edit_begin_alpha();
-			}
 			else
 			{
+				//swatch 외 값 영역 클릭 → 전체 "R, G, B[, A]" 단일 편집.
 				edit_begin_color_text();
 			}
 		}
@@ -1992,61 +1908,49 @@ CRect CSCStatic::get_rect()
 	return r;
 }
 
-LRESULT CSCStatic::on_message_CSCEdit(WPARAM wParam, LPARAM lParam)
+LRESULT CSCStatic::on_message_CSCStaticEdit(WPARAM wParam, LPARAM /*lParam*/)
 {
-	CSCEditMessage* msg = (CSCEditMessage*)wParam;
+	CSCStaticEditMessage* msg = (CSCStaticEditMessage*)wParam;
 
+	//edit_end 가 ShowWindow(SW_HIDE) 할 때 재진입으로 killfocus 가 다시 오는데, 이미 숨겨진 상태이므로
+	//여기서 끊는다. 특히 escape 의 취소(commit 안 함)가 hide 후 killfocus 로 commit 되는 것을 막는다.
 	if (!msg->pThis->IsWindowVisible())
 		return 0;
 
 	bool is_color_picker = (m_text == _T("_color picker_"));
-	bool is_alpha = is_color_picker && (msg->pThis == &m_edit_alpha);
-	bool is_color_text = is_color_picker && (msg->pThis == &m_edit);
 
-	//TRACE(_T("message(%d) from CSCEdit(%p)\n"), (int)lParam, msg->pThis);
-	if (msg->message == WM_KILLFOCUS)
+	switch (msg->message)
 	{
-		if (is_alpha)
-			edit_end_alpha(true);
-		else if (is_color_text)
+	//killfocus(다른 곳 클릭) / enter → 커밋. (CSCEdit 의 WM_KILLFOCUS + VK_RETURN 통합 경로.)
+	case CSCStaticEdit::message_scstaticedit_killfocus:
+	case CSCStaticEdit::message_scstaticedit_enter:
+		if (is_color_picker)
 			edit_end_color_text(true);
 		else
 			edit_end(true);
-	}
-	else if (msg->message == WM_KEYDOWN)
-	{
-		switch ((int)lParam)
-		{
-			case VK_RETURN:
-				if (is_alpha)
-					edit_end_alpha(true);
-				else if (is_color_text)
-					edit_end_color_text(true);
-				else
-					edit_end(true);
-				break;
-			case VK_ESCAPE:
-				if (is_alpha)
-					edit_end_alpha(false);
-				else if (is_color_text)
-					edit_end_color_text(false);
-				else
-					edit_end(false);
-				break;
-		}
-	}
-	else if (msg->message == EN_CHANGE)
-	{
-		//color picker 모드는 부분 입력 (예: "1, ", "10") 이 무효 파싱을 유발해 view 가 깜빡일 수 있음.
-		//commit (Enter / killfocus) 시점에만 메시지 전파한다.
+		break;
+
+	//escape → 취소.
+	case CSCStaticEdit::message_scstaticedit_escape:
+		if (is_color_picker)
+			edit_end_color_text(false);
+		else
+			edit_end(false);
+		break;
+
+	//편집 중 실시간 반영(CSCEdit 의 EN_CHANGE 대응). color picker 모드는 부분 입력 (예: "1, ", "10") 이
+	//무효 파싱을 유발해 view 가 깜빡일 수 있어 commit(Enter / killfocus) 시점에만 전파한다.
+	case CSCStaticEdit::message_scstaticedit_text_changed:
 		if (!is_color_picker)
 		{
-			//편집 중 실시간 반영. m_text_value 갱신 후 부모로 msg_text_value_changed 전파.
-			//ShowWindow(SW_HIDE) 호출하지 않아 편집 세션 유지.
 			m_text_value = m_edit.get_text();
 			CSCStaticMsg out(CSCStaticMsg::msg_text_value_changed, this, m_text_value);
 			::SendMessage(GetParent()->m_hWnd, Message_CSCStatic, (WPARAM)&out, 0);
 		}
+		break;
+
+	default:	//setfocus / action_button 등은 무시.
+		break;
 	}
 
 	Invalidate();
@@ -2079,6 +1983,17 @@ void CSCStatic::OnDestroy()
 	//일단 이 클래스에서 사용하므로 이 클래스의 소멸자에서 해제 함수를 호출해주고 있으나
 	//공통 글로벌 변수라서 뭔가 부작용이 있을수도 있다.
 	safe_release_gradient_rect_handle();
+}
+
+//OS 기본 STATIC 프로시저는 EnableWindow 로 disable 되면 WM_ENABLE 에서 컨트롤을 회색(disable 외관)으로
+//직접 칠한다(WM_PAINT 미경유 → 우리 OnPaint 가 다시 안 그려 그대로 남음). 이 컨트롤은 외관을 전적으로
+//OnPaint 로 그리므로, base(=DefWindowProc/super static proc)로 위임하지 않아 그 회색 칠 자체를 막는다.
+//base 를 호출한 뒤 Invalidate 로 덮으면 '회색 → 정상' 순서로 깜빡이므로, 칠을 아예 발생시키지 않는 게 핵심.
+//(예: CSCColorPicker 가 modal 로 뜰 때 부모 셀을 EnableWindow(FALSE)→(TRUE) 토글 — 부모가 어떤 컨트롤이든
+//CSCStatic 이면 자체적으로 안전.)
+void CSCStatic::OnEnable(BOOL /*bEnable*/)
+{
+	Invalidate(FALSE);
 }
 
 

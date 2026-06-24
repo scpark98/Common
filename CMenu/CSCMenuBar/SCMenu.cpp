@@ -81,6 +81,9 @@ LRESULT CALLBACK CSCMenu::menu_mouse_hook_proc(int nCode, WPARAM wParam, LPARAM 
 			if (!s_menu_root->contains_descendant_hwnd(hwnd_at))
 			{
 				CSCMenu* root = s_menu_root;
+				//이 외부클릭이 root 트리거 위였다면 그 클릭은 통과되어 트리거의 popup_menu 를 재호출한다.
+				//dismiss 시각을 남겨 popup_menu 가 같은 클릭의 재오픈을 무시(토글 닫기)하게 한다.
+				root->m_dismiss_tick = GetTickCount();
 				root->hide_visible_descendants();
 				if (::IsWindow(root->m_hWnd))
 					root->ShowWindow(SW_HIDE);
@@ -1537,6 +1540,13 @@ bool CSCMenu::attach_submenu_by_id(int id, CSCMenu* sub_menu, int new_id)
 void CSCMenu::popup_menu(int x, int y)
 {
 	if (m_items.size() == 0)
+		return;
+
+	//트리거 영역을 눌러 메뉴를 띄운 뒤, 떠 있는 상태에서 같은 트리거를 다시 누르면 mouse hook 이 이 메뉴를
+	//dismiss 하지만 그 클릭은 통과되어 트리거가 popup_menu 를 재호출한다. 방금(같은 클릭으로) dismiss 됐으면
+	//무시한다 → 트리거 재클릭 = 토글 닫기. per-instance 라 메뉴바에서 다른 메뉴(다른 instance)로의 전환은 무관.
+	//같은 클릭의 dismiss→재호출은 같은 메시지 사이클(수 ms 이내)이고, 의도적 재오픈은 별 클릭(≥100ms)이라 80ms 로 분리.
+	if (GetTickCount() - m_dismiss_tick < 80)
 		return;
 
 	m_over_item = -1;

@@ -331,6 +331,10 @@ protected:
 	//popup_menu 진입 시 false 로 reset, popup_submenu_for 첫 호출 시 true.
 	bool			m_submenu_ever_opened = false;
 
+	//mouse hook 의 외부클릭 dismiss 시각(GetTickCount). popup_menu 가 이 직후의 재오픈 요청을 무시한다.
+	//트리거를 다시 눌러 메뉴를 닫는 그 클릭이 트리거의 popup_menu 를 재호출하는 토글 문제 방지. per-instance.
+	DWORD			m_dismiss_tick = 0;
+
 	//mouse vs keyboard 우선순위. 키보드 nav 후 mouse 가 실제로 움직일 때까지 hover 갱신 차단.
 	//Invalidate 후 synthetic WM_MOUSEMOVE / 키 누를 때 손 jitter 가 keyboard hover 를 덮는 증상 회피.
 	CPoint			m_last_mouse_pt = CPoint(-1, -1);

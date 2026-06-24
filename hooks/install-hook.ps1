@@ -5,6 +5,8 @@
 #   1. SessionStart -> ensure-cpp-encoding.ps1       (bulk-convert existing sources at start)
 #   2. PreToolUse (Read|Edit|Write|MultiEdit) -> protect-cpp-encoding-file.ps1
 #                                                    (convert a file added mid-session, on touch)
+#   3. PostToolUse (Write|Edit|MultiEdit) -> ensure-cpp-encoding-after-write.ps1
+#                                                    (re-add the BOM+CRLF that `Write` drops, after write)
 #
 # Why string injection (not ConvertTo-Json round-trip): Windows PowerShell 5.1 collapses a
 # single-element array into a bare object, which would turn the required hook-event ARRAYS
@@ -17,8 +19,9 @@ $settings = Join-Path $env:USERPROFILE '.claude\settings.json'
 $dir      = 'D:\1.Projects_C++\Common\hooks'
 $ensure   = Join-Path $dir 'ensure-cpp-encoding.ps1'
 $protect  = Join-Path $dir 'protect-cpp-encoding-file.ps1'
+$after    = Join-Path $dir 'ensure-cpp-encoding-after-write.ps1'
 
-foreach ($s in @($ensure, $protect)) {
+foreach ($s in @($ensure, $protect, $after)) {
     if (-not (Test-Path -LiteralPath $s)) { throw "[install-hook] missing hook script: $s" }
 }
 if (-not (Test-Path -LiteralPath $settings)) {
@@ -31,6 +34,7 @@ if (-not (Test-Path -LiteralPath $settings)) {
 function Esc($cmd) { $cmd.Replace('\', '\\').Replace('"', '\"') }
 $ensureCmd  = Esc('powershell -NoProfile -ExecutionPolicy Bypass -File "' + $ensure + '"')
 $protectCmd = Esc('powershell -NoProfile -ExecutionPolicy Bypass -File "' + $protect + '"')
+$afterCmd   = Esc('powershell -NoProfile -ExecutionPolicy Bypass -File "' + $after + '"')
 
 # Build a hook-event array literal. $matcher = $null for events that take none (SessionStart).
 # $pad = base indentation for the event key (e.g. 4 spaces, matching siblings under "hooks").
@@ -60,13 +64,18 @@ $newEnsure = 'D:\\1.Projects_C++\\Common\\hooks\\ensure-cpp-encoding.ps1'
 if (-not $text.Contains($newEnsure) -and $text.Contains($oldEnsure)) {
     $text = $text.Replace($oldEnsure, $newEnsure); $changed = $true
 }
-$needSession = -not $text.Contains('ensure-cpp-encoding')
+# Match exact filenames: 'ensure-cpp-encoding.ps1' is NOT a substring of
+# 'ensure-cpp-encoding-after-write.ps1' (the '-after-write' breaks the '.ps1' boundary),
+# so the three needles stay independent.
+$needSession = -not $text.Contains('ensure-cpp-encoding.ps1')
 $needPre     = -not $text.Contains('protect-cpp-encoding-file')
+$needPost    = -not $text.Contains('ensure-cpp-encoding-after-write')
 
-if ($needSession -or $needPre) {
+if ($needSession -or $needPre -or $needPost) {
     $newBlocks = @()
     if ($needSession) { $newBlocks += (Block 'SessionStart' $null $ensureCmd 15 '    ') }
     if ($needPre)     { $newBlocks += (Block 'PreToolUse' 'Read|Edit|Write|MultiEdit' $protectCmd 10 '    ') }
+    if ($needPost)    { $newBlocks += (Block 'PostToolUse' 'Write|Edit|MultiEdit' $afterCmd 10 '    ') }
 
     $m = [regex]::Match($text, '"hooks"\s*:\s*\{')
     if ($m.Success) {
@@ -87,7 +96,7 @@ if ($needSession -or $needPre) {
 }
 
 if (-not $changed) {
-    Write-Host "[install-hook] both hooks already installed; nothing to do."
+    Write-Host "[install-hook] all hooks already installed; nothing to do."
     exit 0
 }
 
@@ -96,5 +105,5 @@ try { [void]($text | ConvertFrom-Json) }
 catch { throw "[install-hook] aborted: produced invalid JSON. settings.json left untouched.`r`n$_" }
 
 [IO.File]::WriteAllText($settings, $text, (New-Object Text.UTF8Encoding($false)))
-Write-Host "[install-hook] settings.json updated: SessionStart + PreToolUse encoding hooks installed."
+Write-Host "[install-hook] settings.json updated: SessionStart + PreToolUse + PostToolUse encoding hooks installed."
 exit 0

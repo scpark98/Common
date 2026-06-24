@@ -470,9 +470,10 @@ void CControlSplitter::AddToTopOrLeftCtrls(CControlItem ctrl)
 	*/
 }
 
+// ID 없는 동적 컨트롤 등록용. CControlItem 경로로 보내 m_rectMax 보정까지 수행(AddToTopOrLeftCtrls(CWnd*) 와 대칭).
 void CControlSplitter::AddToBottomOrRightCtrls(CWnd* pWnd, int min_cx, int min_cy, UINT flag)
 {
-	m_vtBottomRightControls.push_back(CControlItem(pWnd, min_cx, min_cy, flag));
+	AddToBottomOrRightCtrls(CControlItem(pWnd, min_cx, min_cy, flag));
 }
 
 void CControlSplitter::AddToBottomOrRightCtrls(UINT id, int min_cx, int min_cy, UINT flag)

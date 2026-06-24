@@ -11,6 +11,7 @@ enum class drone_map_algorithm
 {
 	edge = 0,		// 엣지(윤곽) 기반 블루노이즈. 사물/단순·큰 형상에 적합. 기본값.
 	tone_fill = 1,	// 엣지 + 톤 면채움(전경 한정). 인물 등 매끈한 면이 중요한 피사체에 적합.
+	halftone = 2,	// 정사각 격자 + 톤→점 크기. LED 패널 느낌, 모핑 시 점이 거의 안 움직임(크기/밝기만 변화).
 };
 
 // 이미지를 *정확히 target_count 개* 의 드론으로 변환한다(고정 드론 수 = 모핑의 전제).
@@ -19,6 +20,7 @@ enum class drone_map_algorithm
 //     실 점이 K 미달이면 외곽 밀착 `unused` 드론으로 패딩.
 //   - drone_map_algorithm::edge      : Sobel 엣지 블루노이즈(윤곽 위주).
 //   - drone_map_algorithm::tone_fill : 윤곽(예산 상한) + 전경 톤 면채움(매끈한 면도 음영으로 채움).
+//   - drone_map_algorithm::halftone  : 정사각 격자에 톤→점 크기 매핑(전경 한정, 규칙 격자 패널).
 std::vector<CSCDrone> build_drones_from_image(CSCD2Image& img,
 											   drone_map_algorithm algorithm = drone_map_algorithm::edge,
 											   int target_count = 1500,

@@ -556,6 +556,145 @@ static std::vector<CSCDrone> build_tone_fill(CSCD2Image& img, int target_count, 
 }
 
 // ============================================================================
+// 알고리즘 3: 하프톤(정사각 격자 + 톤→점 크기). (LED 패널 느낌, 모핑 시 점이 거의 안 움직임)
+// ============================================================================
+static std::vector<CSCDrone> build_halftone(CSCD2Image& img, int target_count, double /*edge_threshold*/, float world_extent)
+{
+	std::vector<CSCDrone> drones;
+
+	const int W = static_cast<int>(img.get_width());
+	const int H = static_cast<int>(img.get_height());
+	if (W < 3 || H < 3 || target_count < 1)
+		return drones;
+	const size_t N = static_cast<size_t>(W) * H;
+
+	// 1) 그레이/알파/RGB 버퍼.
+	std::vector<unsigned char> gray(N), alpha(N), rbuf(N), gbuf(N), bbuf(N);
+	bool has_alpha = false;
+	for (int y = 0; y < H; ++y)
+		for (int x = 0; x < W; ++x)
+		{
+			const Gdiplus::Color c = img.get_pixel(x, y);
+			const size_t i = static_cast<size_t>(y) * W + x;
+			rbuf[i] = c.GetR(); gbuf[i] = c.GetG(); bbuf[i] = c.GetB();
+			gray[i] = static_cast<unsigned char>(0.299 * c.GetR() + 0.587 * c.GetG() + 0.114 * c.GetB());
+			alpha[i] = c.GetA();
+			if (c.GetA() < 250)
+				has_alpha = true;
+		}
+
+	// 2) 전경 마스크(tone_fill 과 동일). 배경 격자에는 점을 두지 않는다.
+	std::vector<unsigned char> fg(N, 1);
+	if (has_alpha)
+	{
+		for (size_t i = 0; i < N; ++i)
+			fg[i] = alpha[i] > 127 ? 1 : 0;
+	}
+	else
+	{
+		double sr = 0, sg = 0, sb = 0; long bc = 0;
+		auto acc = [&](int x, int y) { const size_t i = static_cast<size_t>(y) * W + x; sr += rbuf[i]; sg += gbuf[i]; sb += bbuf[i]; ++bc; };
+		for (int x = 0; x < W; ++x) { acc(x, 0); acc(x, H - 1); }
+		for (int y = 1; y < H - 1; ++y) { acc(0, y); acc(W - 1, y); }
+		const double bgR = sr / bc, bgG = sg / bc, bgB = sb / bc;
+		const double thr2 = 48.0 * 48.0;
+		for (size_t i = 0; i < N; ++i)
+		{
+			const double dr = rbuf[i] - bgR, dg = gbuf[i] - bgG, db = bbuf[i] - bgB;
+			fg[i] = (dr * dr + dg * dg + db * db) > thr2 ? 1 : 0;
+		}
+	}
+
+	const int HN = 1024;
+
+	// 3) 격자 간격 g(정사각). 전경 셀(셀 중심이 전경) 수 ≤ K 가 되는 최소 g = 가장 조밀한 해상도.
+	auto count_cells = [&](int g) -> int
+	{
+		int n = 0;
+		for (int cy = g / 2; cy < H; cy += g)
+			for (int cx = g / 2; cx < W; cx += g)
+				if (fg[static_cast<size_t>(cy) * W + cx])
+					++n;
+		return n;
+	};
+
+	int g = 4;
+	{
+		int lo = 2, hi = 400, best = 400;
+		while (lo <= hi)
+		{
+			const int mid = (lo + hi) / 2;
+			if (count_cells(mid) <= target_count) { best = mid; hi = mid - 1; }
+			else lo = mid + 1;
+		}
+		g = best;
+	}
+
+	const float s = 2.0f * world_extent / static_cast<float>((H > W) ? H : W);
+	const float cx = W * 0.5f;
+	const float cy = H * 0.5f;
+	const float r_max = g * s * 0.5f;	// 격자 한 칸의 절반 = 점이 거의 맞닿는 최대 반지름
+
+	// 4) 각 전경 셀: 셀 평균 톤→점 크기, 셀 평균색. 점 위치는 격자 중심(이미지가 바뀌어도 격자가 같으면 이동 0).
+	struct hd { long long h; CSCDrone d; };
+	std::vector<hd> reals;
+	std::vector<map_cand> reals_xy;	// 외곽 패딩 BFS 시드용
+	const int half = g / 2;
+	for (int yy = half; yy < H; yy += g)
+		for (int xx = half; xx < W; xx += g)
+		{
+			if (!fg[static_cast<size_t>(yy) * W + xx])
+				continue;
+
+			long sr = 0, sg = 0, sb = 0, sl = 0, cnt = 0;
+			for (int dy = -half; dy <= half; ++dy)
+				for (int dx = -half; dx <= half; ++dx)
+				{
+					const int px = xx + dx, py = yy + dy;
+					if (px < 0 || px >= W || py < 0 || py >= H)
+						continue;
+					const size_t pi = static_cast<size_t>(py) * W + px;
+					if (!fg[pi])
+						continue;
+					sr += rbuf[pi]; sg += gbuf[pi]; sb += bbuf[pi]; sl += gray[pi]; ++cnt;
+				}
+			if (cnt == 0)
+				continue;
+
+			const double tone = std::pow((sl / static_cast<double>(cnt)) / 255.0, 0.85);	// 밝을수록 큰 점
+			const float radius = r_max * static_cast<float>(0.20 + 0.80 * tone);
+			const Gdiplus::Color col(255,
+				static_cast<BYTE>(sr / cnt), static_cast<BYTE>(sg / cnt), static_cast<BYTE>(sb / cnt));
+			const SCDVec3 pos{ (xx - cx) * s, -(yy - cy) * s, 0.0f };
+			const long long h = hilbert_of(W, H, HN, xx, yy);
+			reals.push_back({ h, CSCDrone(pos, col, radius) });
+			reals_xy.push_back({ xx, yy, h, false });
+		}
+
+	if (reals.empty())
+		return drones;
+
+	// 5) K 미달 → 외곽 밀착 `unused` 패딩(간격 = 격자 g). 작은 흰 점(소등 상태).
+	const std::vector<map_cand> bg_cands =
+		make_filler_padding(reals_xy, target_count - static_cast<int>(reals.size()), W, H, HN, g);
+
+	std::vector<hd> all = std::move(reals);
+	for (const map_cand& c : bg_cands)
+	{
+		const SCDVec3 pos{ (c.x - cx) * s, -(c.y - cy) * s, 0.0f };
+		CSCDrone d(pos, Gdiplus::Color(255, 255, 255, 255), r_max * 0.3f);
+		d.set_unused(true);
+		all.push_back({ c.h, d });
+	}
+	std::sort(all.begin(), all.end(), [](const hd& a, const hd& b) { return a.h < b.h; });
+
+	drones.reserve(all.size());
+	for (const hd& e : all)
+		drones.push_back(e.d);
+	return drones;
+}
+
+// ============================================================================
 // 디스패처
 // ============================================================================
 std::vector<CSCDrone> build_drones_from_image(CSCD2Image& img, drone_map_algorithm algorithm,
@@ -565,6 +704,8 @@ std::vector<CSCDrone> build_drones_from_image(CSCD2Image& img, drone_map_algorit
 	{
 	case drone_map_algorithm::tone_fill:
 		return build_tone_fill(img, target_count, edge_threshold, world_extent);
+	case drone_map_algorithm::halftone:
+		return build_halftone(img, target_count, edge_threshold, world_extent);
 	case drone_map_algorithm::edge:
 	default:
 		return build_edge(img, target_count, edge_threshold, world_extent);

@@ -8,6 +8,7 @@
 
 #include <afxdlgs.h>
 #include <afxcolordialog.h>
+#include "../../CDialog/CSCColorPicker/SCColorPicker.h"	// "_color picker_" 모드 swatch 클릭 시 사용
 // CSCStatic
 
 IMPLEMENT_DYNAMIC(CSCStatic, CStatic)
@@ -1919,15 +1920,14 @@ void CSCStatic::OnLButtonDown(UINT nFlags, CPoint point)
 
 			if (point.x < rc_swatch.right + 4)
 			{
-				//swatch 클릭 → CMFCColorDialog. alpha 는 다이얼로그에서 다루지 않으므로 전후 보존.
+				//swatch 클릭 → CSCColorPicker(동적 생성). alpha 는 picker 가 다루지 않으므로 전후 보존.
 				BYTE prev_a = m_theme.cr_text.GetA();
-				COLORREF cr = m_theme.cr_text.ToCOLORREF();
-				CMFCColorDialog dlg(cr, 0, this);
-				if (dlg.DoModal() == IDOK)
+				CSCColorPicker picker;
+				if (picker.DoModal(this, m_theme.cr_text, _T("Color Picker")) != IDCANCEL)
 				{
-					cr = dlg.GetColor();
-					m_theme.cr_text = Gdiplus::Color(prev_a, GetRValue(cr), GetGValue(cr), GetBValue(cr));
-					m_text_value.Format(_T("%d, %d, %d"), GetRValue(cr), GetGValue(cr), GetBValue(cr));
+					Gdiplus::Color sel = picker.get_selected_color();
+					m_theme.cr_text = Gdiplus::Color(prev_a, sel.GetR(), sel.GetG(), sel.GetB());
+					m_text_value.Format(_T("%d, %d, %d"), sel.GetR(), sel.GetG(), sel.GetB());
 					Invalidate();
 					CSCStaticMsg msg(CSCStaticMsg::msg_text_value_changed, this, m_text_value);
 					::SendMessage(GetParent()->m_hWnd, Message_CSCStatic, (WPARAM)&msg, 0);

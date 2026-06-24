@@ -7,6 +7,7 @@
 #include <functional>
 #include "../../colors.h"					// CSCColorTheme (Gdiplus::Color 기반 다크 테마)
 #include "../../CStatic/SCStatic/SCStatic.h"	// label+값 셀. value 클릭→CSCEdit 편집 / "_color picker_" 모드→CSCColorPicker
+#include "../../CMenu/CSCMenuBar/SCMenu.h"	// combo 드롭다운 = 다크 테마 CSCMenu 팝업
 
 // ── CSCPropertyCtrl ─────────────────────────────────────────────────────────
 // 데이터 바인딩형 속성 컨트롤. CMFCPropertyGridCtrl 대체용(다크 테마 + Figma 스타일).
@@ -16,7 +17,7 @@
 //    · begin_row()~end_row() 사이의 add_*() 들이 한 라인을 공유한다(없으면 add 마다 1셀 1라인).
 //  - 셀 값(text/int/real/color/info)은 CSCStatic 자식으로 호스팅한다.
 //    · text/int/real : value 클릭 시 CSCEdit 동적 생성·편집. CSCStatic 이 라벨+값을 그림.
-//    · color         : 캡션 "_color picker_" → swatch+RGB. 라벨은 패널이 그림.
+//    · color24/color32: 캡션 "_color picker_" → swatch + "R,G,B"(24, alpha 무시) / "R,G,B,A"(32). 라벨은 패널이 그림.
 //    · bool/combo    : 라벨·위젯 모두 패널이 직접 그림.
 //  - 모든 셀의 값 left 는 layout() 에서 셀폭·m_label_ratio 로 매번 재계산 → resize 에도 일관 정렬.
 //  - 변경은 Message_CSCStatic 으로 통지받아 바인딩 포인터에 되쓰고 on_change(label) 발화.
@@ -32,7 +33,7 @@
 //   m_props.add_int  (_T("cx"), &m_canvas_cx);
 //   m_props.add_int  (_T("cy"), &m_canvas_cy);
 //   m_props.end_row();
-//   m_props.add_color(_T("Background"), &m_bg_color);
+//   m_props.add_color24(_T("Background"), &m_bg_color);	// alpha 무의미 → color24
 //   m_props.add_combo(_T("Morphing"), (int*)&m_map_algorithm, { _T("edge"), _T("tone_fill"), _T("halftone") });
 //   m_props.end();
 class CSCPropertyCtrl : public CDialogEx
@@ -57,7 +58,8 @@ public:
 	void add_int  (const CString& label, int* value);
 	void add_real (const CString& label, float* value);
 	void add_bool (const CString& label, bool* value);
-	void add_color(const CString& label, Gdiplus::Color* value);
+	void add_color24(const CString& label, Gdiplus::Color* value);	// R,G,B (alpha 무시·항상 불투명)
+	void add_color32(const CString& label, Gdiplus::Color* value);	// R,G,B,A
 	void add_combo(const CString& label, int* index, const std::vector<CString>& options);
 	void add_info (const CString& label, const CString& text);	// 읽기 전용
 	void end();												// 자식 컨트롤 생성 + 레이아웃 + 다시 그림
@@ -68,7 +70,7 @@ public:
 	std::function<void(const CString& key)> on_change;
 
 protected:
-	enum class field_type { text, integer, real, boolean, color, combo, info };
+	enum class field_type { text, integer, real, boolean, color24, color32, combo, info };
 
 	// 값 컬럼에 CSCStatic 자식을 두는 셀(text/int/real/color/info)인지.
 	struct prop_cell
@@ -92,7 +94,7 @@ protected:
 		static bool uses_static(field_type t)
 		{
 			return t == field_type::text || t == field_type::integer || t == field_type::real
-				|| t == field_type::color;
+				|| t == field_type::color24 || t == field_type::color32;
 		}
 	};
 
@@ -113,6 +115,10 @@ protected:
 	CSCColorTheme			m_theme = CSCColorTheme(this);
 	CFont					m_font;
 	CFont					m_font_bold;	// 섹션(카테고리) 헤더 전용
+
+	// combo 드롭다운 — 다크 테마 CSCMenu 팝업(네이티브 CMenu 대신). 선택은 Message_CSCMenu 로 async 통지.
+	CSCMenu					m_combo_menu;
+	prop_cell*				m_combo_active = nullptr;	// 현재 열린 combo 메뉴의 대상 셀(통지 처리용)
 
 	int		m_scroll_y  = 0;	// 세로 스크롤 오프셋(px). (TODO: CSCScrollbar 연결)
 	int		m_content_h = 0;	// 전체 콘텐츠 높이
@@ -148,6 +154,7 @@ protected:
 	void	clamp_scroll();
 	int		hit_test_row(CPoint pt) const;	// 행 인덱스(-1=없음). pt=클라이언트 좌표
 	void	toggle_section(int row_index);
+	void	open_combo_menu(prop_cell& c);	// combo 셀 클릭 → 다크 CSCMenu 팝업(옵션 항목 + 현재 선택 radio)
 
 	void	draw_section(CDC& dc, const prop_row& r, const CRect& rc);
 	void	draw_cell_label(CDC& dc, const prop_cell& c, const CRect& cell_rc);	// 라벨 컬럼(패널이 직접 그림)
@@ -167,4 +174,5 @@ protected:
 	afx_msg BOOL OnMouseWheel(UINT nFlags, short zDelta, CPoint pt);
 	afx_msg void OnLButtonDown(UINT nFlags, CPoint point);
 	afx_msg LRESULT on_message_CSCStatic(WPARAM wParam, LPARAM lParam);	// CSCStatic 값 변경 통지
+	afx_msg LRESULT on_message_CSCMenu(WPARAM wParam, LPARAM lParam);	// combo CSCMenu 선택 통지
 };

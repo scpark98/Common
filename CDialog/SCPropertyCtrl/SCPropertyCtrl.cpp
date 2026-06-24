@@ -29,6 +29,7 @@ BEGIN_MESSAGE_MAP(CSCPropertyCtrl, CDialogEx)
 	ON_WM_MOUSEWHEEL()
 	ON_WM_LBUTTONDOWN()
 	ON_REGISTERED_MESSAGE(Message_CSCStatic, &CSCPropertyCtrl::on_message_CSCStatic)
+	ON_REGISTERED_MESSAGE(Message_CSCMenu, &CSCPropertyCtrl::on_message_CSCMenu)
 END_MESSAGE_MAP()
 
 // ── 생성/테마 ───────────────────────────────────────────────────────────────
@@ -157,9 +158,13 @@ void CSCPropertyCtrl::add_bool(const CString& label, bool* value)
 {
 	add_cell(field_type::boolean, label).p_bool = value;
 }
-void CSCPropertyCtrl::add_color(const CString& label, Gdiplus::Color* value)
+void CSCPropertyCtrl::add_color24(const CString& label, Gdiplus::Color* value)
 {
-	add_cell(field_type::color, label).p_color = value;
+	add_cell(field_type::color24, label).p_color = value;
+}
+void CSCPropertyCtrl::add_color32(const CString& label, Gdiplus::Color* value)
+{
+	add_cell(field_type::color32, label).p_color = value;
 }
 void CSCPropertyCtrl::add_combo(const CString& label, int* index, const std::vector<CString>& options)
 {
@@ -219,12 +224,12 @@ void CSCPropertyCtrl::ensure_controls()
 				continue;
 			}
 
-			const bool is_color = (c.type == field_type::color);
+			const bool is_color = (c.type == field_type::color24 || c.type == field_type::color32);
 
 			c.ctrl = std::make_shared<CSCStatic>();
 			// 박스와 라벨은 모두 패널이 그린다. CSCStatic 은 투명으로 두고 '값'만 박스 위에 얹는다.
 			// 이렇게 해야 라벨(패널)과 값(컨트롤)의 세로정렬·여백이 한 곳에서 통일된다.
-			//  - color : caption "_color picker_" → swatch+RGB 를 값 영역에 그림.
+			//  - color : caption "_color picker_" → swatch + "R,G,B"(color24) / "R,G,B,A"(color32).
 			//  - 그 외 : caption=" "(공백). CSCStatic 은 caption 이 비면 값을 안 그리므로, 보이지 않는 공백을
 			//            caption 으로 줘 값(set_text_value)이 세로 가운데로 그려지게 한다.
 			const LPCTSTR caption = is_color ? _T("_color picker_") : _T(" ");
@@ -236,6 +241,7 @@ void CSCPropertyCtrl::ensure_controls()
 
 			if (is_color)
 			{
+				c.ctrl->set_show_alpha(c.type == field_type::color32);	// color32 만 alpha 포함("R,G,B,A")
 				c.ctrl->set_use_edit(true);
 			}
 			else
@@ -278,7 +284,8 @@ void CSCPropertyCtrl::sync_value(prop_cell& c)
 		c.ctrl->set_text_value(s);
 		break;
 	}
-	case field_type::color:
+	case field_type::color24:
+	case field_type::color32:
 		if (c.p_color)
 			c.ctrl->set_text_color(*c.p_color);	// "_color picker_" 모드의 swatch 색
 		break;
@@ -667,31 +674,10 @@ void CSCPropertyCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 					// 값 컬럼 클릭일 때만 드롭다운(라벨 클릭은 무시).
 					if (!cell_value_rect(c.rect, c.label_w).PtInRect(cp))
 						break;
+					// 메뉴가 떠 있을 때 트리거를 다시 누르면 토글 닫기여야 한다(재오픈 금지).
+					// 그 디바운스는 CSCMenu::popup_menu 가 자체 처리(공통 모듈에서 해결).
 					if (c.p_index && !c.options.empty())
-					{
-						CMenu menu;
-						menu.CreatePopupMenu();
-						for (int k = 0; k < static_cast<int>(c.options.size()); ++k)
-							menu.AppendMenu(MF_STRING, static_cast<UINT>(k + 1), c.options[k]);
-						if (*c.p_index >= 0 && *c.p_index < static_cast<int>(c.options.size()))
-							menu.CheckMenuRadioItem(0, static_cast<UINT>(c.options.size()) - 1,
-								static_cast<UINT>(*c.p_index), MF_BYPOSITION);
-
-						CRect vr = cell_value_rect(c.rect, c.label_w);
-						vr.OffsetRect(0, -m_scroll_y);
-						CPoint pt(vr.left, vr.bottom);
-						ClientToScreen(&pt);
-
-						const int cmd = menu.TrackPopupMenu(
-							TPM_RETURNCMD | TPM_LEFTALIGN | TPM_TOPALIGN, pt.x, pt.y, this);
-						if (cmd > 0)
-						{
-							*c.p_index = cmd - 1;
-							if (on_change)
-								on_change(c.label);
-							Invalidate(FALSE);
-						}
-					}
+						open_combo_menu(c);
 				}
 				// text/int/real/color/info 는 자식 CSCStatic 이 클릭/편집 처리.
 				break;
@@ -700,6 +686,62 @@ void CSCPropertyCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 	}
 
 	CDialogEx::OnLButtonDown(nFlags, point);
+}
+
+// combo 셀 클릭 → 다크 테마 CSCMenu 팝업. 옵션을 항목으로 채우고 현재 선택을 radio 로 표시한 뒤
+// 값 영역 좌하단에서 띄운다. 선택은 동기 반환이 아니라 Message_CSCMenu(selchanged) 로 통지된다.
+void CSCPropertyCtrl::open_combo_menu(prop_cell& c)
+{
+	if (m_combo_menu.GetSafeHwnd() == NULL)
+	{
+		// 값 컬럼 너비를 최소 폭으로 — 항목 텍스트가 더 길면 CSCMenu 가 자동 확장.
+		const int w = (std::max)(80, cell_value_rect(c.rect, c.label_w).Width());
+		m_combo_menu.create(this, w);
+	}
+	m_combo_menu.set_color_theme(m_theme);	// 패널 테마와 동기(테마 교체에도 일관)
+
+	m_combo_active = &c;
+
+	// 옵션을 항목으로 채운다. id = 인덱스+1 (CSCMenu 는 id<=0 을 separator 로 취급).
+	m_combo_menu.clear();
+	m_combo_menu.begin_update();
+	for (int k = 0; k < static_cast<int>(c.options.size()); ++k)
+		m_combo_menu.add(k + 1, c.options[k]);
+	m_combo_menu.end_update();
+	if (*c.p_index >= 0 && *c.p_index < static_cast<int>(c.options.size()))
+		m_combo_menu.check_radio_item(1, static_cast<int>(c.options.size()), *c.p_index + 1);
+
+	// 값 영역 좌하단(스크린 좌표)에서 팝업.
+	CRect vr = cell_value_rect(c.rect, c.label_w);
+	vr.OffsetRect(0, -m_scroll_y);
+	CPoint pt(vr.left, vr.bottom);
+	ClientToScreen(&pt);
+	m_combo_menu.popup_menu(pt.x, pt.y);
+}
+
+// combo CSCMenu 선택 통지 → 대상 셀(m_combo_active)의 바인딩 인덱스 갱신 + on_change.
+LRESULT CSCPropertyCtrl::on_message_CSCMenu(WPARAM wParam, LPARAM /*lParam*/)
+{
+	CSCMenuMessage* msg = reinterpret_cast<CSCMenuMessage*>(wParam);
+	if (msg == nullptr)
+		return 0;
+
+	if (msg->m_message == CSCMenu::message_scmenu_selchanged && m_combo_active && msg->m_menu_item)
+	{
+		const int idx = msg->m_menu_item->m_id - 1;	// id = 인덱스+1
+		if (m_combo_active->p_index && idx >= 0 && idx < static_cast<int>(m_combo_active->options.size()))
+		{
+			*m_combo_active->p_index = idx;
+			if (on_change)
+				on_change(m_combo_active->label);
+			Invalidate(FALSE);
+		}
+	}
+	else if (msg->m_message == CSCMenu::message_scmenu_hide)
+	{
+		m_combo_active = nullptr;	// 메뉴 닫힘 — dangling 방지
+	}
+	return 0;
 }
 
 // CSCStatic 값 변경 통지 → 어느 셀인지 찾아 바인딩 포인터에 되쓰고 on_change.
@@ -731,12 +773,16 @@ LRESULT CSCPropertyCtrl::on_message_CSCStatic(WPARAM wParam, LPARAM /*lParam*/)
 			if (c.p_real)
 				*c.p_real = static_cast<float>(_ttof(s));
 			break;
-		case field_type::color:
+		case field_type::color24:
+		case field_type::color32:
 			if (c.p_color)
 			{
-				int cr = 0, cg = 0, cb = 0;
-				if (_stscanf_s(s, _T("%d , %d , %d"), &cr, &cg, &cb) == 3)
-					*c.p_color = Gdiplus::Color(255,
+				// color32 → "R,G,B,A"(4값), color24 → "R,G,B"(3값, alpha 무시 → 불투명 255).
+				int cr = 0, cg = 0, cb = 0, ca = 255;
+				int n = _stscanf_s(s, _T("%d , %d , %d , %d"), &cr, &cg, &cb, &ca);
+				if (n == 3 || n == 4)
+					*c.p_color = Gdiplus::Color(
+						static_cast<BYTE>((n == 4) ? (std::max)(0, (std::min)(255, ca)) : 255),
 						static_cast<BYTE>((std::max)(0, (std::min)(255, cr))),
 						static_cast<BYTE>((std::max)(0, (std::min)(255, cg))),
 						static_cast<BYTE>((std::max)(0, (std::min)(255, cb))));

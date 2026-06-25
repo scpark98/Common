@@ -7818,8 +7818,6 @@ bool BrowseForFolder(HWND hwndOwner, TCHAR* lpszTitle, CString& strSelectedFolde
 	return bSuccess;
 }
 
-//윈도우 운영체제에서 특정 폴더(다운로드, 내 문서 등)의 실제 경로를 리턴한다.
-//FOLDERID_Downloads, FOLDERID_Documents, ...
 CString get_known_folder(KNOWNFOLDERID folderID)
 {
 	// SHGetKnownFolderPath는 Vista 이상에서만 shell32.dll에 존재한다.

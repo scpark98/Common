@@ -1480,6 +1480,7 @@ struct	NETWORK_INFO
 
 	//윈도우 운영체제에서 특정 폴더(다운로드, 내 문서 등)의 실제 경로를 리턴한다.
 	//FOLDERID_Downloads, FOLDERID_Documents, ...
+	//만약 download 폴더를 사용자가 다른 경로로 변경했어도 실제 그 경로를 리턴하도록 수정.
 	CString		get_known_folder(KNOWNFOLDERID folderID);
 	CString		get_known_folder(int csidl);
 

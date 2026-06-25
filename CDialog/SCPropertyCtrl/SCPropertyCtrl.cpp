@@ -56,11 +56,13 @@ bool CSCPropertyCtrl::create(CWnd* parent, int left, int top, int width, int hei
 
 	ModifyStyle(WS_CAPTION, 0);
 
-	m_font.CreateFont(-13, 0, 0, 0, FW_NORMAL, 0, 0, 0, DEFAULT_CHARSET,
-		OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY,
+	// 다크 배경에서 ClearType 서브픽셀은 색번짐(파랑/주황 가장자리)이 거슬리므로 ANTIALIASED_QUALITY(그레이스케일 AA)로 그린다.
+	// 세부 항목(m_font, -10)은 섹션 타이틀(m_font_bold, -12)보다 2px 작게 → Figma 속성창의 위계(타이틀 > 항목)와 동일.
+	m_font.CreateFont(-11, 0, 0, 0, FW_NORMAL, 0, 0, 0, DEFAULT_CHARSET,
+		OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY,
 		DEFAULT_PITCH | FF_DONTCARE, _T("Segoe UI"));
-	m_font_bold.CreateFont(-13, 0, 0, 0, FW_BOLD, 0, 0, 0, DEFAULT_CHARSET,
-		OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY,
+	m_font_bold.CreateFont(-12, 0, 0, 0, FW_BOLD, 0, 0, 0, DEFAULT_CHARSET,
+		OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, ANTIALIASED_QUALITY,
 		DEFAULT_PITCH | FF_DONTCARE, _T("Segoe UI"));
 
 	return true;
@@ -74,10 +76,13 @@ void CSCPropertyCtrl::set_color_theme(const CSCColorTheme& theme, bool invalidat
 			if (c.ctrl && c.ctrl->GetSafeHwnd())
 			{
 				c.ctrl->set_color_theme(m_theme, false);
-				// set_color_theme 가 색을 되돌리므로 다시 적용. 값 컨트롤은 모두 투명(박스/라벨은 패널이 그림).
-				c.ctrl->set_transparent(true, field_back_color());
+				// set_color_theme 가 색을 되돌리므로 비주얼 속성을 다시 적용. 값 필드(text/int/real/color)는
+				// 모두 컨트롤이 자기 라운드 박스+라벨+값(+swatch)을 그린다. (color 의 swatch 색은 m_cr_color_picker
+				// 에 따로 있어 set_color_theme 가 건드리지 않으므로 보존된다.)
 				c.ctrl->set_edit_text_color(m_theme.cr_text_selected);	// 값 / color RGB·alpha 텍스트 밝음
 				c.ctrl->set_edit_back_color(field_back_color());
+				c.ctrl->set_back_color(field_back_color());
+				c.ctrl->set_round(m_field_round, m_theme.cr_back, m_theme.cr_back);
 			}
 	if (invalidate && GetSafeHwnd())
 		Invalidate(FALSE);
@@ -227,28 +232,32 @@ void CSCPropertyCtrl::ensure_controls()
 			const bool is_color = (c.type == field_type::color24 || c.type == field_type::color32);
 
 			c.ctrl = std::make_shared<CSCStatic>();
-			// 박스와 라벨은 모두 패널이 그린다. CSCStatic 은 투명으로 두고 '값'만 박스 위에 얹는다.
-			// 이렇게 해야 라벨(패널)과 값(컨트롤)의 세로정렬·여백이 한 곳에서 통일된다.
-			//  - color : caption "_color picker_" → swatch + "R,G,B"(color24) / "R,G,B,A"(color32).
-			//  - 그 외 : caption=" "(공백). CSCStatic 은 caption 이 비면 값을 안 그리므로, 보이지 않는 공백을
-			//            caption 으로 줘 값(set_text_value)이 세로 가운데로 그려지게 한다.
-			const LPCTSTR caption = is_color ? _T("_color picker_") : _T(" ");
-			c.ctrl->create(caption, WS_CHILD | SS_NOTIFY, CRect(0, 0, 10, 10), this, id++);
+			// 셀 하나 = CSCStatic 하나(값 필드 text/int/real/color 모두 동일). UXStudio CPropertyDlg 의
+			// m_static_canvas_size_cx 와 동일 idiom — caption=라벨, use_edit 로 한 컨트롤이 라벨+값을 그리고
+			// (값은 라벨 우측), 값 클릭→CSCEdit. set_round 로 컨트롤이 자기 라운드 박스까지 직접 그림 → 패널 무관.
+			//  - color24/32 : set_as_color_picker(true) → 라벨 + swatch + "R,G,B"(24)/"R,G,B,A"(32) 까지 한 컨트롤이
+			//                 그림. swatch 클릭→CSCColorPicker, 값 클릭→편집. (CSCStatic 확장: swatch 색은 라벨색과
+			//                 분리된 m_cr_color_picker 에 저장 → 라벨과 색 충돌 없이 "Background ■ 0,0,0" 한 컨트롤.)
+			c.ctrl->create(static_cast<LPCTSTR>(c.label), WS_CHILD | SS_NOTIFY, CRect(0, 0, 10, 10), this, id++);
+			c.ctrl->SetFont(&m_font);	// 패널과 동일한 그레이스케일 AA 폰트(라벨/값 색번짐 방지 + 크기 통일)
 			c.ctrl->set_color_theme(m_theme, false);
-			c.ctrl->set_transparent(true, field_back_color());	// 패널이 그린 박스가 비쳐 보이게
-			c.ctrl->set_edit_text_color(m_theme.cr_text_selected);		// 값 / color 의 "R,G,B"·alpha 텍스트 밝게(읽히게)
+			c.ctrl->set_edit_text_color(m_theme.cr_text_selected);		// 값 / color 의 "R,G,B"·alpha 텍스트 밝게
 			c.ctrl->set_edit_back_color(field_back_color());
+			c.ctrl->set_back_color(field_back_color());					// 박스 채움(패널 배경보다 약간 밝게)
+			c.ctrl->set_round(m_field_round, m_theme.cr_back, m_theme.cr_back);	// 무테 라운드 박스(코너는 패널 배경색과 블렌드)
+			c.ctrl->set_prefix_space(2);								// 박스 안 라벨(prefix) 좌측 여백
+			c.ctrl->set_valign(DT_VCENTER);								// 라벨도 값과 같은 세로 가운데(기본 top → 라벨이 위로 떠 어긋남)
 
 			if (is_color)
 			{
+				c.ctrl->set_as_color_picker(true);						// 라벨 + swatch + "R,G,B[,A]" 를 한 컨트롤이 그림
 				c.ctrl->set_show_alpha(c.type == field_type::color32);	// color32 만 alpha 포함("R,G,B,A")
-				c.ctrl->set_use_edit(true);
+				c.ctrl->set_use_edit(true);								// swatch 클릭→CSCColorPicker, 값 클릭→편집
 			}
 			else
 			{
-				c.ctrl->set_use_edit(true, ES_LEFT);
+				c.ctrl->set_use_edit(true, ES_LEFT);					// 라벨+값. 값 영역 클릭→CSCEdit
 				c.ctrl->set_value_halign(DT_LEFT);
-				c.ctrl->set_label_width(2);					// 값을 값 영역 좌측에 거의 붙여 시작(공백 caption 보정)
 				if (c.type == field_type::integer || c.type == field_type::real)
 					c.ctrl->set_use_updown_key(true, c.type == field_type::real ? 0.1f : 1.0f);
 			}
@@ -312,11 +321,12 @@ Gdiplus::Color CSCPropertyCtrl::field_back_color() const
 	return get_color(m_theme.cr_back, 18);
 }
 
-// 박스 안 라벨(prefix)·값 색. Figma 측정값(side-by-side 캡처): 라벨/값 모두 ≈ (237,237,237) 거의 흰색.
-// cr_text(212)는 렌더 후 ~190 회색으로 보여 어두웠음 → 거의 흰색 슬롯 cr_text_selected(241)로 맞춤.
+// 라벨(prefix) 색 — 패널이 그리는 라벨(color/bool/combo/info)과 컨트롤이 그리는 라벨(text/int/real)을
+// 한 색으로 통일한다. 컨트롤 라벨은 m_theme.cr_text 로 그려지므로 패널도 cr_text 를 쓴다.
+// 값은 cr_text_selected(더 밝음)라 라벨<값 대비가 자연스럽게 생긴다(Figma 스타일).
 Gdiplus::Color CSCPropertyCtrl::field_label_color() const
 {
-	return m_theme.cr_text_selected;
+	return m_theme.cr_text;
 }
 
 int CSCPropertyCtrl::measure_label_width(const CString& text) const
@@ -341,12 +351,10 @@ void CSCPropertyCtrl::position_cell_ctrl(prop_cell& c)
 	if (!c.ctrl || !c.ctrl->GetSafeHwnd())
 		return;
 
-	// 박스/라벨은 패널이 그리므로 투명 컨트롤은 값 영역(라벨 다음)에만 둔다.
+	// 값 필드(text/int/real/color)는 컨트롤이 박스+라벨+값(+swatch)을 직접 그리므로 셀 전체를 덮는다.
 	CRect box = c.rect;
 	box.OffsetRect(0, -m_scroll_y);
 	box.DeflateRect(0, m_field_vmargin);
-	box.left  += c.label_w;
-	box.right -= m_field_round;	// 우측 라운드 코너를 투명 컨트롤이 사각으로 덮지 않게
 	c.ctrl->MoveWindow(box);
 	c.ctrl->ShowWindow(SW_SHOW);
 }
@@ -374,6 +382,10 @@ void CSCPropertyCtrl::layout_cells(prop_row& row)
 		const int cap = c.rect.Width() * m_label_ratio / 100;
 		const int measured = m_field_lpad + measure_label_width(c.label) + m_label_gap;
 		c.label_w = (n == 1) ? (std::min)(m_shared_label_w, cap) : (std::min)(measured, cap);
+
+		// 값 필드는 컨트롤이 라벨+값(또는 라벨+swatch+값)을 직접 그리므로 값/swatch 시작(=라벨 컬럼 폭)을 알려 정렬.
+		if (c.ctrl && c.ctrl->GetSafeHwnd())
+			c.ctrl->set_label_width(c.label_w);
 
 		position_cell_ctrl(c);
 	}
@@ -464,54 +476,54 @@ void CSCPropertyCtrl::toggle_section(int row_index)
 }
 
 // ── 그리기 ──────────────────────────────────────────────────────────────────
+// 삼각형은 Gdiplus 안티앨리어스로 그린다(GDI Polygon 은 계단현상). 색은 COLORREF→불투명 Gdiplus::Color.
 void CSCPropertyCtrl::draw_caret(CDC& dc, const CRect& box, bool expanded, COLORREF cr)
 {
 	const CPoint c = box.CenterPoint();
-	CPoint p[3];
+	Gdiplus::PointF p[3];
 	if (expanded)	// ▾ (아래)
 	{
-		p[0] = CPoint(c.x - 4, c.y - 2);
-		p[1] = CPoint(c.x + 4, c.y - 2);
-		p[2] = CPoint(c.x,     c.y + 3);
+		p[0] = Gdiplus::PointF(c.x - 4.f, c.y - 2.f);
+		p[1] = Gdiplus::PointF(c.x + 4.f, c.y - 2.f);
+		p[2] = Gdiplus::PointF((float)c.x, c.y + 3.f);
 	}
 	else			// ▸ (오른쪽)
 	{
-		p[0] = CPoint(c.x - 2, c.y - 4);
-		p[1] = CPoint(c.x - 2, c.y + 4);
-		p[2] = CPoint(c.x + 3, c.y);
+		p[0] = Gdiplus::PointF(c.x - 2.f, c.y - 4.f);
+		p[1] = Gdiplus::PointF(c.x - 2.f, c.y + 4.f);
+		p[2] = Gdiplus::PointF(c.x + 3.f, (float)c.y);
 	}
-	CBrush br(cr);
-	CPen pen(PS_SOLID, 1, cr);
-	CBrush* ob = dc.SelectObject(&br);
-	CPen* op = dc.SelectObject(&pen);
-	dc.Polygon(p, 3);
-	dc.SelectObject(ob);
-	dc.SelectObject(op);
+	Gdiplus::Graphics g(dc.GetSafeHdc());
+	g.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
+	Gdiplus::SolidBrush br(Gdiplus::Color(GetRValue(cr), GetGValue(cr), GetBValue(cr)));
+	g.FillPolygon(&br, p, 3);
 }
 
 void CSCPropertyCtrl::draw_tri_down(CDC& dc, const CRect& box, COLORREF cr)
 {
 	const CPoint c = box.CenterPoint();
-	CPoint p[3] = { CPoint(c.x - 4, c.y - 2), CPoint(c.x + 4, c.y - 2), CPoint(c.x, c.y + 3) };
-	CBrush br(cr);
-	CPen pen(PS_SOLID, 1, cr);
-	CBrush* ob = dc.SelectObject(&br);
-	CPen* op = dc.SelectObject(&pen);
-	dc.Polygon(p, 3);
-	dc.SelectObject(ob);
-	dc.SelectObject(op);
+	Gdiplus::PointF p[3] = {
+		Gdiplus::PointF(c.x - 4.f, c.y - 2.f),
+		Gdiplus::PointF(c.x + 4.f, c.y - 2.f),
+		Gdiplus::PointF((float)c.x, c.y + 3.f) };
+	Gdiplus::Graphics g(dc.GetSafeHdc());
+	g.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
+	Gdiplus::SolidBrush br(Gdiplus::Color(GetRValue(cr), GetGValue(cr), GetBValue(cr)));
+	g.FillPolygon(&br, p, 3);
 }
 
 void CSCPropertyCtrl::draw_section(CDC& dc, const prop_row& r, const CRect& rc)
 {
-	// 카테고리 헤더: 배경 밴드 없이 굵은 글씨. 위쪽 얇은 구분선으로 이전 항목과 분리.
-	dc.FillSolidRect(CRect(rc.left, rc.top, rc.right, rc.top + 1), m_theme.cr_border_inactive.ToCOLORREF());
+	// 카테고리 헤더: 배경 밴드 없이 굵은 글씨. 위 구분선은 좌우 m_pad 여백(= 필드 박스 left/right 와 정렬)으로 대칭.
+	dc.FillSolidRect(CRect(rc.left + m_pad, rc.top, rc.right - m_pad, rc.top + 1),
+		m_theme.cr_border_inactive.ToCOLORREF());
 
-	CRect caret(rc.left + m_pad, rc.top, rc.left + m_pad + 12, rc.bottom);
-	draw_caret(dc, caret, r.expanded, m_theme.cr_text.ToCOLORREF());
+	// 캐럿은 우측 끝(콤보 화살표와 동일 x), 제목은 왼쪽(필드 박스 left = m_pad 와 정렬)으로 당긴다.
+	CRect caret(rc.right - m_pad - 20, rc.top, rc.right - m_pad - 6, rc.bottom);
+	draw_caret(dc, caret, r.expanded, m_theme.cr_text_dim.ToCOLORREF());
 
 	CFont* old = dc.SelectObject(&m_font_bold);
-	CRect tr(caret.right + 6, rc.top, rc.right - m_pad, rc.bottom);
+	CRect tr(rc.left + m_pad, rc.top, caret.left - 4, rc.bottom);
 	dc.SetTextColor(m_theme.cr_text.ToCOLORREF());
 	dc.DrawText(r.section_title, tr, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
 	dc.SelectObject(old);
@@ -593,8 +605,11 @@ void CSCPropertyCtrl::OnPaint()
 			CRect cell_rc = c.rect;
 			cell_rc.OffsetRect(0, -m_scroll_y);
 
-			// 패널이 모든 셀의 라운드 박스(채움만, 테두리 없음) + 흐린 라벨을 그린다.
-			// 값: text/int/real/color 는 CSCStatic(투명)이 박스 위에 얹고, bool/combo/info 는 패널이 그린다.
+			// 값 필드(text/int/real/color)는 CSCStatic 이 박스+라벨+값(+swatch)을 직접 그리므로 패널은 관여하지 않는다.
+			if (prop_cell::uses_static(c.type))
+				continue;
+
+			// 나머지(bool/combo/info)는 패널이 라운드 박스(채움만, 테두리 없음) + 라벨 + 위젯/값을 그린다.
 			CRect box = cell_rc;
 			box.DeflateRect(0, m_field_vmargin);
 			draw_round_rect(&g, CRect_to_gpRect(box),

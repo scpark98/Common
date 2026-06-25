@@ -222,9 +222,16 @@ public:
 	//여러 항목을 같은 컬럼에 정렬하려면 동일 값으로 호출. value/edit 의 시작 위치가 일치한다.
 	void			set_label_width(int width) { m_label_width = width; Invalidate(); }
 
-	//color picker 모드 (m_text == "_color picker_") 에서 alpha 표시·편집 여부.
+	//color picker 모드에서 alpha 표시·편집 여부.
 	//true(=color32) → 값이 "R, G, B, A", false(=color24) → "R, G, B" (alpha 무시·불투명 취급).
 	void			set_show_alpha(bool show) { m_show_alpha = show; Invalidate(); }
+
+	//color picker 모드로 동작시킨다. true 면 라벨(있으면) 우측에 색상 swatch + "R,G,B[,A]" 값을 그리고
+	//swatch 클릭→CSCColorPicker, 값 클릭→직접 편집. caption "_color picker_" 로 줘도 자동 활성화된다(하위호환).
+	//라벨이 비어 있어도 swatch+값은 그려진다. swatch/값 색은 라벨색(m_theme.cr_text) 과 분리된 m_cr_color_picker
+	//에 저장하므로 라벨과 색이 충돌하지 않는다(= 한 컨트롤로 "Background ■ 0,0,0" 표현 가능).
+	void			set_as_color_picker(bool as = true);
+	bool			is_color_picker() const { return m_as_color_picker; }
 
 	//텍스트가 실제 출력되는 tight rect. plain/단락 모드 모두 정확. 너비만 필요하면 .Width().
 	CRect			get_text_rect() { return m_text_rect; }
@@ -243,7 +250,7 @@ public:
 	//글자색, 배경색 동시 설정
 	void			set_color(Gdiplus::Color cr_text, Gdiplus::Color cr_back);
 	void			set_text_color(Gdiplus::Color cr_text);
-	Gdiplus::Color	get_text_color() { return m_theme.cr_text; }
+	Gdiplus::Color	get_text_color() { return m_as_color_picker ? m_cr_color_picker : m_theme.cr_text; }
 	Gdiplus::Color	get_back_color() { return m_theme.cr_back; }
 	void			set_back_color(Gdiplus::Color cr_back);
 
@@ -467,6 +474,11 @@ protected:
 
 	//color picker 모드에서 alpha 를 값에 포함할지. true → "R,G,B,A"(color32), false → "R,G,B"(color24).
 	bool			m_show_alpha = true;
+
+	//color picker 모드 활성 플래그. (구) m_text=="_color picker_" 트리거를 대체. set_as_color_picker / 매직스트링으로 켜짐.
+	bool			m_as_color_picker = false;
+	//color picker 의 swatch/값 색. 라벨색(m_theme.cr_text) 과 분리 저장 → 라벨과 색이 충돌하지 않음.
+	Gdiplus::Color	m_cr_color_picker = Gdiplus::Color(255, 0, 0, 0);
 
 	LOGFONT			m_lf;
 	CFont			m_font;

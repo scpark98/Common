@@ -72,7 +72,9 @@ END_MESSAGE_MAP()
 BOOL CSCStatic::create(LPCTSTR lpszText, DWORD dwStyle, const RECT& rect, CWnd* pParentWnd, UINT nID)
 {
 	m_text = lpszText;
-	BOOL res = CStatic::Create(lpszText, dwStyle, rect, pParentWnd, nID);
+	//하위호환: caption "_color picker_" 로 생성하면 color picker 모드로 자동 전환(라벨 없음).
+	if (m_text == _T("_color picker_")) { m_as_color_picker = true; m_text.Empty(); }
+	BOOL res = CStatic::Create(m_text, dwStyle, rect, pParentWnd, nID);
 	reconstruct_font();
 
 	return res;
@@ -151,6 +153,9 @@ void CSCStatic::PreSubclassWindow()
 	//동적 생성시에는 이미 m_text에 들어가지만 정적 생성시에는 직접 얻어와야 한다.
 	if (m_text.IsEmpty())
 		CStatic::GetWindowText(m_text);
+
+	//하위호환: 리소스 캡션이 "_color picker_" 면 color picker 모드로 자동 전환(라벨 없음).
+	if (m_text == _T("_color picker_")) { m_as_color_picker = true; m_text.Empty(); }
 
 	//modified the style to avoid text overlap when press tab 
 	ModifyStyle(0, BS_ICON);
@@ -604,7 +609,8 @@ void CSCStatic::OnPaint()
 	{
 	}
 
-	if (!m_text.IsEmpty())
+	//color picker 모드는 라벨(m_text)이 비어 있어도 swatch+값을 그려야 하므로 게이트에 포함.
+	if (!m_text.IsEmpty() || m_as_color_picker)
 	{
 		if (IsWindowEnabled())
 		{
@@ -653,18 +659,24 @@ void CSCStatic::OnPaint()
 			//m_text_rect를 정확히 계산하기 위함도 있었으나 m_text_rect이 실제 텍스트가 출력되는 영역으로 세팅되는지는
 			//다시 확인이 필요하다.
 
-			//text가 "_color picker_"일 경우는 swatch + 값("R, G, B"=color24 / "R, G, B, A"=color32)으로 구성한다.
-			if (m_text == _T("_color picker_"))
+			//color picker 모드: [라벨(있으면)] + swatch + 값("R, G, B"=color24 / "R, G, B, A"=color32).
+			if (m_as_color_picker)
 			{
 				CRect rc_swatch, rc_text;
 				get_color_picker_layout(rc_swatch, rc_text);
 
-				Gdiplus::Color cr = m_theme.cr_text;
+				//라벨(있으면) — swatch 왼쪽 라벨 컬럼에 일반 라벨색(cr_text)으로. swatch/값과 세로 가운데 정렬.
+				if (!m_text.IsEmpty())
+				{
+					CRect lr(rc.left, rc.top, rc_swatch.left, rc.bottom);
+					dc.SetTextColor(m_theme.cr_text.ToCOLORREF());
+					dc.DrawText(sSpace + m_text, lr, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOCLIP);
+				}
+
 				//swatch 는 alpha=0 이어도 색상이 보여야 의미 있으므로 가시성용으로 alpha 강제 255.
+				Gdiplus::Color cr = m_cr_color_picker;
 				Gdiplus::Color cr_swatch(255, cr.GetR(), cr.GetG(), cr.GetB());
 				draw_round_rect(&g, CRect_to_gpRect(rc_swatch), Gdiplus::Color::Gray, cr_swatch, 1);
-				//get_text_rect().Width() 가 swatch 우측(=label 폭) 을 갖도록 유지.
-				m_text_rect.right = m_text_rect.left + rc_swatch.right;
 
 				//값 텍스트 — swatch 직후 좌측정렬. 편집 중이면 m_edit 가 보이므로 텍스트는 그리지 않는다.
 				if (m_edit.GetSafeHwnd() == NULL || !m_edit.IsWindowVisible())
@@ -764,6 +776,9 @@ CRect CSCStatic::set_text(CString text, Gdiplus::Color cr_text_color)
 	//텍스트·색상이 실제로 변했을 때만 Invalidate.
 	bool changed = (m_text != text);
 	m_text = text;
+
+	//하위호환: "_color picker_" 텍스트는 color picker 모드로 자동 전환(라벨 없음).
+	if (m_text == _T("_color picker_")) { m_as_color_picker = true; m_text.Empty(); }
 
 	//cr_text_color가 투명색이면 기본 글자색을 사용한다는 의미임
 	if (cr_text_color.GetValue() != Gdiplus::Color::Transparent)
@@ -909,15 +924,19 @@ void CSCStatic::get_color_picker_layout(CRect& rc_swatch, CRect& rc_text)
 	CRect rc;
 	GetClientRect(rc);
 
+	//라벨이 있으면 swatch 시작을 라벨 컬럼 우측으로 민다(다른 필드의 값 시작과 동일하게 m_label_width 기준).
+	//라벨이 없으면(예: UXStudio 의 별도 라벨 static) 기존처럼 좌측(4px)에서 시작.
+	const int left = rc.left + ((m_label_width > 0) ? m_label_width : 4);
+
 	int cy = rc.CenterPoint().y;
-	rc_swatch = CRect(4, cy - 6, 4 + 12, cy + 6);
+	rc_swatch = CRect(left, cy - 6, left + 12, cy + 6);
 	rc_text = CRect(rc_swatch.right + 8, rc.top, rc.right - 4, rc.bottom);
 }
 
 //color picker 모드의 값 문자열. m_show_alpha(=color32) 면 "R, G, B, A", 아니면(color24) "R, G, B".
 CString CSCStatic::format_color_text() const
 {
-	Gdiplus::Color c = m_theme.cr_text;
+	Gdiplus::Color c = m_cr_color_picker;
 	CString s;
 	if (m_show_alpha)
 		s.Format(_T("%d, %d, %d, %d"), c.GetR(), c.GetG(), c.GetB(), c.GetA());
@@ -992,7 +1011,7 @@ void CSCStatic::edit_end_color_text(bool valid)
 	//color24 는 alpha 무시 → 불투명(255). color32 는 명시된 alpha(4번째 값)를 쓰되, 생략 시 불투명(255).
 	//(RGB 만 주고 alpha 생략 시 0=투명으로 두면 "색을 줬는데 안 보임" 이라 황당 → 255 가 합당.)
 	BYTE alpha = (m_show_alpha && count >= 4) ? (BYTE)vals[3] : 255;
-	m_theme.cr_text = Gdiplus::Color(alpha, (BYTE)vals[0], (BYTE)vals[1], (BYTE)vals[2]);
+	m_cr_color_picker = Gdiplus::Color(alpha, (BYTE)vals[0], (BYTE)vals[1], (BYTE)vals[2]);
 
 	m_text_value = format_color_text();
 	CSCStaticMsg msg(CSCStaticMsg::msg_text_value_changed, this, m_text_value);
@@ -1575,9 +1594,21 @@ void CSCStatic::set_font_antialiased(bool bAntiAliased)
 void CSCStatic::set_text_color(Gdiplus::Color cr_text)
 {
 	if (cr_text.GetValue() != Gdiplus::Color::Transparent)
-		m_theme.cr_text = cr_text;
+	{
+		//color picker 모드면 swatch/값 색(m_cr_color_picker)을 바꾼다. 라벨색(m_theme.cr_text)과 분리.
+		if (m_as_color_picker)
+			m_cr_color_picker = cr_text;
+		else
+			m_theme.cr_text = cr_text;
+	}
 
 	update_surface();
+	Invalidate();
+}
+
+void CSCStatic::set_as_color_picker(bool as)
+{
+	m_as_color_picker = as;
 	Invalidate();
 }
 
@@ -1830,7 +1861,7 @@ void CSCStatic::OnLButtonDown(UINT nFlags, CPoint point)
 	}
 	else if (m_use_edit)
 	{
-		if (m_text == _T("_color picker_"))
+		if (m_as_color_picker)
 		{
 			CRect rc_swatch, rc_text;
 			get_color_picker_layout(rc_swatch, rc_text);
@@ -1838,14 +1869,14 @@ void CSCStatic::OnLButtonDown(UINT nFlags, CPoint point)
 			if (point.x < rc_swatch.right + 4)
 			{
 				//swatch 클릭 → CSCColorPicker(동적 생성).
-				BYTE prev_a = m_theme.cr_text.GetA();
+				BYTE prev_a = m_cr_color_picker.GetA();
 				CSCColorPicker picker;
-				if (picker.DoModal(this, m_theme.cr_text, _T("Color Picker")) != IDCANCEL)
+				if (picker.DoModal(this, m_cr_color_picker, _T("Color Picker")) != IDCANCEL)
 				{
 					Gdiplus::Color sel = picker.get_selected_color();
 					//color32 면 picker 의 alpha 반영, color24 면 alpha 무시 → 불투명(255).
 					BYTE a = m_show_alpha ? sel.GetA() : 255;
-					m_theme.cr_text = Gdiplus::Color(a, sel.GetR(), sel.GetG(), sel.GetB());
+					m_cr_color_picker = Gdiplus::Color(a, sel.GetR(), sel.GetG(), sel.GetB());
 					m_text_value = format_color_text();
 					Invalidate();
 					CSCStaticMsg msg(CSCStaticMsg::msg_text_value_changed, this, m_text_value);
@@ -1917,7 +1948,7 @@ LRESULT CSCStatic::on_message_CSCStaticEdit(WPARAM wParam, LPARAM /*lParam*/)
 	if (!msg->pThis->IsWindowVisible())
 		return 0;
 
-	bool is_color_picker = (m_text == _T("_color picker_"));
+	bool is_color_picker = m_as_color_picker;
 
 	switch (msg->message)
 	{

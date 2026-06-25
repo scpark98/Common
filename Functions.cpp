@@ -885,7 +885,7 @@ bool copy_to_clipboard(HWND hWnd, CString str)
 	WideCharToMultiByte(CP_ACP, 0, (CStringW)str, -1, pString, len, NULL, NULL);
 
 	// 저장할 문자열의 길이를 구한다. ('\0'까지 포함한 크기)
-	int string_length = strlen(pString) + 1;
+	int string_length = (int)(strlen(pString) + 1);
 
 	// 클립보드로 문자열을 복사하기 위하여 메모리를 할당한다. 
 	// 클립보드에는 핸들을 넣는 형식이라서 HeapAlloc 함수 사용이 블가능하다. 
@@ -3026,9 +3026,9 @@ bool ReadURLFile(LPCTSTR pUrl, CString &strBuffer)
 
 std::wstring multibyte2Unicode(std::string inputtext)
 {
-	int length = MultiByteToWideChar(CP_ACP, 0, &inputtext[0], inputtext.size(), NULL, NULL);
+	int length = MultiByteToWideChar(CP_ACP, 0, &inputtext[0], (int)inputtext.size(), NULL, NULL);
 	std::wstring outputtext(length + 1, 0);
-	MultiByteToWideChar(CP_ACP, 0, &inputtext[0], inputtext.size(), &outputtext[0], length);
+	MultiByteToWideChar(CP_ACP, 0, &inputtext[0], (int)inputtext.size(), &outputtext[0], length);
 	return outputtext;
 }
 
@@ -3297,8 +3297,8 @@ void request_url(CRequestUrlParams* params, bool check_server_reachable)
 	{
 		char* proxy_id = CString2char(params->proxy_id);
 		char* proxy_pw = CString2char(params->proxy_pw);
-		InternetSetOption(hOpenRequest, INTERNET_OPTION_PROXY_USERNAME, proxy_id, strlen(proxy_id));
-		InternetSetOption(hOpenRequest, INTERNET_OPTION_PROXY_PASSWORD, proxy_pw, strlen(proxy_pw));
+		InternetSetOption(hOpenRequest, INTERNET_OPTION_PROXY_USERNAME, proxy_id, (DWORD)strlen(proxy_id));
+		InternetSetOption(hOpenRequest, INTERNET_OPTION_PROXY_PASSWORD, proxy_pw, (DWORD)strlen(proxy_pw));
 		delete[] proxy_id;
 		delete[] proxy_pw;
 	}
@@ -3341,7 +3341,7 @@ void request_url(CRequestUrlParams* params, bool check_server_reachable)
 	if (strlen(jsonData) == 0)
 		res = HttpSendRequest(hOpenRequest, NULL, 0, 0, 0);
 	else
-		res = HttpSendRequest(hOpenRequest, NULL, 0, jsonData, strlen(jsonData));
+		res = HttpSendRequest(hOpenRequest, NULL, 0, jsonData, (DWORD)strlen(jsonData));
 #else
 	int char_str_len = WideCharToMultiByte(CP_UTF8, 0, CStringW(params->body), -1, NULL, 0, NULL, NULL);
 	char* jsonData = new char[char_str_len];
@@ -4128,7 +4128,7 @@ int get_registry_str_list(CWinApp* pApp, CString reg_path, std::deque<CString>& 
 		if (!item.IsEmpty())
 			dqlist.push_back(item);
 	}
-	return dqlist.size();
+	return (int)dqlist.size();
 }
 
 std::deque<CString> get_registry_subkeys(HKEY hKeyRoot, CString key_root)
@@ -4880,7 +4880,7 @@ void EncryptString(CString& ToCode, TCHAR* key)
 	//TCHAR key[] = "ai^j$l*m@u^"; // change this to be your key
 	// Take the supplied string and add subsequent letters of the key (in ascii value) to each letter
 	unsigned int j = 0;
-	int len = _tcslen(key);
+	int len = (int)_tcslen(key);
 
 	for(int i = 0; i < ToCode.GetLength(); i++)
 	{
@@ -5373,7 +5373,7 @@ int	getPrecision(double d, bool bExceptZero)
 
 	//12.305600
 	sprintf(str, "%f\0", d);
-	for (i = strlen(str) - 1; i >= 0; i--)
+	for (i = (int)(strlen(str) - 1); i >= 0; i--)
 	{
 		if (str[i] == '.')
 		{
@@ -5903,7 +5903,7 @@ int get_sub_folders(CString root, std::deque<CString>* list, bool special_folder
 	if (list)
 		list->assign(folders.begin(), folders.end());
 
-	return folders.size();
+	return (int)folders.size();
 }
 
 bool has_sub_folders(CString path)
@@ -6676,7 +6676,7 @@ int	delete_all_files(CString folder, CString name_filter, CString ext_filter, bo
 	for (int i = 0; i < files.size(); i++)
 		delete_file(files[i], trash_can);
 
-	return files.size();
+	return (int)files.size();
 }
 
 bool RecursiveCreateDirectory(LPCTSTR lpPathName, LPSECURITY_ATTRIBUTES lpsa/* = NULL*/)
@@ -6746,7 +6746,7 @@ bool DeleteFolder(LPCTSTR lpFolder)
     if (*lpFolder == '\0')
         return FALSE;
 
-    lpFolder_Len = _tcslen(lpFolder);
+    lpFolder_Len = (int)_tcslen(lpFolder);
     if(lpFolder[lpFolder_Len-1]=='\\')
     {
         _stprintf(temp1, _T("%s*.*"), lpFolder);
@@ -8337,7 +8337,7 @@ void get_bowl_rect_path(Gdiplus::GraphicsPath* path, Gdiplus::Rect r, float top_
 	path->CloseFigure();
 }
 
-Gdiplus::GraphicsPath* draw_round_rect(Gdiplus::Graphics* g, Gdiplus::Rect r, Gdiplus::Color cr_stroke, Gdiplus::Color cr_fill, int radius, int width)
+Gdiplus::GraphicsPath* draw_round_rect(Gdiplus::Graphics* g, Gdiplus::Rect r, Gdiplus::Color cr_stroke, Gdiplus::Color cr_fill, int radius, int width, Gdiplus::GraphicsPath* path_out)
 {
 	// define the pen
 	Gdiplus::Pen pen(cr_stroke, width);
@@ -8346,30 +8346,32 @@ Gdiplus::GraphicsPath* draw_round_rect(Gdiplus::Graphics* g, Gdiplus::Rect r, Gd
 	//PenAlignmentCenter로 하고 DrawPath()를 하면 stroke가 빗나가는 현상이 발생한다.
 	pen.SetAlignment(Gdiplus::PenAlignmentInset);
 
-	// get the corner path
-	Gdiplus::GraphicsPath path;
-
 	if (radius < 0)
 		radius = r.Height / 2;
+
+	//호출자가 path_out 을 주면 그 버퍼에 path 를 만들어 돌려준다(없으면 지역 path 에만). 지역 path 의 주소는
+	//절대 반환하지 않는다(과거 &local 반환 = dangling, C4172). 반환값 = path_out(없으면 nullptr).
+	Gdiplus::GraphicsPath local;
+	Gdiplus::GraphicsPath* path = path_out ? path_out : &local;
+	path->Reset();
 
 	//stroke 가 실제로 그려질 때만 path 를 stroke 폭만큼 inset (그래야 stroke 가 r 안에 들어옴).
 	//stroke 가 안 그려지는 경우(width<=0 또는 cr_stroke alpha=0)엔 inset 없이 r 전체에 fill.
 	const int stroke_thick = (width > 0 && cr_stroke.GetAlpha() > 0) ? width : 0;
-	get_round_rect_path(&path, r, (float)radius, stroke_thick);
+	get_round_rect_path(path, r, (float)radius, stroke_thick);
 
 	//fill the round rect
-	g->FillPath(&br, &path);
-
-	if (width <= 0)
-		return &path;
+	g->FillPath(&br, path);
 
 	// draw the round rect
-	g->DrawPath(&pen, &path);
-	return &path;
+	if (width > 0)
+		g->DrawPath(&pen, path);
+
+	return path_out;
 }
 
 //코너별 radius 버전. lt 가 기준 — rt/rb/lb 가 음수(-1)면 lt 와 동일, 0이면 직각, >0이면 그 코너 radius.
-Gdiplus::GraphicsPath* draw_round_rect(Gdiplus::Graphics* g, Gdiplus::Rect r, Gdiplus::Color cr_stroke, Gdiplus::Color cr_fill, int lt, int rt, int rb, int lb, int width)
+Gdiplus::GraphicsPath* draw_round_rect(Gdiplus::Graphics* g, Gdiplus::Rect r, Gdiplus::Color cr_stroke, Gdiplus::Color cr_fill, int lt, int rt, int rb, int lb, int width, Gdiplus::GraphicsPath* path_out)
 {
 	Gdiplus::Pen pen(cr_stroke, width);
 	Gdiplus::SolidBrush br(cr_fill);
@@ -8382,18 +8384,21 @@ Gdiplus::GraphicsPath* draw_round_rect(Gdiplus::Graphics* g, Gdiplus::Rect r, Gd
 	if (rb < 0)	rb = lt;
 	if (lb < 0)	lb = lt;
 
+	//호출자가 path_out 을 주면 그 버퍼에 path 를 만들어 돌려준다(없으면 지역 path 에만). 지역 주소는 반환 안 함(C4172).
+	Gdiplus::GraphicsPath local;
+	Gdiplus::GraphicsPath* path = path_out ? path_out : &local;
+	path->Reset();
+
 	//stroke 가 실제로 그려질 때만 path 를 stroke 폭만큼 inset (단일 radius 버전과 동일 규칙).
 	const int stroke_thick = (width > 0 && cr_stroke.GetAlpha() > 0) ? width : 0;
-	Gdiplus::GraphicsPath path;
-	get_round_rect_path(&path, r, (float)lt, (float)rt, (float)rb, (float)lb, stroke_thick);
+	get_round_rect_path(path, r, (float)lt, (float)rt, (float)rb, (float)lb, stroke_thick);
 
-	g->FillPath(&br, &path);
+	g->FillPath(&br, path);
 
-	if (width <= 0)
-		return &path;
+	if (width > 0)
+		g->DrawPath(&pen, path);
 
-	g->DrawPath(&pen, &path);
-	return &path;
+	return path_out;
 }
 
 void draw_check_box(Gdiplus::Graphics* g, Gdiplus::Rect box, int check_state, Gdiplus::Color cr_border, Gdiplus::Color cr_back, Gdiplus::Color cr_check, int radius, int border_width, float check_thick)
@@ -8743,7 +8748,7 @@ bool show_property_window(std::deque<CString> fullpath)
 
 	// 4. PIDL 배열을 이용하여 IShellItemArray 생성
 	IShellItemArray* psia = nullptr;
-	hr = SHCreateShellItemArrayFromIDLists(fullpath.size(), (LPCITEMIDLIST*)pidl, &psia);
+	hr = SHCreateShellItemArrayFromIDLists((UINT)fullpath.size(), (LPCITEMIDLIST*)pidl, &psia);
 	if (FAILED(hr) || !psia)
 	{
 		AfxMessageBox(_T("SHCreateShellItemArrayFromIDLists 실패"));
@@ -9064,10 +9069,10 @@ CString UTF8toCString(char* pszCode)
 	char* pszAnsi;
 	int     nLength;
 	// Get nLength of the Wide Char buffer
-	nLength = MultiByteToWideChar(CP_UTF8, 0, pszCode, strlen(pszCode) + 1, NULL, NULL);
+	nLength = MultiByteToWideChar(CP_UTF8, 0, pszCode, (int)(strlen(pszCode) + 1), NULL, NULL);
 	bstrWide = SysAllocStringLen(NULL, nLength);
 	// Change UTF-8 to Unicode (UTF-16)
-	MultiByteToWideChar(CP_UTF8, 0, pszCode, strlen(pszCode) + 1, bstrWide, nLength);
+	MultiByteToWideChar(CP_UTF8, 0, pszCode, (int)(strlen(pszCode) + 1), bstrWide, nLength);
 	// Get nLength of the multi byte buffer
 	nLength = WideCharToMultiByte(CP_ACP, 0, bstrWide, -1, NULL, 0, NULL, NULL);
 	pszAnsi = new char[nLength];
@@ -9088,10 +9093,10 @@ char* UTF8toANSI(char* pszCode)
 	char* pszAnsi;
 	int     nLength;
 	// Get nLength of the Wide Char buffer
-	nLength = MultiByteToWideChar(CP_UTF8, 0, pszCode, strlen(pszCode) + 1, NULL, NULL);
+	nLength = MultiByteToWideChar(CP_UTF8, 0, pszCode, (int)(strlen(pszCode) + 1), NULL, NULL);
 	bstrWide = SysAllocStringLen(NULL, nLength);
 	// Change UTF-8 to Unicode (UTF-16)
-	MultiByteToWideChar(CP_UTF8, 0, pszCode, strlen(pszCode) + 1, bstrWide, nLength);
+	MultiByteToWideChar(CP_UTF8, 0, pszCode, (int)(strlen(pszCode) + 1), bstrWide, nLength);
 	// Get nLength of the multi byte buffer
 	nLength = WideCharToMultiByte(CP_ACP, 0, bstrWide, -1, NULL, 0, NULL, NULL);
 	pszAnsi = new char[nLength];
@@ -9107,9 +9112,9 @@ char* ANSItoUTF8(char* pszCode)
 	BSTR bstrCode;
 	char* pszUTFCode = NULL;
 	int  nLength, nLength2;
-	nLength = MultiByteToWideChar(CP_ACP, 0, pszCode, strlen(pszCode), NULL, NULL);
+	nLength = MultiByteToWideChar(CP_ACP, 0, pszCode, (int)strlen(pszCode), NULL, NULL);
 	bstrCode = SysAllocStringLen(NULL, nLength);
-	MultiByteToWideChar(CP_ACP, 0, pszCode, strlen(pszCode), bstrCode, nLength);
+	MultiByteToWideChar(CP_ACP, 0, pszCode, (int)strlen(pszCode), bstrCode, nLength);
 	nLength2 = WideCharToMultiByte(CP_UTF8, 0, bstrCode, -1, pszUTFCode, 0, NULL, NULL);
 	pszUTFCode = new char[nLength2 + 1];
 	ZeroMemory(pszUTFCode, nLength2 + 1);
@@ -9961,14 +9966,14 @@ int get_token_str(CString src, std::deque<CString> &dqToken, CString separator, 
 				dqToken[nMaxToken - 1] += (separator + src);
 			}
 
-			return dqToken.size();
+			return (int)dqToken.size();
 		}
 
 		if (pos < 0)
 			break;
 	}
 
-	return dqToken.size();
+	return (int)dqToken.size();
 }
 
 
@@ -10064,7 +10069,7 @@ int get_exact_token_str(CString src, std::deque<CString>& dqToken, CString separ
 		}
 	}
 
-	return dqToken.size();
+	return (int)dqToken.size();
 }
 
 //"<b><cr=red>This</b></cr> is a <i>sample</i> <b>paragraph</b>."
@@ -10211,7 +10216,7 @@ int	get_map_str(CString src, std::map<CString, CString>& map, CString lfrf, CStr
 		map.insert(std::pair<CString, CString>(dqToken[0], dqToken[1]));
 	}
 
-	return map.size();
+	return (int)map.size();
 }
 
 //dq항목을 하나의 문자열로 합쳐준다.
@@ -11693,7 +11698,7 @@ CString char2CString(char* cstr, int length)
 	TCHAR* buf;
 
 	if (length < 0)
-		len = MultiByteToWideChar(CP_ACP, 0, cstr, strlen(cstr), NULL, NULL);
+		len = MultiByteToWideChar(CP_ACP, 0, cstr, (int)strlen(cstr), NULL, NULL);
 	else
 		len = length;
 
@@ -11714,12 +11719,12 @@ TCHAR* char2TCHAR(char* str)
 {
 	TCHAR* tszStr = NULL;
 #if defined(UNICODE) || defined(_UNICODE)
-	int nLen = strlen(str) + 1;
+	int nLen = (int)(strlen(str) + 1);
 	tszStr = new TCHAR[nLen];
 	memset(tszStr, 0x00, nLen * sizeof(TCHAR));
 	MultiByteToWideChar(CP_ACP, 0, str, -1, tszStr, nLen * sizeof(TCHAR));
 #else
-	int nLen = strlen(str) + 1;
+	int nLen = (int)(strlen(str) + 1);
 	tszStr = new TCHAR[nLen];
 	memset(tszStr, 0x00, nLen * sizeof(TCHAR));
 	_tcscpy(tszStr, str);
@@ -11749,7 +11754,7 @@ char* TCHAR2char(TCHAR* str)
 	memset(szStr, 0x00, nSize);
 	WideCharToMultiByte(CP_ACP, 0, str, -1, szStr, nSize, NULL, NULL);
 #else
-	int nLen = strlen(str) + 1;
+	int nLen = (int)(strlen(str) + 1);
 	szStr = new char[nLen];
 	memset(szStr, 0x00, nLen);
 	strcpy(szStr, str);
@@ -15127,7 +15132,7 @@ void gradient_rect(CDC* pDC, CRect &rect, std::deque<Gdiplus::Color> dqColor, bo
 	double x1 = rect.left;
 	double y1 = rect.top;
 	double x2, y2;
-	int size = dqColor.size();
+	int size = (int)dqColor.size();
 	double divide;
 	TRIVERTEX rcVertex[2];
 	//std::deque<COLORREF>::iterator it;
@@ -15533,7 +15538,7 @@ CRect get_max_rect(CPoint *pt, int nPoints)
 //pt_max
 CRect get_max_rect(std::vector<CPoint> pts, int pt_max /*= -1*/)
 {
-	int max_pt = pts.size();
+	int max_pt = (int)pts.size();
 	CRect	rMax(INT_MAX, INT_MAX, -1, -1);
 
 	if (pt_max > 0)
@@ -15700,7 +15705,7 @@ CString	truncate(CString &src, CString sub)
 void Trim(char* src)
 {
 	int		i, idx = 0;
-	int		len = strlen(src);
+	int		len = (int)strlen(src);
 	char*	temp = new char[len + 1];
 	
 	strcpy(temp, src);
@@ -21366,7 +21371,7 @@ bool HttpUploadFile(CString url, CString filepath, int chatIndex)
 	}
 
 	// 파일 경로에서 파일 이름을 가져온다.
-	int iLen = wcslen(pszFilePath);
+	int iLen = (int)wcslen(pszFilePath);
 	WCHAR* pszFileName = NULL;
 	for (int i = iLen - 1; i >= 0; --i)
 	{
@@ -21437,7 +21442,7 @@ bool HttpUploadFile(CString url, CString filepath, int chatIndex)
 
 				while (1)
 				{
-					iLen = fread(szBuf, 1, sizeof(szBuf), fd);
+					iLen = (int)fread(szBuf, 1, sizeof(szBuf), fd);
 					if (iLen <= 0) break;
 					strBody.append(szBuf, iLen);
 				}
@@ -21451,10 +21456,10 @@ bool HttpUploadFile(CString url, CString filepath, int chatIndex)
 				try
 				{
 					// HTTP 요청 header 를 전송한다.
-					pclsHttpFile->SendRequestEx(strBody.length(), HSR_SYNC | HSR_INITIATE);
+					pclsHttpFile->SendRequestEx((DWORD)strBody.length(), HSR_SYNC | HSR_INITIATE);
 
 					// HTTP 요청 body 를 전송한다.
-					pclsHttpFile->Write(strBody.c_str(), strBody.length());
+					pclsHttpFile->Write(strBody.c_str(), (UINT)strBody.length());
 					pclsHttpFile->EndRequest(HSR_SYNC);
 
 					// HTTP 응답 body 를 수신한다.
@@ -21625,7 +21630,7 @@ bool HttpDownloadFile(CString url, CString local_path)
 	}
 
 	// 파일 경로에서 파일 이름을 가져온다.
-	int iLen = wcslen(pszFilePath);
+	int iLen = (int)wcslen(pszFilePath);
 	WCHAR* pszFileName = NULL;
 	for (int i = iLen - 1; i >= 0; --i)
 	{

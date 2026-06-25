@@ -2411,13 +2411,14 @@ h		: 복사할 height 크기(pixel)
 	void		get_round_rect_path(Gdiplus::GraphicsPath* path, Gdiplus::Rect r, float radius, int stroke_thick = 1);
 	void		get_bowl_rect_path(Gdiplus::GraphicsPath* path, Gdiplus::Rect r, float top_radius, float bottom_radius = -1.0f);
 	//radius = -1이면 height/2크기로 설정되고 이는 양 끝이 둥근 운동장 트랙 모양으로 그려진다.
-	Gdiplus::GraphicsPath* draw_round_rect(Gdiplus::Graphics* g, Gdiplus::Rect r, Gdiplus::Color cr_stroke, Gdiplus::Color cr_fill, int radius = -1, int width = 1);
+	//path_out 을 주면 만들어진 round-rect path 를 그 버퍼에 채워 반환한다(반환값 = path_out, 없으면 nullptr). 지역 path 주소는 반환하지 않는다(과거 dangling 버그 = C4172 수정).
+	Gdiplus::GraphicsPath* draw_round_rect(Gdiplus::Graphics* g, Gdiplus::Rect r, Gdiplus::Color cr_stroke, Gdiplus::Color cr_fill, int radius = -1, int width = 1, Gdiplus::GraphicsPath* path_out = nullptr);
 
 	//코너별 radius 지정 버전. lt(top-left)가 기준. rt/rb/lb 값이 -1(음수)이면 lt 와 동일, 0이면 직각, >0이면 그 코너 radius.
 	//rt/rb/lb 를 C++ default 로 두지 않고 *필수* 로 받는 이유: 위 단일 radius 오버로드와 인자 개수가 겹쳐 호출이 모호해지기 때문. -1 을 sentinel 로 넘긴다.
 	//(lt 자체가 음수면 기존 단일 radius 규칙대로 height/2 = 운동장 트랙.)
 	void		get_round_rect_path(Gdiplus::GraphicsPath* path, Gdiplus::Rect r, float lt, float rt, float rb, float lb, int stroke_thick = 1);
-	Gdiplus::GraphicsPath* draw_round_rect(Gdiplus::Graphics* g, Gdiplus::Rect r, Gdiplus::Color cr_stroke, Gdiplus::Color cr_fill, int lt, int rt, int rb, int lb, int width = 1);
+	Gdiplus::GraphicsPath* draw_round_rect(Gdiplus::Graphics* g, Gdiplus::Rect r, Gdiplus::Color cr_stroke, Gdiplus::Color cr_fill, int lt, int rt, int rb, int lb, int width = 1, Gdiplus::GraphicsPath* path_out = nullptr);
 
 	//체크박스(둥근 사각 박스 + ✓ 또는 indeterminate 사각) 공용 그리기. tree / list / GdiButton 등 모든 컨트롤이 동일한 모양을 쓰도록 통합.
 	//box        : 박스 사각 (offset / deflate 등 호출측 보정이 끝난 최종 rect).

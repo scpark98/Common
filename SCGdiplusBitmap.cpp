@@ -313,7 +313,7 @@ bool CSCGdiplusBitmap::load(CString file)
 
 		if (status == Gdiplus::Ok)
 		{
-			for (int i = 0; i < num_properties; i++)
+			for (int i = 0; i < (int)num_properties; i++)
 			{
 				UINT size = 0;
 				char tstr[255] = { 0, };
@@ -3473,7 +3473,7 @@ bool CSCGdiplusBitmap::save_gif_frames(CString folder)
 
 	for (size_t i = 0; i < m_frame_count; i++)
 	{
-		m_pBitmap->SelectActiveFrame(&pageGuid, i);
+		m_pBitmap->SelectActiveFrame(&pageGuid, (UINT)i);
 		savef(_T("%s\\%s_%04d.png"), folder, get_part(m_filename, fn_name), i);
 	}
 
@@ -3508,7 +3508,7 @@ void CSCGdiplusBitmap::get_gif_frames(std::vector<Gdiplus::Bitmap*>& dqBitmap, s
 
 	for (size_t i = 0; i < m_frame_count; i++)
 	{
-		m_pBitmap->SelectActiveFrame(&pageGuid, i);
+		m_pBitmap->SelectActiveFrame(&pageGuid, (UINT)i);
 		Gdiplus::Bitmap* img = new Gdiplus::Bitmap(width, height, PixelFormat32bppARGB);
 		Gdiplus::Graphics g(img);
 		g.DrawImage(m_pBitmap, 0, 0, width, height);

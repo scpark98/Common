@@ -198,7 +198,9 @@ INT_PTR CWin32InputBox::InputBoxEx(WIN32INPUTBOX_PARAM *param)
 	if (param->DlgTemplateName != 0)
 	{
 		HMODULE hModule = (HMODULE)param->hInstance;
-		HRSRC rcDlg = ::FindResource(hModule, MAKEINTRESOURCE(param->DlgTemplateName), RT_DIALOG);
+		//DlgTemplateName 은 이미 LPCTSTR — FindResource 가 문자열 이름/MAKEINTRESOURCE(ordinal) 를 그대로 받는다.
+		//다시 MAKEINTRESOURCE 로 감싸면 (WORD) 캐스트로 문자열 포인터가 잘려(C4302) 문자열 리소스명 caller 가 깨진다.
+		HRSRC rcDlg = ::FindResource(hModule, param->DlgTemplateName, RT_DIALOG);
 		if (rcDlg == NULL)
 			return 0;
 

@@ -359,7 +359,7 @@ bool Json::array_to_map(CString src, std::string arr_name, std::vector<std::map<
 
 	rapidjson::Value& arr_pair = doc[arr_name];
 
-	for (int i = 0; i < arr_pair.Size(); i++)
+	for (int i = 0; i < (int)arr_pair.Size(); i++)
 	{
 		std::map<CString, CString> m;
 

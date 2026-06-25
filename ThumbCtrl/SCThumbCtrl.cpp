@@ -40,7 +40,7 @@ void CSCThumbCtrl::release_thumb(int index)
 {
 	int i;
 	int start = 0;
-	int end = m_thumb.size();
+	int end = (int)m_thumb.size();
 
 	if (index >= (int)m_thumb.size())
 	{
@@ -1247,7 +1247,7 @@ int CSCThumbCtrl::get_selected_items(std::deque<int>* dqSelected)
 		dqSelected->clear();
 		dqSelected->assign(m_selected.begin(), m_selected.end());
 	}
-	return m_selected.size();
+	return (int)m_selected.size();
 }
 
 //index = -1 : 전체선택
@@ -1610,7 +1610,7 @@ void CSCThumbCtrl::on_key_down(int key)
 	}
 	else if (key == VK_END && selected < m_thumb.size() - 1)
 	{
-		selected = m_thumb.size() - 1;
+		selected = (int)(m_thumb.size() - 1);
 	}
 	else if (key == VK_PRIOR && selected >= m_per_line * 3)
 	{
@@ -1911,7 +1911,7 @@ void CSCThumbCtrl::remove_selected(bool refresh)
 	//if (res == 0)
 	//	return;
 
-	for (i = m_selected.size() - 1; i >= 0; i--)
+	for (i = (int)(m_selected.size() - 1); i >= 0; i--)
 	{
 		remove(m_selected[i], false);
 	}

@@ -138,7 +138,7 @@ public:
 
 	std::deque<CString> m_files;
 	std::deque<CThumbImage> m_thumb;
-	int				size() { return m_thumb.size(); }
+	int				size() { return (int)m_thumb.size(); }
 	CSCGdiplusBitmap*	get_img(int index);
 
 

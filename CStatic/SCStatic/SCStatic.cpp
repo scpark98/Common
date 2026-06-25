@@ -732,7 +732,8 @@ void CSCStatic::OnPaint()
 					rvalue.left += (m_label_width > 0 ? m_label_width : m_text_rect.Width() + 8);
 
 					//edit이 rc.right - 2까지이고 edit 자체의 내부 margin까지 고려하여 총 4만큼 빼줘야만 right align이 위치 변경없이 표현된다.
-					rvalue.right -= 4;
+					//m_value_right_space 는 추가 우측 여백(편집 박스에도 동일 적용 → 정렬 유지).
+					rvalue.right -= (4 + m_value_right_space);
 					dc.SetTextColor(m_theme.cr_edit_text.ToCOLORREF());
 					dc.DrawText(m_text_value, rvalue, m_value_halign | DT_VCENTER | DT_SINGLELINE | DT_NOCLIP);
 				}
@@ -881,7 +882,7 @@ void CSCStatic::edit_begin()
 	//이 여백값을 변경하면 OnPaint()에서 value text를 출력시키는 위치 또한 보정해줘야 한다.
 	int edit_left = m_label_width > 0 ? m_label_width
 		: (m_edit_width <= 0 ? m_text_rect.Width() + 8 : m_edit_width);
-	CRect r(edit_left, 3, rc.right - 2, rc.bottom - 2);
+	CRect r(edit_left, 3, rc.right - 2 - m_value_right_space, rc.bottom - 2);
 	m_edit.MoveWindow(r);
 
 	//value 가로 정렬(m_value_halign, DT_LEFT|DT_CENTER|DT_RIGHT)을 edit 에 그대로 반영(CSCStaticEdit 는 DT_ 정렬을 직접 사용).

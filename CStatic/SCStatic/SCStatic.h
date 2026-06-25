@@ -337,6 +337,9 @@ public:
 
 	//static의 맨 앞에 nSpace 개수만큼의 공백을 추가하여 출력한다.(= left margin)
 	void			set_prefix_space(int nSpace = 1) { m_nPrefixSpace = nSpace; Invalidate(); }
+	//use_edit 값(특히 우측정렬)의 우측 여백(px). 정적 표시(OnPaint)와 편집 박스(edit_begin) 양쪽에
+	//동일하게 적용되어, 값이 박스 우측에 너무 붙지 않게 하면서 편집 전후 정렬이 유지된다.
+	void			set_value_right_space(int n = 0) { m_value_right_space = n; Invalidate(); }
 
 	void			set_margin(int l, int t, int r, int b) { set_margin(CRect(l, t, r, b)); }
 	void			set_margin(CRect margin);
@@ -461,6 +464,7 @@ protected:
 	Gdiplus::Color	m_cr_link = Gdiplus::Color::RoyalBlue;
 
 	int				m_nPrefixSpace;
+	int				m_value_right_space = 0;	// use_edit 값의 우측 여백(px) — 정적/편집 공통
 	CSCGdiplusBitmap	m_img_back;
 
 	int				m_halign = -1;

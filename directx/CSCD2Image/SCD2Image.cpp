@@ -930,7 +930,7 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 
 		bool save_img_for_debug = false;
 
-		for (int i = 0; i < frame_count; i++)
+		for (int i = 0; i < (int)frame_count; i++)
 		{
 			int transparentIndex = -1;
 
@@ -1431,11 +1431,11 @@ void CSCD2Image::blur_effect(float dev)
 
 void CSCD2Image::convert_PBGRA_to_RGBA(byte* pixels, int width, int height, int stride)
 {
-	for (UINT y = 0; y < height; ++y)
+	for (int y = 0; y < height; ++y)
 	{
 		BYTE* row = pixels + y * stride;
 
-		for (UINT x = 0; x < width; ++x)
+		for (int x = 0; x < width; ++x)
 		{
 			BYTE* px = row + x * 4;
 
@@ -1462,11 +1462,11 @@ void CSCD2Image::convert_PBGRA_to_RGBA(byte* pixels, int width, int height, int 
 // un-premultiply만 수행, 채널 순서(BGRA)는 유지
 void CSCD2Image::convert_PBGRA_to_BGRA(byte* pixels, int width, int height, int stride)
 {
-	for (UINT y = 0; y < height; ++y)
+	for (int y = 0; y < height; ++y)
 	{
 		BYTE* row = pixels + y * stride;
 
-		for (UINT x = 0; x < width; ++x)
+		for (int x = 0; x < width; ++x)
 		{
 			BYTE* px = row + x * 4;
 			BYTE a = px[3];
@@ -2202,7 +2202,7 @@ int CSCD2Image::goto_frame(int index, bool pause)
 	if (pause)
 	{
 		m_ani_thread.pause();
-		CSCD2ImageMessage msg(this, message_frame_changed, m_frame_index, m_img.size());
+		CSCD2ImageMessage msg(this, message_frame_changed, m_frame_index, (int)m_img.size());
 		::SendMessage(m_parent, Message_CSCD2Image, (WPARAM)&msg, 0);
 	}
 
@@ -2222,13 +2222,13 @@ void CSCD2Image::step(int interval)
 
 	//범위는 순환처리한다.
 	if (m_frame_index < 0)
-		m_frame_index = m_img.size() - 1;
+		m_frame_index = (int)m_img.size() - 1;
 	if (m_frame_index >= (int)m_img.size())
 		m_frame_index = 0;
 
 	m_img_origin_for_back_transparency.Reset();
 
-	CSCD2ImageMessage msg(this, message_frame_changed, m_frame_index, m_img.size());
+	CSCD2ImageMessage msg(this, message_frame_changed, m_frame_index, (int)m_img.size());
 	::SendMessage(m_parent, Message_CSCD2Image, (WPARAM)&msg, 0);
 }
 
@@ -2288,7 +2288,7 @@ void CSCD2Image::thread_animation(CSCThread& th)
 	long t0;
 	long t1;
 
-	CSCD2ImageMessage msg(this, message_frame_changed, m_frame_index, m_img.size());
+	CSCD2ImageMessage msg(this, message_frame_changed, m_frame_index, (int)m_img.size());
 
 	while (!th.stop_requested())// m_run_thread_animation)
 	{

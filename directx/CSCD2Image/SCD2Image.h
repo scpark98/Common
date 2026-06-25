@@ -261,7 +261,7 @@ public:
 //animated image
 	bool					is_animated_image() { return (m_img.size() > 1); }
 	int						get_cur_frame_index() { return m_frame_index; }
-	int						get_frame_count() { return m_img.size(); }
+	int						get_frame_count() { return (int)m_img.size(); }
 	int						get_frame_delay(int index);
 	void					set_parent(HWND hWnd) { m_parent = hWnd; }
 	void					play();

@@ -1833,7 +1833,7 @@ int CSCSliderCtrl::get_near_bookmark(int pos, bool forward)
 
 	//맨 마지막 북마크보다 큰 위치에서 backward를 누른 경우
 	if ((m_bookmark.size() >= 1) && (pos >= m_bookmark[m_bookmark.size() - 1].pos))
-		return m_bookmark.size() - 1;
+		return (int)(m_bookmark.size() - 1);
 
 	return index;
 }

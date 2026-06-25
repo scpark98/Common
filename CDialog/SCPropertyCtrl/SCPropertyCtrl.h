@@ -167,7 +167,8 @@ protected:
 
 	void	draw_section(CDC& dc, const prop_row& r, const CRect& rc);
 	void	draw_cell_label(CDC& dc, const prop_cell& c, const CRect& cell_rc);	// 라벨 컬럼(패널이 직접 그림)
-	void	draw_widget(CDC& dc, const prop_cell& c, const CRect& cell_rc);		// bool/combo 위젯(값 컬럼)
+	void	draw_widget(CDC& dc, const prop_cell& c, const CRect& cell_rc);		// combo 위젯(값 컬럼)
+	void	draw_bool  (CDC& dc, const prop_cell& c, const CRect& cell_rc);		// bool 셀(라벨 넓게 + 체크박스 우측)
 	static void draw_caret(CDC& dc, const CRect& box, bool expanded, COLORREF cr);
 	static void draw_tri_down(CDC& dc, const CRect& box, COLORREF cr);
 

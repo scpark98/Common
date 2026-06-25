@@ -277,10 +277,15 @@ void CSCPropertyCtrl::ensure_controls()
 			}
 			else
 			{
-				c.ctrl->set_use_edit(true, ES_LEFT);					// 라벨+값. 값 영역 클릭→CSCEdit
-				c.ctrl->set_value_halign(DT_LEFT);
-				if (c.type == field_type::integer || c.type == field_type::real)
+				const bool is_number = (c.type == field_type::integer || c.type == field_type::real);
+				// 숫자(int/real)는 값/편집을 우측정렬, 텍스트는 좌측정렬.
+				c.ctrl->set_use_edit(true, is_number ? ES_RIGHT : ES_LEFT);	// 라벨+값. 값 영역 클릭→CSCEdit
+				c.ctrl->set_value_halign(is_number ? DT_RIGHT : DT_LEFT);
+				if (is_number)
+				{
+					c.ctrl->set_value_right_space(m_field_lpad - 4);	// 값 우측 여백 8px(내장 4 + 4) = 좌측 prefix 와 대칭
 					c.ctrl->set_use_updown_key(true, c.type == field_type::real ? 0.1f : 1.0f);
+				}
 			}
 
 			sync_value(c);
@@ -600,35 +605,39 @@ void CSCPropertyCtrl::draw_cell_label(CDC& dc, const prop_cell& c, const CRect& 
 
 void CSCPropertyCtrl::draw_widget(CDC& dc, const prop_cell& c, const CRect& cell_rc)
 {
-	// 값은 라벨 컬럼 다음(=text 필드 값과 같은 x)에서 시작. 우측은 화살표 여백만 남긴다.
+	// combo 위젯(값 컬럼). bool 은 draw_bool 에서 별도 처리(라벨을 체크박스 직전까지 넓게 쓰기 위해).
 	CRect vr = cell_value_rect(cell_rc, c.label_w);
 	vr.right -= 6;
 	dc.SetTextColor(m_theme.cr_text.ToCOLORREF());
 
-	if (c.type == field_type::boolean)
+	CRect ar(vr.right - 14, vr.top, vr.right, vr.bottom);
+	draw_tri_down(dc, ar, m_theme.cr_text_dim.ToCOLORREF());
+	CString s;
+	if (c.p_index && *c.p_index >= 0 && *c.p_index < static_cast<int>(c.options.size()))
+		s = c.options[*c.p_index];
+	CRect tr(vr.left, vr.top, ar.left - 4, vr.bottom);
+	dc.DrawText(s, tr, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
+}
+
+// bool 셀: 체크박스를 셀 우측(여백 m_field_lpad)에 그리고, 라벨은 label_w 에 갇히지 않고 체크박스
+// 직전까지 넓게 그린다(2-cell 배치에서 label_w 가 작아 라벨이 "..." 로 일찍 잘리던 문제 해결).
+void CSCPropertyCtrl::draw_bool(CDC& dc, const prop_cell& c, const CRect& cell_rc)
+{
+	const bool v = c.p_bool && *c.p_bool;
+	const int cyc = cell_rc.CenterPoint().y;
+	CRect bx(cell_rc.right - m_field_lpad - 16, cyc - 8, cell_rc.right - m_field_lpad, cyc + 8);	// 우측 여백 = 좌측 prefix 와 대칭
+	dc.FillSolidRect(bx, (v ? m_theme.cr_back_selected : m_theme.cr_back_alternate).ToCOLORREF());
+	dc.Draw3dRect(bx, m_theme.cr_border_inactive.ToCOLORREF(), m_theme.cr_border_inactive.ToCOLORREF());
+	if (v)
 	{
-		const bool v = c.p_bool && *c.p_bool;
-		const int cyc = vr.CenterPoint().y;
-		CRect bx(vr.left, cyc - 8, vr.left + 16, cyc + 8);
-		dc.FillSolidRect(bx, (v ? m_theme.cr_back_selected : m_theme.cr_back_alternate).ToCOLORREF());
-		dc.Draw3dRect(bx, m_theme.cr_border_inactive.ToCOLORREF(), m_theme.cr_border_inactive.ToCOLORREF());
-		if (v)
-		{
-			CRect t(bx);
-			t.DeflateRect(4, 4);
-			dc.FillSolidRect(t, m_theme.cr_text.ToCOLORREF());
-		}
+		CRect t(bx);
+		t.DeflateRect(4, 4);
+		dc.FillSolidRect(t, m_theme.cr_text.ToCOLORREF());
 	}
-	else if (c.type == field_type::combo)
-	{
-		CRect ar(vr.right - 14, vr.top, vr.right, vr.bottom);
-		draw_tri_down(dc, ar, m_theme.cr_text_dim.ToCOLORREF());
-		CString s;
-		if (c.p_index && *c.p_index >= 0 && *c.p_index < static_cast<int>(c.options.size()))
-			s = c.options[*c.p_index];
-		CRect tr(vr.left, vr.top, ar.left - 4, vr.bottom);
-		dc.DrawText(s, tr, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
-	}
+
+	CRect lr(cell_rc.left + m_field_lpad, cell_rc.top, bx.left - m_label_gap, cell_rc.bottom);
+	dc.SetTextColor(field_label_color().ToCOLORREF());
+	dc.DrawText(c.label, lr, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
 }
 
 void CSCPropertyCtrl::OnPaint()
@@ -675,17 +684,22 @@ void CSCPropertyCtrl::OnPaint()
 			box.DeflateRect(0, m_field_vmargin);
 			draw_round_rect(&g, CRect_to_gpRect(box),
 				Gdiplus::Color::Transparent, field_back_color(), m_field_round, 0);
-			draw_cell_label(dc, c, cell_rc);
 
-			if (c.type == field_type::boolean || c.type == field_type::combo)
+			if (c.type == field_type::boolean)
 			{
-				draw_widget(dc, c, cell_rc);
+				draw_bool(dc, c, cell_rc);	// 라벨(넓게) + 체크박스(우측) 자체 처리
 			}
-			else if (c.type == field_type::info)
+			else
 			{
-				CRect vr = cell_value_rect(cell_rc, c.label_w);
-				dc.SetTextColor(m_theme.cr_text.ToCOLORREF());
-				dc.DrawText(c.info_text, vr, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
+				draw_cell_label(dc, c, cell_rc);
+				if (c.type == field_type::combo)
+					draw_widget(dc, c, cell_rc);
+				else if (c.type == field_type::info)
+				{
+					CRect vr = cell_value_rect(cell_rc, c.label_w);
+					dc.SetTextColor(m_theme.cr_text.ToCOLORREF());
+					dc.DrawText(c.info_text, vr, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
+				}
 			}
 		}
 	}
@@ -702,7 +716,12 @@ void CSCPropertyCtrl::OnSize(UINT nType, int cx, int cy)
 {
 	CDialogEx::OnSize(nType, cx, cy);
 	layout();
-	Invalidate(FALSE);
+	// 패널 + 모든 자식 값 필드를 매 resize 마다 즉시 동기 repaint → 항목 left/값이 윈도우 이동과 같은
+	// 프레임에 갱신되어 끊김/lag 없이 따라온다.
+	// (CS_HREDRAW 미사용 의도적 — 전체 full repaint 가 무거워 스플리터가 함께 resize 하는 가운데 view 를
+	//  끊기게 했다. 그 대신 우측 끝에 미세한 BitBlt 잔떨림이 남지만, 3자(가운데·left·right) 트레이드오프에서
+	//  가운데·left 완벽 + 우측 미세 떨림이 가장 견딜 만한 조합이라 이 쪽을 택함.)
+	RedrawWindow(NULL, NULL, RDW_INVALIDATE | RDW_UPDATENOW | RDW_ALLCHILDREN);
 }
 
 BOOL CSCPropertyCtrl::OnMouseWheel(UINT /*nFlags*/, short zDelta, CPoint /*pt*/)

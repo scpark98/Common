@@ -2106,7 +2106,7 @@ void CSCMenu::OnPaint()
 			//sub button: 컨텐츠 좌표는 m_r 에 저장 (hit test용), 그리기는 view 좌표.
 			CRect r_content = m_items[i]->m_r;
 			CRect r_view = view_r;
-			for (int j = m_items[i]->m_buttons.size() - 1; j >= 0; j--)
+			for (int j = (int)(m_items[i]->m_buttons.size() - 1); j >= 0; j--)
 			{
 				int btn_w = m_items[i]->m_buttons[j]->m_r.Width();
 				r_content.right -= 6;

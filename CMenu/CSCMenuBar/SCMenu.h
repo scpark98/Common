@@ -262,7 +262,7 @@ public:
 	//모니터 영역을 벗어나지 않도록 보정한 후 표시해야 한다.
 	void			popup_menu(int x, int y);
 	CSCMenuItem*	get_menu_item(int menu_id);
-	int				get_menu_count() { return m_items.size(); }
+	int				get_menu_count() { return (int)m_items.size(); }
 	//모든 항목 destroy. 동적 메뉴 (북마크 / 최근 파일 등) 를 popup 마다 rebuild 할 때 사용.
 	void			clear();
 	//특정 menu_id 항목 1개 제거. 첫 매칭만 제거. resource load 후 일부 항목 위치를 옮기고 싶을 때 사용

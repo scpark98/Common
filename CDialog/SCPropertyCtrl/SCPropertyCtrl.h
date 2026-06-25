@@ -2,6 +2,7 @@
 
 #include <afxwin.h>
 #include <afxdialogex.h>	// CDialogEx
+#include <afxcmn.h>			// CToolTipCtrl (bool/combo/info 셀 label 툴팁)
 #include <vector>
 #include <memory>
 #include <functional>
@@ -62,6 +63,7 @@ public:
 	void add_color32(const CString& label, Gdiplus::Color* value);	// R,G,B,A
 	void add_combo(const CString& label, int* index, const std::vector<CString>& options);
 	void add_info (const CString& label, const CString& text);	// 읽기 전용
+	void set_tooltip(const CString& text);	// 직전 add_*() 셀에 설명 툴팁(hover) 연결
 	void end();												// 자식 컨트롤 생성 + 레이아웃 + 다시 그림
 
 	void refresh();	// 외부에서 바인딩 값이 바뀐 경우 자식 컨트롤 표시 동기화 + 다시 그림
@@ -86,6 +88,7 @@ protected:
 		int*			p_index = nullptr;
 		std::vector<CString> options;
 		CString			info_text;
+		CString			tooltip;				// 항목 설명(hover). text/int/real/color=자식 CSCStatic 내장 툴팁, bool/combo/info=패널이 label 에 띄움.
 		int				label_w = 0;			// layout() 에서 계산된 라벨 컬럼 폭(측정 기반)
 		CRect			rect;					// 셀 전체 영역(스크롤 적용 전, 패널 좌표)
 		std::shared_ptr<CSCStatic> ctrl;		// 값 컬럼 자식(uses_static 셀만)
@@ -119,6 +122,11 @@ protected:
 	// combo 드롭다운 — 다크 테마 CSCMenu 팝업(네이티브 CMenu 대신). 선택은 Message_CSCMenu 로 async 통지.
 	CSCMenu					m_combo_menu;
 	prop_cell*				m_combo_active = nullptr;	// 현재 열린 combo 메뉴의 대상 셀(통지 처리용)
+
+	// bool/combo/info 셀은 값 컬럼을 호스팅하는 자식 컨트롤이 없어 패널이 직접 툴팁을 띄운다(label 영역에 rect 툴).
+	// text/int/real/color 는 자식 CSCStatic 의 내장 툴팁(set_tooltip_text)이 처리하므로 여기 대상이 아니다.
+	CToolTipCtrl			m_tooltip;
+	UINT					m_tip_tool_count = 0;	// 직전 layout 에서 등록한 rect 툴 개수(스크롤/리레이아웃마다 통째 재구성)
 
 	int		m_scroll_y  = 0;	// 세로 스크롤 오프셋(px). (TODO: CSCScrollbar 연결)
 	int		m_content_h = 0;	// 전체 콘텐츠 높이
@@ -155,6 +163,7 @@ protected:
 	int		hit_test_row(CPoint pt) const;	// 행 인덱스(-1=없음). pt=클라이언트 좌표
 	void	toggle_section(int row_index);
 	void	open_combo_menu(prop_cell& c);	// combo 셀 클릭 → 다크 CSCMenu 팝업(옵션 항목 + 현재 선택 radio)
+	void	rebuild_widget_tooltips();		// bool/combo/info 셀 label 영역에 설명 툴팁(rect 툴) 재등록
 
 	void	draw_section(CDC& dc, const prop_row& r, const CRect& rc);
 	void	draw_cell_label(CDC& dc, const prop_cell& c, const CRect& cell_rc);	// 라벨 컬럼(패널이 직접 그림)
@@ -166,6 +175,7 @@ protected:
 	// 편집 중 Esc 는 CSCStatic 내부 edit 이 먼저 처리하므로 여기 빈 override 로 닫힘만 막는다.
 	virtual void OnOK();
 	virtual void OnCancel();
+	virtual BOOL PreTranslateMessage(MSG* pMsg);	// 패널 툴팁(bool/combo/info) hover relay
 
 	DECLARE_MESSAGE_MAP()
 	afx_msg void OnPaint();

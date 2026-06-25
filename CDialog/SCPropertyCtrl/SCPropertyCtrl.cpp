@@ -22,6 +22,14 @@ CSCPropertyCtrl::~CSCPropertyCtrl()
 void CSCPropertyCtrl::OnOK()     {}
 void CSCPropertyCtrl::OnCancel() {}
 
+// bool/combo/info 셀 label 위 hover 를 패널 툴팁으로 relay(수동 relay 라 EnableToolTips 불필요).
+BOOL CSCPropertyCtrl::PreTranslateMessage(MSG* pMsg)
+{
+	if (m_tooltip.GetSafeHwnd())
+		m_tooltip.RelayEvent(pMsg);
+	return CDialogEx::PreTranslateMessage(pMsg);
+}
+
 BEGIN_MESSAGE_MAP(CSCPropertyCtrl, CDialogEx)
 	ON_WM_PAINT()
 	ON_WM_ERASEBKGND()
@@ -182,6 +190,19 @@ void CSCPropertyCtrl::add_info(const CString& label, const CString& text)
 	add_cell(field_type::info, label).info_text = text;
 }
 
+// 직전 add_*() 로 추가된 셀에 설명 툴팁을 단다. text/int/real/color 는 자식 CSCStatic 의 내장 툴팁,
+// bool/combo/info 는 자식이 없어 패널이 label 영역에 띄운다(rebuild_widget_tooltips).
+void CSCPropertyCtrl::set_tooltip(const CString& text)
+{
+	for (auto it = m_rows.rbegin(); it != m_rows.rend(); ++it)
+	{
+		if (it->is_section || it->cells.empty())
+			continue;
+		it->cells.back().tooltip = text;
+		return;
+	}
+}
+
 void CSCPropertyCtrl::end()
 {
 	ensure_controls();
@@ -263,6 +284,9 @@ void CSCPropertyCtrl::ensure_controls()
 			}
 
 			sync_value(c);
+
+			if (!c.tooltip.IsEmpty())
+				c.ctrl->set_tooltip_text(c.tooltip);	// 자식 CSCStatic 내장 툴팁(SS_NOTIFY 보유 → hover relay)
 		}
 	}
 }
@@ -443,6 +467,43 @@ void CSCPropertyCtrl::layout()
 
 	m_content_h = y;
 	clamp_scroll();
+	rebuild_widget_tooltips();
+}
+
+// bool/combo/info 셀(값 컬럼 자식 없음)의 label 영역에 설명 툴팁을 rect 툴로 (재)등록한다.
+// 스크롤/리레이아웃마다 on-screen rect 가 바뀌므로 매 layout 끝에서 통째로 재구성한다.
+void CSCPropertyCtrl::rebuild_widget_tooltips()
+{
+	if (!GetSafeHwnd())
+		return;
+	if (m_tooltip.GetSafeHwnd() == NULL)
+	{
+		m_tooltip.Create(this, TTS_ALWAYSTIP | TTS_NOPREFIX);
+		m_tooltip.SetMaxTipWidth(280);
+		m_tooltip.Activate(TRUE);
+	}
+
+	for (UINT i = 1; i <= m_tip_tool_count; ++i)	// 직전에 등록한 rect 툴 제거
+		m_tooltip.DelTool(this, i);
+	m_tip_tool_count = 0;
+
+	UINT id = 1;
+	for (const prop_row& row : m_rows)
+	{
+		if (row.is_section || !row.visible)
+			continue;
+		for (const prop_cell& c : row.cells)
+		{
+			// text/int/real/color 는 자식 CSCStatic 이 자체 툴팁 처리 → 제외. bool/combo/info 만 label 영역에.
+			if (prop_cell::uses_static(c.type) || c.tooltip.IsEmpty())
+				continue;
+			CRect lr(c.rect.left + m_field_lpad, c.rect.top, c.rect.left + c.label_w, c.rect.bottom);
+			lr.OffsetRect(0, -m_scroll_y);
+			m_tooltip.AddTool(this, c.tooltip, lr, id);
+			++id;
+		}
+	}
+	m_tip_tool_count = id - 1;
 }
 
 void CSCPropertyCtrl::clamp_scroll()

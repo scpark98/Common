@@ -1660,7 +1660,7 @@ void CSCStatic::set_gradient_color(int idx, Gdiplus::Color crGradient)
 
 	if (idx >= m_crGradient.size())
 	{
-		int loop = idx -  m_crGradient.size() + 1;
+		int loop = (int)(idx -  m_crGradient.size() + 1);
 		for (int i = 0; i < loop; i++)
 			m_crGradient.push_back(crGradient);
 	}
@@ -1697,7 +1697,7 @@ void CSCStatic::insert_gradient_color(int idx, Gdiplus::Color crGradient)
 
 	if (idx >= m_crGradient.size())
 	{
-		int loop = idx -  m_crGradient.size();
+		int loop = (int)(idx -  m_crGradient.size());
 		for (int i = 0; i < loop; i++)
 			m_crGradient.push_back(crGradient);
 	}

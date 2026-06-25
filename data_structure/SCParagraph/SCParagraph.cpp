@@ -1225,7 +1225,7 @@ CRect CSCParagraph::draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCPar
 	{
 		//각 항목을 출력하되 뒤에서부터 출력시킨다.
 		//이는 italic인 경우 다음 항목에 의해 일부 가려지는 현상을 방지하기 위함이다.
-		for (j = para[i].size() - 1; j >= 0; j--)
+		for (j = (int)(para[i].size() - 1); j >= 0; j--)
 		{
 #ifdef USING_HDC
 			pOldFont = select_paragraph_font(pDC, para, i, j, lf, &font);

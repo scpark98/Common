@@ -155,52 +155,70 @@ CSCPropertyCtrl::prop_cell& CSCPropertyCtrl::add_cell(field_type type, const CSt
 	return m_rows.back().cells.back();
 }
 
-void CSCPropertyCtrl::add_text(const CString& label, CString* value)
+void CSCPropertyCtrl::add_text(CString* value, const CString& label, const CString& tooltip)
 {
-	add_cell(field_type::text, label).p_text = value;
+	prop_cell& c = add_cell(field_type::text, label); c.p_text = value; c.tooltip = tooltip;
 }
-void CSCPropertyCtrl::add_int(const CString& label, int* value)
+void CSCPropertyCtrl::add_int(int* value, const CString& label, const CString& tooltip)
 {
-	add_cell(field_type::integer, label).p_int = value;
+	prop_cell& c = add_cell(field_type::integer, label); c.p_int = value; c.tooltip = tooltip;
 }
-void CSCPropertyCtrl::add_real(const CString& label, float* value)
+void CSCPropertyCtrl::add_real(float* value, const CString& label, const CString& tooltip)
 {
-	add_cell(field_type::real, label).p_real = value;
+	prop_cell& c = add_cell(field_type::real, label); c.p_real = value; c.tooltip = tooltip;
 }
-void CSCPropertyCtrl::add_bool(const CString& label, bool* value)
+void CSCPropertyCtrl::add_bool(bool* value, const CString& label, const CString& tooltip)
 {
-	add_cell(field_type::boolean, label).p_bool = value;
+	prop_cell& c = add_cell(field_type::boolean, label); c.p_bool = value; c.tooltip = tooltip;
 }
-void CSCPropertyCtrl::add_color24(const CString& label, Gdiplus::Color* value)
+void CSCPropertyCtrl::add_color24(Gdiplus::Color* value, const CString& label, const CString& tooltip)
 {
-	add_cell(field_type::color24, label).p_color = value;
+	prop_cell& c = add_cell(field_type::color24, label); c.p_color = value; c.tooltip = tooltip;
 }
-void CSCPropertyCtrl::add_color32(const CString& label, Gdiplus::Color* value)
+void CSCPropertyCtrl::add_color32(Gdiplus::Color* value, const CString& label, const CString& tooltip)
 {
-	add_cell(field_type::color32, label).p_color = value;
+	prop_cell& c = add_cell(field_type::color32, label); c.p_color = value; c.tooltip = tooltip;
 }
-void CSCPropertyCtrl::add_combo(const CString& label, int* index, const std::vector<CString>& options)
+void CSCPropertyCtrl::add_combo(int* index, const CString& label, const std::vector<CString>& options, const CString& tooltip)
 {
 	prop_cell& c = add_cell(field_type::combo, label);
 	c.p_index = index;
 	c.options = options;
+	c.tooltip = tooltip;
 }
-void CSCPropertyCtrl::add_info(const CString& label, const CString& text)
+void CSCPropertyCtrl::add_info(const CString& label, const CString& text, const CString& tooltip)
 {
-	add_cell(field_type::info, label).info_text = text;
+	prop_cell& c = add_cell(field_type::info, label); c.info_text = text; c.tooltip = tooltip;
 }
 
-// 직전 add_*() 로 추가된 셀에 설명 툴팁을 단다. text/int/real/color 는 자식 CSCStatic 의 내장 툴팁,
-// bool/combo/info 는 자식이 없어 패널이 label 영역에 띄운다(rebuild_widget_tooltips).
-void CSCPropertyCtrl::set_tooltip(const CString& text)
+CSCPropertyCtrl::prop_cell* CSCPropertyCtrl::find_cell_by_binding(const void* p)
 {
-	for (auto it = m_rows.rbegin(); it != m_rows.rend(); ++it)
+	for (prop_row& row : m_rows)
 	{
-		if (it->is_section || it->cells.empty())
+		if (row.is_section)
 			continue;
-		it->cells.back().tooltip = text;
-		return;
+		for (prop_cell& c : row.cells)
+		{
+			if ((const void*)c.p_text == p || (const void*)c.p_int == p || (const void*)c.p_real == p
+				|| (const void*)c.p_bool == p || (const void*)c.p_color == p || (const void*)c.p_index == p)
+				return &c;
+		}
 	}
+	return nullptr;
+}
+
+// 바인딩한 값 포인터로 셀을 지정해 툴팁을 설정/변경/제거(공백)한다. end() 이후라면 즉시 반영한다.
+// text/int/real/color 는 자식 CSCStatic 내장 툴팁, bool/combo/info 는 패널이 label 영역에 띄운다.
+void CSCPropertyCtrl::set_tooltip(const void* value, const CString& tooltip)
+{
+	prop_cell* pc = find_cell_by_binding(value);
+	if (!pc)
+		return;
+	pc->tooltip = tooltip;
+	if (pc->ctrl)							// 자식 CSCStatic 보유(text/int/real/color) → 내장 툴팁 갱신
+		pc->ctrl->set_tooltip_text(tooltip);
+	else if (GetSafeHwnd())					// bool/combo/info → 패널 rect 툴 재구성(공백이면 등록 제외됨)
+		rebuild_widget_tooltips();
 }
 
 void CSCPropertyCtrl::end()
@@ -724,8 +742,36 @@ void CSCPropertyCtrl::OnSize(UINT nType, int cx, int cy)
 	RedrawWindow(NULL, NULL, RDW_INVALIDATE | RDW_UPDATENOW | RDW_ALLCHILDREN);
 }
 
-BOOL CSCPropertyCtrl::OnMouseWheel(UINT /*nFlags*/, short zDelta, CPoint /*pt*/)
+BOOL CSCPropertyCtrl::OnMouseWheel(UINT /*nFlags*/, short zDelta, CPoint pt)
 {
+	// 커서가 콤보 값 영역 위면 패널 스크롤 대신 항목을 바꾼다(CSCMenu 기반이라 기본 콤보의 휠 선택이 없으므로 보완).
+	// pt 는 스크린 좌표 → 클라이언트로 변환 후 hit-test.
+	CPoint cp = pt;
+	ScreenToClient(&cp);
+	const int i = hit_test_row(cp);
+	if (i >= 0 && !m_rows[i].is_section)
+	{
+		const CPoint hit(cp.x, cp.y + m_scroll_y);	// 스크롤 보정(셀 rect 는 스크롤 적용 전 좌표)
+		for (prop_cell& c : m_rows[i].cells)
+		{
+			if (c.type != field_type::combo || !c.p_index || c.options.empty())
+				continue;
+			if (!cell_value_rect(c.rect, c.label_w).PtInRect(hit))
+				continue;
+			const int n = static_cast<int>(c.options.size());
+			int idx = *c.p_index + (zDelta > 0 ? -1 : 1);	// 위로 굴림=이전 항목, 아래=다음 항목
+			idx = (std::max)(0, (std::min)(n - 1, idx));	// 양 끝에서 멈춤(wrap 안 함, 기본 콤보와 동일)
+			if (idx != *c.p_index)
+			{
+				*c.p_index = idx;
+				if (on_change)
+					on_change(c.label);
+				Invalidate(FALSE);
+			}
+			return TRUE;	// 콤보에서 소비 — 패널 스크롤로 흘리지 않음
+		}
+	}
+
 	const int step = m_row_h * 3;
 	m_scroll_y -= zDelta * step / WHEEL_DELTA;
 	clamp_scroll();

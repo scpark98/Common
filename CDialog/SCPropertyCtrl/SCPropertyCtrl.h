@@ -55,15 +55,17 @@ public:
 	void begin_row();										// 이후 add_*() 들이 한 라인을 균등 분할해 공유
 	void end_row();											// 라인 공유 종료(이후 add 는 다시 1셀 1라인)
 
-	void add_text (const CString& label, CString* value);
-	void add_int  (const CString& label, int* value);
-	void add_real (const CString& label, float* value);
-	void add_bool (const CString& label, bool* value);
-	void add_color24(const CString& label, Gdiplus::Color* value);	// R,G,B (alpha 무시·항상 불투명)
-	void add_color32(const CString& label, Gdiplus::Color* value);	// R,G,B,A
-	void add_combo(const CString& label, int* index, const std::vector<CString>& options);
-	void add_info (const CString& label, const CString& text);	// 읽기 전용
-	void set_tooltip(const CString& text);	// 직전 add_*() 셀에 설명 툴팁(hover) 연결
+	// 인자 순서: 값 포인터 → 레이블 → 툴팁(선택). 툴팁은 나중에 set_tooltip(값 포인터, ...) 으로 변경/제거 가능.
+	void add_text (CString* value, const CString& label, const CString& tooltip = _T(""));
+	void add_int  (int* value, const CString& label, const CString& tooltip = _T(""));
+	void add_real (float* value, const CString& label, const CString& tooltip = _T(""));
+	void add_bool (bool* value, const CString& label, const CString& tooltip = _T(""));
+	void add_color24(Gdiplus::Color* value, const CString& label, const CString& tooltip = _T(""));	// R,G,B (alpha 무시·항상 불투명)
+	void add_color32(Gdiplus::Color* value, const CString& label, const CString& tooltip = _T(""));	// R,G,B,A
+	void add_combo(int* index, const CString& label, const std::vector<CString>& options, const CString& tooltip = _T(""));
+	void add_info (const CString& label, const CString& text, const CString& tooltip = _T(""));	// 읽기 전용(바인딩 포인터 없음 → label 만 키)
+	// 바인딩한 값 포인터로 셀을 지정해 툴팁을 바꾼다. tooltip 이 공백이면 툴팁 제거. end() 이후에도 즉시 반영.
+	void set_tooltip(const void* value, const CString& tooltip = _T(""));
 	void end();												// 자식 컨트롤 생성 + 레이아웃 + 다시 그림
 
 	void refresh();	// 외부에서 바인딩 값이 바뀐 경우 자식 컨트롤 표시 동기화 + 다시 그림
@@ -156,6 +158,7 @@ protected:
 	int		measure_label_width(const CString& text) const;	// 라벨 텍스트 픽셀 폭(m_font 기준)
 	CRect	cell_value_rect(const CRect& cell_rc, int label_w) const;	// 셀 안 값 컬럼(라벨 컬럼 제외)
 	prop_cell* find_cell_by_ctrl(const CWnd* pCtrl);
+	prop_cell* find_cell_by_binding(const void* p);	// 바인딩한 값 포인터로 셀 검색(set_tooltip 용)
 
 	void	layout();			// y 커서 누적 → 각 행 rect + 셀 분할/배치 + m_content_h
 	void	layout_cells(prop_row& row);	// 라인 셀들을 균등 분할 + 자식 배치

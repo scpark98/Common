@@ -1528,6 +1528,16 @@ void CSCStatic::SetFont(CFont* font, BOOL bRedraw)
 {
 	font->GetObject(sizeof(m_lf), &m_lf);
 	reconstruct_font();
+	// 내장 m_edit (CSCStaticEdit) 의 폰트 동기화. set_use_edit 최초 호출 시 한 번만 폰트 셋이라
+	// SetFont 후 m_edit 가 stale — set_edit_text_color/set_edit_back_color 와 동일한 패턴. 즉시 갱신.
+	if (m_edit.GetSafeHwnd())
+	{
+		m_edit.set_font_name(m_lf.lfFaceName);
+		m_edit.set_font_size(get_font_size_from_pixel_size(m_hWnd, m_lf.lfHeight));
+		m_edit.set_font_weight(m_lf.lfWeight);
+	}
+	if (bRedraw)
+		Invalidate();
 }
 
 void CSCStatic::set_font_name(const CString& strFont, BYTE byCharSet)

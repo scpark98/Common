@@ -707,7 +707,35 @@ void CSCStatic::OnPaint()
 			}
 			else
 			{
-				dc.DrawText(sSpace + m_text, m_text_rect, dwText);// | DT_WORDBREAK);
+				//라벨 그리기 영역의 우측 한계 결정 — set_label_auto_ellipsis(true) 로 opt-in 한 사용자만 적용.
+				//의도(opt-in 시): 값과 *실제로 충돌* 할 때만 ellipsis 발동. 값이 우측 정렬(숫자 셀)이고 값 폭이 짧으면 라벨이 m_label_width
+				//                 컬럼 경계를 넘어 값 직전까지 자유롭게 그려진다(컬럼 정렬보다 라벨 가독성 우선).
+				//                 라벨이 그 한계도 못 들어가면 비로소 ellipsis. 기본 사용자(opt-out)는 WORDBREAK 동작 유지 → 회귀 없음.
+				//DT_END_ELLIPSIS 발동 요건 — DT_SINGLELINE 명시 + DT_WORDBREAK 제거(충돌) + DT_NOCLIP 제거(영역 밖 그리기 허용 시 truncation 회피).
+				//기본 dwText 는 SS_ENDELLIPSIS 가 없으면 DT_WORDBREAK 가 자동 포함(line 406-410 매핑)되므로 위 셋업 필수.
+				CRect label_rect = m_text_rect;
+				DWORD label_flags = dwText;
+				if (m_label_auto_ellipsis && m_use_edit && !m_text_value.IsEmpty())
+				{
+					const int value_w = dc.GetTextExtent(m_text_value).cx;
+					int value_left;
+					if (m_value_halign == DT_RIGHT)
+						value_left = rc.right - (4 + m_value_right_space) - value_w;
+					else	//DT_LEFT / CENTER — 값이 m_label_width 부터 시작
+						value_left = (m_label_width > 0) ? m_label_width : m_text_rect.right;
+
+					const int label_gap = 4;	//라벨과 값 사이 최소 시각 간격
+					int label_right_limit = value_left - label_gap;
+					if (label_right_limit > m_text_rect.right)
+						label_right_limit = m_text_rect.right;
+
+					if (label_right_limit < label_rect.right)
+					{
+						label_rect.right = label_right_limit;
+						label_flags = (label_flags | DT_END_ELLIPSIS | DT_SINGLELINE) & ~(DT_NOCLIP | DT_WORDBREAK);
+					}
+				}
+				dc.DrawText(sSpace + m_text, label_rect, label_flags);// | DT_WORDBREAK);
 
 			//get_text_rect() 가 실제 그려진 텍스트 영역을 돌려주도록 m_text_rect 를 tight 하게 보정.
 			//szText 는 DT_CALCRECT 로 구한 실제 텍스트 크기. dwText 의 정렬 플래그대로 좌표를 산출하면
@@ -877,18 +905,46 @@ void CSCStatic::edit_begin()
 	CRect rc;
 	GetClientRect(rc);
 
-	//edit 의 left 결정 우선순위: m_label_width > m_edit_width > 자동(m_text_rect.Width() + 8).
-	//rc.right - 2만큼 여백을 둬서 edit을 위치시킨다.
-	//이 여백값을 변경하면 OnPaint()에서 value text를 출력시키는 위치 또한 보정해줘야 한다.
-	int edit_left = m_label_width > 0 ? m_label_width
+	//edit 의 right 는 항상 셀 우측에서 m_value_right_space + 2 만큼 여백.
+	const int edit_right = rc.right - 2 - m_value_right_space;
+
+	//edit 의 left 결정 — 기본 하한(우선순위 m_label_width > m_edit_width > m_text_rect.Width()+8)으로 *라벨 침범 방지*.
+	//값이 우측 정렬(DT_RIGHT)이고 셀이 충분히 넓으면 값이 그려진 자리부터 입력 여유만큼만 잡아 끌어들인다 → 짧은 숫자가
+	//셀 전체를 덮으며 라벨을 가리는 현상 해소. 좌측/중앙 정렬은 기존 동작 유지(텍스트 셀은 라벨 컬럼 직후가 자연).
+	int edit_left_min = m_label_width > 0 ? m_label_width
 		: (m_edit_width <= 0 ? m_text_rect.Width() + 8 : m_edit_width);
-	CRect r(edit_left, 3, rc.right - 2 - m_value_right_space, rc.bottom - 2);
+	int edit_left = edit_left_min;
+
+	if (m_value_halign == DT_RIGHT)
+	{
+		CClientDC dc(this);
+		CFont* old_font = dc.SelectObject(&m_font);
+		const int value_w = dc.GetTextExtent(m_text_value).cx;
+		dc.SelectObject(old_font);
+
+		const int min_edit_w   = 60;	//1~2자 값에서도 입력 여유 확보
+		const int h_pad_inside = 8;		//값 좌측 여유(커서 placement)
+		const int label_gap    = 4;		//라벨과 edit 사이 최소 간격(left_bound 시각 여유)
+
+		const int desired_w    = (std::max)(value_w, min_edit_w) + h_pad_inside;
+		const int left_natural = edit_right - desired_w;
+		const int left_bound   = edit_left_min + label_gap;
+		edit_left = (std::max)(left_natural, left_bound);
+	}
+
+	CRect r(edit_left, 3, edit_right, rc.bottom - 2);
 	m_edit.MoveWindow(r);
+
+	//edit_end 에서 *실제 변경* 여부 비교용 snapshot. 사용자가 값을 안 바꾸고 그대로 빠져나오면 통지 생략.
+	//편집 중 실시간 통지(message_scstaticedit_text_changed) 가 m_text_value 를 매 키마다 갱신하므로
+	//commit 비교용 원본은 별도 보관해야 한다.
+	m_edit_begin_value = m_text_value;
 
 	//value 가로 정렬(m_value_halign, DT_LEFT|DT_CENTER|DT_RIGHT)을 edit 에 그대로 반영(CSCStaticEdit 는 DT_ 정렬을 직접 사용).
 	m_edit.set_text_align(m_value_halign);
 
 	m_edit.set_text(m_text_value);
+	//m_edit.set_back_color(Gdiplus::Color::Pink);
 
 	m_edit.ShowWindow(SW_SHOW);
 	m_edit.set_sel(0, -1);
@@ -913,7 +969,13 @@ void CSCStatic::edit_end(bool valid)
 	if (!valid)
 		return;
 
-	m_text_value = m_edit.get_text();
+	CString new_value = m_edit.get_text();
+	//값이 안 바뀌었으면 commit 통지 생략 — edit 만 진입했다 빠져나온 케이스에서 parent 의 on_change 가 발화되어
+	//save_view / 비싼 재생성 작업이 무의미하게 호출되는 것을 막는다.
+	if (new_value == m_edit_begin_value)
+		return;
+
+	m_text_value = new_value;
 	Invalidate();
 
 	CSCStaticMsg msg(CSCStaticMsg::msg_text_value_changed, this, m_text_value);
@@ -1631,12 +1693,23 @@ void CSCStatic::set_back_color(Gdiplus::Color cr_back)
 void CSCStatic::set_edit_text_color(Gdiplus::Color cr_edit_text)
 {
 	if (cr_edit_text.GetValue() != Gdiplus::Color::Transparent)
+	{
 		m_theme.cr_edit_text = cr_edit_text;
+		//set_use_edit 안의 m_edit.set_text_color 는 m_edit 최초 생성 시 한 번만 호출되므로, 이후 setter 호출이
+		//m_edit 에 반영되지 않는 버그가 있었다. 호출 시점에 즉시 동기화(테마 변경 → m_edit 의 텍스트색 stale 방지).
+		if (m_edit.GetSafeHwnd())
+			m_edit.set_text_color(cr_edit_text);
+	}
 }
 void CSCStatic::set_edit_back_color(Gdiplus::Color cr_edit_back)
 {
 	if (cr_edit_back.GetValue() != Gdiplus::Color::Transparent)
+	{
 		m_theme.cr_edit_back = cr_edit_back;
+		//동일한 stale 버그 회피 — m_edit 가 이미 생성됐으면 즉시 동기화.
+		if (m_edit.GetSafeHwnd())
+			m_edit.set_back_color(cr_edit_back);
+	}
 }
 
 void CSCStatic::set_gradient(bool bGradient)

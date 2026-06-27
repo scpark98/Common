@@ -222,6 +222,21 @@ public:
 	//여러 항목을 같은 컬럼에 정렬하려면 동일 값으로 호출. value/edit 의 시작 위치가 일치한다.
 	void			set_label_width(int width) { m_label_width = width; Invalidate(); }
 
+	//set_use_edit + 값(m_text_value) 이 있는 라벨+값 셀에서 라벨이 m_label_width 컬럼 안에 안 들어갈 때의 처리 방식.
+	//
+	//  false (default):
+	//      기본 동작. 라벨이 m_label_width 를 넘어도 잘리지 않고 그대로 그려진다(WORDBREAK 적용으로 다음 줄로
+	//      넘어갈 수도 있음). 라벨 컬럼 폭 vs 라벨 측정폭의 비교만 본다 — 값과의 관계는 고려 안 함.
+	//
+	//  true:
+	//      라벨을 한 줄로 표시하되, *값과 겹치지 않게* 라벨 right 를 동적으로 제한한 뒤 "..." (ellipsis) 처리한다.
+	//      라벨 right = 값의 실제 left(우측 정렬 값은 = 셀 right - value 측정폭 - 우측 여백) - 4px gap.
+	//      즉 *값이 짧으면 라벨이 m_label_width 컬럼 경계를 넘어 값 직전까지 자유롭게* 그려지고, *값이 길어져
+	//      라벨을 밀어내야 비로소* ellipsis 발동. 값 영역과의 시각적 충돌은 절대 발생하지 않는다. 대신 라벨 컬럼
+	//      정렬(여러 셀의 라벨 right 가 한 줄로 맞춰지는 시각) 은 일부 양보된다.
+	//      값 영역이 동적으로 변하는 라벨+값 패턴(예: CSCPropertyCtrl 의 셀)에 적합.
+	void			set_label_auto_ellipsis(bool on = true) { m_label_auto_ellipsis = on; Invalidate(); }
+
 	//color picker 모드에서 alpha 표시·편집 여부.
 	//true(=color32) → 값이 "R, G, B, A", false(=color24) → "R, G, B" (alpha 무시·불투명 취급).
 	void			set_show_alpha(bool show) { m_show_alpha = show; Invalidate(); }
@@ -407,6 +422,7 @@ protected:
 	CSCStaticEdit	m_edit;
 	bool			m_use_edit = false;
 	CString			m_text_value;		//m_use_edit = true이면 label + value로 표시되는데 이 때 value의 내용이 저장된다.
+	CString			m_edit_begin_value;	//edit_begin 시점의 m_text_value snapshot — edit_end 에서 실제 변경 여부 비교용(미변경 시 통지 생략).
 	int				m_edit_width = 0;	//편집모드일 때 edit의 너비. 이 값이 0이면 (m_text_rect.Width() + 8)부터 edit이 시작된다.
 
 	//color picker 모드 전용 layout 계산. swatch / 값 텍스트 영역.
@@ -475,6 +491,10 @@ protected:
 
 	//label + value 형태일 때 label 영역의 고정 너비. 0 이면 m_text_rect.Width() + 8 사용.
 	int				m_label_width = 0;
+
+	//set_label_auto_ellipsis 참고. false (default) = 기본 wordbreak 동작 유지.
+	//true = 라벨이 값과 겹치지 않게 right 동적 제한 + 안 들어가면 ellipsis. 라벨+값 셀(예 CSCPropertyCtrl) 의 opt-in.
+	bool			m_label_auto_ellipsis = false;
 
 	//color picker 모드에서 alpha 를 값에 포함할지. true → "R,G,B,A"(color32), false → "R,G,B"(color24).
 	bool			m_show_alpha = true;

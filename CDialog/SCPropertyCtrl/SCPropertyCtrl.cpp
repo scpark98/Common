@@ -540,8 +540,12 @@ void CSCPropertyCtrl::position_cell_ctrl(prop_cell& c)
 	CRect box = c.rect;
 	box.OffsetRect(0, -m_scroll_y);
 	box.DeflateRect(0, m_field_vmargin);
-	c.ctrl->MoveWindow(box);
+	// MoveWindow 의 default fRepaint=TRUE 는 자식의 즉시 sync paint 를 trigger 한다.
+	// splitter drag 중 매 mouse 이동마다 모든 자식이 sync paint → UI thread 점유 → 호스트의 animation
+	// 갱신(view) 이 끊김. fRepaint=FALSE + async InvalidateRect 로 자식 paint 를 큐로 보내 dispatch.
+	c.ctrl->MoveWindow(box, FALSE);
 	c.ctrl->ShowWindow(SW_SHOW);
+	c.ctrl->Invalidate(FALSE);
 }
 
 void CSCPropertyCtrl::layout_cells(prop_row& row)
@@ -873,12 +877,11 @@ void CSCPropertyCtrl::OnSize(UINT nType, int cx, int cy)
 {
 	CDialogEx::OnSize(nType, cx, cy);
 	layout();
-	// 패널 + 모든 자식 값 필드를 매 resize 마다 즉시 동기 repaint → 항목 left/값이 윈도우 이동과 같은
-	// 프레임에 갱신되어 끊김/lag 없이 따라온다.
-	// (CS_HREDRAW 미사용 의도적 — 전체 full repaint 가 무거워 스플리터가 함께 resize 하는 가운데 view 를
-	//  끊기게 했다. 그 대신 우측 끝에 미세한 BitBlt 잔떨림이 남지만, 3자(가운데·left·right) 트레이드오프에서
-	//  가운데·left 완벽 + 우측 미세 떨림이 가장 견딜 만한 조합이라 이 쪽을 택함.)
-	RedrawWindow(NULL, NULL, RDW_INVALIDATE | RDW_UPDATENOW | RDW_ALLCHILDREN);
+	// 절충안 — *패널 자체* 만 sync paint (RDW_UPDATENOW, 자식 제외), *자식 CSCStatic* 은 position_cell_ctrl 의
+	// async InvalidateRect 로 큐 dispatch. 이전 RDW_UPDATENOW|RDW_ALLCHILDREN 은 자식까지 sync paint 라
+	// UI thread 가 splitter drag 중 점유돼 호스트 animation(view) 가 끊겼었다. 자식 async 로 view 부드러움
+	// + 패널 자체 sync 로 PropertyCtrl 배경/section header 잔떨림 최소.
+	RedrawWindow(NULL, NULL, RDW_INVALIDATE | RDW_UPDATENOW);
 }
 
 BOOL CSCPropertyCtrl::OnMouseWheel(UINT /*nFlags*/, short zDelta, CPoint pt)

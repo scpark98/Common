@@ -631,31 +631,44 @@ void CSCStaticEdit::OnKeyDown(UINT n_char, UINT n_rep_cnt, UINT n_flags)
 			if (p_end == begin || p_end == nullptr || *p_end != _T('\0'))
 				return;
 			push_undo();
-			val += (n_char == VK_UP) ? m_updown_interval : -m_updown_interval;
 
-			// 소수점 자리수 = max(interval 자리수, 현재 텍스트 자리수).
-			// %g 는 trailing 0 을 제거해 "0.09 + 0.01 = 0.10" 이 "0.1" 로 보이므로
-			// %.Nf 로 고정 자리수 표시. 사용자 입력 정밀도 (예: "1.234") 도 보존.
-			//
-			// interval 자리수 추출: float 의 이진 부정확성 때문에 반복 곱하기 방식은 오버카운트됨
-			// (0.0001f 는 실제 9.99999974e-5 라 ×10 을 반복해도 fractional part 가 안 사라짐).
-			// → (double) 승격 후 %g 문자열 표현에서 '.' / 'e' 위치로 직접 계산.
-			CString s_iv;
-			s_iv.Format(_T("%g"), (double)m_updown_interval);
-			int iexp = s_iv.FindOneOf(_T("eE"));
-			int idot = s_iv.Find(_T('.'));
-			int mantissa_end  = (iexp >= 0) ? iexp : s_iv.GetLength();
-			int mantissa_prec = (idot >= 0 && idot < mantissa_end) ? (mantissa_end - idot - 1) : 0;
-			int exp_val       = (iexp >= 0) ? _ttoi(s_iv.Mid(iexp + 1)) : 0;
-			int interval_prec = mantissa_prec - exp_val;
-			if (interval_prec < 0)
-				interval_prec = 0;
-
+			// step 결정 — m_updown_interval 값에 따라 두 모드:
+			//   > 0 : 고정 step. 표시 자리수 = max(interval 자릿수, 텍스트 자릿수).
+			//   == 0 : auto. 입력 텍스트의 소숫점 자릿수로 step = 10^(-text_prec).
+			//     예) "0.5"→0.1, "0.000345"→1e-6, "5"→1.
+			// %g 는 trailing 0 을 제거해 "0.09 + 0.01 = 0.10" 이 "0.1" 로 보이므로 %.Nf 로 고정 자리수 표시.
 			int text_prec = 0;
 			int dot = trimmed.ReverseFind(_T('.'));
 			if (dot >= 0)
 				text_prec = trimmed.GetLength() - dot - 1;
-			int precision = max(interval_prec, text_prec);
+
+			double step;
+			int    precision;
+			if (m_updown_interval > 0.0f)
+			{
+				step = m_updown_interval;
+				// interval 자리수 추출: float 의 이진 부정확성 때문에 반복 곱하기 방식은 오버카운트됨
+				// (0.0001f 는 실제 9.99999974e-5 라 ×10 을 반복해도 fractional part 가 안 사라짐).
+				// → (double) 승격 후 %g 문자열 표현에서 '.' / 'e' 위치로 직접 계산.
+				CString s_iv;
+				s_iv.Format(_T("%g"), (double)m_updown_interval);
+				int iexp = s_iv.FindOneOf(_T("eE"));
+				int idot = s_iv.Find(_T('.'));
+				int mantissa_end  = (iexp >= 0) ? iexp : s_iv.GetLength();
+				int mantissa_prec = (idot >= 0 && idot < mantissa_end) ? (mantissa_end - idot - 1) : 0;
+				int exp_val       = (iexp >= 0) ? _ttoi(s_iv.Mid(iexp + 1)) : 0;
+				int interval_prec = mantissa_prec - exp_val;
+				if (interval_prec < 0)
+					interval_prec = 0;
+				precision = max(interval_prec, text_prec);
+			}
+			else
+			{
+				step = pow(10.0, -text_prec);
+				precision = text_prec;
+			}
+
+			val += (n_char == VK_UP) ? step : -step;
 
 			CString new_text;
 			new_text.Format(_T("%.*f"), precision, val);

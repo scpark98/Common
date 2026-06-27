@@ -1169,8 +1169,15 @@ void CSCEdit::GetWindowText(CString& text) const
 }
 */
 
-// 텍스트 전체가 정수/실수로 파싱 가능하면 ±m_updown_interval 적용 후 set_text.
+// 텍스트 전체가 정수/실수로 파싱 가능하면 ±step 적용 후 set_text.
 // 부분 문자(예: "12abc") 가 섞여 있으면 false 리턴해 호출처가 base 로 위임하도록 함.
+//
+// step 결정 — m_updown_interval 값에 따라 두 모드:
+//   m_updown_interval > 0 → 고정 모드 : 외부에서 지정한 값(±interval). 표시 자릿수 = max(interval 자릿수, 텍스트 자릿수).
+//   m_updown_interval == 0 → auto 모드 : 입력 텍스트의 소숫점 자릿수로 step = 10^(-text_prec) 자동 결정.
+//     예) "0.5"      → text_prec=1 → step=0.1     → "0.6"
+//         "0.000345" → text_prec=6 → step=1e-6    → "0.000346"
+//         "5"        → text_prec=0 → step=1       → "6"
 bool CSCEdit::apply_updown_step(bool up)
 {
 	if (!m_use_updown_key)
@@ -1190,27 +1197,37 @@ bool CSCEdit::apply_updown_step(bool up)
 	if (p_end == begin || p_end == nullptr || *p_end != _T('\0'))
 		return false;
 
-	val += up ? m_updown_interval : -m_updown_interval;
-
-	// 소수점 자리수 = max(interval prec, 현재 텍스트 prec). %g 의 trailing 0 제거 회피.
-	// interval 자리수 추출: float 의 이진 부정확성 때문에 ×10 반복 방식은 오버카운트되므로
-	// (double) 승격 후 %g 표현의 '.'/'e' 위치로 직접 계산.
-	CString s_iv;
-	s_iv.Format(_T("%g"), (double)m_updown_interval);
-	int iexp = s_iv.FindOneOf(_T("eE"));
-	int idot = s_iv.Find(_T('.'));
-	int mantissa_end  = (iexp >= 0) ? iexp : s_iv.GetLength();
-	int mantissa_prec = (idot >= 0 && idot < mantissa_end) ? (mantissa_end - idot - 1) : 0;
-	int exp_val       = (iexp >= 0) ? _ttoi(s_iv.Mid(iexp + 1)) : 0;
-	int interval_prec = mantissa_prec - exp_val;
-	if (interval_prec < 0)
-		interval_prec = 0;
-
 	int text_prec = 0;
 	int dot = trimmed.ReverseFind(_T('.'));
 	if (dot >= 0)
 		text_prec = trimmed.GetLength() - dot - 1;
-	int precision = max(interval_prec, text_prec);
+
+	double step;
+	int    precision;
+	if (m_updown_interval > 0.0f)
+	{
+		step = m_updown_interval;
+		// 고정 interval 의 자릿수: %g 표현의 mantissa/exp 위치로 직접 계산(이진 부정확성 회피 — ×10 반복은 오버카운트됨).
+		CString s_iv;
+		s_iv.Format(_T("%g"), (double)m_updown_interval);
+		int iexp = s_iv.FindOneOf(_T("eE"));
+		int idot = s_iv.Find(_T('.'));
+		int mantissa_end  = (iexp >= 0) ? iexp : s_iv.GetLength();
+		int mantissa_prec = (idot >= 0 && idot < mantissa_end) ? (mantissa_end - idot - 1) : 0;
+		int exp_val       = (iexp >= 0) ? _ttoi(s_iv.Mid(iexp + 1)) : 0;
+		int interval_prec = mantissa_prec - exp_val;
+		if (interval_prec < 0)
+			interval_prec = 0;
+		precision = max(interval_prec, text_prec);
+	}
+	else
+	{
+		// auto — 텍스트 자릿수가 곧 step 의 자릿수.
+		step = pow(10.0, -text_prec);
+		precision = text_prec;
+	}
+
+	val += up ? step : -step;
 
 	CString new_text;
 	new_text.Format(_T("%.*f"), precision, val);

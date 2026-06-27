@@ -176,8 +176,10 @@ public:
 
     // shift + up/down 방향키로 수치 증감. shift + mousewheel로도 동일.
     // 텍스트가 실수로 파싱되지 않으면 스킵.
-    // interval 은 실수 허용 (예: 0.001). 표시 자리수 = max(interval 소수자리수, 현재 텍스트 소수자리수).
-    // 예: interval=0.01, "0.09" → up → "0.10" (trailing 0 보존).
+    // interval > 0 : 고정 step. 실수 허용 (예: 0.001). 표시 자리수 = max(interval 소수자리수, 현재 텍스트 소수자리수).
+    //   예: interval=0.01, "0.09" → up → "0.10" (trailing 0 보존).
+    // interval == 0 : auto. 입력 텍스트의 소숫점 자릿수로 step 자동 결정.
+    //   예: "0.5"→0.1, "0.000345"→1e-6, "5"→1.
     void		    set_use_updown_key(bool use_updown_key = true, float interval = 1.0f)
                         { m_use_updown_key = use_updown_key; m_updown_interval = interval; }
 	//dim text를 설정한다. cr_dim이 Transparent가 아니면 dim text 색상을 별도로 지정할 수 있다. 기본값은 m_theme.cr_text_dim.

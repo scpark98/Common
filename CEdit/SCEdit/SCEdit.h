@@ -204,6 +204,9 @@ public:
 
 	//Shift + Up/Down 또는 Shift + MouseWheel 로 숫자 값 증감.
 	//텍스트 전체가 정수/실수로 파싱 가능할 때만 동작 — 그 외엔 base 로 위임 (탭/네비게이션 보존).
+	// interval :
+	//   > 0  → 고정 step (예: 0.5 → 매번 ±0.5)
+	//   == 0 → auto. 입력 텍스트의 소숫점 자릿수로 step 자동 결정 (예: "0.5"→0.1, "0.000345"→1e-6, "5"→1)
 	void				set_use_updown_key(bool use = true, float interval = 1.0f)
 						{ m_use_updown_key = use; m_updown_interval = interval; }
 

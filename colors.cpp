@@ -1179,6 +1179,41 @@ int CSCColorTheme::get_theme_index(LPCTSTR name, int fallback)
 	return fallback;
 }
 
+// cr_text_dim 산출 — cr_text 와 cr_back 의 RGB 보간 + WCAG contrast 자동 보정.
+// 단순 ratio 보간(0.25 고정) 은 *저대비 테마* 에서 dim 이 cr_back 과 시각적으로 거의 같아져 안 보임.
+// 알고리즘:
+//   1. ratio=0.25 candidate (가독 + 값/라벨 hierarchy 적정)
+//   2. dim 과 cr_back 의 WCAG contrast 가 2.5 미만이면 ratio 점진 감소(0.20→0.05) 로 dim 을 cr_text 쪽으로 끌어당김
+//   3. 모든 시도 실패 시 r=0.05 (거의 cr_text) — cr_text 자체가 cr_back 과 차이 작은 테마(우리 한계)
+//
+// WCAG relative luminance + gamma 보정 contrast = 시각 대비를 8bit RGB 차이보다 정확히 반영.
+// 임계값 2.5 — WCAG AA-large(3.0) 보다 약간 낮음. dim 은 보조 라벨이라 본문 4.5 가 아니라 2.5 로 충분.
+static Gdiplus::Color compute_text_dim(const Gdiplus::Color& cr_text, const Gdiplus::Color& cr_back)
+{
+	auto rel_lum = [](const Gdiplus::Color& c) -> double {
+		auto ch = [](int v) -> double {
+			double f = v / 255.0;
+			return (f <= 0.03928) ? f / 12.92 : pow((f + 0.055) / 1.055, 2.4);
+		};
+		return 0.2126 * ch(c.GetR()) + 0.7152 * ch(c.GetG()) + 0.0722 * ch(c.GetB());
+	};
+	auto contrast = [&](const Gdiplus::Color& a, const Gdiplus::Color& b) -> double {
+		double la = rel_lum(a), lb = rel_lum(b);
+		if (la < lb) std::swap(la, lb);
+		return (la + 0.05) / (lb + 0.05);
+	};
+
+	const double ratios[] = { 0.25, 0.20, 0.15, 0.10, 0.05 };
+	Gdiplus::Color dim;
+	for (double r : ratios)
+	{
+		dim = get_color(cr_text, cr_back, r);
+		if (contrast(dim, cr_back) >= 2.5)
+			return dim;
+	}
+	return dim;	// 마지막 시도 — cr_text 자체가 cr_back 과 거의 같은 저대비 테마
+}
+
 void CSCColorTheme::set_theme_from_editor_palette(Gdiplus::Color bg, Gdiplus::Color fg, Gdiplus::Color sel_bg,
 								Gdiplus::Color header_fg, Gdiplus::Color header_bg)
 {
@@ -1187,7 +1222,10 @@ void CSCColorTheme::set_theme_from_editor_palette(Gdiplus::Color bg, Gdiplus::Co
 	cr_parent_back	= bg;
 	cr_text			= fg;
 	cr_text_hover	= fg;
-	cr_text_dim		= get_weak_color(fg, 100);		//fg 를 중간 톤 쪽으로 흐리게
+	//cr_text 와 cr_back 의 RGB 보간(ratio=0.35) → cr_text 쪽에 가까운 dim 색.
+	//ratio 가 작을수록 cr_back 에 가깝고(흐림→ 안 보임), 클수록 cr_text 와 구분 안 됨. 0.35 = 가독 유지 + 값/라벨 hierarchy 확보.
+	//get_weak_color(fg, 100) 같이 *fg 절대 거리 이동* 방식은 fg/bg 간격을 무시해 일부 테마에서 너무 dim / 너무 진함.
+	cr_text_dim		= compute_text_dim(cr_text, cr_back);
 	cr_disabled_text = cr_text_dim;
 
 	//edit 본문 = 에디터 본문. import 테마는 dark IDE 류라 흰 카드 baseline 대신 에디터색 그대로 쓴다.
@@ -1322,7 +1360,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_sys_buttons_down_back = get_color(cr_title_back_active, 24);
 
 			cr_text = gRGB(22, 25, 31);                       //#16191f — admin 본문 dark
-			cr_text_dim = gRGB(134, 159, 177);                //#869fb1 — mid gray-blue
+			cr_text_dim = compute_text_dim(cr_text, cr_back);                //#869fb1 — mid gray-blue
 			cr_text_hover = Gdiplus::Color::White;            //hover bg 가 logo color +32 (dark) 라 dark text 가독성 ↓ — white 강제
 			cr_text_selected = Gdiplus::Color::White;         //selected 배경 = navy → white text
 			cr_text_selected_inactive = get_color(cr_text, 32);
@@ -1381,7 +1419,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_sys_buttons_down_back = get_color(cr_title_back_active, 24);
 
 			cr_text = Gdiplus::Color::White;
-			cr_text_dim = gRGB(176, 181, 188);                //#B0B5BC — section header / '현재버전' 등 보조 텍스트
+			cr_text_dim = compute_text_dim(cr_text, cr_back);                //#B0B5BC — section header / '현재버전' 등 보조 텍스트
 			cr_text_hover = Gdiplus::Color::White;            //hover bg 가 blue (#5BA2D9 +) — white 강제
 			cr_text_selected = Gdiplus::Color::White;         //selected bg = blue 위 white
 			cr_text_selected_inactive = get_color(cr_text, -32);
@@ -1436,7 +1474,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_sys_buttons_down_back = get_color(cr_title_back_active, -28);
 
 			cr_text = gRGB(63, 58, 51);                       //#3F3A33 — 본문 dark
-			cr_text_dim = get_color(cr_text, 80);             //~#8F8A83 — 버전/보조 텍스트 (추출 #8B8377 근사)
+			cr_text_dim = compute_text_dim(cr_text, cr_back);             //~#8F8A83 — 버전/보조 텍스트 (추출 #8B8377 근사)
 			cr_text_hover = Gdiplus::Color::White;            //hover bg = orange → white text 강제
 			cr_text_selected = Gdiplus::Color::White;         //selected bg = orange → white text
 			cr_text_selected_inactive = cr_text;              //inactive selection bg 가 옅은 크림이므로 본문 dark 색 그대로 — 대비 확보
@@ -1488,7 +1526,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_sys_buttons_down_back = get_color(cr_title_back_active, -28);
 
 			cr_text = gRGB(17, 24, 39);
-			cr_text_dim = get_color(cr_text, 80);
+			cr_text_dim = compute_text_dim(cr_text, cr_back);
 			cr_text_hover = Gdiplus::Color::White;
 			cr_text_selected = Gdiplus::Color::White;
 			cr_text_selected_inactive = cr_text;
@@ -1530,7 +1568,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_sys_buttons_down_back = get_color(cr_title_back_active, 24);
 
 			cr_text = Gdiplus::Color::White;
-			cr_text_dim = gRGB(143, 143, 143);
+			cr_text_dim = compute_text_dim(cr_text, cr_back);
 			cr_text_hover = gRGB(30, 30, 30);                 //hover bg = light gray → dark text
 			cr_text_selected = gRGB(30, 30, 30);
 			cr_text_selected_inactive = cr_text;
@@ -1572,7 +1610,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_sys_buttons_down_back = get_color(cr_title_back_active, 24);
 
 			cr_text = gRGB(236, 239, 244);
-			cr_text_dim = gRGB(143, 153, 169);
+			cr_text_dim = compute_text_dim(cr_text, cr_back);
 			cr_text_hover = gRGB(46, 52, 64);
 			cr_text_selected = gRGB(46, 52, 64);
 			cr_text_selected_inactive = cr_text;
@@ -1613,7 +1651,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_sys_buttons_down_back = get_color(cr_title_back_active, -28);
 
 			cr_text = gRGB(31, 41, 55);
-			cr_text_dim = get_color(cr_text, 80);
+			cr_text_dim = compute_text_dim(cr_text, cr_back);
 			cr_text_hover = Gdiplus::Color::White;
 			cr_text_selected = Gdiplus::Color::White;
 			cr_text_selected_inactive = cr_text;
@@ -1654,7 +1692,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_sys_buttons_down_back = get_color(cr_title_back_active, 24);
 
 			cr_text = gRGB(244, 244, 244);
-			cr_text_dim = gRGB(143, 143, 143);
+			cr_text_dim = compute_text_dim(cr_text, cr_back);
 			cr_text_hover = Gdiplus::Color::White;
 			cr_text_selected = Gdiplus::Color::White;
 			cr_text_selected_inactive = cr_text;
@@ -1696,7 +1734,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_sys_buttons_down_back = get_color(cr_title_back_active, -28);
 
 			cr_text = gRGB(63, 58, 51);
-			cr_text_dim = get_color(cr_text, 80);
+			cr_text_dim = compute_text_dim(cr_text, cr_back);
 			cr_text_hover = Gdiplus::Color::White;
 			cr_text_selected = Gdiplus::Color::White;
 			cr_text_selected_inactive = cr_text;
@@ -1737,7 +1775,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_sys_buttons_down_back = get_color(cr_title_back_active, 24);
 
 			cr_text = gRGB(226, 232, 240);
-			cr_text_dim = gRGB(148, 163, 184);
+			cr_text_dim = compute_text_dim(cr_text, cr_back);
 			cr_text_hover = Gdiplus::Color::White;
 			cr_text_selected = Gdiplus::Color::White;
 			cr_text_selected_inactive = cr_text;
@@ -1778,7 +1816,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_sys_buttons_down_back = get_color(cr_title_back_active, -28);
 
 			cr_text = gRGB(15, 23, 42);
-			cr_text_dim = get_color(cr_text, 80);
+			cr_text_dim = compute_text_dim(cr_text, cr_back);
 			cr_text_hover = Gdiplus::Color::White;
 			cr_text_selected = Gdiplus::Color::White;
 			cr_text_selected_inactive = cr_text;
@@ -1819,7 +1857,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_sys_buttons_down_back = get_color(cr_title_back_active, 24);
 
 			cr_text = gRGB(245, 245, 245);
-			cr_text_dim = gRGB(160, 160, 168);
+			cr_text_dim = compute_text_dim(cr_text, cr_back);
 			cr_text_hover = Gdiplus::Color::White;
 			cr_text_selected = Gdiplus::Color::White;
 			cr_text_selected_inactive = cr_text;
@@ -1860,7 +1898,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_sys_buttons_down_back = get_color(cr_title_back_active, -28);
 
 			cr_text = gRGB(17, 24, 39);
-			cr_text_dim = get_color(cr_text, 80);
+			cr_text_dim = compute_text_dim(cr_text, cr_back);
 			cr_text_hover = Gdiplus::Color::White;
 			cr_text_selected = Gdiplus::Color::White;
 			cr_text_selected_inactive = cr_text;
@@ -1905,7 +1943,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_sys_buttons_down_back = get_color(cr_title_back_active, -16);
 
 			cr_text = gRGB(34, 46, 61);                       //#222E3D — BI dark navy-gray (1.0 과 공유)
-			cr_text_dim = Gdiplus::Color::DimGray;
+			cr_text_dim = compute_text_dim(cr_text, cr_back);
 			cr_text_hover = Gdiplus::Color::White;            //hover bg 가 logo color +32 (dark) — white 강제
 			cr_text_selected = Gdiplus::Color::White;
 			cr_text_selected_inactive = get_color(cr_text, 32);
@@ -1951,7 +1989,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_sys_buttons_down_back = get_color(cr_title_back_active, -16);
 
 			cr_text = gRGB(13, 41, 71);                       //#0D2947 — BI logo 보조 dark navy
-			cr_text_dim = Gdiplus::Color::DimGray;
+			cr_text_dim = compute_text_dim(cr_text, cr_back);
 			cr_text_hover = Gdiplus::Color::White;            //hover bg 가 logo color +32 (dark) — white 강제
 			cr_text_selected = Gdiplus::Color::White;
 			cr_text_selected_inactive = get_color(cr_text, 32);
@@ -1999,7 +2037,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_sys_buttons_down_back = get_color(cr_title_back_active, -16);
 
 			cr_text = cr_title_text;                         //본문도 동일 dark navy
-			cr_text_dim = gRGB(159, 159, 159);               //#9F9F9F — BI gray
+			cr_text_dim = compute_text_dim(cr_text, cr_back);               //#9F9F9F — BI gray
 			cr_text_hover = Gdiplus::Color::White;           //hover bg 가 logo teal +32 — white 강제
 			cr_text_selected = Gdiplus::Color::White;        //selected = logo teal 위 white
 			cr_text_selected_inactive = get_color(cr_text, 32);
@@ -2044,7 +2082,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_sys_buttons_down_back = get_color(cr_title_back_active, -16);
 
 			cr_text = gRGB(34, 46, 61);                       //BI 보조 명시 없음 — 일반 dark navy
-			cr_text_dim = Gdiplus::Color::DimGray;
+			cr_text_dim = compute_text_dim(cr_text, cr_back);
 			cr_text_hover = Gdiplus::Color::White;            //hover bg 가 logo orange +32 — white 강제
 			cr_text_selected = Gdiplus::Color::White;
 			cr_text_selected_inactive = get_color(cr_text, 32);
@@ -2084,7 +2122,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_sys_buttons_down_back = get_color(cr_title_back_active, 24);
 
 			cr_text					= Gdiplus::Color(255, 192, 192, 192);
-			cr_text_dim				= Gdiplus::Color(255, 96, 96, 96);
+			cr_text_dim				= compute_text_dim(cr_text, cr_back);
 			cr_text_hover			= cr_text;
 			cr_text_selected		= Gdiplus::Color(255, 241, 241, 241);
 			cr_text_selected_inactive = cr_text_selected;
@@ -2118,7 +2156,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 
 		case color_theme_dark :
 			cr_text					= Gdiplus::Color(255, 212, 212, 212);
-			cr_text_dim				= Gdiplus::Color(255, 96, 96, 96);
+			cr_text_dim				= compute_text_dim(cr_text, cr_back);
 			cr_text_hover			= cr_text;
 			cr_text_selected		= Gdiplus::Color(255, 241, 241, 241);
 			cr_text_selected_inactive = cr_text_selected;
@@ -2183,7 +2221,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 
 		case color_theme_white :
 			cr_text = RGB2gpColor(::GetSysColor(COLOR_BTNTEXT));
-			cr_text_dim = Gdiplus::Color::LightGray;// get_color(cr_text, 32);
+			cr_text_dim = compute_text_dim(cr_text, cr_back);// get_color(cr_text, 32);
 			cr_text_hover = cr_text;
 			cr_text_selected = cr_text;// RGB2gpColor(::GetSysColor(COLOR_HIGHLIGHTTEXT));;
 			cr_text_selected_inactive = cr_text_selected;
@@ -2228,7 +2266,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 
 		case color_theme_gray:
 			cr_text = gRGB(64, 64, 64);
-			cr_text_dim = get_color(cr_text, 32);
+			cr_text_dim = compute_text_dim(cr_text, cr_back);
 			cr_text_hover = cr_text;
 			cr_text_selected = cr_text;
 			cr_text_selected_inactive = cr_text_selected;
@@ -2271,7 +2309,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 		//세피아 — 빛바랜 종이/사진 톤. 따뜻한 크림 배경 + 갈색 글자 (light 테마 계열).
 		case color_theme_sepia:
 			cr_text = gRGB(80, 60, 42);					//dark sepia brown
-			cr_text_dim = get_weak_color(cr_text, 90);
+			cr_text_dim = compute_text_dim(cr_text, cr_back);
 			cr_text_hover = cr_text;
 			cr_text_selected = cr_text;
 			cr_text_selected_inactive = cr_text_selected;
@@ -2382,7 +2420,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			//테두리/선택색 등을 하드코딩하지만, 이 테마는 라이브 OS 색(accent 포함 — Win11 의 COLOR_HIGHLIGHT
 			//= 사용자 accent)을 그대로 쓴다. control-kind 별 배경 분기는 default 와 동일.
 			cr_text					= get_sys_color(COLOR_WINDOWTEXT);
-			cr_text_dim				= get_sys_color(COLOR_GRAYTEXT);
+			cr_text_dim				= compute_text_dim(cr_text, cr_back);
 			cr_text_hover			= cr_text;
 			cr_text_selected		= get_sys_color(COLOR_HIGHLIGHTTEXT);
 			cr_text_selected_inactive = cr_text;
@@ -2437,7 +2475,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 
 		default: //case color_theme_default :
 			cr_text					= get_sys_color(COLOR_BTNTEXT);
-			cr_text_dim				= get_weak_color(cr_text, 132);
+			cr_text_dim				= compute_text_dim(cr_text, cr_back);
 			cr_text_hover			= cr_text;
 			cr_text_selected		= cr_text;// RGB2gpColor(::GetSysColor(COLOR_HIGHLIGHTTEXT));;
 			cr_text_selected_inactive = cr_text_selected;

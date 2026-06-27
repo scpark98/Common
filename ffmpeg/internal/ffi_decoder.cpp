@@ -1469,8 +1469,8 @@ namespace ffi
 					m_segment_rt.store(m_pending_segment_rt);
 					m_video_first_emit_pts_rt.store(LLONG_MIN);	  //다음 video frame push 시 set.
 					int new_gen = m_seek_generation.fetch_add(1) + 1;
-					//logWrite(_T("[ffi/dec] seek to %.0fms hr=%d gen=%d seg_rt=%lld seek_us=%lld"),
-						//seek_pos, hr_seek, new_gen, (long long)m_pending_segment_rt, seek_us);
+					logWrite(_T("[ffi/dec] seek to %.0fms hr=%d gen=%d seg_rt=%lld seek_us=%lld (디코더 seek 처리비용)"),
+						seek_pos, hr_seek, new_gen, (long long)m_pending_segment_rt, seek_us);
 
 					//first frame 시간 측정용 — worker 가 다음 frame push 시점.
 					m_first_frame_after_seek = false;
@@ -1687,9 +1687,9 @@ namespace ffi
 					}
 					//전진 keyframe 도달 — skip 종료. 이 packet 부터 정상 디코드 (아래로 fall through).
 					m_kf_skip_active = false;
-					//logWrite(_T("[ffi/dec/kf] keyframe reached pts=%lld min=%lld target=%lld pkt_pos=%lld → decode start"),
-						//(long long)((pkt->pts != AV_NOPTS_VALUE) ? pkt->pts : pkt->dts),
-						//(long long)m_kf_skip_min_pts, (long long)m_kf_skip_target_pts, (long long)pkt->pos);
+					logWrite(_T("[ffi/dec/kf] keyframe reached pts=%lld min=%lld target=%lld skipped_pkts=%lld → decode start (skip 많으면 긴 GOP=A/V 동시 끊김 후보)"),
+						(long long)((pkt->pts != AV_NOPTS_VALUE) ? pkt->pts : pkt->dts),
+						(long long)m_kf_skip_min_pts, (long long)m_kf_skip_target_pts, (long long)m_kf_skip_count);
 				}
 				//audio packet 은 skip 하지 않고 정상 디코드로 흘려보낸다 (아래 fall through).
 				//[GOP 시작~target] 구간 audio 를 확보해야 audio 첫 emit 의 미디어 시점이 video_first 와 정렬되어

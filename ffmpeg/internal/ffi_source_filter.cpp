@@ -317,8 +317,8 @@ namespace ffi
 				ULONGLONG t0 = GetTickCount64();
 				HRESULT hr = GetDeliveryBuffer(&pSample, NULL, NULL, 0);
 				ULONGLONG t_gdb_ms = GetTickCount64() - t0;
-				if (t_gdb_ms > 100)
-					;//logWrite(_T("[ffi/src/video/diag] GetDeliveryBuffer wait %llums"), t_gdb_ms);
+				if (t_gdb_ms > 50)
+					logWrite(_T("[ffi/src/video/diag] GetDeliveryBuffer wait %llums (다운스트림 버퍼 부족 — 렌더러가 sample 반납 안 함)"), t_gdb_ms);
 
 				if (FAILED(hr))
 				{
@@ -330,11 +330,22 @@ namespace ffi
 
 				if (hr == S_OK)
 				{
+					//블록 전후 그래프 StreamTime 을 함께 측정 — Deliver 가 막힌 동안 클럭이 *안 돌면*(clk_advance≈0)
+					//레퍼런스 클럭(오디오 렌더러) stall 확정 → 영상 정지는 그 종속 증상. 클럭이 ~block 만큼 돌았는데도
+					//막혔으면 비디오 렌더러 고유 hold.
+					CRefTime st_before;
+					REFERENCE_TIME clk_before = (m_pFilter && m_pFilter->StreamTime(st_before) == S_OK) ? (REFERENCE_TIME)st_before : -1;
 					ULONGLONG t1 = GetTickCount64();
 					hr = Deliver(pSample);
 					ULONGLONG t_dlv_ms = GetTickCount64() - t1;
-					if (t_dlv_ms > 100)
-						;//logWrite(_T("[ffi/src/video/diag] Deliver wait %llums"), t_dlv_ms);
+					if (t_dlv_ms > 50)
+					{
+						CRefTime st_after;
+						REFERENCE_TIME clk_after = (m_pFilter && m_pFilter->StreamTime(st_after) == S_OK) ? (REFERENCE_TIME)st_after : -1;
+						long long clk_adv = (clk_before >= 0 && clk_after >= 0) ? (long long)((clk_after - clk_before) / 10000) : -1;
+						logWrite(_T("[ffi/src/video/diag] Deliver BLOCKED %llums clk_advance=%lldms (clk≈0이면 클럭 stall=오디오렌더러 원인, clk≈block이면 비디오렌더러 hold)"),
+							t_dlv_ms, clk_adv);
+					}
 
 					pSample->Release();
 					if (hr != S_OK)
@@ -379,9 +390,9 @@ namespace ffi
 		else if (m_fb_last_entry_ms != 0)
 		{
 			ULONGLONG gap_ms = now_ms - m_fb_last_entry_ms;
-			if (gap_ms > 100)
-				;//logWrite(_T("[ffi/src/video/diag] FillBuffer entry gap %llums (call #%d since seek)"),
-					//gap_ms, m_fb_count_since_seek);
+			if (gap_ms > 80)
+				logWrite(_T("[ffi/src/video/diag] FillBuffer entry gap %llums (call #%d since seek — video 흐름 끊김)"),
+					gap_ms, m_fb_count_since_seek);
 		}
 		m_fb_last_entry_ms = now_ms;
 		++m_fb_count_since_seek;
@@ -604,9 +615,9 @@ namespace ffi
 		{
 			static thread_local int s_vfill = 0;
 			if ((++s_vfill % 120) == 0)
-				logWrite(_T("[ffi/src/avsync/v] v_rtStart_ms=%lld v_pts_ms=%lld sc=%lld"),
-					(long long)(m_last_rtStart / 10000), (long long)m_last_emitted_pts_ms.load(),
-					(long long)m_sample_count);
+				;//logWrite(_T("[ffi/src/avsync/v] v_rtStart_ms=%lld v_pts_ms=%lld sc=%lld"),
+					//(long long)(m_last_rtStart / 10000), (long long)m_last_emitted_pts_ms.load(),
+					//(long long)m_sample_count);
 		}
 
 		//flush 후 첫 sample 에 Discontinuity flag — renderer 의 internal state reset 알림.
@@ -633,6 +644,21 @@ namespace ffi
 				//(long long)(clk < 0 ? -1 : clk / 10000),
 				//(long long)(clk < 0 ? 0 : (rtStart - clk) / 10000),
 				//(int)((frame->flags & AV_FRAME_FLAG_KEY) ? 1 : 0));
+		}
+
+		//[seekgap-video] seek 후 첫 8 fill 의 video delivery story — audio seekgap 과 대칭. 트랙이동 시 "영상이 잠깐 멈춤"의
+		//단계별 신호를 한 줄씩 남긴다. skip(=keyframe→target pre-target skip 수, 크면 디코드량 폭증 → A/V 동시 끊김 원인),
+		//wait_q(=큐 starve ms, 디코더가 못 따라옴), rtStart_ms(=0 근처여야 즉시 표시. 크면 렌더러가 미래 frame 으로 보고 hold),
+		//clk_diff(=rtStart - streamClock. 양수로 크면 렌더러가 표시를 미룸=정지로 보임).
+		if (m_fb_count_since_seek <= 8)
+		{
+			CRefTime stream_t;
+			REFERENCE_TIME clk = (m_pFilter && m_pFilter->StreamTime(stream_t) == S_OK) ? (REFERENCE_TIME)stream_t : -1;
+			logWrite(_T("[ffi/src/video/seekgap] fill#=%d +%llums skip=%d wait_q=%dms rtStart_ms=%lld clk_diff_ms=%lld key=%d sc=%lld"),
+				m_fb_count_since_seek, m_seek_t0_ms ? (GetTickCount64() - m_seek_t0_ms) : 0ULL,
+				skipped, wait_v_ms, (long long)(rtStart / 10000),
+				(long long)(clk < 0 ? 0 : (rtStart - clk) / 10000),
+				(int)((frame->flags & AV_FRAME_FLAG_KEY) ? 1 : 0), (long long)m_sample_count);
 		}
 
 		av_frame_free(&frame);
@@ -1058,9 +1084,10 @@ namespace ffi
 					if (s_raw < 10)
 					{
 						++s_raw;
-						logWrite(_T("[ffi/src/avsync/raw] #%d nb_samples=%d frame_sr=%d ctx_sr=%d pts=%lld tb=%d/%d"),
-							s_raw, frame->nb_samples, frame->sample_rate, m_out_sample_rate,
-							(long long)frame->pts, audio_tb.num, audio_tb.den);
+						//swr in_rate 교정 조사용 — 끊김 추적과 무관. 끔.
+						//logWrite(_T("[ffi/src/avsync/raw] #%d nb_samples=%d frame_sr=%d ctx_sr=%d pts=%lld tb=%d/%d"),
+							//s_raw, frame->nb_samples, frame->sample_rate, m_out_sample_rate,
+							//(long long)frame->pts, audio_tb.num, audio_tb.den);
 					}
 				}
 
@@ -1128,8 +1155,8 @@ namespace ffi
 				m_pSource->set_av_stretch(stretch);
 				static thread_local int s_stretch_log = 0;
 				if ((s_stretch_log++ % 200) == 0)
-					logWrite(_T("[ffi/src/avsync] video_stretch=%.4f (cumulative, sc=%lld span_ms=%lld)"),
-						stretch, (long long)m_sample_count, (long long)(span_rt / 10000));
+					;//logWrite(_T("[ffi/src/avsync] video_stretch=%.4f (cumulative, sc=%lld span_ms=%lld)"),
+						//stretch, (long long)m_sample_count, (long long)(span_rt / 10000));
 			}
 		}
 
@@ -1320,16 +1347,17 @@ namespace ffi
 		//(측정) A/V drift — sample_count 진행 vs 실제 audio PTS 진행. 둘이 벌어지면 audio 가 video 대비 빠름/느림.
 		//sc_ms = sample_count 기반(=rtStart 의 offset 제외분), apts_ms = 실제 audio PTS 가 anchor 이후 진행한 시간.
 		//diff(=apts-sc) 가 0 근처면 정상, 선형 증가/감소면 그 부호·기울기가 drift 방향·속도.
-		if ((s_fill_count % 200) == 0 && m_avsync_anchor_apts_rt != LLONG_MIN
-			&& frame->pts != AV_NOPTS_VALUE && audio_tb.num > 0 && audio_tb.den > 0)
-		{
-			int64_t cur_apts_rt = av_rescale_q(frame->pts, audio_tb, AVRational{1, 10000000});
-			long long sc_ms = (long long)((rtStart - m_audio_offset_rt) / 10000);
-			long long apts_ms = (long long)((cur_apts_rt - m_avsync_anchor_apts_rt) / 10000);
-			long long a_pts_abs_ms = (long long)av_rescale_q(frame->pts, audio_tb, AVRational{1, 1000});
-			logWrite(_T("[ffi/src/avsync] sc_ms=%lld apts_ms=%lld diff(apts-sc)=%lldms a_pts_abs_ms=%lld sr=%d sc=%lld"),
-				sc_ms, apts_ms, apts_ms - sc_ms, a_pts_abs_ms, m_out_sample_rate, (long long)m_sample_count);
-		}
+		//(measure) A/V drift — 다른 조사(드리프트)용 per-frame 노이즈. 끊김 추적 중엔 끔.
+		//if ((s_fill_count % 200) == 0 && m_avsync_anchor_apts_rt != LLONG_MIN
+		//	&& frame->pts != AV_NOPTS_VALUE && audio_tb.num > 0 && audio_tb.den > 0)
+		//{
+		//	int64_t cur_apts_rt = av_rescale_q(frame->pts, audio_tb, AVRational{1, 10000000});
+		//	long long sc_ms = (long long)((rtStart - m_audio_offset_rt) / 10000);
+		//	long long apts_ms = (long long)((cur_apts_rt - m_avsync_anchor_apts_rt) / 10000);
+		//	long long a_pts_abs_ms = (long long)av_rescale_q(frame->pts, audio_tb, AVRational{1, 1000});
+		//	logWrite(_T("[ffi/src/avsync] sc_ms=%lld apts_ms=%lld diff(apts-sc)=%lldms a_pts_abs_ms=%lld sr=%d sc=%lld"),
+		//		sc_ms, apts_ms, apts_ms - sc_ms, a_pts_abs_ms, m_out_sample_rate, (long long)m_sample_count);
+		//}
 
 		pSample->SetTime(&rtStart, &rtStop);
 
@@ -1370,7 +1398,11 @@ namespace ffi
 				IMediaSample* pSample;
 
 				m_audio_loop_state.store(1);
+				ULONGLONG t_gdb0 = GetTickCount64();
 				HRESULT hr = GetDeliveryBuffer(&pSample, NULL, NULL, 0);
+				ULONGLONG t_gdb_ms = GetTickCount64() - t_gdb0;
+				if (t_gdb_ms > 50)
+					logWrite(_T("[ffi/src/audio/diag] GetDeliveryBuffer wait %llums (다운스트림이 버퍼 반납 안 함)"), t_gdb_ms);
 
 				if (FAILED(hr))
 				{
@@ -1385,8 +1417,12 @@ namespace ffi
 				if (hr == S_OK)
 				{
 					m_audio_loop_state.store(3);
+					ULONGLONG t_dlv0 = GetTickCount64();
 					hr = Deliver(pSample);
+					ULONGLONG t_dlv_ms = GetTickCount64() - t_dlv0;
 					m_audio_loop_state.store(0);
+					if (t_dlv_ms > 50)
+						logWrite(_T("[ffi/src/audio/diag] Deliver BLOCKED %llums (DSound input 큐 full = 오디오 렌더러/클럭 stall 신호)"), t_dlv_ms);
 
 					pSample->Release();
 					if (hr != S_OK)

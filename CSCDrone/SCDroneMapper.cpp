@@ -695,6 +695,367 @@ static std::vector<CSCDrone> build_halftone(CSCD2Image& img, int target_count, d
 }
 
 // ============================================================================
+// 드론 물리(크기 고정 + 색·밝기 가변) 친화 알고리즘 5종 (build_halftone 패턴 변형).
+// 공통 helper(hilbert_of / make_filler_padding / map_cand) 재사용.
+// ============================================================================
+
+// 픽셀 → 전경 마스크 + 그레이/RGB 버퍼 계산. halftone 등에서 쓰는 패턴을 함수로 분리하지 않고 인라인.
+// (코드 중복 최소화 위해 lambda 로 캡슐화하는 패턴은 추후 리팩토링 — 일단 prototype.)
+
+// 1) bright_mod — 균일 그리드 + 픽셀 색 + 명도 → 알파.
+//    halftone 베이스, radius 균일(r_max*0.7), color.a 가 셀 평균 명도에 비례.
+//    실제 LED 드론쇼에서 *드론 크기 고정·발광 강도 가변* 표현과 1:1.
+static std::vector<CSCDrone> build_bright_mod(CSCD2Image& img, int target_count, double /*edge_threshold*/, float world_extent)
+{
+	std::vector<CSCDrone> drones;
+	const int W = (int)img.get_width(), H = (int)img.get_height();
+	if (W < 3 || H < 3 || target_count < 1) return drones;
+	const size_t N = (size_t)W * H;
+
+	std::vector<unsigned char> gray(N), rbuf(N), gbuf(N), bbuf(N), alpha(N), fg(N, 1);
+	bool has_alpha = false;
+	for (int y = 0; y < H; ++y)
+		for (int x = 0; x < W; ++x)
+		{
+			const Gdiplus::Color c = img.get_pixel(x, y);
+			const size_t i = (size_t)y * W + x;
+			rbuf[i] = c.GetR(); gbuf[i] = c.GetG(); bbuf[i] = c.GetB();
+			gray[i] = (unsigned char)(0.299 * c.GetR() + 0.587 * c.GetG() + 0.114 * c.GetB());
+			alpha[i] = c.GetA();
+			if (c.GetA() < 250) has_alpha = true;
+		}
+	// 전경 마스크 (alpha 우선, 없으면 배경색 추정).
+	if (has_alpha)
+	{
+		for (size_t i = 0; i < N; ++i) fg[i] = alpha[i] > 127 ? 1 : 0;
+	}
+	else
+	{
+		double sr=0, sg=0, sb=0; long bc=0;
+		auto acc=[&](int x,int y){ const size_t i=(size_t)y*W+x; sr+=rbuf[i]; sg+=gbuf[i]; sb+=bbuf[i]; ++bc; };
+		for (int x=0;x<W;++x){ acc(x,0); acc(x,H-1); }
+		for (int y=1;y<H-1;++y){ acc(0,y); acc(W-1,y); }
+		const double bgR=sr/bc, bgG=sg/bc, bgB=sb/bc;
+		const double thr2=48.0*48.0;
+		for (size_t i=0;i<N;++i){ const double dr=rbuf[i]-bgR, dg=gbuf[i]-bgG, db=bbuf[i]-bgB; fg[i] = (dr*dr+dg*dg+db*db) > thr2 ? 1 : 0; }
+	}
+
+	const int HN = 1024;
+	// 격자 간격 — halftone 과 동일 알고리즘으로 K 안에 들어가는 최소 g.
+	auto count_cells = [&](int g) { int n=0; for (int cy=g/2; cy<H; cy+=g) for (int cx=g/2; cx<W; cx+=g) if (fg[(size_t)cy*W+cx]) ++n; return n; };
+	int g = 4;
+	{ int lo=2, hi=400, best=400; while (lo<=hi){ const int mid=(lo+hi)/2; if (count_cells(mid)<=target_count){ best=mid; hi=mid-1; } else lo=mid+1; } g=best; }
+
+	const float s = 2.0f * world_extent / (float)((H>W)?H:W);
+	const float cxf = W*0.5f, cyf = H*0.5f;
+	const float r_max = g * s * 0.5f;
+	const float radius_fixed = r_max * 0.7f;	// 균일 크기(드론 물리)
+
+	struct hd { long long h; CSCDrone d; };
+	std::vector<hd> reals;
+	std::vector<map_cand> reals_xy;
+	const int half = g / 2;
+	for (int yy = half; yy < H; yy += g)
+		for (int xx = half; xx < W; xx += g)
+		{
+			if (!fg[(size_t)yy*W+xx]) continue;
+			long sr=0, sg=0, sb=0, sl=0, cnt=0;
+			for (int dy=-half; dy<=half; ++dy) for (int dx=-half; dx<=half; ++dx)
+			{
+				const int px=xx+dx, py=yy+dy;
+				if (px<0||px>=W||py<0||py>=H) continue;
+				const size_t pi=(size_t)py*W+px;
+				if (!fg[pi]) continue;
+				sr+=rbuf[pi]; sg+=gbuf[pi]; sb+=bbuf[pi]; sl+=gray[pi]; ++cnt;
+			}
+			if (cnt==0) continue;
+			const double brightness = (sl / (double)cnt) / 255.0;	// 0~1
+			// 알파 = brightness, 단 최저 0.15 (너무 어두워도 약간 발광 — 형상 보존).
+			const BYTE a = (BYTE)(255 * (std::max)(0.15, brightness));
+			const Gdiplus::Color col(a, (BYTE)(sr/cnt), (BYTE)(sg/cnt), (BYTE)(sb/cnt));
+			const SCDVec3 pos{ (xx-cxf)*s, -(yy-cyf)*s, 0.0f };
+			const long long h = hilbert_of(W, H, HN, xx, yy);
+			reals.push_back({ h, CSCDrone(pos, col, radius_fixed) });
+			reals_xy.push_back({ xx, yy, h, false });
+		}
+	if (reals.empty()) return drones;
+
+	const std::vector<map_cand> bg_cands = make_filler_padding(reals_xy, target_count - (int)reals.size(), W, H, HN, g);
+	std::vector<hd> all = std::move(reals);
+	for (const map_cand& c : bg_cands)
+	{
+		const SCDVec3 pos{ (c.x-cxf)*s, -(c.y-cyf)*s, 0.0f };
+		CSCDrone d(pos, Gdiplus::Color(255, 255, 255, 255), radius_fixed * 0.5f);
+		d.set_unused(true);
+		all.push_back({ c.h, d });
+	}
+	std::sort(all.begin(), all.end(), [](const hd& a, const hd& b){ return a.h < b.h; });
+	drones.reserve(all.size());
+	for (const hd& e : all) drones.push_back(e.d);
+	return drones;
+}
+
+// 2) soft_edge — 균일 그리드 + neighborhood fg ratio → 알파(부드러운 윤곽).
+//    fg 0/1 binary 대신 5x5 neighborhood 의 fg 비율로 알파 결정.
+//    경계 셀 = 비율 ~0.5 → 알파 ~0.5 → fade. AA 의 sub-pixel coverage 원리.
+static std::vector<CSCDrone> build_soft_edge(CSCD2Image& img, int target_count, double /*edge_threshold*/, float world_extent)
+{
+	std::vector<CSCDrone> drones;
+	const int W = (int)img.get_width(), H = (int)img.get_height();
+	if (W < 3 || H < 3 || target_count < 1) return drones;
+	const size_t N = (size_t)W * H;
+
+	std::vector<unsigned char> rbuf(N), gbuf(N), bbuf(N), alpha(N), fg(N, 1);
+	bool has_alpha = false;
+	for (int y = 0; y < H; ++y)
+		for (int x = 0; x < W; ++x)
+		{
+			const Gdiplus::Color c = img.get_pixel(x, y);
+			const size_t i = (size_t)y*W+x;
+			rbuf[i]=c.GetR(); gbuf[i]=c.GetG(); bbuf[i]=c.GetB(); alpha[i]=c.GetA();
+			if (c.GetA()<250) has_alpha=true;
+		}
+	if (has_alpha) { for (size_t i=0;i<N;++i) fg[i] = alpha[i]>127?1:0; }
+	else
+	{
+		double sr=0,sg=0,sb=0; long bc=0;
+		auto acc=[&](int x,int y){ const size_t i=(size_t)y*W+x; sr+=rbuf[i]; sg+=gbuf[i]; sb+=bbuf[i]; ++bc; };
+		for (int x=0;x<W;++x){ acc(x,0); acc(x,H-1); }
+		for (int y=1;y<H-1;++y){ acc(0,y); acc(W-1,y); }
+		const double bgR=sr/bc, bgG=sg/bc, bgB=sb/bc;
+		const double thr2=48.0*48.0;
+		for (size_t i=0;i<N;++i){ const double dr=rbuf[i]-bgR, dg=gbuf[i]-bgG, db=bbuf[i]-bgB; fg[i]=(dr*dr+dg*dg+db*db)>thr2?1:0; }
+	}
+
+	const int HN = 1024;
+	// 격자 — soft_edge 는 외부 fade 까지 그리므로 fg 셀 + neighborhood 점수 > 0 셀 모두 카운트.
+	auto count_cells = [&](int g) {
+		int n=0;
+		for (int cy=g/2; cy<H; cy+=g) for (int cx=g/2; cx<W; cx+=g)
+		{
+			int fc=0, tc=0;
+			for (int dy=-2; dy<=2; ++dy) for (int dx=-2; dx<=2; ++dx) {
+				const int px=cx+dx, py=cy+dy;
+				if (px<0||px>=W||py<0||py>=H) continue;
+				if (fg[(size_t)py*W+px]) ++fc; ++tc;
+			}
+			if (fc > 0) ++n;
+		}
+		return n;
+	};
+	int g = 4;
+	{ int lo=2, hi=400, best=400; while (lo<=hi){ const int mid=(lo+hi)/2; if (count_cells(mid)<=target_count){ best=mid; hi=mid-1; } else lo=mid+1; } g=best; }
+
+	const float s = 2.0f * world_extent / (float)((H>W)?H:W);
+	const float cxf = W*0.5f, cyf = H*0.5f;
+	const float r_max = g * s * 0.5f;
+	const float radius_fixed = r_max * 0.7f;
+
+	struct hd { long long h; CSCDrone d; };
+	std::vector<hd> reals;
+	std::vector<map_cand> reals_xy;
+	const int half = g/2;
+	for (int yy=half; yy<H; yy+=g) for (int xx=half; xx<W; xx+=g)
+	{
+		int fc=0, tc=0;
+		long sr=0, sg=0, sb=0, cnt=0;
+		for (int dy=-2; dy<=2; ++dy) for (int dx=-2; dx<=2; ++dx)
+		{
+			const int px=xx+dx, py=yy+dy;
+			if (px<0||px>=W||py<0||py>=H) continue;
+			const size_t pi=(size_t)py*W+px;
+			if (fg[pi]) { ++fc; sr+=rbuf[pi]; sg+=gbuf[pi]; sb+=bbuf[pi]; ++cnt; }
+			++tc;
+		}
+		if (fc == 0 || cnt == 0) continue;
+		const double soft = (double)fc / tc;	// 0~1, 경계는 ~0.5, 깊은 안쪽은 1.0
+		const BYTE a = (BYTE)(255 * soft);
+		const Gdiplus::Color col(a, (BYTE)(sr/cnt), (BYTE)(sg/cnt), (BYTE)(sb/cnt));
+		const SCDVec3 pos{ (xx-cxf)*s, -(yy-cyf)*s, 0.0f };
+		const long long h = hilbert_of(W, H, HN, xx, yy);
+		reals.push_back({ h, CSCDrone(pos, col, radius_fixed) });
+		reals_xy.push_back({ xx, yy, h, false });
+	}
+	if (reals.empty()) return drones;
+
+	const std::vector<map_cand> bg_cands = make_filler_padding(reals_xy, target_count - (int)reals.size(), W, H, HN, g);
+	std::vector<hd> all = std::move(reals);
+	for (const map_cand& c : bg_cands)
+	{
+		const SCDVec3 pos{ (c.x-cxf)*s, -(c.y-cyf)*s, 0.0f };
+		CSCDrone d(pos, Gdiplus::Color(255, 255, 255, 255), radius_fixed*0.5f);
+		d.set_unused(true);
+		all.push_back({ c.h, d });
+	}
+	std::sort(all.begin(), all.end(), [](const hd& a, const hd& b){ return a.h < b.h; });
+	drones.reserve(all.size());
+	for (const hd& e : all) drones.push_back(e.d);
+	return drones;
+}
+
+// 3) stipple — 명도 기반 상위 K 픽셀 선택(점 밀도가 형상).
+//    프로토타입: gray 값으로 정렬, 상위 target_count 픽셀에 점 배치.
+//    정식 dithering (Floyd-Steinberg) 은 후속 — 일단 단순 buckets / random sample.
+static std::vector<CSCDrone> build_stipple(CSCD2Image& img, int target_count, double /*edge_threshold*/, float world_extent)
+{
+	std::vector<CSCDrone> drones;
+	const int W = (int)img.get_width(), H = (int)img.get_height();
+	if (W < 3 || H < 3 || target_count < 1) return drones;
+	const size_t N = (size_t)W * H;
+
+	std::vector<unsigned char> gray(N), rbuf(N), gbuf(N), bbuf(N);
+	for (int y=0; y<H; ++y) for (int x=0; x<W; ++x)
+	{
+		const Gdiplus::Color c = img.get_pixel(x, y);
+		const size_t i = (size_t)y*W+x;
+		rbuf[i]=c.GetR(); gbuf[i]=c.GetG(); bbuf[i]=c.GetB();
+		gray[i] = (unsigned char)(0.299*c.GetR() + 0.587*c.GetG() + 0.114*c.GetB());
+	}
+
+	// stride 로 픽셀 sub-sample → 그 중 명도 높은 상위 K. 모든 픽셀 정렬은 비용 큼.
+	const int stride = (std::max)(1, (int)std::sqrt((double)N / (target_count * 4)));	// 후보 ~4K
+	std::vector<std::pair<int, int>> cand;	// (gray, idx)
+	cand.reserve((W/stride) * (H/stride) + 16);
+	for (int y=0; y<H; y+=stride) for (int x=0; x<W; x+=stride)
+		cand.push_back({ -(int)gray[(size_t)y*W+x], (int)((size_t)y*W+x) });	// 음수 → 큰 명도 먼저
+	std::sort(cand.begin(), cand.end());
+	const int take = (std::min)(target_count, (int)cand.size());
+
+	const int HN = 1024;
+	const float s = 2.0f * world_extent / (float)((H>W)?H:W);
+	const float cxf = W*0.5f, cyf = H*0.5f;
+	const float radius_fixed = (stride * s) * 0.4f;
+
+	struct hd { long long h; CSCDrone d; };
+	std::vector<hd> reals;
+	std::vector<map_cand> reals_xy;
+	for (int k=0; k<take; ++k)
+	{
+		const int idx = cand[k].second;
+		const int xx = idx % W, yy = idx / W;
+		const size_t pi = (size_t)idx;
+		const Gdiplus::Color col(255, rbuf[pi], gbuf[pi], bbuf[pi]);
+		const SCDVec3 pos{ (xx-cxf)*s, -(yy-cyf)*s, 0.0f };
+		const long long h = hilbert_of(W, H, HN, xx, yy);
+		reals.push_back({ h, CSCDrone(pos, col, radius_fixed) });
+		reals_xy.push_back({ xx, yy, h, false });
+	}
+	if (reals.empty()) return drones;
+
+	const std::vector<map_cand> bg_cands = make_filler_padding(reals_xy, target_count - (int)reals.size(), W, H, HN, stride);
+	std::vector<hd> all = std::move(reals);
+	for (const map_cand& c : bg_cands)
+	{
+		const SCDVec3 pos{ (c.x-cxf)*s, -(c.y-cyf)*s, 0.0f };
+		CSCDrone d(pos, Gdiplus::Color(255, 255, 255, 255), radius_fixed*0.5f);
+		d.set_unused(true);
+		all.push_back({ c.h, d });
+	}
+	std::sort(all.begin(), all.end(), [](const hd& a, const hd& b){ return a.h < b.h; });
+	drones.reserve(all.size());
+	for (const hd& e : all) drones.push_back(e.d);
+	return drones;
+}
+
+// 4) layered — 전경 마스크 안 균일 그리드. radius·alpha 균일, 색만 픽셀 sample.
+//    bright_mod 의 *알파 변조 없는* 단순 on/off 버전.
+static std::vector<CSCDrone> build_layered(CSCD2Image& img, int target_count, double /*edge_threshold*/, float world_extent)
+{
+	std::vector<CSCDrone> drones;
+	const int W = (int)img.get_width(), H = (int)img.get_height();
+	if (W < 3 || H < 3 || target_count < 1) return drones;
+	const size_t N = (size_t)W*H;
+
+	std::vector<unsigned char> rbuf(N), gbuf(N), bbuf(N), alpha(N), fg(N, 1);
+	bool has_alpha = false;
+	for (int y=0; y<H; ++y) for (int x=0; x<W; ++x)
+	{
+		const Gdiplus::Color c = img.get_pixel(x, y);
+		const size_t i = (size_t)y*W+x;
+		rbuf[i]=c.GetR(); gbuf[i]=c.GetG(); bbuf[i]=c.GetB(); alpha[i]=c.GetA();
+		if (c.GetA()<250) has_alpha=true;
+	}
+	if (has_alpha) { for (size_t i=0;i<N;++i) fg[i] = alpha[i]>127?1:0; }
+	else
+	{
+		double sr=0,sg=0,sb=0; long bc=0;
+		auto acc=[&](int x,int y){ const size_t i=(size_t)y*W+x; sr+=rbuf[i]; sg+=gbuf[i]; sb+=bbuf[i]; ++bc; };
+		for (int x=0;x<W;++x){ acc(x,0); acc(x,H-1); }
+		for (int y=1;y<H-1;++y){ acc(0,y); acc(W-1,y); }
+		const double bgR=sr/bc, bgG=sg/bc, bgB=sb/bc;
+		const double thr2=48.0*48.0;
+		for (size_t i=0;i<N;++i){ const double dr=rbuf[i]-bgR, dg=gbuf[i]-bgG, db=bbuf[i]-bgB; fg[i]=(dr*dr+dg*dg+db*db)>thr2?1:0; }
+	}
+
+	const int HN = 1024;
+	auto count_cells = [&](int g) { int n=0; for (int cy=g/2; cy<H; cy+=g) for (int cx=g/2; cx<W; cx+=g) if (fg[(size_t)cy*W+cx]) ++n; return n; };
+	int g = 4;
+	{ int lo=2, hi=400, best=400; while (lo<=hi){ const int mid=(lo+hi)/2; if (count_cells(mid)<=target_count){ best=mid; hi=mid-1; } else lo=mid+1; } g=best; }
+
+	const float s = 2.0f * world_extent / (float)((H>W)?H:W);
+	const float cxf = W*0.5f, cyf = H*0.5f;
+	const float r_max = g * s * 0.5f;
+	const float radius_fixed = r_max * 0.7f;
+
+	struct hd { long long h; CSCDrone d; };
+	std::vector<hd> reals;
+	std::vector<map_cand> reals_xy;
+	const int half = g/2;
+	for (int yy=half; yy<H; yy+=g) for (int xx=half; xx<W; xx+=g)
+	{
+		if (!fg[(size_t)yy*W+xx]) continue;
+		long sr=0,sg=0,sb=0, cnt=0;
+		for (int dy=-half; dy<=half; ++dy) for (int dx=-half; dx<=half; ++dx)
+		{
+			const int px=xx+dx, py=yy+dy;
+			if (px<0||px>=W||py<0||py>=H) continue;
+			const size_t pi=(size_t)py*W+px;
+			if (!fg[pi]) continue;
+			sr+=rbuf[pi]; sg+=gbuf[pi]; sb+=bbuf[pi]; ++cnt;
+		}
+		if (cnt==0) continue;
+		const Gdiplus::Color col(255, (BYTE)(sr/cnt), (BYTE)(sg/cnt), (BYTE)(sb/cnt));	// 알파 풀, on/off 만
+		const SCDVec3 pos{ (xx-cxf)*s, -(yy-cyf)*s, 0.0f };
+		const long long h = hilbert_of(W, H, HN, xx, yy);
+		reals.push_back({ h, CSCDrone(pos, col, radius_fixed) });
+		reals_xy.push_back({ xx, yy, h, false });
+	}
+	if (reals.empty()) return drones;
+
+	const std::vector<map_cand> bg_cands = make_filler_padding(reals_xy, target_count - (int)reals.size(), W, H, HN, g);
+	std::vector<hd> all = std::move(reals);
+	for (const map_cand& c : bg_cands)
+	{
+		const SCDVec3 pos{ (c.x-cxf)*s, -(c.y-cyf)*s, 0.0f };
+		CSCDrone d(pos, Gdiplus::Color(255, 255, 255, 255), radius_fixed*0.5f);
+		d.set_unused(true);
+		all.push_back({ c.h, d });
+	}
+	std::sort(all.begin(), all.end(), [](const hd& a, const hd& b){ return a.h < b.h; });
+	drones.reserve(all.size());
+	for (const hd& e : all) drones.push_back(e.d);
+	return drones;
+}
+
+// 5) hybrid — edge contour(외곽) + 내부 sparse 그리드(색 채움).
+//    프로토타입: edge 결과 70% + 내부 그리드 30% mix. 정확한 비율은 사용자 결과 보고 조율.
+static std::vector<CSCDrone> build_hybrid(CSCD2Image& img, int target_count, double edge_threshold, float world_extent)
+{
+	const int edge_budget = (int)(target_count * 0.6);
+	const int fill_budget = target_count - edge_budget;
+	// edge 점들 (forward declaration 없이 같은 .cpp 안이라 직접 호출 가능).
+	std::vector<CSCDrone> edge_drones = build_edge(img, edge_budget, edge_threshold, world_extent);
+	std::vector<CSCDrone> fill_drones = build_layered(img, fill_budget, edge_threshold, world_extent);
+
+	// 단순 concat — 두 결과를 합치고 Hilbert 재정렬은 생략(prototype). 모핑 품질은 sub-optimal 일 수 있음.
+	std::vector<CSCDrone> all;
+	all.reserve(edge_drones.size() + fill_drones.size());
+	for (const auto& d : edge_drones) all.push_back(d);
+	for (const auto& d : fill_drones) all.push_back(d);
+	return all;
+}
+
+// ============================================================================
 // 디스패처
 // ============================================================================
 std::vector<CSCDrone> build_drones_from_image(CSCD2Image& img, drone_map_algorithm algorithm,
@@ -702,12 +1063,14 @@ std::vector<CSCDrone> build_drones_from_image(CSCD2Image& img, drone_map_algorit
 {
 	switch (algorithm)
 	{
-	case drone_map_algorithm::tone_fill:
-		return build_tone_fill(img, target_count, edge_threshold, world_extent);
-	case drone_map_algorithm::halftone:
-		return build_halftone(img, target_count, edge_threshold, world_extent);
+	case drone_map_algorithm::tone_fill:  return build_tone_fill (img, target_count, edge_threshold, world_extent);
+	case drone_map_algorithm::halftone:   return build_halftone  (img, target_count, edge_threshold, world_extent);
+	case drone_map_algorithm::bright_mod: return build_bright_mod(img, target_count, edge_threshold, world_extent);
+	case drone_map_algorithm::soft_edge:  return build_soft_edge (img, target_count, edge_threshold, world_extent);
+	case drone_map_algorithm::stipple:    return build_stipple   (img, target_count, edge_threshold, world_extent);
+	case drone_map_algorithm::layered:    return build_layered   (img, target_count, edge_threshold, world_extent);
+	case drone_map_algorithm::hybrid:     return build_hybrid    (img, target_count, edge_threshold, world_extent);
 	case drone_map_algorithm::edge:
-	default:
-		return build_edge(img, target_count, edge_threshold, world_extent);
+	default:                              return build_edge      (img, target_count, edge_threshold, world_extent);
 	}
 }

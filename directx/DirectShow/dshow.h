@@ -296,6 +296,16 @@ public:
 	bool			get_video_mirror() { return m_mirror; }
 	bool			get_video_flip() { return m_flip; }
 
+	//[ambient pillarbox] 풀스크린에서 좌우 필러박스 여백을 영상 가장자리 색으로 연하게 그라디언트 칠하기(유튜브 ambient).
+	//on=true 면 set_video_position 의 MPC-VR 경로가 *필러박스일 때만* 렌더러 창을 영상 rect 로 줄여 좌우 여백을
+	//부모(호스트)가 소유·paint 하게 한다. off / letterbox / panscan / non-MPCVR 면 기존(전체 client) 동작 그대로.
+	void			set_ambient_pillarbox(bool on);
+	bool			is_ambient_pillarbox() const { return m_ambient_pillarbox; }
+	//현재 좌우 바 영역(부모 client 좌표) 반환. 바가 없으면(필러박스 아님/비활성) false. 호스트가 paint·invalidate 에 사용.
+	bool			get_ambient_bars(CRect& left_bar, CRect& right_bar) const;
+	//현재 표시 프레임의 좌/우 가장자리 평균색 샘플(저빈도 호출 권장 — 내부 GPU readback). 재생 중일 때만 갱신.
+	bool			sample_pillarbox_edge_colors(Gdiplus::Color& left, Gdiplus::Color& right);
+
 	//영상 회전 — MPC Video Renderer 의 IExFilterConfig "rotation" 사용 (90 배수).
 	//VMR9/EVR 는 SetOutputRect 가 반사만 되고 회전 파라미터가 없어 미지원 (false 반환).
 	bool			set_video_rotation(int degrees);	//절대 각도 (0/90/180/270 로 정규화). core.
@@ -493,6 +503,12 @@ protected:
 	float			m_panscan_left, m_panscan_top, m_panscan_right, m_panscan_bottom;
 	//set_video_position 의 마지막 호출 rect — set_video_pan_scan 에서 panscan refresh 시 재사용.
 	CRect			m_last_video_position_rect;
+
+	//[ambient pillarbox]
+	bool			m_ambient_pillarbox = false;	//호스트가 켠 ambient 요청(풀스크린 진입 시 true).
+	bool			m_ambient_active = false;		//실제로 좌우 바가 표시 중인가(필러박스 + 조건 충족). set_video_position 이 갱신.
+	CRect			m_ambient_video_rect;			//ambient 활성 시 영상 영역(부모 client 좌표). 좌우 바는 이 rect 바깥.
+	CRect			m_ambient_full_rect;			//ambient 활성 시 전체 영역(부모 client 좌표). 바 계산 기준.
 
 	BOOL VerifyVMR9(void);
 

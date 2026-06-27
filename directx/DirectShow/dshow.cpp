@@ -3345,15 +3345,44 @@ void CDShow::set_video_position(CRect r)
 			int final_w = (int)((m_panscan_right - m_panscan_left) * vid_w + 0.5f);
 			int final_h = (int)((m_panscan_bottom - m_panscan_top) * vid_h + 0.5f);
 
+			//[ambient pillarbox] 좌우 필러박스가 있고(vid_x>0, 세로 꽉 참) 변형(회전/미러/플립/panscan)이 없을 때만,
+			//렌더러 창을 영상 rect 로 줄여 좌우 여백을 부모(호스트)가 소유·paint 하게 한다. 그 외에는 기존 전체 client 동작.
+			bool panscan_identity = (m_panscan_left == 0.0f && m_panscan_top == 0.0f &&
+									 m_panscan_right == 1.0f && m_panscan_bottom == 1.0f);
+			bool ambient_eligible = m_ambient_pillarbox && m_keep_aspect &&
+									m_video_rotation == 0 && !m_mirror && !m_flip && panscan_identity &&
+									vid_x > 0 && vid_y == 0 && vid_w > 0 && vid_h > 0 && win_w > 0 && win_h > 0;
+
 			CComQIPtr<IBasicVideo> pBV(m_VMR);
-			if (pBV)
-			{
-				pBV->SetDefaultSourcePosition();
-				pBV->SetDestinationPosition(final_x, final_y, final_w, final_h);
-			}
 			CComQIPtr<IVideoWindow> pVW(m_VMR);
-			if (pVW)
-				pVW->SetWindowPosition(r.left, r.top, win_w, win_h);
+			if (ambient_eligible)
+			{
+				//렌더러는 영상 영역만 덮는다 → 좌우 여백은 부모 client 로 노출.
+				if (pBV)
+				{
+					pBV->SetDefaultSourcePosition();
+					pBV->SetDestinationPosition(0, 0, vid_w, vid_h);
+				}
+				if (pVW)
+					pVW->SetWindowPosition(r.left + vid_x, r.top + vid_y, vid_w, vid_h);
+
+				m_ambient_active	= true;
+				m_ambient_full_rect = r;
+				m_ambient_video_rect= CRect(r.left + vid_x, r.top + vid_y,
+											r.left + vid_x + vid_w, r.top + vid_y + vid_h);
+			}
+			else
+			{
+				if (pBV)
+				{
+					pBV->SetDefaultSourcePosition();
+					pBV->SetDestinationPosition(final_x, final_y, final_w, final_h);
+				}
+				if (pVW)
+					pVW->SetWindowPosition(r.left, r.top, win_w, win_h);
+
+				m_ambient_active = false;
+			}
 
 			//panscan refresh 위해 base rect 기억.
 			m_last_video_position_rect = r;
@@ -4117,6 +4146,76 @@ bool CDShow::capture_frame(CSCGdiplusBitmap& out)
 
 	CoTaskMemFree(lpDib);
 	return ok;
+}
+
+void CDShow::set_ambient_pillarbox(bool on)
+{
+	if (m_ambient_pillarbox == on)
+		return;
+	m_ambient_pillarbox = on;
+	//즉시 반영 — 마지막 video position rect 로 재적용해 렌더러 창 크기를 갱신(축소/복원). 호스트가 곧 set_video_position 을
+	//다시 불러도 무해(idempotent). off 로 끄면 렌더러가 전체 client 로 복원되고 m_ambient_active=false 가 된다.
+	if (!m_last_video_position_rect.IsRectEmpty())
+		set_video_position(m_last_video_position_rect);
+}
+
+bool CDShow::get_ambient_bars(CRect& left_bar, CRect& right_bar) const
+{
+	if (!m_ambient_active)
+		return false;
+	left_bar  = CRect(m_ambient_full_rect.left,   m_ambient_full_rect.top,
+					  m_ambient_video_rect.left,  m_ambient_full_rect.bottom);
+	right_bar = CRect(m_ambient_video_rect.right, m_ambient_full_rect.top,
+					  m_ambient_full_rect.right,  m_ambient_full_rect.bottom);
+	return true;
+}
+
+bool CDShow::sample_pillarbox_edge_colors(Gdiplus::Color& left, Gdiplus::Color& right)
+{
+	//재생 중일 때만 — capture_frame 은 paused 시 step_frame 부작용(위치 1프레임 이동)이 있어 ambient 샘플로는 쓰지 않는다.
+	if (get_play_state() != State_Running)
+		return false;
+
+	CSCGdiplusBitmap bmp;
+	if (!capture_frame(bmp) || !bmp.m_pBitmap)
+		return false;
+
+	UINT w = bmp.m_pBitmap->GetWidth();
+	UINT h = bmp.m_pBitmap->GetHeight();
+	if (w < 4 || h < 4)
+		return false;
+
+	Gdiplus::Rect lock_rc(0, 0, (INT)w, (INT)h);
+	Gdiplus::BitmapData data;
+	if (bmp.m_pBitmap->LockBits(&lock_rc, Gdiplus::ImageLockModeRead, PixelFormat32bppARGB, &data) != Gdiplus::Ok)
+		return false;
+
+	const int edge_cols = (w >= 16) ? 8 : (int)(w / 2);	//가장자리 몇 열을 평균.
+	const int row_step  = (h >= 64) ? (int)(h / 64) : 1;	//행은 최대 ~64 샘플(저비용).
+
+	unsigned long long lr = 0, lg = 0, lb = 0, rr = 0, rg = 0, rb = 0;
+	int lcount = 0, rcount = 0;
+	BYTE* base = (BYTE*)data.Scan0;
+	for (UINT y = 0; y < h; y += row_step)
+	{
+		BYTE* row = base + (int)y * data.Stride;
+		for (int x = 0; x < edge_cols; ++x)
+		{
+			//PixelFormat32bppARGB 는 메모리상 B,G,R,A 순서.
+			BYTE* pl = row + x * 4;
+			lb += pl[0]; lg += pl[1]; lr += pl[2]; ++lcount;
+			BYTE* pr = row + ((int)w - 1 - x) * 4;
+			rb += pr[0]; rg += pr[1]; rr += pr[2]; ++rcount;
+		}
+	}
+	bmp.m_pBitmap->UnlockBits(&data);
+
+	if (lcount == 0 || rcount == 0)
+		return false;
+
+	left  = Gdiplus::Color(255, (BYTE)(lr / lcount), (BYTE)(lg / lcount), (BYTE)(lb / lcount));
+	right = Gdiplus::Color(255, (BYTE)(rr / rcount), (BYTE)(rg / rcount), (BYTE)(rb / rcount));
+	return true;
 }
 
 bool CDShow::grab_preview_frame(double time_ms, int target_width, CSCGdiplusBitmap& out, bool exact)

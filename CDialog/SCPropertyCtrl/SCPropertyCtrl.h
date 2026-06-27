@@ -57,6 +57,23 @@ public:
 	bool create(CWnd* parent, int left = 0, int top = 0, int width = 280, int height = 400);
 	void set_color_theme(const CSCColorTheme& theme, bool invalidate = true);
 
+	// ── 폰트 / 색 커스터마이즈 ────────────────────────────────────────────
+	// 섹션 헤더 (Canvas/Transition/... 등) 와 항목(label+value) 의 폰트를 각각 변경.
+	// LOGFONT overload = 전권 (italic/underline/charset 등 모두 커버).
+	// (name, size, weight) overload = 부분 변경 편의 — nullptr/0 인자는 기존 유지.
+	// 색 override 는 Transparent default = theme 색 자동 사용 (theme 변경에 따라가게).
+	void			set_section_font		(const LOGFONT& lf);
+	void			set_section_font		(LPCTSTR name = nullptr, int size = 0, int weight = 0);
+	const LOGFONT&	get_section_font		() const { return m_lf_section; }
+
+	void			set_item_font			(const LOGFONT& lf);
+	void			set_item_font			(LPCTSTR name = nullptr, int size = 0, int weight = 0);
+	const LOGFONT&	get_item_font			() const { return m_lf_item; }
+
+	void			set_section_text_color	(Gdiplus::Color cr);	// 섹션 헤더 텍스트 (default = m_theme.cr_text)
+	void			set_item_label_color	(Gdiplus::Color cr);	// 항목 라벨 (default = m_theme.cr_text_dim)
+	void			set_item_value_color	(Gdiplus::Color cr);	// 항목 값 (default = m_theme.cr_text)
+
 	// ── 선언적 빌드 ──
 	void begin();											// 모든 행 제거(컨텍스트 교체 시작)
 	void section(const CString& title, bool expanded = true);
@@ -86,7 +103,8 @@ public:
 	{
 		field_type		type = field_type::info;
 		CString			label;
-		bool			enabled = true;			// set_enabled 가 토글. false 시 dim 표시 + 입력 차단.
+		bool			enabled = true;			// set_enabled 가 토글. false 시 dim 표시 + 입력 차단(자리 차지 유지).
+		bool			visible = true;			// set_visible 가 토글. false 시 자리도 안 차지(layout 에서 skip + 자식 hide).
 		// 바인딩(타입별 하나만 유효)
 		CString*		p_text  = nullptr;
 		int*			p_int   = nullptr;
@@ -151,6 +169,21 @@ public:
 	bool	set_tooltip				(const CString& label, const CString& tooltip = _T(""));
 	bool	set_tooltip_by_binding	(const void* binding, const CString& tooltip = _T(""));
 
+	// 가시성 — set_enabled 는 dim 표시(자리 유지), set_visible 는 자리도 빠짐(layout 에서 skip).
+	bool	set_visible				(const CString& label, bool visible);
+	bool	set_visible_by_binding	(const void* binding, bool visible);
+	bool	get_visible				(const CString& label) const;
+	bool	get_visible_by_binding	(const void* binding) const;
+
+	// 항목 제거 — 자식 CSCStatic destroy + row/cell erase + section_index 재계산 + layout 재실행.
+	//  - remove: 한 셀 제거. 그 셀이 row 의 마지막이면 row 자체도 제거.
+	//  - remove_section: 섹션 헤더 row + 그 섹션 안의 모든 row 통째.
+	//  - clear: 모든 항목 + 섹션 제거 (begin()/end() cycle 의 명시적 alias).
+	bool	remove					(const CString& label);
+	bool	remove_by_binding		(const void* binding);
+	bool	remove_section			(const CString& title);
+	void	clear					();
+
 	// 사용자가 어떤 셀 값을 바꾸면 호출(인자 = 그 셀 label). 모델 갱신/자동저장 연결용.
 	std::function<void(const CString& key)> on_change;
 
@@ -172,6 +205,12 @@ protected:
 	CSCColorTheme			m_theme = CSCColorTheme(this);
 	CFont					m_font;
 	CFont					m_font_bold;	// 섹션(카테고리) 헤더 전용
+	LOGFONT					m_lf_item    = {};	// set_item_font / get_item_font 가 읽고 쓰는 polestar. create() 에서 default 셋.
+	LOGFONT					m_lf_section = {};	// set_section_font / get_section_font.
+	// 색 override — Transparent(default) 면 theme 색 자동 사용. set_*_color 로 override 가능.
+	Gdiplus::Color			m_cr_section_text = Gdiplus::Color::Transparent;	// default = m_theme.cr_text
+	Gdiplus::Color			m_cr_item_label   = Gdiplus::Color::Transparent;	// default = m_theme.cr_text_dim
+	Gdiplus::Color			m_cr_item_value   = Gdiplus::Color::Transparent;	// default = m_theme.cr_text
 
 	// combo 드롭다운 — 다크 테마 CSCMenu 팝업(네이티브 CMenu 대신). 선택은 Message_CSCMenu 로 async 통지.
 	CSCMenu					m_combo_menu;
@@ -220,6 +259,9 @@ protected:
 	bool	apply_label         (prop_cell* pc, const CString& new_label);
 	bool	apply_tooltip       (prop_cell* pc, const CString& tooltip);
 	bool	apply_options       (prop_cell* pc, const std::vector<CString>& options);
+	bool	apply_set_visible   (prop_cell* pc, bool visible);
+	bool	apply_remove        (prop_cell* pc);					// row 의 마지막 cell 이면 row 통째 제거
+	void	recompute_section_indices();						// row erase 후 각 row 의 section_index 재정렬
 	// add / set_value / get_value template 의 if constexpr dispatch — 본문 자체가 워커. 정의는 헤더 하단 inline.
 	//  - apply_add<T>(c, value) : T → field_type 결정 + 바인딩 포인터 셋. add<T> 가 호출.
 	//  - apply_set<T>(pc, v)    : T + 셀 타입 검증 + 바인딩에 쓰기 + sync_value + Invalidate. set_value/_by_binding 가 호출.
@@ -236,7 +278,7 @@ protected:
 	void	open_combo_menu(prop_cell& c);	// combo 셀 클릭 → 다크 CSCMenu 팝업(옵션 항목 + 현재 선택 radio)
 	void	rebuild_widget_tooltips();		// bool/combo/info 셀 label 영역에 설명 툴팁(rect 툴) 재등록
 
-	void	draw_section(CDC& dc, const prop_row& r, const CRect& rc);
+	void	draw_section(CDC& dc, const prop_row& r, const CRect& rc, bool draw_separator);
 	void	draw_cell_label(CDC& dc, const prop_cell& c, const CRect& cell_rc);	// 라벨 컬럼(패널이 직접 그림)
 	void	draw_widget(CDC& dc, const prop_cell& c, const CRect& cell_rc);		// combo 위젯(값 컬럼)
 	void	draw_bool  (CDC& dc, const prop_cell& c, const CRect& cell_rc);		// bool 셀(라벨 넓게 + 체크박스 우측)

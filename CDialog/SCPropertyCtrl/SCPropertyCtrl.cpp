@@ -65,15 +65,85 @@ bool CSCPropertyCtrl::create(CWnd* parent, int left, int top, int width, int hei
 	ModifyStyle(WS_CAPTION, 0);
 
 	// 다크 배경에서 ClearType 서브픽셀은 색번짐(파랑/주황 가장자리)이 거슬리므로 ANTIALIASED_QUALITY(그레이스케일 AA)로 그린다.
-	// 세부 항목(m_font, -10)은 섹션 타이틀(m_font_bold, -12)보다 2px 작게 → Figma 속성창의 위계(타이틀 > 항목)와 동일.
-	m_font.CreateFont(-11, 0, 0, 0, FW_NORMAL, 0, 0, 0, DEFAULT_CHARSET,
-		OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY,
-		DEFAULT_PITCH | FF_DONTCARE, _T("Segoe UI"));
-	m_font_bold.CreateFont(-12, 0, 0, 0, FW_BOLD, 0, 0, 0, DEFAULT_CHARSET,
-		OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, ANTIALIASED_QUALITY,
-		DEFAULT_PITCH | FF_DONTCARE, _T("Segoe UI"));
+	// 세부 항목(m_font, -11px)은 섹션 타이틀(m_font_bold, -12px FW_BOLD)보다 1px 작게 → Figma 속성창의 위계(타이틀 > 항목).
+	// LOGFONT 로 보관 → set_item_font / set_section_font 가 *부분 변경* 가능 (lf 한 멤버만 수정 후 재생성).
+	m_lf_item.lfHeight			= -11;
+	m_lf_item.lfWeight			= FW_NORMAL;
+	m_lf_item.lfCharSet			= DEFAULT_CHARSET;
+	m_lf_item.lfQuality			= DEFAULT_QUALITY;
+	m_lf_item.lfPitchAndFamily	= DEFAULT_PITCH | FF_DONTCARE;
+	_tcscpy_s(m_lf_item.lfFaceName, LF_FACESIZE, _T("Segoe UI"));
+	m_font.CreateFontIndirect(&m_lf_item);
+
+	m_lf_section				= m_lf_item;
+	m_lf_section.lfHeight		= -12;
+	m_lf_section.lfWeight		= FW_BOLD;
+	m_lf_section.lfQuality		= ANTIALIASED_QUALITY;	// 섹션 헤더는 ClearType fringe 회피 위해 grayscale AA
+	m_font_bold.CreateFontIndirect(&m_lf_section);
 
 	return true;
+}
+
+// ── 폰트 / 색 커스터마이즈 ───────────────────────────────────────────────────
+void CSCPropertyCtrl::set_section_font(const LOGFONT& lf)
+{
+	m_lf_section = lf;
+	m_font_bold.DeleteObject();
+	m_font_bold.CreateFontIndirect(&m_lf_section);
+	if (GetSafeHwnd())
+	{
+		layout();			// 폰트 크기 변경 시 section_h 와 측정폭 갱신될 수 있음 → layout 다시
+		Invalidate(FALSE);
+	}
+}
+
+void CSCPropertyCtrl::set_section_font(LPCTSTR name, int size, int weight)
+{
+	LOGFONT lf = m_lf_section;
+	if (name && *name) _tcscpy_s(lf.lfFaceName, LF_FACESIZE, name);
+	if (size != 0)     lf.lfHeight = size;
+	if (weight != 0)   lf.lfWeight = weight;
+	set_section_font(lf);
+}
+
+void CSCPropertyCtrl::set_item_font(const LOGFONT& lf)
+{
+	m_lf_item = lf;
+	m_font.DeleteObject();
+	m_font.CreateFontIndirect(&m_lf_item);
+	// 자식 CSCStatic 에 폰트 propagate — SetFont 가 내부 m_lf 셋 + 내장 m_edit 까지 동기화(CSCStatic SetFont 수정 후).
+	for (prop_row& row : m_rows)
+		for (prop_cell& c : row.cells)
+			if (c.ctrl && c.ctrl->GetSafeHwnd())
+				c.ctrl->SetFont(&m_font);
+	if (GetSafeHwnd())
+	{
+		layout();
+		Invalidate(FALSE);
+	}
+}
+
+void CSCPropertyCtrl::set_item_font(LPCTSTR name, int size, int weight)
+{
+	LOGFONT lf = m_lf_item;
+	if (name && *name) _tcscpy_s(lf.lfFaceName, LF_FACESIZE, name);
+	if (size != 0)     lf.lfHeight = size;
+	if (weight != 0)   lf.lfWeight = weight;
+	set_item_font(lf);
+}
+
+void CSCPropertyCtrl::set_section_text_color(Gdiplus::Color cr) { m_cr_section_text = cr; if (GetSafeHwnd()) Invalidate(FALSE); }
+void CSCPropertyCtrl::set_item_label_color  (Gdiplus::Color cr) { m_cr_item_label   = cr; if (GetSafeHwnd()) Invalidate(FALSE); }
+void CSCPropertyCtrl::set_item_value_color  (Gdiplus::Color cr)
+{
+	m_cr_item_value = cr;
+	// 자식 CSCStatic 의 값 색도 즉시 갱신 (set_edit_text_color 가 m_edit 까지 propagate).
+	const Gdiplus::Color eff = (cr.GetValue() != Gdiplus::Color::Transparent) ? cr : m_theme.cr_text;
+	for (prop_row& row : m_rows)
+		for (prop_cell& c : row.cells)
+			if (c.ctrl && c.ctrl->GetSafeHwnd())
+				c.ctrl->set_edit_text_color(c.enabled ? eff : m_theme.cr_text_dim);
+	if (GetSafeHwnd()) Invalidate(FALSE);
 }
 
 void CSCPropertyCtrl::set_color_theme(const CSCColorTheme& theme, bool invalidate)
@@ -251,7 +321,9 @@ void CSCPropertyCtrl::apply_enabled_visual(prop_cell& c)
 	//   enabled  → cr_text (값 > 라벨 대비 = 정상)
 	//   disabled → cr_text_dim (값 = 라벨 = 같은 색 → "비활성" 시각 신호)
 	// + EnableWindow(FALSE) 로 입력도 차단. color 셀의 swatch 색은 m_cr_color_picker(별개) 라 영향 없음.
-	c.ctrl->set_edit_text_color(c.enabled ? m_theme.cr_text : m_theme.cr_text_dim);
+	// 값 색 — m_cr_item_value override 우선, 없으면 m_theme.cr_text. disabled 면 cr_text_dim.
+	const Gdiplus::Color value_eff = (m_cr_item_value.GetValue() != Gdiplus::Color::Transparent) ? m_cr_item_value : m_theme.cr_text;
+	c.ctrl->set_edit_text_color(c.enabled ? value_eff : m_theme.cr_text_dim);
 }
 
 bool CSCPropertyCtrl::set_enabled           (const CString& label,   bool enabled) { return apply_enabled(find_property(label),            enabled); }
@@ -338,6 +410,159 @@ bool CSCPropertyCtrl::apply_tooltip(prop_cell* pc, const CString& tooltip)
 
 bool CSCPropertyCtrl::set_tooltip           (const CString& label,   const CString& tooltip) { return apply_tooltip(find_property(label),            tooltip); }
 bool CSCPropertyCtrl::set_tooltip_by_binding(const void*    binding, const CString& tooltip) { return apply_tooltip(find_property_by_binding(binding), tooltip); }
+
+// ── 가시성 (cell 단위, 자리도 빠짐) ─────────────────────────────────────────
+bool CSCPropertyCtrl::apply_set_visible(prop_cell* pc, bool visible)
+{
+	if (!pc)
+		return false;
+	if (pc->visible == visible)
+		return true;
+	pc->visible = visible;
+	if (pc->ctrl && pc->ctrl->GetSafeHwnd())
+		pc->ctrl->ShowWindow(visible ? SW_SHOW : SW_HIDE);
+	if (GetSafeHwnd())
+	{
+		layout();
+		Invalidate(FALSE);
+	}
+	return true;
+}
+
+bool CSCPropertyCtrl::set_visible           (const CString& label,   bool visible) { return apply_set_visible(find_property(label),             visible); }
+bool CSCPropertyCtrl::set_visible_by_binding(const void*    binding, bool visible) { return apply_set_visible(find_property_by_binding(binding), visible); }
+
+bool CSCPropertyCtrl::get_visible(const CString& label) const
+{
+	const prop_cell* pc = find_property(label);
+	return pc ? pc->visible : true;
+}
+bool CSCPropertyCtrl::get_visible_by_binding(const void* binding) const
+{
+	const prop_cell* pc = find_property_by_binding(binding);
+	return pc ? pc->visible : true;
+}
+
+// ── 항목 제거 ───────────────────────────────────────────────────────────────
+// 한 cell 제거 → 자식 destroy + row 에서 erase + (빈 row 면 row 자체 erase) + section_index 재정렬 + layout.
+bool CSCPropertyCtrl::apply_remove(prop_cell* pc)
+{
+	if (!pc)
+		return false;
+	for (int ri = 0; ri < (int)m_rows.size(); ++ri)
+	{
+		prop_row& row = m_rows[ri];
+		if (row.is_section)
+			continue;
+		for (int ci = 0; ci < (int)row.cells.size(); ++ci)
+		{
+			if (&row.cells[ci] != pc)
+				continue;
+			// 자식 컨트롤 파기 (uses_static 셀만 ctrl 보유).
+			if (row.cells[ci].ctrl && row.cells[ci].ctrl->GetSafeHwnd())
+				row.cells[ci].ctrl->DestroyWindow();
+			row.cells.erase(row.cells.begin() + ci);
+			// row 의 모든 cell 이 지워졌으면 row 자체 erase + open_line/cur_section/section_index 보정.
+			if (row.cells.empty())
+			{
+				m_rows.erase(m_rows.begin() + ri);
+				if      (m_open_line == ri) m_open_line = -1;
+				else if (m_open_line >  ri) --m_open_line;
+				if      (m_cur_section >  ri) --m_cur_section;
+				recompute_section_indices();
+			}
+			if (GetSafeHwnd())
+			{
+				layout();
+				Invalidate(FALSE);
+			}
+			return true;
+		}
+	}
+	return false;
+}
+
+bool CSCPropertyCtrl::remove           (const CString& label)   { return apply_remove(find_property(label));             }
+bool CSCPropertyCtrl::remove_by_binding(const void*    binding) { return apply_remove(find_property_by_binding(binding)); }
+
+// 섹션 헤더 + 그 섹션의 모든 row 통째 제거.
+bool CSCPropertyCtrl::remove_section(const CString& title)
+{
+	int sec_idx = -1;
+	for (int i = 0; i < (int)m_rows.size(); ++i)
+	{
+		if (m_rows[i].is_section && m_rows[i].section_title == title)
+		{
+			sec_idx = i;
+			break;
+		}
+	}
+	if (sec_idx < 0)
+		return false;
+
+	// 다음 섹션 헤더 또는 m_rows 끝까지 = 이 섹션의 범위 [sec_idx, end_idx).
+	int end_idx = (int)m_rows.size();
+	for (int i = sec_idx + 1; i < (int)m_rows.size(); ++i)
+	{
+		if (m_rows[i].is_section)
+		{
+			end_idx = i;
+			break;
+		}
+	}
+
+	// 범위 안 모든 row 의 자식 컨트롤 파기.
+	for (int i = sec_idx; i < end_idx; ++i)
+		for (prop_cell& c : m_rows[i].cells)
+			if (c.ctrl && c.ctrl->GetSafeHwnd())
+				c.ctrl->DestroyWindow();
+
+	const int removed = end_idx - sec_idx;
+	m_rows.erase(m_rows.begin() + sec_idx, m_rows.begin() + end_idx);
+
+	// open_line / cur_section 보정.
+	if      (m_open_line >= sec_idx && m_open_line < end_idx) m_open_line   = -1;
+	else if (m_open_line >= end_idx)                          m_open_line  -= removed;
+	if      (m_cur_section >= sec_idx && m_cur_section < end_idx) m_cur_section = -1;
+	else if (m_cur_section >= end_idx)                            m_cur_section -= removed;
+
+	recompute_section_indices();
+	if (GetSafeHwnd())
+	{
+		layout();
+		Invalidate(FALSE);
+	}
+	return true;
+}
+
+// 모든 항목 + 섹션 제거 (begin()/end() cycle 의 명시적 alias).
+void CSCPropertyCtrl::clear()
+{
+	begin();
+	if (GetSafeHwnd())
+	{
+		layout();
+		Invalidate(FALSE);
+	}
+}
+
+// row erase 후 각 비-섹션 row 의 section_index 를 *위쪽 가장 가까운 섹션 헤더 row 인덱스* 로 재정렬.
+void CSCPropertyCtrl::recompute_section_indices()
+{
+	int cur = -1;
+	for (int i = 0; i < (int)m_rows.size(); ++i)
+	{
+		if (m_rows[i].is_section)
+		{
+			cur = i;
+			m_rows[i].section_index = i;
+		}
+		else
+		{
+			m_rows[i].section_index = cur;
+		}
+	}
+}
 
 void CSCPropertyCtrl::end()
 {
@@ -496,22 +721,23 @@ Gdiplus::Color CSCPropertyCtrl::field_back_color() const
 	return get_color(m_theme.cr_back, 18);
 }
 
-// 라벨(prefix) 색 — 패널이 그리는 라벨(color/bool/combo/info)과 컨트롤이 그리는 라벨(text/int/real)을
-// 한 색으로 통일한다. 양쪽 모두 cr_text_dim 사용 → 값(cr_text) 보다 흐림 → Figma 스타일의 라벨<값 대비.
+// 라벨(prefix) 색 — m_cr_item_label override 우선, 없으면 m_theme.cr_text_dim (값 cr_text 보다 흐림 → Figma 위계).
 // 컨트롤 쪽은 dim_label_theme propagate(cr_text=cr_text_dim) 로, 패널 쪽은 이 함수 직접 사용.
 Gdiplus::Color CSCPropertyCtrl::field_label_color() const
 {
-	return m_theme.cr_text_dim;
+	return (m_cr_item_label.GetValue() != Gdiplus::Color::Transparent) ? m_cr_item_label : m_theme.cr_text_dim;
 }
 
-// 패널 그리기 셀의 라벨/값 색 — enabled 면 normal, disabled 면 dim. draw_cell_label / draw_widget / draw_bool 공통.
+// 패널 그리기 셀의 라벨/값 색 — enabled 면 normal, disabled 면 dim. m_cr_item_value override 도 반영.
 Gdiplus::Color CSCPropertyCtrl::cell_label_color(const prop_cell& c) const
 {
 	return c.enabled ? field_label_color() : m_theme.cr_text_dim;
 }
 Gdiplus::Color CSCPropertyCtrl::cell_text_color(const prop_cell& c) const
 {
-	return c.enabled ? m_theme.cr_text : m_theme.cr_text_dim;
+	if (!c.enabled)
+		return m_theme.cr_text_dim;
+	return (m_cr_item_value.GetValue() != Gdiplus::Color::Transparent) ? m_cr_item_value : m_theme.cr_text;
 }
 
 int CSCPropertyCtrl::measure_label_width(const CString& text) const
@@ -550,7 +776,19 @@ void CSCPropertyCtrl::position_cell_ctrl(prop_cell& c)
 
 void CSCPropertyCtrl::layout_cells(prop_row& row)
 {
-	const int n = static_cast<int>(row.cells.size());
+	// invisible cell (set_visible(false)) 은 자리 차지 안 함 — visible cell 만 모아 균등 분할.
+	// invisible cell 의 자식 ctrl 은 set_visible 호출 시 이미 SW_HIDE, 여기서도 안전하게 hide 보장.
+	std::vector<prop_cell*> vis;
+	vis.reserve(row.cells.size());
+	for (prop_cell& c : row.cells)
+	{
+		if (c.visible)
+			vis.push_back(&c);
+		else if (c.ctrl && c.ctrl->GetSafeHwnd())
+			c.ctrl->ShowWindow(SW_HIDE);
+	}
+
+	const int n = static_cast<int>(vis.size());
 	if (n == 0)
 		return;
 
@@ -562,7 +800,7 @@ void CSCPropertyCtrl::layout_cells(prop_row& row)
 
 	for (int i = 0; i < n; ++i)
 	{
-		prop_cell& c = row.cells[i];
+		prop_cell& c = *vis[i];
 		const int cl = content_left + i * (cell_w + gap);
 		const int cr = (i == n - 1) ? content_right : cl + cell_w;	// 마지막 셀이 나머지 폭 흡수
 		c.rect = CRect(cl, row.rect.top, cr, row.rect.bottom);		// 스크롤 적용 전(패널 콘텐츠 좌표)
@@ -595,7 +833,7 @@ void CSCPropertyCtrl::layout()
 			max_label = (std::max)(max_label, measure_label_width(row.cells[0].label));
 	m_shared_label_w = m_field_lpad + max_label + m_label_gap;	// 라벨 왼쪽여백 + 가장 긴 라벨 + 간격
 
-	int y = 0;
+	int y = m_pad;					// 첫 row 와 패널 top 사이 여백 — 좌우 padding(m_pad) 과 동일하게.
 	bool seen_section = false;
 	for (prop_row& row : m_rows)
 	{
@@ -614,7 +852,12 @@ void CSCPropertyCtrl::layout()
 		const bool exp = (row.section_index >= 0 && row.section_index < static_cast<int>(m_rows.size()))
 			? m_rows[row.section_index].expanded : true;
 
-		if (!exp)
+		// row 가 모든 cell invisible 이면 자리 차지 0 (= 섹션 접힘과 동일 처리).
+		bool any_visible = false;
+		for (const prop_cell& c : row.cells)
+			if (c.visible) { any_visible = true; break; }
+
+		if (!exp || !any_visible)
 		{
 			row.visible = false;
 			row.rect = CRect(0, y, W, y);
@@ -738,11 +981,13 @@ void CSCPropertyCtrl::draw_tri_down(CDC& dc, const CRect& box, COLORREF cr)
 	g.FillPolygon(&br, p, 3);
 }
 
-void CSCPropertyCtrl::draw_section(CDC& dc, const prop_row& r, const CRect& rc)
+void CSCPropertyCtrl::draw_section(CDC& dc, const prop_row& r, const CRect& rc, bool draw_separator)
 {
-	// 카테고리 헤더: 배경 밴드 없이 굵은 글씨. 위 구분선은 좌우 m_pad 여백(= 필드 박스 left/right 와 정렬)으로 대칭.
-	dc.FillSolidRect(CRect(rc.left + m_pad, rc.top, rc.right - m_pad, rc.top + 1),
-		m_theme.cr_border_inactive.ToCOLORREF());
+	// 카테고리 헤더: 배경 밴드 없이 굵은 글씨. 위 구분선은 *섹션 간 구분용* — 첫 섹션 위에는 그리지 않음
+	// (그 위는 패널 top padding 영역이라 분리할 항목 없음). 좌우 m_pad 여백(= 필드 박스 left/right 와 정렬) 대칭.
+	if (draw_separator)
+		dc.FillSolidRect(CRect(rc.left + m_pad, rc.top, rc.right - m_pad, rc.top + 1),
+			m_theme.cr_border_inactive.ToCOLORREF());
 
 	// 캐럿은 우측 끝(콤보 화살표와 동일 x), 제목은 왼쪽(필드 박스 left = m_pad 와 정렬)으로 당긴다.
 	CRect caret(rc.right - m_pad - 20, rc.top, rc.right - m_pad - 6, rc.bottom);
@@ -750,7 +995,8 @@ void CSCPropertyCtrl::draw_section(CDC& dc, const prop_row& r, const CRect& rc)
 
 	CFont* old = dc.SelectObject(&m_font_bold);
 	CRect tr(rc.left + m_pad, rc.top, caret.left - 4, rc.bottom);
-	dc.SetTextColor(m_theme.cr_text.ToCOLORREF());
+	const Gdiplus::Color section_text = (m_cr_section_text.GetValue() != Gdiplus::Color::Transparent) ? m_cr_section_text : m_theme.cr_text;
+	dc.SetTextColor(section_text.ToCOLORREF());
 	dc.DrawText(r.section_title, tr, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
 	dc.SelectObject(old);
 }
@@ -815,6 +1061,7 @@ void CSCPropertyCtrl::OnPaint()
 	Gdiplus::Graphics g(dc.GetSafeHdc());
 	g.SetSmoothingMode(Gdiplus::SmoothingMode::SmoothingModeAntiAlias);
 
+	bool seen_section = false;
 	for (const prop_row& row : m_rows)
 	{
 		if (!row.visible)
@@ -823,11 +1070,16 @@ void CSCPropertyCtrl::OnPaint()
 		CRect rr = row.rect;
 		rr.OffsetRect(0, -m_scroll_y);
 		if (rr.bottom < 0 || rr.top > rc.bottom)
+		{
+			if (row.is_section)		// 화면 밖이라도 첫 섹션 통과 추적
+				seen_section = true;
 			continue;
+		}
 
 		if (row.is_section)
 		{
-			draw_section(dc, row, rr);
+			draw_section(dc, row, rr, /*draw_separator*/ seen_section);
+			seen_section = true;
 			continue;
 		}
 

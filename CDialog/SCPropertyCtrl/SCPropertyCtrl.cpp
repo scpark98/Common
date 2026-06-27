@@ -79,18 +79,28 @@ bool CSCPropertyCtrl::create(CWnd* parent, int left, int top, int width, int hei
 void CSCPropertyCtrl::set_color_theme(const CSCColorTheme& theme, bool invalidate)
 {
 	m_theme.copy_colors_from(theme);
+
+	// 자식 CSCStatic 의 prefix 라벨은 cr_text 로 그려진다(CSCStatic OnPaint 내부 기본). 값보다 *흐리게* 표시하기 위해
+	// propagate 시 cr_text 만 cr_text_dim 으로 override 한 사본을 전달 → CSCStatic 의 m_theme.cr_text(=라벨)가 자동 dim.
+	// 값은 set_edit_text_color (별개 멤버 cr_edit_text) 로 cr_text 셋팅 — 라벨 < 값 대비.
+	// color 셀의 swatch 색(m_cr_color_picker)과 RGB 값 텍스트(cr_edit_text) 는 별개 변수라 영향 없음.
+	// 기존엔 값 색으로 cr_text_selected 를 썼지만, 그 색의 본래 의미는 *selected 배경 위 텍스트* 라 deep_black 처럼
+	// sel_bg 가 밝은 다크 테마에서 값이 검정으로 산출되어 안 보이던 버그가 있었다.
+	CSCColorTheme dim_label_theme;
+	dim_label_theme.copy_colors_from(m_theme);
+	dim_label_theme.cr_text = m_theme.cr_text_dim;
+
 	for (prop_row& row : m_rows)			// 이미 생성된 자식에도 전파
 		for (prop_cell& c : row.cells)
 			if (c.ctrl && c.ctrl->GetSafeHwnd())
 			{
-				c.ctrl->set_color_theme(m_theme, false);
-				// set_color_theme 가 색을 되돌리므로 비주얼 속성을 다시 적용. 값 필드(text/int/real/color)는
-				// 모두 컨트롤이 자기 라운드 박스+라벨+값(+swatch)을 그린다. (color 의 swatch 색은 m_cr_color_picker
-				// 에 따로 있어 set_color_theme 가 건드리지 않으므로 보존된다.)
-				c.ctrl->set_edit_text_color(m_theme.cr_text_selected);	// 값 / color RGB·alpha 텍스트 밝음
+				c.ctrl->set_color_theme(dim_label_theme, false);
+				c.ctrl->set_edit_text_color(m_theme.cr_text);			// 값 / color RGB·alpha 텍스트
 				c.ctrl->set_edit_back_color(field_back_color());
 				c.ctrl->set_back_color(field_back_color());
 				c.ctrl->set_round(m_field_round, m_theme.cr_back, m_theme.cr_back);
+
+				apply_enabled_visual(c);	// disabled 셀의 값 dim 색을 theme 교체 후에도 유지
 			}
 	if (invalidate && GetSafeHwnd())
 		Invalidate(FALSE);
@@ -155,71 +165,179 @@ CSCPropertyCtrl::prop_cell& CSCPropertyCtrl::add_cell(field_type type, const CSt
 	return m_rows.back().cells.back();
 }
 
-void CSCPropertyCtrl::add_text(CString* value, const CString& label, const CString& tooltip)
-{
-	prop_cell& c = add_cell(field_type::text, label); c.p_text = value; c.tooltip = tooltip;
-}
-void CSCPropertyCtrl::add_int(int* value, const CString& label, const CString& tooltip)
-{
-	prop_cell& c = add_cell(field_type::integer, label); c.p_int = value; c.tooltip = tooltip;
-}
-void CSCPropertyCtrl::add_real(float* value, const CString& label, const CString& tooltip)
-{
-	prop_cell& c = add_cell(field_type::real, label); c.p_real = value; c.tooltip = tooltip;
-}
-void CSCPropertyCtrl::add_bool(bool* value, const CString& label, const CString& tooltip)
-{
-	prop_cell& c = add_cell(field_type::boolean, label); c.p_bool = value; c.tooltip = tooltip;
-}
-void CSCPropertyCtrl::add_color24(Gdiplus::Color* value, const CString& label, const CString& tooltip)
-{
-	prop_cell& c = add_cell(field_type::color24, label); c.p_color = value; c.tooltip = tooltip;
-}
-void CSCPropertyCtrl::add_color32(Gdiplus::Color* value, const CString& label, const CString& tooltip)
-{
-	prop_cell& c = add_cell(field_type::color32, label); c.p_color = value; c.tooltip = tooltip;
-}
-void CSCPropertyCtrl::add_combo(int* index, const CString& label, const std::vector<CString>& options, const CString& tooltip)
+// add<T> 본체 = 헤더 inline (template). 여기엔 combo overload / color32 / info 만 정의 (T 추론으로 통합 불가능한 케이스들).
+void CSCPropertyCtrl::add(int* index, const CString& label, const std::vector<CString>& options, const CString& tooltip)
 {
 	prop_cell& c = add_cell(field_type::combo, label);
 	c.p_index = index;
 	c.options = options;
 	c.tooltip = tooltip;
 }
+void CSCPropertyCtrl::add_color32(Gdiplus::Color* value, const CString& label, const CString& tooltip)
+{
+	prop_cell& c = add_cell(field_type::color32, label); c.p_color = value; c.tooltip = tooltip;
+}
 void CSCPropertyCtrl::add_info(const CString& label, const CString& text, const CString& tooltip)
 {
 	prop_cell& c = add_cell(field_type::info, label); c.info_text = text; c.tooltip = tooltip;
 }
 
-CSCPropertyCtrl::prop_cell* CSCPropertyCtrl::find_cell_by_binding(const void* p)
+// ── 항목 식별 (public) ──────────────────────────────────────────────────────
+// const 변형은 본체, 비-const 변형은 const_cast 위임 — 코드 중복 방지.
+const CSCPropertyCtrl::prop_cell* CSCPropertyCtrl::find_property(const CString& label) const
 {
-	for (prop_row& row : m_rows)
+	for (const prop_row& row : m_rows)
 	{
 		if (row.is_section)
 			continue;
-		for (prop_cell& c : row.cells)
+		for (const prop_cell& c : row.cells)
+			if (c.label == label)
+				return &c;
+	}
+	return nullptr;
+}
+
+CSCPropertyCtrl::prop_cell* CSCPropertyCtrl::find_property(const CString& label)
+{
+	return const_cast<prop_cell*>(static_cast<const CSCPropertyCtrl*>(this)->find_property(label));
+}
+
+const CSCPropertyCtrl::prop_cell* CSCPropertyCtrl::find_property_by_binding(const void* binding) const
+{
+	for (const prop_row& row : m_rows)
+	{
+		if (row.is_section)
+			continue;
+		for (const prop_cell& c : row.cells)
 		{
-			if ((const void*)c.p_text == p || (const void*)c.p_int == p || (const void*)c.p_real == p
-				|| (const void*)c.p_bool == p || (const void*)c.p_color == p || (const void*)c.p_index == p)
+			if ((const void*)c.p_text == binding || (const void*)c.p_int == binding || (const void*)c.p_real == binding
+				|| (const void*)c.p_bool == binding || (const void*)c.p_color == binding || (const void*)c.p_index == binding)
 				return &c;
 		}
 	}
 	return nullptr;
 }
 
-// 바인딩한 값 포인터로 셀을 지정해 툴팁을 설정/변경/제거(공백)한다. end() 이후라면 즉시 반영한다.
-// text/int/real/color 는 자식 CSCStatic 내장 툴팁, bool/combo/info 는 패널이 label 영역에 띄운다.
-void CSCPropertyCtrl::set_tooltip(const void* value, const CString& tooltip)
+CSCPropertyCtrl::prop_cell* CSCPropertyCtrl::find_property_by_binding(const void* binding)
 {
-	prop_cell* pc = find_cell_by_binding(value);
-	if (!pc)
-		return;
-	pc->tooltip = tooltip;
-	if (pc->ctrl)							// 자식 CSCStatic 보유(text/int/real/color) → 내장 툴팁 갱신
-		pc->ctrl->set_tooltip_text(tooltip);
-	else if (GetSafeHwnd())					// bool/combo/info → 패널 rect 툴 재구성(공백이면 등록 제외됨)
-		rebuild_widget_tooltips();
+	return const_cast<prop_cell*>(static_cast<const CSCPropertyCtrl*>(this)->find_property_by_binding(binding));
 }
+
+bool CSCPropertyCtrl::has_property           (const CString& label)   const { return find_property(label)            != nullptr; }
+bool CSCPropertyCtrl::has_property_by_binding(const void*    binding) const { return find_property_by_binding(binding) != nullptr; }
+
+// ── 활성/비활성 ─────────────────────────────────────────────────────────────
+// 비활성 시 자식 CSCStatic 은 EnableWindow(FALSE)로 입력 차단 + dim 색, 패널 그리기 셀(bool/combo/info)은
+// OnLButtonDown/OnMouseWheel 에서 enabled 체크로 입력 무시 + draw_* 에서 dim 색 사용.
+bool CSCPropertyCtrl::apply_enabled(prop_cell* pc, bool enabled)
+{
+	if (!pc)
+		return false;
+	if (pc->enabled == enabled)
+		return true;
+	pc->enabled = enabled;
+	apply_enabled_visual(*pc);
+	if (GetSafeHwnd())
+		Invalidate(FALSE);					// 패널 그리기 셀의 dim 색 반영 위해 재그리기
+	return true;
+}
+
+void CSCPropertyCtrl::apply_enabled_visual(prop_cell& c)
+{
+	if (!c.ctrl || !c.ctrl->GetSafeHwnd())
+		return;
+	c.ctrl->EnableWindow(c.enabled ? TRUE : FALSE);
+	// 라벨 색은 dim_label_theme propagate(=cr_text_dim) 으로 결정되어 항상 dim. 여기선 *값 색* 만 enabled 에 따라 분기:
+	//   enabled  → cr_text (값 > 라벨 대비 = 정상)
+	//   disabled → cr_text_dim (값 = 라벨 = 같은 색 → "비활성" 시각 신호)
+	// + EnableWindow(FALSE) 로 입력도 차단. color 셀의 swatch 색은 m_cr_color_picker(별개) 라 영향 없음.
+	c.ctrl->set_edit_text_color(c.enabled ? m_theme.cr_text : m_theme.cr_text_dim);
+}
+
+bool CSCPropertyCtrl::set_enabled           (const CString& label,   bool enabled) { return apply_enabled(find_property(label),            enabled); }
+bool CSCPropertyCtrl::set_enabled_by_binding(const void*    binding, bool enabled) { return apply_enabled(find_property_by_binding(binding), enabled); }
+
+bool CSCPropertyCtrl::get_enabled(const CString& label) const
+{
+	const prop_cell* pc = find_property(label);
+	return pc ? pc->enabled : true;			// 없는 항목 = enabled 로 취급(가짜 false 로 사용자 로직 오염 방지)
+}
+bool CSCPropertyCtrl::get_enabled_by_binding(const void* binding) const
+{
+	const prop_cell* pc = find_property_by_binding(binding);
+	return pc ? pc->enabled : true;
+}
+
+// ── 라벨 변경 ───────────────────────────────────────────────────────────────
+bool CSCPropertyCtrl::apply_label(prop_cell* pc, const CString& new_label)
+{
+	if (!pc)
+		return false;
+	pc->label = new_label;
+	if (pc->ctrl && pc->ctrl->GetSafeHwnd())
+		pc->ctrl->SetWindowText(new_label);	// CSCStatic 의 caption = prefix 라벨
+	if (GetSafeHwnd())
+	{
+		layout();							// 라벨 길이 변화 → m_shared_label_w / label_w 재계산
+		Invalidate(FALSE);
+	}
+	return true;
+}
+
+bool CSCPropertyCtrl::set_label           (const CString& old_label, const CString& new_label) { return apply_label(find_property(old_label),         new_label); }
+bool CSCPropertyCtrl::set_label_by_binding(const void*    binding,   const CString& new_label) { return apply_label(find_property_by_binding(binding), new_label); }
+
+CString CSCPropertyCtrl::get_label_by_binding(const void* binding) const
+{
+	const prop_cell* pc = find_property_by_binding(binding);
+	return pc ? pc->label : CString();
+}
+
+// apply_set<T> / apply_get<T> / set_value<T> / get_value<T> 본체 = 헤더 inline (template).
+// apply_set 의 if constexpr 분기가 옛 apply_value_str/int/real/bool/color 5 워커를 통합 흡수.
+
+// ── combo 옵션 교체 ────────────────────────────────────────────────────────
+bool CSCPropertyCtrl::apply_options(prop_cell* pc, const std::vector<CString>& options)
+{
+	if (!pc || pc->type != field_type::combo)
+		return false;
+	pc->options = options;
+	if (pc->p_index)
+	{
+		const int n = static_cast<int>(pc->options.size());
+		*pc->p_index = (n == 0) ? -1 : (std::max)(0, (std::min)(n - 1, *pc->p_index));
+	}
+	if (GetSafeHwnd())
+		Invalidate(FALSE);
+	return true;
+}
+
+bool CSCPropertyCtrl::set_options           (const CString& label,   const std::vector<CString>& options) { return apply_options(find_property(label),            options); }
+bool CSCPropertyCtrl::set_options_by_binding(const void*    binding, const std::vector<CString>& options) { return apply_options(find_property_by_binding(binding), options); }
+
+const std::vector<CString>& CSCPropertyCtrl::get_options(const CString& label) const
+{
+	static const std::vector<CString> empty;
+	const prop_cell* pc = find_property(label);
+	return (pc && pc->type == field_type::combo) ? pc->options : empty;
+}
+
+// ── 툴팁 ────────────────────────────────────────────────────────────────────
+// 빈 문자열 → 툴팁 제거. text/int/real/color 는 자식 CSCStatic 내장 툴팁, bool/combo/info 는 패널이 label 영역에 띄움.
+bool CSCPropertyCtrl::apply_tooltip(prop_cell* pc, const CString& tooltip)
+{
+	if (!pc)
+		return false;
+	pc->tooltip = tooltip;
+	if (pc->ctrl && pc->ctrl->GetSafeHwnd())
+		pc->ctrl->set_tooltip_text(tooltip);
+	else if (GetSafeHwnd())
+		rebuild_widget_tooltips();
+	return true;
+}
+
+bool CSCPropertyCtrl::set_tooltip           (const CString& label,   const CString& tooltip) { return apply_tooltip(find_property(label),            tooltip); }
+bool CSCPropertyCtrl::set_tooltip_by_binding(const void*    binding, const CString& tooltip) { return apply_tooltip(find_property_by_binding(binding), tooltip); }
 
 void CSCPropertyCtrl::end()
 {
@@ -279,13 +397,19 @@ void CSCPropertyCtrl::ensure_controls()
 			//                 분리된 m_cr_color_picker 에 저장 → 라벨과 색 충돌 없이 "Background ■ 0,0,0" 한 컨트롤.)
 			c.ctrl->create(static_cast<LPCTSTR>(c.label), WS_CHILD | SS_NOTIFY, CRect(0, 0, 10, 10), this, id++);
 			c.ctrl->SetFont(&m_font);	// 패널과 동일한 그레이스케일 AA 폰트(라벨/값 색번짐 방지 + 크기 통일)
-			c.ctrl->set_color_theme(m_theme, false);
-			c.ctrl->set_edit_text_color(m_theme.cr_text_selected);		// 값 / color 의 "R,G,B"·alpha 텍스트 밝게
+			// dim_label_theme = m_theme 사본 + cr_text 만 cr_text_dim 으로 override → CSCStatic 의 prefix 라벨이 dim.
+			// 값은 set_edit_text_color 로 cr_text 별도 셋(라벨 < 값 대비). set_color_theme 와 동일 패턴.
+			CSCColorTheme dim_label_theme;
+			dim_label_theme.copy_colors_from(m_theme);
+			dim_label_theme.cr_text = m_theme.cr_text_dim;
+			c.ctrl->set_color_theme(dim_label_theme, false);
+			c.ctrl->set_edit_text_color(m_theme.cr_text);				// 값 / color 의 "R,G,B"·alpha 텍스트
 			c.ctrl->set_edit_back_color(field_back_color());
 			c.ctrl->set_back_color(field_back_color());					// 박스 채움(패널 배경보다 약간 밝게)
 			c.ctrl->set_round(m_field_round, m_theme.cr_back, m_theme.cr_back);	// 무테 라운드 박스(코너는 패널 배경색과 블렌드)
 			c.ctrl->set_prefix_space(2);								// 박스 안 라벨(prefix) 좌측 여백
 			c.ctrl->set_valign(DT_VCENTER);								// 라벨도 값과 같은 세로 가운데(기본 top → 라벨이 위로 떠 어긋남)
+			c.ctrl->set_label_auto_ellipsis(true);						// 라벨이 값과 충돌 시에만 "..." 처리(값이 짧으면 라벨이 컬럼 너머까지 자유롭게)
 
 			if (is_color)
 			{
@@ -302,7 +426,9 @@ void CSCPropertyCtrl::ensure_controls()
 				if (is_number)
 				{
 					c.ctrl->set_value_right_space(m_field_lpad - 4);	// 값 우측 여백 8px(내장 4 + 4) = 좌측 prefix 와 대칭
-					c.ctrl->set_use_updown_key(true, c.type == field_type::real ? 0.1f : 1.0f);
+					// real 셀은 interval=0 (auto) — 입력 텍스트의 소숫점 자릿수로 step 자동 결정.
+					//   "0.5" → 0.1 step, "0.000345" → 1e-6 step. integer 셀은 1 고정.
+					c.ctrl->set_use_updown_key(true, c.type == field_type::real ? 0.0f : 1.0f);
 				}
 			}
 
@@ -310,6 +436,8 @@ void CSCPropertyCtrl::ensure_controls()
 
 			if (!c.tooltip.IsEmpty())
 				c.ctrl->set_tooltip_text(c.tooltip);	// 자식 CSCStatic 내장 툴팁(SS_NOTIFY 보유 → hover relay)
+
+			apply_enabled_visual(c);					// end() 이전에 set_enabled(false) 했어도 자식 생성 후 일관 반영
 		}
 	}
 }
@@ -369,11 +497,21 @@ Gdiplus::Color CSCPropertyCtrl::field_back_color() const
 }
 
 // 라벨(prefix) 색 — 패널이 그리는 라벨(color/bool/combo/info)과 컨트롤이 그리는 라벨(text/int/real)을
-// 한 색으로 통일한다. 컨트롤 라벨은 m_theme.cr_text 로 그려지므로 패널도 cr_text 를 쓴다.
-// 값은 cr_text_selected(더 밝음)라 라벨<값 대비가 자연스럽게 생긴다(Figma 스타일).
+// 한 색으로 통일한다. 양쪽 모두 cr_text_dim 사용 → 값(cr_text) 보다 흐림 → Figma 스타일의 라벨<값 대비.
+// 컨트롤 쪽은 dim_label_theme propagate(cr_text=cr_text_dim) 로, 패널 쪽은 이 함수 직접 사용.
 Gdiplus::Color CSCPropertyCtrl::field_label_color() const
 {
-	return m_theme.cr_text;
+	return m_theme.cr_text_dim;
+}
+
+// 패널 그리기 셀의 라벨/값 색 — enabled 면 normal, disabled 면 dim. draw_cell_label / draw_widget / draw_bool 공통.
+Gdiplus::Color CSCPropertyCtrl::cell_label_color(const prop_cell& c) const
+{
+	return c.enabled ? field_label_color() : m_theme.cr_text_dim;
+}
+Gdiplus::Color CSCPropertyCtrl::cell_text_color(const prop_cell& c) const
+{
+	return c.enabled ? m_theme.cr_text : m_theme.cr_text_dim;
 }
 
 int CSCPropertyCtrl::measure_label_width(const CString& text) const
@@ -617,24 +755,25 @@ void CSCPropertyCtrl::draw_cell_label(CDC& dc, const prop_cell& c, const CRect& 
 {
 	// 박스 안 흐린 라벨(prefix). 왼쪽 여백 + 세로 가운데. 모든 셀의 라벨을 여기 한 곳에서 통일되게 그린다.
 	CRect lr(cell_rc.left + m_field_lpad, cell_rc.top, cell_rc.left + c.label_w, cell_rc.bottom);
-	dc.SetTextColor(field_label_color().ToCOLORREF());
+	dc.SetTextColor(cell_label_color(c).ToCOLORREF());
 	dc.DrawText(c.label, lr, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
 }
 
 void CSCPropertyCtrl::draw_widget(CDC& dc, const prop_cell& c, const CRect& cell_rc)
 {
 	// combo 위젯(값 컬럼). bool 은 draw_bool 에서 별도 처리(라벨을 체크박스 직전까지 넓게 쓰기 위해).
+	// 값 텍스트는 우측 정렬 — text/int/real/color 셀의 값 우측 정렬과 통일. 드롭다운 메뉴는 표준 컨벤션(좌측+radio mark) 유지.
 	CRect vr = cell_value_rect(cell_rc, c.label_w);
 	vr.right -= 6;
-	dc.SetTextColor(m_theme.cr_text.ToCOLORREF());
+	dc.SetTextColor(cell_text_color(c).ToCOLORREF());
 
 	CRect ar(vr.right - 14, vr.top, vr.right, vr.bottom);
-	draw_tri_down(dc, ar, m_theme.cr_text_dim.ToCOLORREF());
+	draw_tri_down(dc, ar, m_theme.cr_text_dim.ToCOLORREF());	// 화살표는 평시에도 dim — disabled 와 시각 구분 없음(체크박스 fill 로 식별)
 	CString s;
 	if (c.p_index && *c.p_index >= 0 && *c.p_index < static_cast<int>(c.options.size()))
 		s = c.options[*c.p_index];
 	CRect tr(vr.left, vr.top, ar.left - 4, vr.bottom);
-	dc.DrawText(s, tr, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
+	dc.DrawText(s, tr, DT_RIGHT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
 }
 
 // bool 셀: 체크박스를 셀 우측(여백 m_field_lpad)에 그리고, 라벨은 label_w 에 갇히지 않고 체크박스
@@ -650,11 +789,11 @@ void CSCPropertyCtrl::draw_bool(CDC& dc, const prop_cell& c, const CRect& cell_r
 	{
 		CRect t(bx);
 		t.DeflateRect(4, 4);
-		dc.FillSolidRect(t, m_theme.cr_text.ToCOLORREF());
+		dc.FillSolidRect(t, cell_text_color(c).ToCOLORREF());	// disabled 면 체크표시도 dim
 	}
 
 	CRect lr(cell_rc.left + m_field_lpad, cell_rc.top, bx.left - m_label_gap, cell_rc.bottom);
-	dc.SetTextColor(field_label_color().ToCOLORREF());
+	dc.SetTextColor(cell_label_color(c).ToCOLORREF());
 	dc.DrawText(c.label, lr, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
 }
 
@@ -715,7 +854,7 @@ void CSCPropertyCtrl::OnPaint()
 				else if (c.type == field_type::info)
 				{
 					CRect vr = cell_value_rect(cell_rc, c.label_w);
-					dc.SetTextColor(m_theme.cr_text.ToCOLORREF());
+					dc.SetTextColor(cell_text_color(c).ToCOLORREF());	// 값 색 — enabled=cr_text / disabled=cr_text_dim
 					dc.DrawText(c.info_text, vr, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
 				}
 			}
@@ -756,6 +895,8 @@ BOOL CSCPropertyCtrl::OnMouseWheel(UINT /*nFlags*/, short zDelta, CPoint pt)
 		{
 			if (c.type != field_type::combo || !c.p_index || c.options.empty())
 				continue;
+			if (!c.enabled)
+				continue;					// disabled combo: 휠 cycle 차단(패널 스크롤로 폴-스루)
 			if (!cell_value_rect(c.rect, c.label_w).PtInRect(hit))
 				continue;
 			const int n = static_cast<int>(c.options.size());
@@ -799,6 +940,8 @@ void CSCPropertyCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 			{
 				if (!c.rect.PtInRect(cp))
 					continue;
+				if (!c.enabled)
+					break;					// disabled 셀: 클릭 소비(다른 셀로 전파 막음)하되 아무 동작 안 함
 
 				if (c.type == field_type::boolean)
 				{

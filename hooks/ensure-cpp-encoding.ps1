@@ -73,12 +73,12 @@ end_of_line = crlf
 }
 
 # --- 2. Convert CP949 / BOM-less sources to UTF-8 BOM -------------------------
-# C/C++ sources + BOM-harmless text docs. Allowlist (NOT denylist) so binaries
-# (.png/.lib/.dll/.ico/.exe...) are never CP949-misdecoded and destroyed. Excluded on
-# purpose: .rc/.rc2 (VS keeps UTF-16) and BOM-hostile text (.bat/.cmd/.sh shebang,
-# strict .json/.yaml parsers) -- a BOM there breaks the file.
-$exts = @('.cpp', '.h', '.hpp', '.c', '.cc', '.cxx', '.inl', '.ipp',
-          '.txt', '.md', '.markdown', '.log', '.csv', '.ini', '.xml', '.html', '.htm')
+# C/C++ sources ONLY. Allowlist (NOT denylist) so binaries (.png/.lib/.dll/.ico/.exe...)
+# are never CP949-misdecoded and destroyed. Text docs (.md/.txt/.log/.csv/.ini/.xml/.html)
+# are intentionally NOT here: a BOM breaks them -- notably claude.md, whose first line
+# `@../Common/claude.md` (import directive) stops resolving with a leading BOM. .rc/.rc2
+# stay UTF-16 (VS-managed); BOM-hostile text (.bat/.cmd/.sh/.json/.yaml) excluded too.
+$exts = @('.cpp', '.h', '.hpp', '.c', '.cc', '.cxx', '.inl', '.ipp')
 $skipDirs = @('\x64\', '\win32\', '\debug\', '\release\', '\.vs\', '\ipch\', '\obj\')
 # Headers that are #include'd by a .rc must keep an RC-friendly encoding. rc.exe chokes
 # when such a Korean .h is converted to UTF-8 BOM (e.g. a stray doxygen '@' surfaced as

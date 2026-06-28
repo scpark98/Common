@@ -2540,6 +2540,15 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_separator = get_weak_color(cr_back, 30);
 	}
 
+	//cr_text_dim 권위 산출 — switch 안의 각 case 가 cr_text 를 먼저 쓰고 cr_back 을 그 *뒤* 줄에서
+	//지정하므로, case 안의 compute_text_dim(cr_text, cr_back) 는 *직전 테마* 의 cr_back 으로 계산되는
+	//순서 버그가 있었다(특히 light→dark_gray 첫 전환 시 dim 이 거의 cr_text 와 같아져 disabled 가
+	//enabled 와 구분 안 됨). cr_text·cr_back 이 모두 확정된 이 시점에서 한 번 더 산출해 모든 테마를
+	//일괄 교정하고, 향후 테마 추가 시 같은 순서 함정도 방지한다. (cr_text·cr_text_dim 은 apply_theme_level
+	//대상이 아니므로 leveling 전 base 색 기준으로 계산하는 기존 설계와도 일치.)
+	cr_text_dim			= compute_text_dim(cr_text, cr_back);
+	cr_disabled_text	= cr_text_dim;
+
 	//selected + hover combo — selected 의 luma 방향으로 12% 만큼 black/white 와 블렌딩.
 	//(이전 공식 = cr_back→cr_back_selected delta 의 절반 가산 — light bg + dark selected 처럼 delta 가 크면
 	// 채널 cap 0/255 에 박혀 selected_hover 가 거의 검정/흰색 되어 contrast 깨졌음.)

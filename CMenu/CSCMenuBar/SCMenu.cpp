@@ -781,10 +781,12 @@ void CSCMenu::hide_visible_ancestors()
 	}
 }
 
-//over_index 의 항목이 submenu 면 부모 메뉴의 window 우측 edge 너머에 popup.
-//Win10/11 의 WS_THICKFRAME 은 좌/우/하에 ~7 px invisible border 가 있어 GetWindowRect 가 실제 visible edge
-//보다 큰 rect 반환. get_window_real_rect (DwmGetWindowAttribute DWMWA_EXTENDED_FRAME_BOUNDS) 로
-//actual visible bounds 사용. Windows 탐색기 / 기본 CMenu 와 동일하게 부모 우측 border 와 ~3 px 겹쳐 표시.
+//over_index 의 항목이 submenu 면 부모 메뉴의 client 우측 edge 너머에 popup.
+//부모 client 영역을 ClientToScreen 으로 변환해 그 우측 edge(논리 screen 좌표)를 기준으로 한다.
+//get_window_real_rect (DWMWA_EXTENDED_FRAME_BOUNDS) 를 쓰면 그 값이 *물리 픽셀* 이라
+//popup_menu/MoveWindow 의 *논리 좌표계* 와 어긋난다 — 고DPI(예:150%)에서 submenu 가 우측으로 멀리,
+//그리고 depth 마다 누적되어 벌어짐. client edge 는 모든 배율에서 위치 좌표계와 일관.
+//(100% 에선 client_right-10 ≈ 기존 DWM_right-11 로 외관 동일. 부모 우측과 ~3 px 겹쳐 표시.)
 void CSCMenu::popup_submenu_for(int over_index)
 {
 	if (over_index < 0 || over_index >= (int)m_items.size())
@@ -801,8 +803,10 @@ void CSCMenu::popup_submenu_for(int over_index)
 	rItem.OffsetRect(0, view_dy());
 	ClientToScreen(rItem);
 
-	CRect rWin = get_window_real_rect(this);
-	item->m_sub_menu->popup_menu(rWin.right - 11, rItem.top);
+	CRect rClient;
+	GetClientRect(rClient);
+	ClientToScreen(rClient);
+	item->m_sub_menu->popup_menu(rClient.right - 10, rItem.top);
 
 	//전체 단계 통합 — 모든 호출 경로 (hover timer / click / keyboard) 에서 sibling switch 일관 처리.
 	//(1) Z-order top → WS_EX_NOACTIVATE popup 끼리 자동 정렬 불안정해 명시.

@@ -3261,7 +3261,14 @@ void CDShow::play(int state)
 		else if (m_play_state == State_Paused)
 			pMC->Pause();
 		else if (m_play_state == State_Running)
+		{
+			//재생 재개 시 frame-step anchor 무효화 — 재생으로 위치가 이동하므로, 사용자가 *먼저* 일시정지한 뒤
+			//D/F 를 누르면 직전 step 세션의 stale anchor 를 재사용해 엉뚱한 위치(수십 프레임)로 점프하던 버그 차단.
+			//(step_frame 의 Running→Paused 자가 리셋은 D 를 Running 중 눌렀을 때만 발동. 먼저 일시정지하면 안 거침.)
+			//set_track_pos(외부 seek)는 이미 자체 리셋함 — 여기선 재생 재개 경로만 보강.
+			m_step_anchor_ms = -1.0;
 			pMC->Run();
+		}
 
 		//MPCVR — graph Run 후에야 put_MessageDrain 이 succeed. parent 로 마우스 forward 해 영상 클릭/드래그가 main dlg 의
 		//OnLButtonDown 등에 도달하도록 (창 이동 / 더블클릭 fullscreen 등 기존 동작 유지).
@@ -3786,11 +3793,33 @@ void CDShow::step_frame(bool forward)
 
 	double interval_ms = 1000.0 / m_frame_rate;
 
-	//fresh 진입(외부 seek/재생 후 첫 step) — settled 표시 위치(audio 동기 track_pos)에서 anchor 시작. 이후 step 은 자체 ±interval 유지.
-	//get_CurrentPosition(deliver 누적)은 렌더러 큐 깊이만큼 표시보다 앞서고, get_track_pos 는 IVideoFrameStep 전진을
-	//audio 가 못 따라가거나(stale) 연속 backward seek 중 flush 로 튀어, 매 step 기준으로 재읽으면 안 됨 — seed 후 직접 누적.
+	//fresh 진입(외부 seek/재생 후 첫 step) — *실제 화면 표시 video frame* 에서 anchor 시작. 이후 step 은 자체 ±interval 유지.
+	//내장 FFmpeg 경로: 로그 분석 결과 스텝 진행 중 모든 tick 에서 video_last_emit == anchor + 1프레임 →
+	//렌더러(MPCVR) 큐 = 1프레임 고정 → 표시 frame = last_emitted_pts_ms − 1프레임 (데이터로 확정).
+	//get_track_pos(audio pts)는 일시정지 순간 표시 frame 보다 1~2프레임 뒤처져(가변) 첫 D 가 2~4프레임 과도하게
+	//뒤로 점프했음 → 표시 frame 으로 직접 seed → 일시정지 화면 이동 없이 첫 D 도 정확히 1프레임(PotPlayer 동작).
+	//(non-internal 경로는 last_emitted 없음 → 기존 get_track_pos fallback 유지.)
 	if (m_step_anchor_ms < 0)
+	{
 		m_step_anchor_ms = get_track_pos();
+		if (m_pFFiSource)
+		{
+			ffi::CFFiSource* src = (ffi::CFFiSource*)m_pFFiSource;
+			int64_t v = src->video_stream() ? src->video_stream()->last_emitted_pts_ms() : -1;
+			if (v >= 0)
+				m_step_anchor_ms = (double)v - interval_ms;
+		}
+	}
+
+	//[ffi/step diag] fresh seed 정확도 검증용 — push 전 정리.
+	if (m_pFFiSource)
+	{
+		ffi::CFFiSource* src = (ffi::CFFiSource*)m_pFFiSource;
+		int64_t v = src->video_stream() ? src->video_stream()->last_emitted_pts_ms() : -1;
+		logWrite(_T("[ffi/step] %s anchor=%.1f | track_pos=%.1f video_last_emit=%lld interval=%.2f"),
+			forward ? _T("FWD") : _T("BACK"), m_step_anchor_ms,
+			get_track_pos(), (long long)v, interval_ms);
+	}
 
 	//forward step: IVideoFrameStep (MPC-VR / EVR 지원) — graph clock 진행 없이 *다음 sample 1 개* 표시.
 	//seek-based step 의 부작용 (sparse keyframe 미디어에서 av_seek_frame BACKWARD 가 forward fallback → 수초 jump) 회피.

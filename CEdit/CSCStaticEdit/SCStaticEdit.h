@@ -34,6 +34,7 @@
  */
 
 #include <afxwin.h>
+#include <afxcmn.h>
 #include <gdiplus.h>
 #pragma comment(lib, "gdiplus.lib")
 
@@ -200,6 +201,9 @@ public:
     action_button_type      get_action_button() const { return m_action_type; }
     bool		            has_action_button() const { return m_action_type != action_none; }
 
+    // action 버튼 위에 마우스를 올리면 표시할 툴팁 텍스트를 지정. 빈 문자열이면 action 종류별 기본 텍스트 사용.
+    void		            set_action_button_tooltip(LPCTSTR text);
+
     // 좌측에 prefix 이미지 표시 (PNG 리소스 ID).
     //   size : 그려질 이미지 높이 (px). 항상 이 값으로 그림 (edit 높이와 무관).
     //          width 는 원본 비율을 유지해 자동 계산.
@@ -335,6 +339,12 @@ private:
 
     // action_file/action_folder 대화상자 초기 폴더 결정 (현재 텍스트 폴더 → recent_folder → exe 디렉토리).
     CString				action_button_start_folder() const;
+
+    // ── Action 버튼 툴팁 ──
+    CToolTipCtrl		m_action_tooltip;
+    CString				m_action_tooltip_text;            // 사용자 override. 비어있으면 action 종류별 기본 텍스트.
+    void				update_action_tooltip();          // 텍스트/활성 갱신 (set_action_button / setter 에서 호출).
+    CString				action_tooltip_default_text() const; // action 종류별 기본 툴팁 텍스트.
 
     // ── Prefix 이미지 (좌측 아이콘) ──
     CSCGdiplusBitmap	m_prefix_image;

@@ -170,6 +170,13 @@ void CSCStaticEdit::PreSubclassWindow()
 	}
 	if (dw_style & SS_CENTERIMAGE)
 		m_valign = DT_VCENTER;
+
+	// action 버튼 영역 툴팁. tool id = 1. rect 는 draw_action_button 에서 SetToolRect 로 갱신.
+	if (m_action_tooltip.Create(this, TTS_ALWAYSTIP))
+	{
+		m_action_tooltip.AddTool(this, _T(""), CRect(0, 0, 0, 0), 1);
+		update_action_tooltip();
+	}
 }
 
 // ──────────────────────────────────────────────────────────
@@ -444,6 +451,9 @@ void CSCStaticEdit::OnKillFocus(CWnd* p_new_wnd)
 // ──────────────────────────────────────────────────────────
 BOOL CSCStaticEdit::PreTranslateMessage(MSG* p_msg)
 {
+	if (m_action_tooltip.GetSafeHwnd())
+		m_action_tooltip.RelayEvent(p_msg);
+
 	if (p_msg->message == WM_KEYDOWN)
 	{
 		switch (p_msg->wParam)
@@ -1827,10 +1837,48 @@ void CSCStaticEdit::set_action_button(action_button_type action)
 
 	if (m_hWnd)
 	{
+		update_action_tooltip();
 		ensure_caret_visible();
 		update_caret_pos();
 		Invalidate();
 	}
+}
+
+void CSCStaticEdit::set_action_button_tooltip(LPCTSTR text)
+{
+	m_action_tooltip_text = text;
+	if (m_hWnd)
+		update_action_tooltip();
+}
+
+CString CSCStaticEdit::action_tooltip_default_text() const
+{
+	switch (m_action_type)
+	{
+		case action_copy:				return _T("복사");
+		case action_clear:				return _T("지우기");
+		case action_find:				return _T("찾기");
+		case action_password_toggle:	return _T("표시/감추기");
+		case action_file:				return _T("파일 선택");
+		case action_folder:				return _T("폴더 선택");
+		default:						return _T("");
+	}
+}
+
+void CSCStaticEdit::update_action_tooltip()
+{
+	if (!m_action_tooltip.GetSafeHwnd())
+		return;
+
+	if (!has_action_button())
+	{
+		m_action_tooltip.Activate(FALSE);
+		return;
+	}
+
+	CString text = m_action_tooltip_text.IsEmpty() ? action_tooltip_default_text() : m_action_tooltip_text;
+	m_action_tooltip.UpdateTipText(text, this, 1);
+	m_action_tooltip.Activate(TRUE);
 }
 
 void CSCStaticEdit::draw_action_button(Gdiplus::Graphics& g)
@@ -1846,6 +1894,9 @@ void CSCStaticEdit::draw_action_button(Gdiplus::Graphics& g)
 	m_r_action_button.right = rc.right - 6 - m_margin.right;
 	m_r_action_button.left  = m_r_action_button.right - m_r_action_button.Height();
 	m_r_action_button.InflateRect(0, 0, 1, 1);
+
+	if (m_action_tooltip.GetSafeHwnd())
+		m_action_tooltip.SetToolRect(this, 1, m_r_action_button);
 
 	if (m_r_action_button.IsRectEmpty())
 		return;

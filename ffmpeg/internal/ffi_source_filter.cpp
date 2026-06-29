@@ -607,6 +607,7 @@ namespace ffi
 			{
 				int64_t pts_ms = av_rescale_q(frame->pts, video_tb, AVRational{1, 1000});
 				m_last_emitted_pts_ms.store(pts_ms);
+				m_emit_seq.fetch_add(1);	//real 표시 frame 갱신 — frame step closed-loop 의 settle 신호.
 			}
 		}
 

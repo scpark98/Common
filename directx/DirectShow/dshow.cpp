@@ -3259,7 +3259,33 @@ void CDShow::play(int state)
 		if (m_play_state == State_Stopped)
 			pMC->Stop();
 		else if (m_play_state == State_Paused)
+		{
 			pMC->Pause();
+			//일시정지 직후 렌더러가 poster frame 을 1개 더 요청해 last_emitted 가 ~1프레임 advance 후 안정된다.
+			//OSD(get_track_pos)/frame-step seed 가 advance *전* 값을 잡으면 표시 frame 보다 1프레임 뒤처져 첫 D 가
+			//제자리처럼(시각 정지) 보였다(로그 Seq C). emit 이 멎을 때까지(stable) 잠깐 기다린 뒤 OSD 가 안정값을 쓰게 한다.
+			if (m_pFFiSource && m_frame_rate > 0.0)
+			{
+				ffi::CFFiVideoStream* vs = ((ffi::CFFiSource*)m_pFFiSource)->video_stream();
+				if (vs)
+				{
+					int stable = 0;
+					int64_t prev = vs->emit_seq();
+					for (int i = 0; i < 60 && stable < 8; i++)	//최대 60ms, 8ms 무emit 시 안정 판정.
+					{
+						::Sleep(1);
+						int64_t cur = vs->emit_seq();
+						if (cur == prev)
+							stable++;
+						else
+						{
+							stable = 0;
+							prev = cur;
+						}
+					}
+				}
+			}
+		}
 		else if (m_play_state == State_Running)
 		{
 			//재생 재개 시 frame-step anchor 무효화 — 재생으로 위치가 이동하므로, 사용자가 *먼저* 일시정지한 뒤
@@ -3523,7 +3549,20 @@ double CDShow::get_track_pos()
 		OAFilterState fs = State_Stopped;
 		HRESULT hr_s = m_pMC->GetState(0, &fs);
 		if (hr_s == VFW_S_STATE_INTERMEDIATE || fs == State_Paused)
+		{
+			//fresh 일시정지(frame-step 전, m_step_anchor_ms<0): m_last_track_pos_ms 는 재생 중 추적하던 audio input
+			//pts 라 화면 표시 video frame 보다 A/V offset(수 프레임)만큼 뒤처진다(로그 확정 — 일시정지↔첫 frame-step
+			//시각이 증가처럼 튐). 내장 경로의 실제 표시 frame = last_emitted - interval(렌더러 큐 1)로 보정해 반환.
+			//frame-step 시작 후(m_step_anchor_ms>=0)는 step 이 m_last_track_pos_ms 를 landed(실제 frame)로 갱신하므로 그대로.
+			if (m_pFFiSource && m_step_anchor_ms < 0 && m_frame_rate > 0.0)
+			{
+				ffi::CFFiVideoStream* vs = ((ffi::CFFiSource*)m_pFFiSource)->video_stream();
+				int64_t v = vs ? vs->last_emitted_pts_ms() : -1;
+				if (v >= 0)
+					return (double)v - 1000.0 / m_frame_rate;
+			}
 			return m_last_track_pos_ms;
+		}
 	}
 
 	//재생 중 — rate 무관 *원본 미디어 시점* — audio chain 의 input PTS 를 source 로. graph clock 은 wall clock 기반이라
@@ -3793,6 +3832,10 @@ void CDShow::step_frame(bool forward)
 
 	double interval_ms = 1000.0 / m_frame_rate;
 
+	//fresh = 외부 seek/재생 후 첫 step. backward closed-loop 가 "재생→일시정지 직후(렌더러 큐 1프레임)" 와
+	//"이전 step 으로 큐가 비워진 상태(큐 0)" 를 구분하는 데 사용.
+	bool fresh = (m_step_anchor_ms < 0.0);
+
 	//fresh 진입(외부 seek/재생 후 첫 step) — *실제 화면 표시 video frame* 에서 anchor 시작. 이후 step 은 자체 ±interval 유지.
 	//내장 FFmpeg 경로: 로그 분석 결과 스텝 진행 중 모든 tick 에서 video_last_emit == anchor + 1프레임 →
 	//렌더러(MPCVR) 큐 = 1프레임 고정 → 표시 frame = last_emitted_pts_ms − 1프레임 (데이터로 확정).
@@ -3809,16 +3852,6 @@ void CDShow::step_frame(bool forward)
 			if (v >= 0)
 				m_step_anchor_ms = (double)v - interval_ms;
 		}
-	}
-
-	//[ffi/step diag] fresh seed 정확도 검증용 — push 전 정리.
-	if (m_pFFiSource)
-	{
-		ffi::CFFiSource* src = (ffi::CFFiSource*)m_pFFiSource;
-		int64_t v = src->video_stream() ? src->video_stream()->last_emitted_pts_ms() : -1;
-		logWrite(_T("[ffi/step] %s anchor=%.1f | track_pos=%.1f video_last_emit=%lld interval=%.2f"),
-			forward ? _T("FWD") : _T("BACK"), m_step_anchor_ms,
-			get_track_pos(), (long long)v, interval_ms);
 	}
 
 	//forward step: IVideoFrameStep (MPC-VR / EVR 지원) — graph clock 진행 없이 *다음 sample 1 개* 표시.
@@ -3841,7 +3874,29 @@ void CDShow::step_frame(bool forward)
 	}
 
 	//seek-based: backward, 또는 IVideoFrameStep 미지원 forward.
-	m_step_anchor_ms += forward ? interval_ms : -interval_ms;
+	ffi::CFFiSource* src = m_pFFiSource ? (ffi::CFFiSource*)m_pFFiSource : nullptr;
+	ffi::CFFiVideoStream* vstream = src ? src->video_stream() : nullptr;
+
+	//내장 FFmpeg backward = closed-loop. 매 step 마다 *실제 표시 frame 의 원본 PTS*(last_emitted_pts_ms,
+	//그라운드 트루스)에서 직전 frame 위치로 seek 한다. 매 step 그라운드 트루스로 재앵커해 누적 오차를 제거한다.
+	//(forward 는 IVideoFrameStep 으로 이미 정확 → 위에서 return.)
+	//decoder 의미(검증, ffi FillBuffer pre-target skip): seek 은 frame.pts < target 을 버리고 *첫 pts ≥ target frame*
+	//을 emit 한다 = "target 이상의 첫 frame". 따라서 직전 frame 에 착지하려면 target ≤ 직전 frame pts 여야 한다.
+	//직전 frame ≈ displayed - interval, 그 전 frame ≈ displayed - 2·interval → 유효구간 (prev2, prev].
+	//그 중앙인 displayed - 1.5·interval 로 둬 no-move(>prev) / skip(≤prev2) 양쪽에 0.5·interval 여유 확보.
+	bool closed_loop = (vstream && !forward);
+
+	if (closed_loop)
+	{
+		//현재 표시 frame PTS — fresh(재생→일시정지 직후)는 렌더러가 lookahead 1프레임 보유 → last_emitted - interval.
+		//이후 step 은 seek 으로 큐가 비워져 last_emitted == 표시 frame (settle 로 보장).
+		double displayed = fresh ? (m_step_anchor_ms) : (double)vstream->last_emitted_pts_ms();
+		m_step_anchor_ms = displayed - 1.5 * interval_ms;	//직전 frame 에 결정적 착지(첫 pts ≥ target = prev).
+	}
+	else
+	{
+		m_step_anchor_ms += forward ? interval_ms : -interval_ms;
+	}
 	if (m_step_anchor_ms < 0)
 		m_step_anchor_ms = 0;
 
@@ -3849,9 +3904,8 @@ void CDShow::step_frame(bool forward)
 	//frame step 은 정밀 1프레임이 본질이라 이 seek 만 정확 모드로 우회한다. put_CurrentPosition 내부의
 	//on_change_start / decoder.seek 가 모드를 *동기로* 스냅샷하므로, 호출 직후 원복해도 이 seek 은 정확 모드로 처리됨.
 	bool restore_kf = false;
-	if (m_pFFiSource)
+	if (src)
 	{
-		ffi::CFFiSource* src = (ffi::CFFiSource*)m_pFFiSource;
 		//frame step seek 표시 — FillBuffer 의 latency budget 비활성(정확 target 까지 skip, 화면 튐 방지).
 		src->set_frame_step_mode(true);
 		//keyframe 모드면 정확 모드로 우회 (GOP 시작 키프레임 점프 방지). on_change_start/decoder.seek 가 동기 스냅샷.
@@ -3862,15 +3916,26 @@ void CDShow::step_frame(bool forward)
 		}
 	}
 
+	int64_t seq0 = vstream ? vstream->emit_seq() : 0;
 	m_pMP->put_CurrentPosition(m_step_anchor_ms / 1000.0);
 	m_last_track_pos_ms = m_step_anchor_ms;	//일시정지 표시 위치 = 스텝 목표 (put_CurrentPosition 은 m_last_track_pos_ms 갱신 안 함).
 
-	if (m_pFFiSource)
+	if (src)
 	{
-		ffi::CFFiSource* src = (ffi::CFFiSource*)m_pFFiSource;
 		if (restore_kf)
 			src->set_seek_keyframe_mode(true);
 		src->set_frame_step_mode(false);
+	}
+
+	//closed-loop settle — 이 seek 의 실제 frame emit(emit_seq 증가) 대기. 반환 시 last_emitted/track_pos 가
+	//그라운드 트루스가 되어 (a) 다음 backward 가 정확한 표시 PTS 에서 재앵커, (b) OSD/컨트롤바 시각도 정확.
+	//put_CurrentPosition 의 pre-set(target)을 실제 착지 PTS 로 대체할 때까지. bound 250ms(보통 1프레임 디코드 < 33ms).
+	if (closed_loop && vstream)
+	{
+		for (int waited = 0; waited < 250 && vstream->emit_seq() == seq0; waited++)
+			::Sleep(1);
+		m_step_anchor_ms = (double)vstream->last_emitted_pts_ms();	//실제 착지 frame → 다음 step 의 표시 PTS source.
+		m_last_track_pos_ms = m_step_anchor_ms;
 	}
 }
 

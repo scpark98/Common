@@ -84,6 +84,9 @@ namespace ffi
 
 		REFERENCE_TIME		last_rtStart() const { return m_last_rtStart; }
 		int64_t				last_emitted_pts_ms() const { return m_last_emitted_pts_ms.load(); }
+		//frame step settle 신호 — *실제* frame emit 마다 ++. seek 의 pre-set(on_change_start)은 미증가.
+		//CDShow::step_frame 의 closed-loop backward 가 seek 후 이 값 변화로 새 표시 frame 착지를 확인.
+		int64_t				emit_seq() const { return m_emit_seq.load(); }
 		CFFiSource*			source() { return m_pSource; }
 
 	private:
@@ -122,6 +125,10 @@ namespace ffi
 		//audio PTS 기반은 seek 시 video keyframe 후진과 mismatch → 컨트롤바 / 자막 timing 이 화면보다 앞섬.
 		//video frame 의 원본 PTS = 실제 화면 frame 시점 = .smi 자막 timing reference.
 		std::atomic<int64_t> m_last_emitted_pts_ms{ -1 };
+
+		//실제 표시 frame 이 갱신될 때마다 ++ (FillBuffer 의 real emit). seek 의 pre-set 은 미증가 →
+		//frame step closed-loop 가 "pre-set target" 과 "실제 착지 frame" 을 구분해 settle 을 판정.
+		std::atomic<int64_t> m_emit_seq{ 0 };
 	private:
 
 		CCritSec		m_cs_seeking;

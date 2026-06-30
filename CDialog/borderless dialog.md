@@ -1,4 +1,4 @@
-# Borderless Customized Dialog 적용 매뉴얼
+﻿# Borderless Customized Dialog 적용 매뉴얼
 
 WS_CAPTION 없는 *완전 customized* MFC 다이얼로그 (caption / 시스템 system buttons / NC frame 을 사용자가 직접 그리되, OS resize / Aero Snap / Win11 round corner / shadow 는 유지) 만들기.
 

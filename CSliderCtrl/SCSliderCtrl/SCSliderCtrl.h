@@ -249,12 +249,12 @@ public:
 	bool	m_tic_show_text = false;	//default = false
 	//틱 동작 3모드 (m_tic_freq > 0 일 때만 의미):
 	// 1) 둘 다 false : 틱은 표시만, 위치 자유.
-	// 2) m_auto_snap : 틱 ±m_snap_tolerance(자석 범위) 안이면 그 틱으로 끌어당김, 밖은 자유. (자석식)
+	// 2) m_auto_snap : 틱 ±m_snap_tolerance(자석 범위, 화면 픽셀) 안이면 그 틱으로 끌어당김, 밖은 자유. (자석식)
 	// 3) m_tic_only  : 틱 위치만 선택 가능, 항상 가장 가까운 틱으로 강제. (이산값 — 해상도 목록처럼)
 	// 둘 다 켜지면 m_tic_only 우선.
 	bool	m_auto_snap = false;
 	bool	m_tic_only = false;
-	int		m_snap_tolerance = 2;		//m_auto_snap 자석 범위 (pos 값 단위, ±). 틱과의 거리가 이 이하면 스냅.
+	int		m_snap_tolerance = -1;		//m_auto_snap 자석 범위 (화면 픽셀, ±). -1 = auto(틱 픽셀 간격 비례, clamp 4~12). 명시 px 로 override.
 	//freq는 CSliderCtrl::SetTicFreq()와 동일하게 lower ~ upper 사이의 구간을 몇 등분할 것인지가 아닌 간격을 의미한다.
 	//즉, freq = 23이면 23 등분이 아니라 0 ~ 23 ~ 46 ~ 69 ~ 92와 같이 틱이 표시된다.
 	void	set_tic_freq(int freq, bool show_text = false);
@@ -263,7 +263,8 @@ public:
 	void	set_auto_snap(bool enable = true) { m_auto_snap = enable; }
 	//모드3 — 틱 위치만 선택 가능(이산값). 항상 가장 가까운 틱으로 강제. 픽셀폭보다 range 가 커도 정확히 틱에 안착.
 	void	set_tic_only(bool enable = true) { m_tic_only = enable; }
-	//모드2 자석 범위 (pos 값 단위, ±). 기본 2.
+	//모드2 자석 범위 override (화면 픽셀, ±). 기본은 auto(틱 픽셀 간격 비례) — 보통 호출 불필요.
+	//터치 UI(큰 자석)·정밀 슬라이더(0=자석 끔) 등 특수 feel 일 때만 명시 px 지정. 다시 auto 로: -1.
 	void	set_snap_tolerance(int tolerance) { m_snap_tolerance = tolerance; }
 
 	void	use_bookmark(bool use = true) { m_use_bookmark = use; }

@@ -1108,8 +1108,19 @@ int CSCSliderCtrl::snap_to_tic(int pos)
 	if (m_tic_only)				//모드3 — 항상 가장 가까운 틱.
 		return nearest;
 
-	//모드2 — 틱 tolerance 안일 때만 끌어당기고, 그 밖은 자유 이동.
-	if (abs(nearest - pos) <= m_snap_tolerance)
+	//모드2 — 틱 자석 범위 안일 때만 끌어당기고, 그 밖은 자유 이동.
+	//자석 범위는 *화면 픽셀* 거리로 판정한다. pos 값 단위로 판정하면 range 가 넓은(pos-per-pixel 이 큰)
+	//슬라이더에서 tolerance 가 sub-pixel 窓이 되어 거의 스냅되지 않는다 — 예: width range 100~500 / freq 100 은
+	//1px 이 여러 pos 라 ±2 pos 가 1px 미만. 픽셀 거리면 range·freq 와 무관하게 일관된 자석감.
+	//override(-1) 가 없으면 틱 픽셀 간격의 ~18% 로 자동 산출(clamp 4~12px) — 컨트롤 폭·freq·range 어떤
+	//조합에서도 호출자 손계산 없이 일관. set_snap_tolerance(px) 로 특수 feel(터치 큰 자석/정밀 0)만 override.
+	int tol_px = m_snap_tolerance;
+	if (tol_px < 0)
+	{
+		int span_px = abs(Pos2Pixel(lower + m_tic_freq) - Pos2Pixel(lower));
+		tol_px = max(4, min(12, (int)(span_px * 0.18)));
+	}
+	if (abs(Pos2Pixel(nearest) - Pos2Pixel(pos)) <= tol_px)
 		return nearest;
 
 	return pos;

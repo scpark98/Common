@@ -289,6 +289,15 @@ Gdiplus::Color get_color(COLORREF rgb)
 //기준색보다 밝거나 어두운 색을 리턴한다.
 //기준색이 밝은색 계열이면 그보다 offset만큼 좀 더 어두운 색을,
 //기준색이 어두운 계열이면 그보다 offset만큼 좀 더 밝은 색을 리턴한다.
+//
+//[중요/주의] offset 은 *절대 거리 이동* 이라 기준색과 배경색의 간격(대비)을 전혀 고려하지 않는다.
+//  따라서 "본문색(fg)을 배경(bg) 위에서 약하게 = 보조 텍스트(크기/날짜 등)" 표현하려고 get_weak_color(fg, offset)
+//  를 쓰면 테마마다 결과가 크게 달라진다 — 고대비 테마에선 적당히 약하지만, 저대비 테마(fg 가 bg 와 가까운)에선
+//  같은 offset 이동만으로 fg 가 bg 를 지나치거나 근접해 거의 안 보이게 되는 부작용이 있다.
+//  → *전경색을 배경 대비로 약화* 하려는 용도라면 get_weak_color 가 아니라 get_color(fg, bg, ratio)(대비 비례 blend,
+//     ratio 0=fg / 1=bg, 절대 bg 까진 안 감) 를 써야 모든 테마에서 일관된다.
+//  get_weak_color 는 "배경/테두리/타이틀바처럼 *배경 계열에서 한 톤 파생*"(작은 offset)하는 용도에만 안전하다.
+//  (실제 사례: CVtListCtrlEx 의 크기/날짜 보조색이 get_weak_color(cr_text, N) 이라 일부 테마에서 안 보여 ratio blend 로 전환.)
 Gdiplus::Color	get_weak_color(Gdiplus::Color cr, int offset)
 {
 	byte lum = get_luminance(cr);

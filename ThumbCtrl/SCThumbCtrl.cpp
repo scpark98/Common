@@ -16,11 +16,13 @@ CSCThumbCtrl::CSCThumbCtrl()
 
 	m_max_thumbs = AfxGetApp()->GetProfileInt(_T("setting\\thumbctrl"), _T("max thumbs limit"), 0);
 
-	//info text default 를 theme.cr_text 로 — light/dark theme 자동 적응.
+	//info text default 를 cr_text 의 약화색으로 — light/dark theme 자동 적응.
+	//get_weak_color(절대 offset) 대신 get_color(cr_text, cr_back, ratio) (대비 비례 blend) — 저대비 테마에서
+	//본문이 배경에 묻히는 부작용 방지. ratio 0.25 ≒ 기존 offset 64 (full-contrast 기준 동일, 저대비에선 비례).
 	for (int i = 0; i < INFO_TEXT_COUNT; i++)
 	{
 		m_show_info_text[i] = false;
-		m_cr_info_text[i] = get_weak_color(m_theme.cr_text, 64);
+		m_cr_info_text[i] = get_color(m_theme.cr_text, m_theme.cr_back, 0.25);
 	}
 }
 
@@ -1396,11 +1398,12 @@ void CSCThumbCtrl::set_color_theme(const CSCColorTheme& theme, bool invalidate)
 		Invalidate();
 }
 
-//theme 변경 시 info text default + 모든 썸네일의 cr_info 를 theme.cr_text 의 weak 색 (살짝 톤 다운) 으로 동기화.
+//theme 변경 시 info text default + 모든 썸네일의 cr_info 를 cr_text 의 약화색 (살짝 톤 다운) 으로 동기화.
 //사용자가 set_info_text_color 로 customize 한 색은 함께 reset 됨 — 필요시 theme 변경 후 재호출.
 void CSCThumbCtrl::apply_theme_to_info_text()
 {
-	Gdiplus::Color cr_default = get_weak_color(m_theme.cr_text, 64);
+	//get_weak_color(절대 offset) 대신 대비 비례 blend — 저대비 테마에서 배경에 묻히지 않도록. (생성자와 동일 ratio.)
+	Gdiplus::Color cr_default = get_color(m_theme.cr_text, m_theme.cr_back, 0.25);
 
 	for (int i = 0; i < INFO_TEXT_COUNT; i++)
 		m_cr_info_text[i] = cr_default;

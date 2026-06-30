@@ -271,6 +271,12 @@ Gdiplus::Color	get_normalized_bright_color(Gdiplus::Color cr, int min_peak = 40)
 //"어떤 색의 80%" 의 가장 일반적 의미(밝기 80%) 가 이것이다.
 Gdiplus::Color	get_ratio_color(Gdiplus::Color cr, float ratio);
 
+//cr 을 흰색 쪽으로 t(0~1) 비율만큼 밝게 한다. HSL 의 L 만 흰색 방향으로 이동(new_L = L + (1-L)*t)하므로
+//hue·채도 보존 + alpha 보존 — 가산(get_color +n)·곱셈(get_ratio_color) 과 달리 채널 포화로 인한 색조 드리프트가 없다.
+//t=0 → 원색, t=0.1 → 흰색 쪽 10%, t=0.5 → 흰색 쪽 절반, t=1 → 흰색. 채도 높은 강조색을 같은 톤으로 밝게 할 때 사용.
+//(어둡게는 곱셈이 검정 쪽으로 포화가 없어 hue 안전 → get_ratio_color(cr, <1) 를 쓴다.)
+Gdiplus::Color	get_lightened_color(Gdiplus::Color cr, double t);
+
 //테마 강도(intensity) 보간. 중성색(흰색) 기준으로 cr 의 편차를 level 배로 조절한다.
 //level=1.0 → cr 그대로, 0.0 → 흰색(편차 0), 0.8 → 편차 80%(20% 옅게), >1.0 → 편차 확대(더 진하게).
 //알파 보존. get_ratio_color 와 달리 *흰색* 기준이라 dark 테마를 옅게 하면 "덜 어두워진다"(밝아짐).

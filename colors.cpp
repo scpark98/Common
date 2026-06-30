@@ -318,6 +318,74 @@ Gdiplus::Color get_ratio_color(Gdiplus::Color cr, float ratio)
 	return Gdiplus::Color(cr.GetA(), ch(cr.GetR()), ch(cr.GetG()), ch(cr.GetB()));
 }
 
+//RGB→HSL 후 L 만 흰색 쪽으로 이동 → HSL→RGB. H·S 를 고정하므로 채널 포화로 인한 hue 드리프트가 없다(가산/곱셈 대비 이점).
+//HSL 식은 image_processing/hsl/hsl.h 의 HSL 클래스와 동일 — 새 의존(include) 없이 colors 모듈 안에서 자급.
+Gdiplus::Color get_lightened_color(Gdiplus::Color cr, double t)
+{
+	if (t <= 0.0)
+		return cr;
+	if (t > 1.0)
+		t = 1.0;
+
+	double r = cr.GetR() / 255.0;
+	double g = cr.GetG() / 255.0;
+	double b = cr.GetB() / 255.0;
+
+	double mn = r < g ? (r < b ? r : b) : (g < b ? g : b);
+	double mx = r > g ? (r > b ? r : b) : (g > b ? g : b);
+	double l = (mn + mx) / 2.0;
+
+	double h = 0.0;
+	double s = 0.0;
+	double chroma = mx - mn;
+	if (chroma != 0.0)
+	{
+		s = (l <= 0.5) ? chroma / (mx + mn) : chroma / (2.0 - mx - mn);
+		if (mx == r)
+		{
+			h = 60.0 * (g - b) / chroma;
+			if (h < 0.0)
+				h += 360.0;
+		}
+		else if (mx == g)
+			h = 120.0 + 60.0 * (b - r) / chroma;
+		else
+			h = 240.0 + 60.0 * (r - g) / chroma;
+	}
+
+	l = l + (1.0 - l) * t;	//흰색 쪽으로 t 만큼 이동(H·S 고정).
+
+	double q = (l < 0.5) ? l * (1.0 + s) : l + s - l * s;
+	double p = 2.0 * l - q;
+	double hk = h / 360.0;
+	double seg[3] = { hk + 1.0 / 3.0, hk, hk - 1.0 / 3.0 };
+
+	BYTE out[3];
+	for (int i = 0; i < 3; ++i)
+	{
+		double c = seg[i];
+		if (c < 0.0)
+			c += 1.0;
+		else if (c > 1.0)
+			c -= 1.0;
+
+		double v;
+		if (c < 1.0 / 6.0)
+			v = p + (q - p) * 6.0 * c;
+		else if (c < 0.5)
+			v = q;
+		else if (c < 2.0 / 3.0)
+			v = p + (q - p) * (4.0 - 6.0 * c);
+		else
+			v = p;
+
+		v = v * 255.0 + 0.5;
+		out[i] = (BYTE)(v < 0.0 ? 0.0 : (v > 255.0 ? 255.0 : v));
+	}
+
+	return Gdiplus::Color(cr.GetA(), out[0], out[1], out[2]);
+}
+
 //기존 get_color(cr1, cr2, ratio) 는 ratio 를 [0,1] 로 clamp 하고 alpha 까지 보간하므로
 //level>1(더 진하게) 과 alpha 보존이 안 된다. 여기서는 흰색(255) 기준으로 각 채널 편차를
 //level 배 한 뒤 0..255 clamp, alpha 는 원본 유지 → 테마 강도 다이얼 용도.

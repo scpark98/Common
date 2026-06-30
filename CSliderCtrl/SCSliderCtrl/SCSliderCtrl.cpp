@@ -711,7 +711,8 @@ void CSCSliderCtrl::OnPaint()
 				bool is_end_tic = (tic == lower || tic == upper);
 				int tic_d = is_end_tic ? 8 : 6;
 				CRect rtic = make_center_rect(tic_pos, rtrack.CenterPoint().y, tic_d, tic_d);
-				g.FillEllipse(&Gdiplus::SolidBrush(is_end_tic ? cr_tic : get_weak_color(cr_tic)), CRect_to_gpRect(rtic));
+				//중간 tic 는 약화색 — get_weak_color(절대 offset 32) 대신 cr_tic 을 cr_back 쪽으로 대비 비례 blend(ratio 0.13 ≒ offset 32). 저대비 테마에서 tic 이 배경에 묻힘 방지.
+				g.FillEllipse(&Gdiplus::SolidBrush(is_end_tic ? cr_tic : get_color(cr_tic, m_theme.cr_back, 0.13)), CRect_to_gpRect(rtic));
 
 				if (m_tic_show_text)
 				{

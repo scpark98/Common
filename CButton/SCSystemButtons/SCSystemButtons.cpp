@@ -120,10 +120,12 @@ void CSCSystemButtons::resize()
 
 	for (int i = 0; i < m_button.size(); i++)
 	{
-		//박스 bottom 을 타이틀바 bottom 보다 ~2px 위로. strip 이 top 에서 m_top 만큼 내려와 상단 여백이
-		//생기는데 bottom 이 m_button_height 꽉 차면 비대칭(상단 ~2px / 하단 0). (m_button_height - m_top) 가
-		//strip-client 좌표에서의 타이틀바 bottom 이고, 거기서 2px 더 빼 상/하 여백을 맞춘다.
-		m_button[i].r = CRect(i * (m_button_width + m_gap), m_top, i * (m_button_width + m_gap) + m_button_width, m_button_height - m_top - 2);
+		//strip 을 타이틀바에 정확히 겹치므로(아래 MoveWindow top=0, height=m_button_height) 버튼 박스도 strip
+		//전체 높이 [0, m_button_height] 를 차지 → 글리프 중심 = m_button_height/2 = 타이틀바 중앙. 예전엔 strip 을
+		//m_top(=1)만큼 내려 배치하고 상/하 1px 마진을 주려 박스 bottom 을 -m_top-2 했으나, strip 색이 타이틀바
+		//색과 같아 마진이 보이지도 않으면서 strip 바닥만 타이틀바 밖으로 1px 넘쳐(부모가 안 클리핑하면 콘텐츠 위로
+		//회색 1px 노출) 어긋났다. Windows 시스템버튼처럼 마진 없이 꽉 맞춘다.
+		m_button[i].r = CRect(i * (m_button_width + m_gap), 0, i * (m_button_width + m_gap) + m_button_width, m_button_height);
 
 		//toolbar 모드면 버튼 박스를 각 변 toolbar_inset px 작게 — 호버 fill·히트·글리프 기준이 모두 이 rect 라 한 번에 작아진다.
 		//★ 버튼 크기 미세조정은 이 toolbar_inset 한 값만 바꾸면 됨.
@@ -134,8 +136,8 @@ void CSCSystemButtons::resize()
 		}
 	}
 
-	MoveWindow(m_right - 1 - m_button.size() * m_button_width - (m_button.size() - 1) * m_gap,
-		m_top,
+	MoveWindow(m_right - m_button.size() * m_button_width - (m_button.size() - 1) * m_gap,
+		0,
 		m_button.size() * m_button_width - (m_button.size() - 1) * m_gap,
 		m_button_height);
 
@@ -151,7 +153,9 @@ void CSCSystemButtons::adjust(int top, int right)
 	GetClientRect(rc);
 
 	m_top = top + 1;
-	m_right = right - 1;
+	//strip 우측을 client 우측 edge(right)에 flush — 종료버튼 우측 마진 제거. vertical(top=0)과 동일하게
+	//horizontal 마진도 0. 예전 -1 + resize() MoveWindow 의 -1 이 합쳐져 우측 2px 마진을 만들었다.
+	m_right = right;
 	resize();
 	//MoveWindow(m_right - rc.Width(), m_top, rc.Width(), rc.Height());
 }
@@ -226,7 +230,10 @@ void CSCSystemButtons::OnPaint()
 		{
 			Gdiplus::Pen pen(m_theme.cr_title_text, 1.0f);
 			Gdiplus::Pen pen_pin(Gdiplus::Color(45, 122, 190), 17.0f);
-			Gdiplus::Pen pen_pin_gray(get_weak_color(m_theme.cr_title_back_inactive, 48), 17.0f);
+			//비활성(미고정) pin 의 회색: get_weak_color(cr_title_back_inactive, 48) 는 배경 톤을 절대 offset 이동해
+			//저대비 테마에선 surface 와 비슷해져 안 보일 수 있었다. 글리프의 자연색(cr_title_text)을 surface(cr_back)
+			//쪽으로 대비 비례 blend 해 muted glyph 로 — 어떤 테마에서도 배경에 묻히지 않는다. (basis 변경, 시각 확인 권장.)
+			Gdiplus::Pen pen_pin_gray(get_color(m_theme.cr_title_text, m_theme.cr_back, 0.45), 17.0f);
 			Gdiplus::SolidBrush br_back(m_theme.cr_back);
 			Gdiplus::SolidBrush br_pin(Gdiplus::Color(255, 255, 255, 255));
 
@@ -442,7 +449,10 @@ void CSCSystemButtons::set_button_width(int width)
 
 void CSCSystemButtons::set_button_height(int height)
 {
-	m_button_height = height - 1;
+	//variadic create(height=...) 경로는 m_button_height = height 그대로 쓴다. 여기서 -1 하면 set_button_height
+	//로 높이를 맞춘 dlg(set_system_buttons 경유)만 버튼이 1px 짧아져 글리프가 0.5px 위로 떠, create 경로로 만든
+	//dlg(Endorphin2 TitleDlg 등)와 세로정렬이 어긋났다. 두 경로를 동일하게 — height 그대로 사용.
+	m_button_height = height;
 	resize();		//폭은 resize() 가 height(+toolbar 모드)에서 파생.
 	/*
 	return;

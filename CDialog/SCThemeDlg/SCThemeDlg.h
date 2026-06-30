@@ -118,7 +118,10 @@ public:
 			m_sys_buttons.insert_button(-1, arg[i]);
 
 		m_sys_buttons.set_button_width(button_width);
-		m_sys_buttons.set_button_height(m_titlebar_height - 2);
+		//OnInitDialog 의 base 경로(set_button_height(m_titlebar_height))·variadic create(height=m_titlebar_height)
+		//와 동일하게 타이틀바 높이 그대로 동기화. 예전 -2 는 resize() 의 rect 보정(-m_top-2)과 중복되어 버튼이
+		//2px 짧아지고 글리프가 1px 위로 떠 다른 경로(Endorphin2 TitleDlg 등)와 세로정렬이 어긋났다.
+		m_sys_buttons.set_button_height(m_titlebar_height);
 	}
 
 	//parent가 maximize되거나 restore되면 CSCSystemButtons의 버튼 모양이 달라지므로

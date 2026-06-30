@@ -368,9 +368,10 @@ void CPathCtrl::OnPaint()
 		if (i < m_path.size() - 1 || m_has_subfolder)
 		{
 			//chevron 색을 CSCTreeCtrl 과 동일하게 — 항목 텍스트색(활성 세그먼트는 강조 배경 위라 상태색,
-			//비활성은 본래 cr_text)을 get_weak_color 로 48 만큼 흐리게. 원색은 너무 진해 탐색기 chevron 의 옅은 톤과 다름.
+			//비활성은 본래 cr_text)을 흐리게. 원색은 너무 진해 탐색기 chevron 의 옅은 톤과 다름.
+			//get_weak_color(절대 offset) 대신 get_color(glyph, cr_back, ratio) (대비 비례) — 저대비 테마에서 묻힘 방지. ratio 0.2 ≒ offset 48.
 			Gdiplus::Color cr_glyph = (i == m_index ? (m_down ? m_theme.cr_text_selected : m_theme.cr_text_hover) : m_theme.cr_text);
-			Gdiplus::Color cr_arrow = get_weak_color(cr_glyph, 48);
+			Gdiplus::Color cr_arrow = get_color(cr_glyph, m_theme.cr_back, 0.2);
 
 			//pathctrl의 width가 좁아서 일부 노드만 표시할 경우 생략되었음을 나타내는 << 기호를 표시
 			if (i == 0 && m_start_index > 1)

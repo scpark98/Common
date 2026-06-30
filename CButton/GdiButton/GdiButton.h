@@ -476,6 +476,11 @@ public:
 	//직접 그리는 checkbox/radio 글리프(정사각형)의 픽셀 크기. 기본 13 = Windows 96DPI 표준 글리프 크기.
 	void		set_check_size(int size) { m_check_size = (size > 0) ? size : m_check_size; if (m_hWnd) Invalidate(); }
 
+	//indicator(체크박스 사각형 / 라디오 원) 채움색 지정 — 지정하면 무조건 그 색으로 채운다. Transparent(기본)면 미채움(컨트롤 배경 비침).
+	void		set_cr_indicator_fill(Gdiplus::Color cr) { m_cr_indicator_fill = cr; if (m_hWnd) Invalidate(); }
+	//mark(체크 v / 라디오 점) 색 지정 — Transparent(기본)면 자동(채움색과 대비되는 색). 채움색과 별개로 줄 수 있다.
+	void		set_cr_indicator_mark(Gdiplus::Color cr) { m_cr_indicator_mark = cr; if (m_hWnd) Invalidate(); }
+
 	//public으로 하여 CSCGdiplusBitmap의 effect등의 함수등을 사용할 수 있도록 함.
 	//하나의 버튼에는 n개의 이미지를 담을 수 있고 각 이미지는 4개의 state image를 각각 설정할 수 있다.
 	std::deque<CGdiButtonImage*> m_image;
@@ -494,7 +499,12 @@ protected:
 
 	//checkbox를 직접 그려줄 경우 윈도우 기본 스타일, 라운드 채움 스타일 등
 	int			m_check_style = check_style_default;
-	Gdiplus::Color m_cr_check_fill = Gdiplus::Color::RoyalBlue;
+	//indicator = 체크박스의 사각형 / 라디오의 원(둘의 공통 명칭, Qt/CSS/접근성 표준). mark = 그 안의 표시(체크 v / 라디오 점).
+	//indicator 채움색. 기본 Transparent = "안 채움"(컨트롤 배경이 비침 — 흰 박스 고정 시 다크/타이틀바 테마에서 이질감+표시 묻힘).
+	//set_cr_indicator_fill() 로 색을 지정하면 무조건 그 색으로 채운다.
+	Gdiplus::Color m_cr_indicator_fill = Gdiplus::Color::Transparent;
+	//mark(체크/점) 색 override. 기본 Transparent = 자동(채움색과 대비되는 색; 미채움이면 cr_text). 채움색과 별개로 set_cr_indicator_mark() 로 지정.
+	Gdiplus::Color m_cr_indicator_mark = Gdiplus::Color::Transparent;
 	int			m_check_size = 13;			//직접 그리는 checkbox/radio 글리프 정사각형 크기(px). Windows 96DPI 표준=13. set_check_size 로 변경.
 
 	//set_button_action()으로 SC_HELP, SC_PIN, SC_MINIMIZE, SC_MAXIMIZE, SC_CLOSE 중의 한 값으로 줄 경우 해당 버튼이 그려진다.

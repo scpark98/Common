@@ -1397,6 +1397,23 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 	{
 		CRect	r = rc;
 
+		//[indicator(체크박스 사각형 / 라디오 원) 공통 색 결정 — check·radio 가 동일 규칙으로 그린다]
+		//채움(cr_ind_fill): m_cr_indicator_fill 기본 Transparent = 미채움(컨트롤 배경이 비쳐 라디오와 동일).
+		//   set_cr_indicator_fill() 로 색을 주면 무조건 그 색으로 채운다. disabled+채움이면 LightGray.
+		//표시(cr_ind_mark): "채움색과 대비되는 색"이 원칙. set_cr_indicator_mark() 명시색 우선.
+		//   미채움이면 배경과 대비되는 cr_text(테마 일관: blue text→blue mark; disabled 시 cr_text 가 이미 grayed),
+		//   채움 지정이면 그 채움색과 대비(get_distinct_bw_color, disabled Gray).
+		Gdiplus::Color cr_ind_fill = m_cr_indicator_fill;
+		if (is_disabled && cr_ind_fill.GetA() != 0)
+			cr_ind_fill = Gdiplus::Color::LightGray;
+		Gdiplus::Color cr_ind_mark;
+		if (m_cr_indicator_mark.GetA() != 0)
+			cr_ind_mark = m_cr_indicator_mark;
+		else if (cr_ind_fill.GetA() == 0)
+			cr_ind_mark = cr_text;
+		else
+			cr_ind_mark = is_disabled ? Gdiplus::Color::Gray : get_distinct_bw_color(cr_ind_fill);
+
 		//사각형 안에 v자 체크를 직접 그려준다.
 		if (is_button_style(BS_CHECKBOX, BS_AUTOCHECKBOX) && !is_button_style(BS_PUSHLIKE))
 		{
@@ -1405,27 +1422,12 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 			r.top = r.CenterPoint().y - m_check_size / 2;
 			r.bottom = r.top + m_check_size;
 
-			Gdiplus::Color cr_check_fill = (is_disabled ? Gdiplus::Color::LightGray : m_cr_check_fill);
+			//테두리: round_fill 은 채움만(테두리 없음), 그 외는 cr_text. radius: default=직각, round/round_fill=둥근 모서리.
+			Gdiplus::Color cr_border = (m_check_style == check_style_round_fill) ? Gdiplus::Color::Transparent : cr_text;
+			int radius = (m_check_style == check_style_default) ? 0 : 2;
 
-			//check_style 별 박스 외관을 draw_check_box 파라미터로 매핑 — default: 직각 흰 박스, round: 투명 채움 둥근 박스, round_fill: 채워진 둥근 박스(체크는 대비색).
-			Gdiplus::Color cr_border = cr_text;
-			Gdiplus::Color cr_back = Gdiplus::Color::White;
-			Gdiplus::Color cr_check = cr_text;
-			int radius = 0;
-			if (m_check_style == check_style_round)
-			{
-				radius = 2;
-				cr_back = Gdiplus::Color::Transparent;
-			}
-			else if (m_check_style == check_style_round_fill)
-			{
-				radius = 2;
-				cr_border = Gdiplus::Color::Transparent;
-				cr_back = cr_check_fill;
-				cr_check = is_disabled ? Gdiplus::Color::Gray : get_distinct_bw_color(cr_check_fill);
-			}
-
-			draw_check_box(&g, CRect_to_gpRect(r), GetCheck(), cr_border, cr_back, cr_check, radius);
+			//채움 = cr_ind_fill(미지정 시 Transparent → 미채움/배경 비침), 체크 = cr_ind_mark(채움 대비색/미채움 시 cr_text).
+			draw_check_box(&g, CRect_to_gpRect(r), GetCheck(), cr_border, cr_ind_fill, cr_ind_mark, radius);
 
 			rText = r;
 
@@ -1453,8 +1455,15 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 				r.top = r.CenterPoint().y - m_check_size / 2;
 				r.bottom = r.top + m_check_size;
 
-				Gdiplus::Pen pen(cr_text, 1.0);
-				Gdiplus::SolidBrush br(cr_text);
+				//indicator(원) 채움이 지정돼 있으면 먼저 채운다(기본 Transparent = 미채움 → 컨트롤 배경이 비침).
+				if (cr_ind_fill.GetA() != 0)
+				{
+					Gdiplus::SolidBrush br_fill(cr_ind_fill);
+					g.FillEllipse(&br_fill, r.left, r.top, r.Width(), r.Height());
+				}
+
+				Gdiplus::Pen pen(cr_text, 1.0);		//원 외곽선 = cr_text
+				Gdiplus::SolidBrush br(cr_ind_mark);	//가운데 점(mark) = 채움 대비색(미채움 시 cr_text)
 				g.DrawEllipse(&pen, r.left, r.top, r.Width(), r.Height());
 
 				if (GetCheck())
@@ -2697,7 +2706,7 @@ void CGdiButton::set_check_style(int check_style, Gdiplus::Color cr_fill)
 	m_check_style = check_style;
 
 	if (cr_fill.GetValue() != Gdiplus::Color::Transparent)
-		m_cr_check_fill = cr_fill;
+		m_cr_indicator_fill = cr_fill;
 
 	Invalidate();
 }

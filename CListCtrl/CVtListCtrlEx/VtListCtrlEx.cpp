@@ -345,13 +345,15 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		}
 		else
 		{
-			//비선택: unused → 기본 글자색, weak sentinel → 본문색을 한 톤만 약화(get_weak_color(cr_text,16)), 그 외 명시색 유지.
-			//cr_text_dim(=get_weak_color(fg,100)) 은 dark_gray 처럼 본문색이 이미 옅은 테마에서 과하게 어두워져 크기/날짜가
-			//거의 안 보였다. 16 만 약화하면 본문보다 살짝 흐리되 가독성은 유지된다.
+			//비선택: unused → 기본 글자색, weak sentinel → 본문색을 cr_back 쪽으로 *비율 blend* 해 보조색(크기/날짜)으로, 그 외 명시색 유지.
+			//get_weak_color(cr, offset) 의 절대 offset 방식은 테마의 fg/bg 간격을 무시해, 어떤 테마는 적절히 약하지만
+			//저대비 테마(본문색이 배경과 가까운)에선 offset 이동만으로 배경과 비슷해져 거의 안 보였다.
+			//get_color(cr_text, cr_back, ratio) 는 *대비에 비례* 약화 → 모든 테마에서 일관된 보조색(절대 배경색까진 안 감).
+			//ratio: 0=본문색, 1=배경색. 0.4 = 배경 쪽으로 40% (가독성 유지하며 명확히 흐림). 값만 조정하면 강도 튜닝 가능.
 			if (crText.GetValue() == listctrlex_unused_color.GetValue())
 				crText = m_theme.cr_text;
 			else if (crText.GetValue() == listctrlex_weak_color.GetValue())
-				crText = get_weak_color(m_theme.cr_text, 16);
+				crText = get_color(m_theme.cr_text, m_theme.cr_back, 0.4);
 			else
 				crText = m_list_db[iItem].crText[iSubItem];
 
@@ -5803,7 +5805,14 @@ void CVtListCtrlEx::OnWindowPosChanged(WINDOWPOS* lpwndpos)
 	//하단 remainder 예약으로 client 높이는 itemH 배수 단위로만 바뀐다 → sub-row 만큼 window 가 커질 땐 client 가
 	//안 변해 WM_SIZE 가 안 떠 sync 가 호출되지 않는다(스크롤바가 window 를 못 따라옴). window 크기 변화에서도
 	//sync 를 돌려 바가 매 순간 window 에 맞게 따라오게 한다. m_syncing 으로 framechange 재진입은 차단.
-	if (m_scrollbar_setup && lpwndpos && !(lpwndpos->flags & SWP_NOSIZE) && !m_syncing)
+	//
+	//*위치(move)만 바뀌어도* sync 해야 한다 — overlay 스크롤바는 부모 dialog 의 child 라 sync_scrollbar 가 listctrl 의
+	//현재 window 위치(ClientToScreen)로 매번 바를 재배치한다. CResizeCtrl 가 리스트를 *크기변경 없이 이동*만 시키는
+	//경우(예: 하단 anchor 의 즐겨찾기 리스트, move 0/100/0/0)는 SWP_NOSIZE 가 켜져 예전 조건(!SWP_NOSIZE)으로는
+	//sync 가 누락되어 바가 안 따라왔다(클릭 시에야 제자리로 점프). 따라서 size *또는* move 변화 모두에서 sync 한다.
+	//(size·move 둘 다 억제된 순수 z-order/framechange 만 제외 → sync_scrollbar 의 SWP_NOMOVE|SWP_NOSIZE framechange 재진입 무해.)
+	if (m_scrollbar_setup && lpwndpos && !m_syncing &&
+		!((lpwndpos->flags & SWP_NOSIZE) && (lpwndpos->flags & SWP_NOMOVE)))
 		sync_scrollbar();
 }
 

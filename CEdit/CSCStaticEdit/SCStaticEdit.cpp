@@ -171,12 +171,29 @@ void CSCStaticEdit::PreSubclassWindow()
 	if (dw_style & SS_CENTERIMAGE)
 		m_valign = DT_VCENTER;
 
-	// action 버튼 영역 툴팁. tool id = 1. rect 는 draw_action_button 에서 SetToolRect 로 갱신.
+	// action 버튼 영역 툴팁.
+	// 동적 Create 경로에서는 MFC 윈도우 생성 훅(m_pWndInit)이 이 컨트롤에 대해
+	// 아직 살아있는 상태로 PreSubclassWindow 가 불린다. 여기서 자식 툴팁을 Create 하면
+	// AfxHookWindowCreate 에 재진입해 ASSERT(m_pWndInit == NULL) 가 터진다.
+	// 따라서 dialog template subclass(!m_dynamic)일 때만 즉시 생성하고,
+	// 동적 컨트롤은 첫 사용 시점(ensure_action_tooltip)으로 지연한다.
+	if (!m_dynamic)
+		ensure_action_tooltip();
+}
+
+// 툴팁을 처음 필요한 시점에 생성(지연 생성). 생성 훅 재진입을 피하기 위해
+// PreSubclassWindow 가 아닌 draw_action_button / update_action_tooltip /
+// PreTranslateMessage 등 생성 완료 이후 호출 지점에서 불린다.
+void CSCStaticEdit::ensure_action_tooltip()
+{
+	if (m_action_tooltip.GetSafeHwnd())
+		return;
+	if (m_hWnd == NULL)
+		return;
+
+	// tool id = 1. rect 는 draw_action_button 에서 SetToolRect 로 갱신.
 	if (m_action_tooltip.Create(this, TTS_ALWAYSTIP))
-	{
 		m_action_tooltip.AddTool(this, _T(""), CRect(0, 0, 0, 0), 1);
-		update_action_tooltip();
-	}
 }
 
 // ──────────────────────────────────────────────────────────
@@ -1867,6 +1884,7 @@ CString CSCStaticEdit::action_tooltip_default_text() const
 
 void CSCStaticEdit::update_action_tooltip()
 {
+	ensure_action_tooltip();
 	if (!m_action_tooltip.GetSafeHwnd())
 		return;
 
@@ -1895,6 +1913,7 @@ void CSCStaticEdit::draw_action_button(Gdiplus::Graphics& g)
 	m_r_action_button.left  = m_r_action_button.right - m_r_action_button.Height();
 	m_r_action_button.InflateRect(0, 0, 1, 1);
 
+	ensure_action_tooltip();
 	if (m_action_tooltip.GetSafeHwnd())
 		m_action_tooltip.SetToolRect(this, 1, m_r_action_button);
 

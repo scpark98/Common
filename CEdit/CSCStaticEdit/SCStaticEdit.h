@@ -343,6 +343,7 @@ private:
     // ── Action 버튼 툴팁 ──
     CToolTipCtrl		m_action_tooltip;
     CString				m_action_tooltip_text;            // 사용자 override. 비어있으면 action 종류별 기본 텍스트.
+    void				ensure_action_tooltip();          // 첫 사용 시점 지연 생성 (동적 Create 의 생성 훅 재진입 회피).
     void				update_action_tooltip();          // 텍스트/활성 갱신 (set_action_button / setter 에서 호출).
     CString				action_tooltip_default_text() const; // action 종류별 기본 툴팁 텍스트.
 

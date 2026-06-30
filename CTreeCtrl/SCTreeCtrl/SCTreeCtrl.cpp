@@ -3835,7 +3835,9 @@ void CSCTreeCtrl::OnNMCustomDraw(NMHDR* pNMHDR, LRESULT* pResult)
 					//전체 행 선택이면 chevron 이 선택 배경 위에 오므로 상태색(crText)으로 대비시킨다. 아니면 chevron 은
 					//라벨 강조 밖(일반 배경) 이라 선택색을 쓰면 배경에 안 묻고 어색 — 항목 본래색(crTextNormal)을 쓴다.
 					Gdiplus::Color crGlyph = ((GetStyle() & TVS_FULLROWSELECT) || !state_highlight) ? crText : crTextNormal;
-					Gdiplus::Pen pen(get_weak_color(crGlyph, 48), chevron_thickness);
+					//get_weak_color(절대 offset) 대신 get_color(glyph, cr_back, ratio) (대비 비례) — 저대비 테마에서 chevron 이
+					//배경에 묻히는 부작용 방지. ratio 0.2 ≒ 기존 offset 48.
+					Gdiplus::Pen pen(get_color(crGlyph, m_theme.cr_back, 0.2), chevron_thickness);
 					pen.SetStartCap(Gdiplus::LineCapRound);
 					pen.SetEndCap(Gdiplus::LineCapRound);
 					pen.SetLineJoin(Gdiplus::LineJoinRound);
@@ -3885,7 +3887,8 @@ void CSCTreeCtrl::OnNMCustomDraw(NMHDR* pNMHDR, LRESULT* pResult)
 
 				Gdiplus::Graphics g(dc.m_hDC);
 				Gdiplus::Rect box(rcCheck.left, rcCheck.top, rcCheck.Width(), rcCheck.Height());
-				draw_check_box(&g, box, check_state, m_theme.cr_text_dim, m_theme.cr_back, get_weak_color(m_theme.cr_text_dim, 32));
+				//체크마크 색: get_weak_color(절대 offset) 대신 cr_text_dim 을 cr_back 쪽으로 대비 비례 blend(ratio 0.13 ≒ 기존 offset 32) — 저대비 테마 안전.
+				draw_check_box(&g, box, check_state, m_theme.cr_text_dim, m_theme.cr_back, get_color(m_theme.cr_text_dim, m_theme.cr_back, 0.13));
 			}
 
 			int img_normal = -1, img_selected = -1;
@@ -4874,6 +4877,12 @@ void CSCTreeCtrl::sync_scrollbar()
 			pParent->ScreenToClient(&rCur);
 		if (rCur != rTarget)
 			m_scrollbar_h.MoveWindow(rTarget);
+
+		//H 바는 parent dialog 의 child 다. splitter/main drag-resize 중에는 메시지 펌프가 바빠
+		//ShowWindow/MoveWindow 가 invalidate 만 마크하고 즉시 그려지지 않아 release 전까지 바가 갱신 안 되는
+		//현상이 있다(listctrl 의 sync_scrollbar 와 동일 — 거기선 RDW_UPDATENOW 로 해결). 보일 때 즉시 paint 강제.
+		if (need_h)
+			m_scrollbar_h.RedrawWindow(NULL, NULL, RDW_INVALIDATE | RDW_UPDATENOW);
 	}
 
 	//---- 4단계: 모델 값 push ----

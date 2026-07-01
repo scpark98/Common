@@ -4544,7 +4544,19 @@ void CVtListCtrlEx::set_filelist(std::deque<CVtFileInfo>* pFolderList, std::dequ
 	refresh_list(false);
 }
 
-void CVtListCtrlEx::refresh_list(bool reload)
+void CVtListCtrlEx::invalidate_folder_cache(CString path)
+{
+	//외부 훅이라 호출부가 넘기는 path 의 대소문자가 다를 수 있어 CompareNoCase 로 매칭(Windows 경로).
+	for (auto it = m_folder_cache.begin(); it != m_folder_cache.end(); )
+	{
+		if (it->path.CompareNoCase(path) == 0)
+			it = m_folder_cache.erase(it);
+		else
+			++it;
+	}
+}
+
+void CVtListCtrlEx::refresh_list(bool reload, bool force)
 {
 	if (!m_is_shell_listctrl)
 		return;
@@ -4584,8 +4596,14 @@ void CVtListCtrlEx::refresh_list(bool reload)
 			}
 			else
 			{
+				//force(명시적 새로고침 등)면 이 폴더의 캐시를 먼저 무효화해 아래 조회가 반드시 miss → 디스크 재열거되게 한다.
+				if (force)
+					invalidate_folder_cache(m_path);
+
 				//폴더 콘텐츠 캐시 — 디렉토리 mtime 이 캐시와 같으면 디스크 재-enumerate(+아이콘)를 건너뛰고 캐시 사용.
-				//mtime(LastWriteTime)은 항목 추가/삭제/이름변경 시 갱신되므로 폴더 목록 무효화 기준으로 정확.
+				//mtime(LastWriteTime)은 항목 추가/삭제/이름변경 시에만 갱신된다. 기존 파일의 제자리 내용 편집(크기/날짜만
+				//변경)은 dir mtime 을 안 바꾸므로 이 캐시로 감지 못한다 — 그래서 (1) 큰 폴더만 캐시(작은 폴더는 매번 최신),
+				//(2) 명시적 새로고침/전송 완료 시 force/invalidate 로 우회하도록 설계했다.
 				bool have_mtime = false;
 				WIN32_FILE_ATTRIBUTE_DATA fad;
 				if (::GetFileAttributesEx(m_path, GetFileExInfoStandard, &fad))
@@ -4625,8 +4643,10 @@ void CVtListCtrlEx::refresh_list(bool reload)
 						else
 							m_cur_files.push_back(CVtFileInfo(dq[i]));
 					}
-					//mtime 을 못 읽었으면(접근 불가 등) 캐시하지 않는다 — 무효화 기준이 없어 stale 위험.
-					store_to_cache = have_mtime;
+					//캐시 조건: (1) mtime 을 읽었고(무효화 기준 존재), (2) 항목 수가 임계값 이상(큰 폴더만 — 작은 폴더는
+					//재열거가 싸고 제자리 편집 stale 위험이 커 캐시하지 않는다).
+					store_to_cache = have_mtime &&
+						(int)(m_cur_folders.size() + m_cur_files.size()) >= m_folder_cache_min_items;
 				}
 			}
 			TRACE(_T("cur folders[0] = %s\n"), m_cur_folders.size() > 0 ? m_cur_folders[0].data.cFileName : _T(""));
@@ -4812,6 +4832,13 @@ void CVtListCtrlEx::display_filelist(CString cur_path)
 		set_text_color(index, col_filesize, listctrlex_weak_color);
 		set_text_color(index, col_filedate, listctrlex_weak_color);
 	}
+
+	//완료 통지 — 진행률을 256 항목마다로 스로틀했으므로 마지막 항목(lParam == 총개수) 통지가 루프에서 누락될 수 있다.
+	//parent 핸들러는 lParam == reserved(총개수) 일 때만 프로그레스바를 숨기므로, 완료 통지를 스로틀과 무관하게
+	//한 번 더 보내 총개수가 256n+1 이 아닌 경우에도 항상 숨겨지도록 한다.
+	if (m_cur_folders.size() + m_cur_files.size() > 0)
+		::SendMessage(GetParent()->GetSafeHwnd(), Message_CVtListCtrlEx,
+			(WPARAM) & (CVtListCtrlExMessage(this, message_list_processing, NULL, _T(""), _T(""), WPARAM(m_cur_folders.size() + m_cur_files.size()))), (LPARAM)(m_cur_folders.size() + m_cur_files.size()));
 
 	//bulk 종료 — 항목수·scrollbar 를 한 번만 갱신.
 	m_in_bulk_insert = false;

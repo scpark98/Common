@@ -69,8 +69,24 @@
 
 #include "Functions.h"
 #include "data_structure/SCParagraph/SCParagraph.h"
+#include "thread/CSCThread/SCThread.h"	//gif 애니메이션을 관리형 스레드로 구동(정지 시 join, cross-thread GDI 제거).
 
 static const UINT Message_CSCGdiplusBitmap = ::RegisterWindowMessage(_T("MessageString_CSCGdiplusBitmap"));
+
+//CSCThread 는 비복사(스레드 소유)라 그대로 멤버로 두면 CSCGdiplusBitmap 이 비복사가 되고, CSCGdiplusBitmap 을 값으로
+//담아 컨테이너(deque/vector)에 저장하는 클래스들(CSCSystemButtonProperty, CSCSliderCtrlSteps 등)이 전부 깨진다.
+//CSCGdiplusBitmap 은 원래 암묵적(얕은) 복사에 의존하므로, 스레드만 "복사 시 새(정지) 스레드로 리셋"되는 홀더로 감싸
+//복사 가능성을 유지한다. 복사본은 애니메이션을 공유하지 않고 자기만의 정지된 스레드를 갖는다(정적 이미지 저장용 복사에 적합).
+struct CSCAniThread
+{
+	CSCThread	th;
+	CSCAniThread() = default;
+	CSCAniThread(const CSCAniThread&) {}								//복사 = 새 스레드(원본 스레드 공유 안 함)
+	CSCAniThread& operator=(const CSCAniThread&) { th.stop(); return *this; }
+	void	start(CSCThread::thread_function f) { th.start(std::move(f)); }
+	void	stop() { th.stop(); }
+	bool	is_running() const { return th.is_running(); }
+};
 
 //주의할 점은 TOP, LEFT는 0이므로 먼저 비교하면 안되고 CENTER, RIGHT인지 검사한 후 아니면 LEFT라고 판단해야 한다.
 //align = ALIGN_LEFT | ALIGN_BOTTOM 을 주면 8이 되는데 이렇게 호출하면
@@ -549,6 +565,9 @@ public:
 	void			pause_gif(int pos = -1);
 	//animation thread가 종료되고 화면에도 더 이상 표시되지 않는다. 만약 그대로 멈추길 원한다면 pause_animation()을 호출한다.
 	void			stop_gif();
+	//현재 선택된 gif 프레임을 그린다(alpha 배경+mirror 포함). CSCStatic::OnPaint 가 UI 스레드에서 호출한다.
+	//워커는 프레임 전진 + InvalidateRect 만 하고 그리기는 이 함수(OnPaint 경유)로 일원화 → 깜빡임/ cross-thread GDI 제거.
+	void			draw_gif_current_frame(Gdiplus::Graphics& g);
 	void			goto_frame(int pos, bool pause = false);			//지정 프레임으로 이동
 	void			goto_frame_percent(int pos, bool pause = false);	//지정 % 위치의 프레임으로 이동
 	void			set_gif_mirror(bool is_mirror = true) { m_is_gif_mirror = is_mirror; }
@@ -609,11 +628,11 @@ protected:
 	int				m_ani_width;
 	int				m_ani_height;
 	Gdiplus::Color	m_cr_back = Gdiplus::Color::Transparent;
-	bool			m_run_thread_animation = false;
+	CSCAniThread	m_ani_thread;	//gif 애니 워커(관리형, 복사 안전 홀더). stop()이 join 하므로 정지 후 잔존 스레드가 없다.
 	bool			m_is_gif_mirror = false;
 
 	void			check_animate_gif();
-	void			thread_gif_animation();
+	void			thread_gif_animation(CSCThread& th);
 	void			goto_gif_frame(int frame);
 };
 

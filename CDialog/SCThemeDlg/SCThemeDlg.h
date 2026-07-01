@@ -85,6 +85,10 @@ public:
 
 	//WS_THICKFRAME이 있어야만 윈도우 테두리에 그림자가 생기고 모니터 자동 레이아웃도 지원된다.
 	//이 속성을 주면 resize가 가능해지는데 만약 이를 막고 싶다면 set_use_resizable(false)를 호출한다.
+	//★ 반드시 CSCThemeDlg::OnInitDialog() "앞에서" 호출해야 한다. 이 함수는 플래그(m_use_resizable)만 세팅하고,
+	//   실제 WS_THICKFRAME 부여 여부는 OnInitDialog() 안에서 이 플래그를 읽어 한 번 결정하기 때문이다(그 이후 호출은 무효).
+	//   OnInitDialog() 이후(런타임)에 resize 가능 여부를 바꾸려면 이 함수가 아니라 enable_resize()를 써야 한다
+	//   (enable_resize 는 ModifyStyle 로 WS_THICKFRAME 을 실제로 추가/제거한다).
 	void	set_use_resizable(bool use_resizable = true) { m_use_resizable = use_resizable; }
 
 	//void	set_target_wnd(CWnd* pTarget) { m_target_wnd = pTarget; }
@@ -140,7 +144,14 @@ public:
 	void	set_back_image(UINT resource_id, int draw_mode = CSCGdiplusBitmap::draw_mode_stretch);
 
 	void	set_draw_border(bool draw, int width = 1, Gdiplus::Color cr = Gdiplus::Color::DimGray);
+	//주의: 아래 set_border_color 는 "컨트롤 테두리색"(cr_border_inactive — 콤보/에디트 등 흰 본문 위 컨트롤)을 바꾼다.
+	//창 외곽 프레임(NC 1px 링 + Win11 DWM border)은 아래 set_frame_border_color 로 별도 지정한다.
 	void	set_border_color(Gdiplus::Color cr) { m_theme.cr_border_inactive = cr; }
+
+	//창 외곽 프레임(NC 1px 링 + DWM border) 색을 원하는 값으로 지정. titlebar 가 있는 창에 적용된다.
+	//미지정(기본)이면 타이틀바색에서 한 톤 파생한 은은한 색(get_weak_color(cr_title_back_active, 32))을 쓴다.
+	//cr_border_inactive(컨트롤 테두리)와 분리돼 있어, 프레임만 따로 칠할 수 있다.
+	void	set_frame_border_color(Gdiplus::Color cr);
 
 	void	set_color_theme(int theme, bool invalidate = true);
 	//부모 dlg 의 m_theme 객체를 그대로 전달받는 경로 — 또 다른 CSCThemeDlg 가 자식인 경우 부모의 모든 색
@@ -199,6 +210,15 @@ protected:
 	bool				m_draw_border = false;
 	//default = 1
 	int					m_border_width = 1;
+
+	//창 외곽 프레임(NC 링 + DWM border) override 색. Transparent(A=0) = 미지정 → 타이틀바색 파생 기본값 사용.
+	Gdiplus::Color		m_frame_border_color = Gdiplus::Color::Transparent;
+	//프레임 테두리에 실제 쓸 색: override 지정됐으면 그 색, 아니면 타이틀바색 한 톤 파생(은은한 경계).
+	Gdiplus::Color		get_frame_border_color() const
+	{
+		return (m_frame_border_color.GetA() != 0) ? m_frame_border_color
+			: get_weak_color(m_theme.cr_title_back_active, 32);
+	}
 
 
 	//프로그램 로고 아이콘 표시 여부. 기본값 true

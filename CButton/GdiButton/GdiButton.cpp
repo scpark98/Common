@@ -1429,11 +1429,12 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 			//채움 = cr_ind_fill(미지정 시 Transparent → 미채움/배경 비침), 체크 = cr_ind_mark(채움 대비색/미채움 시 cr_text).
 			draw_check_box(&g, CRect_to_gpRect(r), GetCheck(), cr_border, cr_ind_fill, cr_ind_mark, radius);
 
-			rText = r;
-
-			rText.left = rText.right + 4;
+			//텍스트는 버튼 전체 높이(rc)에서 DT_VCENTER 로 수직 중앙정렬 — 박스도 버튼 중앙이라 서로 정렬된다.
+			//(예전엔 rText 를 박스 rect(m_check_size 높이)로 잡아 폰트/상태에 따라 미세하게 어긋나 보였다.)
+			rText.left = r.right + 4;
+			rText.top = rc.top;
+			rText.bottom = rc.bottom;
 			rText.right = rc.right;
-			//rText.bottom -= 1;
 		}
 		//동그란 라디오 버튼을 직접 그려준다.
 		else if (is_button_style(BS_RADIOBUTTON, BS_AUTORADIOBUTTON) && !is_button_style(BS_PUSHLIKE))
@@ -1468,19 +1469,23 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 
 				if (GetCheck())
 				{
-					r.DeflateRect(3, 3);
+					//점(dot)은 r 의 "복사본"에서 그린다. r 을 직접 Deflate/Inflate(예전 Deflate3/Inflate2 = net -1px)하면
+					//아래 rText 위치가 checked/unchecked 에 따라 달라져, 선택 상태별로 정렬이 다르게 보였다(사용자 지적).
+					CRect r_dot = r;
+					r_dot.DeflateRect(3, 3);
 					g.FillEllipse(&br,
-						(Gdiplus::REAL)(r.left) + 0.2f,
-						(Gdiplus::REAL)(r.top) + 0.2f,
-						(Gdiplus::REAL)(r.Width()) - 0.4f,
-						(Gdiplus::REAL)(r.Height()) - 0.4f);
-					r.InflateRect(2, 2);
+						(Gdiplus::REAL)(r_dot.left) + 0.2f,
+						(Gdiplus::REAL)(r_dot.top) + 0.2f,
+						(Gdiplus::REAL)(r_dot.Width()) - 0.4f,
+						(Gdiplus::REAL)(r_dot.Height()) - 0.4f);
 				}
 
-				rText = r;
-				rText.left = rText.right + 4;
+				//텍스트는 버튼 전체 높이(rc)에서 DT_VCENTER 로 수직 중앙정렬 — 원(circle)도 버튼 중앙이라 서로 정렬되고,
+				//checked/unchecked 에 무관하게 동일하게 보인다.
+				rText.left = r.right + 4;
+				rText.top = rc.top;
+				rText.bottom = rc.bottom;
 				rText.right = rc.right;
-				rText.bottom += 1;
 			}
 		}
 		else

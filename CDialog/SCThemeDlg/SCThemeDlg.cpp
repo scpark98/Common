@@ -381,10 +381,13 @@ void CSCThemeDlg::OnNcPaint()
 	rcClientInWin.OffsetRect(ptClientOrg.x - rcWindow.left, ptClientOrg.y - rcWindow.top);
 
 	dc.ExcludeClipRect(rcClientInWin);
-	//내부 titlebar 가 있는 dlg 는 NC 1px 도 titlebar 색으로 — cr_back (보통 white) 으로 두면 titlebar teal 위/좌/우에
-	//흰 띠가 보인다. titlebar 없는 dlg 는 cr_back 그대로.
+	//titlebar 가 있는 dlg 의 NC 1px 링 = "창 프레임 테두리" 색.
+	//- cr_back(흰색)으로 두면 titlebar 위/좌/우에 흰 띠, cr_title_back_active(타이틀바색)로 두면 창 네 변이 진한 프레임.
+	//- 테마의 cr_border_inactive 는 콤보/에디트 등 "흰 본문 위 컨트롤 테두리"용(예: linkmemine #d2d2d2)이라 어두운
+	//  chrome 프레임에 쓰면 오히려 너무 밝다. 그래서 창 프레임은 타이틀바색에서 한 톤 파생한 은은한 색으로 별도 계산한다.
+	//titlebar 없는 dlg 는 cr_back 그대로(내용과 blend).
 	COLORREF nc_fill = (m_titlebar_height > 0)
-		? m_theme.cr_title_back_active.ToCOLORREF()
+		? get_frame_border_color().ToCOLORREF()
 		: m_theme.cr_back.ToCOLORREF();
 	dc.FillSolidRect(rcWindowLocal, nc_fill);
 }
@@ -617,10 +620,10 @@ void CSCThemeDlg::set_color_theme(int theme, bool invalidate)
 	{
 		win_compat::dwm::use_immersive_dark_mode(m_hWnd, true);
 		win_compat::dwm::set_window_corner_round(m_hWnd);
-		//OnNcPaint 의 nc_fill 과 동일한 색 — titlebar 가 있는 dlg 는 frame seam 제거를 위해 titlebar 색.
+		//OnNcPaint 의 nc_fill 과 동일한 색(타이틀바색 한 톤 파생) — 두 경로가 같은 색이라 seam 없음.
 		win_compat::dwm::set_border_color(m_hWnd,
 			(m_titlebar_height > 0)
-				? m_theme.cr_title_back_active.ToCOLORREF()
+				? get_frame_border_color().ToCOLORREF()
 				: m_theme.cr_back.ToCOLORREF());
 	}
 
@@ -641,10 +644,10 @@ void CSCThemeDlg::set_color_theme(const CSCColorTheme& theme, bool invalidate)
 	{
 		win_compat::dwm::use_immersive_dark_mode(m_hWnd, true);
 		win_compat::dwm::set_window_corner_round(m_hWnd);
-		//OnNcPaint 의 nc_fill 과 동일한 색 — titlebar 가 있는 dlg 는 frame seam 제거를 위해 titlebar 색.
+		//OnNcPaint 의 nc_fill 과 동일한 색(타이틀바색 한 톤 파생) — 두 경로가 같은 색이라 seam 없음.
 		win_compat::dwm::set_border_color(m_hWnd,
 			(m_titlebar_height > 0)
-				? m_theme.cr_title_back_active.ToCOLORREF()
+				? get_frame_border_color().ToCOLORREF()
 				: m_theme.cr_back.ToCOLORREF());
 	}
 
@@ -901,6 +904,20 @@ void CSCThemeDlg::set_draw_border(bool draw, int width, Gdiplus::Color cr)
 	m_theme.cr_border_inactive = cr;
 	Invalidate();
 	RedrawWindow();
+}
+
+//창 외곽 프레임(NC 링 + DWM border) 색 override. Transparent 를 주면 기본값(타이틀바색 파생)으로 되돌아간다.
+void CSCThemeDlg::set_frame_border_color(Gdiplus::Color cr)
+{
+	m_frame_border_color = cr;
+
+	//즉시 반영 — DWM border 색 갱신 + SWP_FRAMECHANGED 로 NC 재계산/재그리기(OnNcPaint 의 nc_fill 재적용).
+	if (m_hWnd && m_titlebar_height > 0)
+	{
+		win_compat::dwm::set_border_color(m_hWnd, get_frame_border_color().ToCOLORREF());
+		SetWindowPos(NULL, 0, 0, 0, 0,
+			SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
+	}
 }
 
 /*

@@ -229,7 +229,9 @@ public:
 	//reload가 true라면 local의 파일목록을 다시 불러오지만 false라면 목록을 다시 리스트에 표시한다
 	//(sort의 경우 폴더/파일 목록을 sort하여 보여줄 뿐 파일목록을 reload하진 않는다)
 	//다른 코드에 의해 이미 m_cur_folders/m_cur_files 가 채워졌다면 reload를 false로 호출한다.
-	void		refresh_list(bool reload = true);
+	//force=true 면 폴더 콘텐츠 캐시를 우회(해당 폴더 엔트리 무효화 후 디스크 재열거) — 명시적 새로고침/전송 완료 등
+	//"반드시 최신"이 필요한 호출부에서 사용. 캐시는 local 폴더에만 적용되므로 remote/sort 경로에선 force 가 무해.
+	void		refresh_list(bool reload = true, bool force = false);
 
 	//m_cur_folders와 m_cur_files에 채워진 정보대로 리스트에 출력시킨다.
 	void		display_filelist(CString cur_path);
@@ -253,6 +255,15 @@ public:
 	};
 	std::list<folder_cache_entry>	m_folder_cache;
 	static const int				m_folder_cache_max = 32;
+	//이 개수 미만 폴더는 캐시하지 않는다 — 작은 폴더는 재열거가 싸고, 파일 제자리 편집(내용 수정 → 크기/날짜 변경,
+	//부모 dir mtime 은 불변)이 흔해 stale 위험이 크다. 반대로 거대 폴더(System32/WinSxS 등)는 열거가 비싸고 제자리
+	//편집이 드물어(업데이트는 대개 추가/삭제/교체 → mtime 갱신) 캐시 이득은 크고 위험은 작다. 그래서 큰 폴더만 캐시한다.
+	static const int				m_folder_cache_min_items = 1000;
+
+	//폴더 콘텐츠 캐시 무효화 — dir mtime 은 파일 제자리 편집을 감지 못하므로, 앱은 명시적 새로고침 / 전송 완료(덮어쓰기) /
+	//변경 감지 시 아래를 호출해 강제로 다시 읽게 해야 한다. refresh_list(reload, force=true) 도 내부적으로 이를 쓴다.
+	void		clear_folder_cache() { m_folder_cache.clear(); }
+	void		invalidate_folder_cache(CString path);
 
 	//파일 또는 폴더를 해당하는 멤버 리스트에 추가한다.
 	//local인 경우 크기와 날짜등이 비어있다면 자동 채워주고 remote라면 비어있으면 안된다.

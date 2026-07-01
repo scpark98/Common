@@ -338,6 +338,12 @@ void CSCStatic::OnPaint()
 		m_img_back.draw(g, rc, CSCGdiplusBitmap::draw_mode_stretch);
 		//m_img_back.save(_T("d:\\copy.png"));
 	}
+	else if (m_img_back.is_valid() && m_img_back.is_animated_gif())
+	{
+		//애니 gif: 현재 프레임을 여기(UI 스레드 OnPaint)에서 그린다. 워커는 프레임 전진 + InvalidateRect 만 하므로
+		//완료/리사이즈/expose 등 어떤 WM_PAINT 에도 프레임이 다시 그려져 깜빡임이 없다.
+		m_img_back.draw_gif_current_frame(g);
+	}
 	else
 	{
 		if (m_bGradient)
@@ -2075,6 +2081,13 @@ LRESULT CSCStatic::on_message_CSCStaticEdit(WPARAM wParam, LPARAM /*lParam*/)
 
 void CSCStatic::OnDestroy()
 {
+	//gif 애니메이션 스레드는 m_target_hwnd 로 "직접" 그린다(WM_PAINT 아님). 따라서 HWND 파괴 전에 반드시 정지시켜야 한다.
+	//정지하지 않으면 창이 닫힌 뒤에도 스레드가 죽은 DC(CMemoryDC)로 그리다 CDC::LPtoDP ASSERT/크래시가 난다.
+	//(WM_DESTROY 시점엔 m_hWnd 가 아직 유효하므로 여기서 stop_gif() 하면 스레드가 안전하게 종료된다. 소멸자에서만
+	// 멈추면 이미 HWND 가 파괴된 뒤라 늦다.)
+	if (m_img_back.is_animated_gif())
+		m_img_back.stop_gif();
+
 	CStatic::OnDestroy();
 
 	// TODO: 여기에 메시지 처리기 코드를 추가합니다.

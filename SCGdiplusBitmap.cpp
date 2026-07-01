@@ -967,11 +967,8 @@ void CSCGdiplusBitmap::release()
 	if (this == NULL || m_pBitmap == NULL || m_referenced_variable)
 		return;
 
-	if (m_run_thread_animation)
-	{
-		m_run_thread_animation = false;
-		Wait(500);
-	}
+	//관리형 스레드 정지(내부에서 join). 예전 bool+Wait(500) 추측 대신 확실히 종료된 뒤 진행한다.
+	m_ani_thread.stop();
 
 	if (m_palette)
 	{
@@ -3420,7 +3417,7 @@ bool CSCGdiplusBitmap::get_frame_delay()
 
 void CSCGdiplusBitmap::check_animate_gif()
 {
-	m_run_thread_animation = false;
+	m_ani_thread.stop();	//이미지 재로드 전 기존 애니 스레드 확실히 종료.
 	m_frame_index = 0;
 
 	UINT count = m_pBitmap->GetFrameDimensionsCount();
@@ -3586,7 +3583,8 @@ void CSCGdiplusBitmap::play_gif()
 	if (!m_gif_play_in_this)
 		return;
 
-	if (m_run_thread_animation)
+	//이미 재생 중이면 pause<->play 토글(기존 동작 유지).
+	if (m_ani_thread.is_running())
 	{
 		m_paused = !m_paused;
 		return;
@@ -3595,15 +3593,14 @@ void CSCGdiplusBitmap::play_gif()
 	if (m_frame_count < 2)
 		return;
 
-	m_run_thread_animation = true;
+	m_paused = false;
 
 	GUID   pageGuid = Gdiplus::FrameDimensionTime;
 	m_frame_index = 0;
 	m_pBitmap->SelectActiveFrame(&pageGuid, m_frame_index);
-	//replace_color(Gdiplus::Color(255, 76, 86, 164), Gdiplus::Color(0, 255, 112, 109));
 
-	std::thread t(&CSCGdiplusBitmap::thread_gif_animation, this);
-	t.detach();
+	//관리형 스레드로 구동. 워커는 타이밍/프레임 전진만 하고 실제 그리기는 invoke_ui 로 UI 스레드에서 실행한다.
+	m_ani_thread.start([this](CSCThread& th) { thread_gif_animation(th); });
 }
 
 //pos위치로 이동한 후 일시정지한다. -1이면 pause <-> play를 토글한다.
@@ -3612,7 +3609,7 @@ void CSCGdiplusBitmap::pause_gif(int pos)
 	if (!m_gif_play_in_this)
 		return;
 
-	if (m_frame_count < 2 || !m_run_thread_animation)
+	if (m_frame_count < 2 || !m_ani_thread.is_running())
 		return;
 
 	//m_frame_count가 UINT이고 pos = -1일 경우 아래 if문은 true가 된다.
@@ -3636,8 +3633,7 @@ void CSCGdiplusBitmap::stop_gif()
 	if (m_frame_count < 2)
 		return;
 
-	m_run_thread_animation = false;
-	Wait(500);
+	m_ani_thread.stop();	//join — 정지 후 잔존 워커 없음. (예전 bool+Wait(500) 추측 제거.)
 	RECT r;
 	r.left = m_ani_sx;
 	r.top = m_ani_sy;
@@ -3657,18 +3653,14 @@ void CSCGdiplusBitmap::goto_frame(int pos, bool pause)
 	m_frame_index = pos;
 	m_paused = pause;
 
-	GUID   pageGuid = Gdiplus::FrameDimensionTime;
-	m_pBitmap->SelectActiveFrame(&pageGuid, m_frame_index);
-
-	if (m_paused)
-	{
-		RECT r;
-		r.left = m_ani_sx;
-		r.top = m_ani_sy;
-		r.right = r.left + m_ani_width;
-		r.bottom = r.top + m_ani_height;
-		::InvalidateRect(m_target_hwnd, &r, TRUE);
-	}
+	//프레임 선택은 그리는 OnPaint(draw_gif_current_frame) 가 하므로 여기선 인덱스만 바꾸고 무효화만 한다.
+	//erase=FALSE — OnPaint 가 double-buffer 로 배경+프레임을 다시 그려 깜빡임 없음(예전 TRUE 는 지웠다가 다시 그려 깜빡였다).
+	RECT r;
+	r.left = m_ani_sx;
+	r.top = m_ani_sy;
+	r.right = r.left + m_ani_width;
+	r.bottom = r.top + m_ani_height;
+	::InvalidateRect(m_target_hwnd, &r, FALSE);
 }
 
 //지정 % 위치의 프레임으로 이동
@@ -3678,126 +3670,83 @@ void CSCGdiplusBitmap::goto_frame_percent(int pos, bool pause)
 	goto_frame((int)dpos, pause);
 }
 
-void CSCGdiplusBitmap::thread_gif_animation()
+//gif 애니 워커(CSCThread). 실제 GDI 그리기는 워커에서 하지 않는다 — 프레임 인덱스만 전진시키고 그 영역을 InvalidateRect 하여
+//UI 스레드의 CSCStatic::OnPaint 가 현재 프레임을 그리게 한다. 완료/리사이즈/expose 등 어떤 WM_PAINT 에도 OnPaint 가 프레임을
+//다시 그려 깜빡임이 없고, SelectActiveFrame(m_pBitmap 변경)+DrawImage 가 OnPaint(UI 스레드)에서만 일어나 data race 도 없다.
+void CSCGdiplusBitmap::thread_gif_animation(CSCThread& th)
 {
 	if (m_frame_count < 2)
 		return;
 
-	HDC hDC = GetDC(m_target_hwnd);
-	CDC* pDC = CDC::FromHandle(hDC);
-	Gdiplus::SolidBrush brush_tr(m_cr_back);
-
-	bool mirror_applied = false;
-
-	CRect r(m_ani_sx, m_ani_sy, m_ani_sx + m_ani_width, m_ani_sy + m_ani_height);
-	CMemoryDC dc(pDC, &r);
-	Gdiplus::Graphics g(dc.GetSafeHdc());
-
-	auto br_zigzag = get_zigzag_pattern(32);
-
 	long t0 = clock();
-	long t1;
 
-	while (m_run_thread_animation)
+	while (!th.stop_requested())
 	{
-		GUID   pageGuid = Gdiplus::FrameDimensionTime;
-
-		if (hDC)
-		{
-			CRect r(m_ani_sx, m_ani_sy, m_ani_sx + m_ani_width, m_ani_sy + m_ani_height);
-			CMemoryDC dc(pDC, &r);
-			Gdiplus::Graphics g(dc.GetSafeHdc());
-
-			if (m_has_alpha_pixel)
-			{
-				if (m_cr_back.GetA() == 0)
-					g.FillRectangle(br_zigzag.get(), CRect_to_gpRect(r));
-				else
-				{
-					Gdiplus::SolidBrush br(m_cr_back);
-					g.FillRectangle(&br, CRect_to_gpRect(r));
-				}
-			}
-
-			//if (m_cr_back.GetValue() != 
-			//g.FillRectangle(&brush_tr, m_ani_sx, m_ani_sy, m_ani_width, m_ani_height);
-
-			//CGdiButton과 같이 배경이 투명하게 표시하려 했으나 뭔가 다르다.
-			/*
-			CRect Rect = r;
-			CWnd* pParent = CWnd::FromHandle(m_target_hwnd);
-			ASSERT(pParent);
-			pParent->ScreenToClient(&Rect);  //convert our corrdinates to our parents
-			//copy what's on the parents at this point
-			CDC* pParentDC = pParent->GetDC();
-			CDC MemDC;
-			CBitmap bmp;
-			MemDC.CreateCompatibleDC(pParentDC);
-			bmp.CreateCompatibleBitmap(pParentDC, Rect.Width(), Rect.Height());
-			CBitmap* pOldBmp = MemDC.SelectObject(&bmp);
-			MemDC.BitBlt(0, 0, Rect.Width(), Rect.Height(), pParentDC, Rect.left, Rect.top, SRCCOPY);
-			pParentDC->BitBlt(m_ani_sx, m_ani_sy, Rect.Width(), Rect.Height(), &MemDC, 0, 0, SRCCOPY);
-			MemDC.SelectObject(pOldBmp);
-			pParent->ReleaseDC(pParentDC);
-			MemDC.DeleteDC();
-			*/
-			//Graphics g(hDC, r);
-			//배경색을 투명하게 한다 해도 이미지의 투명 영역이
-			//parent에서도 투명하게 표시되진 않는다.
-			//parent의 영역을 그려준 후 이미지를 그려줘야 한다.
-			//if (!is_equal(m_cr_back, Gdiplus::Color(0, 0, 0, 0), 4))
-			//{
-			//	Gdiplus::SolidBrush brush_tr(m_cr_back);
-			//	g.FillRectangle(&brush_tr, m_ani_sx, m_ani_sy, m_ani_width, m_ani_height);
-			//}
-
-			//save(_T("d:\\copy.png"));
-
-			//mirror할 경우 m_pBitmap을 mirror()하면 gif정보가 사라지므로 clone한 이미지를 mirror하여 표시해야 한다.
-			Gdiplus::Bitmap* pBitmap = m_pBitmap;
-			if (m_is_gif_mirror)
-			{
-				pBitmap = m_pBitmap->Clone(0, 0, m_pBitmap->GetWidth(), m_pBitmap->GetHeight(), m_pBitmap->GetPixelFormat());
-				pBitmap->RotateFlip(Gdiplus::RotateNoneFlipX);
-			}
-
-			//save(_T("d:\\copy.png"));
-			g.DrawImage(pBitmap, m_ani_sx, m_ani_sy, m_ani_width, m_ani_height);
-
-			//clone된 경우는 반드시 release해줘야 한다.
-			if (pBitmap != m_pBitmap)
-				SAFE_DELETE(pBitmap);
-		}
-
+		//paused 면 프레임을 전진시키지 않고 대기 — 그리기는 OnPaint 가 현재 프레임을 유지한다. stop 시 즉시 깨어남.
 		if (m_paused)
 		{
-			std::this_thread::sleep_for(std::chrono::milliseconds(500));
+			th.sleep_for(std::chrono::milliseconds(100));
 			continue;
 		}
 
-		CSCGdiplusBitmapMessage msg(m_pBitmap, message_gif_frame_changed, m_frame_index, m_frame_count);
-		::SendMessage(m_target_hwnd, Message_CSCGdiplusBitmap, (WPARAM)&msg, 0);
+		//다음 프레임으로 전진하고 그 영역만 무효화 → UI 스레드의 CSCStatic::OnPaint 가 현재 프레임을 그린다.
+		//워커는 GDI 를 직접 만지지 않는다(SelectActiveFrame/DrawImage 는 OnPaint 에서만) → data race·cross-thread GDI 없음.
+		m_frame_index = (m_frame_index + 1) % m_frame_count;
 
-		m_frame_index++;
-		if (m_frame_index >= m_frame_count)
-			m_frame_index = 0;
+		if (::IsWindow(m_target_hwnd))
+		{
+			RECT r = { m_ani_sx, m_ani_sy, m_ani_sx + m_ani_width, m_ani_sy + m_ani_height };
+			::InvalidateRect(m_target_hwnd, &r, FALSE);	//erase=FALSE — OnPaint 가 double-buffer 로 배경+프레임 다시 그림.
+		}
 
-		m_pBitmap->SelectActiveFrame(&pageGuid, m_frame_index);
-
-		//replace_color(Gdiplus::Color(255, 76, 86, 164), Gdiplus::Color(0, 255, 112, 109));
-
-		//delay는 해당 프레임에 설정된 delay를 그대로 주면 안되고
-		//전 프레임부터 현 프레임까지 재생하는데 걸린 시간은 빼줘야 한다.
-		t1 = clock();
+		long t1 = clock();
 		long display_delay = t1 - t0;
 		long delay = ((long*)m_frame_delay->value)[m_frame_index] * 10;
 
 		if (delay > display_delay)
-			std::this_thread::sleep_for(std::chrono::milliseconds((delay - display_delay)));
+			th.sleep_for(std::chrono::milliseconds(delay - display_delay));
 		t0 = clock();
 	}
+}
 
-	::ReleaseDC(m_target_hwnd, hDC);
+//현재 선택된 gif 프레임을 주어진 Graphics 에 그린다(alpha 배경 fill + mirror 포함). CSCStatic::OnPaint(UI 스레드)가 호출.
+//SelectActiveFrame 이 m_pBitmap 을 변경하므로 반드시 UI 스레드에서만 호출한다(워커는 호출하지 않음 → data race 없음).
+void CSCGdiplusBitmap::draw_gif_current_frame(Gdiplus::Graphics& g)
+{
+	if (m_frame_count < 2 || m_pBitmap == NULL)
+		return;
+
+	GUID pageGuid = Gdiplus::FrameDimensionTime;
+	m_pBitmap->SelectActiveFrame(&pageGuid, m_frame_index);
+
+	CRect r(m_ani_sx, m_ani_sy, m_ani_sx + m_ani_width, m_ani_sy + m_ani_height);
+
+	if (m_has_alpha_pixel)
+	{
+		if (m_cr_back.GetA() == 0)
+		{
+			auto br_zigzag = get_zigzag_pattern(32);
+			g.FillRectangle(br_zigzag.get(), CRect_to_gpRect(r));
+		}
+		else
+		{
+			Gdiplus::SolidBrush br(m_cr_back);
+			g.FillRectangle(&br, CRect_to_gpRect(r));
+		}
+	}
+
+	//mirror 시 m_pBitmap 을 직접 mirror 하면 gif 프레임 정보가 사라지므로 clone 을 mirror 해서 그린다.
+	Gdiplus::Bitmap* pBitmap = m_pBitmap;
+	if (m_is_gif_mirror)
+	{
+		pBitmap = m_pBitmap->Clone(0, 0, m_pBitmap->GetWidth(), m_pBitmap->GetHeight(), m_pBitmap->GetPixelFormat());
+		pBitmap->RotateFlip(Gdiplus::RotateNoneFlipX);
+	}
+
+	g.DrawImage(pBitmap, m_ani_sx, m_ani_sy, m_ani_width, m_ani_height);
+
+	if (pBitmap != m_pBitmap)
+		SAFE_DELETE(pBitmap);
 }
 
 void CSCGdiplusBitmap::goto_gif_frame(int frame)

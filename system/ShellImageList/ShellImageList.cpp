@@ -602,44 +602,128 @@ bool CShellImageList::is_special_folder(int index, CString path)
 
 //C:\\, C:\\Program Files, C:\\Windows 등과 같은 주요 폴더는 rename, delete등의 액션을 허용하지 않아야 한다.
 //내 PC, 다운로드, 바탕 화면, 문서 등의 폴더도 허용하지 않아야 한다.
-bool CShellImageList::is_protected(int index, CString folder)
+//전송/삭제/이름변경 등 손상 액션을 금지해야 하는 "주요 시스템 폴더/드라이브 루트"인지 판정한다.
+//index : 대상이 어느 쪽(SERVER/CLIENT) 볼륨의 경로인지. as_destination : 이 경로가 "수신/쓰기 목적지"인지.
+//정책:
+// - 시스템 폴더(Windows / Program Files / Program Files (x86) / ProgramData / Recovery /
+//   System Volume Information / $Recycle.Bin)는 폴더 자신 + 하위 전체 금지(소스·목적지 공통).
+//   판정은 드라이브 문자를 떼고 예약 폴더명으로만 하므로 어느 드라이브든(멀티부팅 C:\Windows·D:\Windows 모두) 적용된다.
+//   (예전엔 <drive>\Windows\System32 존재로 검증했으나, 그 검증은 항상 로컬 디스크를 확인해 '원격 경로'일 때
+//    원격 Windows 를 못 막는 구멍이 있어 제거했다. 이름 기반이 원격에도 안전하고, 데이터폴더가 우연히 동명일
+//    오탐은 안전측 과보호라 무방.)
+// - Users / Documents and Settings 는 "루트만" 금지 — 하위는 사용자 문서 등 대상이므로 허용(소스·목적지 공통).
+// - 드라이브 루트:
+//     · 소스(as_destination=false)  : 모든 드라이브 루트 금지(통째 전송/삭제/이름변경 대상 아님). 하위는 위 규칙만 적용.
+//     · 목적지(as_destination=true) : 시스템(실행 OS) 드라이브 루트(C:\)만 금지. 데이터 드라이브 루트(D:\ 등)는
+//                                     수신 허용(작업 디스크로 파일 받기 가능).
+bool CShellImageList::is_protected(int index, CString folder, bool as_destination)
 {
 	folder = convert_special_folder_to_real_path(index, folder);
-	//folder.MakeLower();
+	if (folder.IsEmpty())
+		return false;
 
-	//바탕 화면, 문서 등 특수 폴더는 보호. "내 PC"의 패스는 ""으로 세팅되어 있으므로 비교 제외.
-	//std::map<int, CString> path_map = *plist->m_volume[index].get_path_map();
-	//if (folder.Find(path_map[CSIDL_DESKTOP]) >= 0)
-	//	return true;
-	//if (folder.Find(path_map[CSIDL_MYDOCUMENTS]) >= 0)
-	//	return true;
+	//내 PC(드라이브 목록 가상 폴더)는 소스·목적지 모두 금지 — 전송/삭제/이름변경/수신 대상이 아니다.
+	//(convert_special_folder_to_real_path 는 "내 PC" 를 실제경로가 아니라 라벨 그대로 돌려주므로 라벨로 비교.)
+	if (folder == m_volume[index].get_label(CSIDL_DRIVES))
+		return true;
 
-	//드라이브 루트는 모두 보호.
-	for (auto drive_list : *m_volume[index].get_drive_list())
+	//정규화: 소문자 + 끝 '\' 제거(단 "c:\" 같은 드라이브 루트 형태는 뒤에서 rest 로 구분).
+	CString path = folder;
+	path.MakeLower();
+	while (path.GetLength() > 3 && path.Right(1) == _T('\\'))
+		path = path.Left(path.GetLength() - 1);
+
+	//드라이브 문자를 떼고 나머지 경로만으로 판정 → 어느 드라이브든 동일 규칙(멀티부팅 대응).
+	//"c:\windows\system32" → rest="\windows\system32", 드라이브 루트 "c:\" → rest="\".
+	CString drive;	//"c:" 형태(없으면 빈 문자열)
+	CString rest;
+	if (path.GetLength() >= 2 && path[1] == _T(':'))
 	{
-		//CString drive_root = convert_special_folder_to_real_path(drive_list.path, plist, index);
-		if (folder.CompareNoCase(drive_list.path) == 0)
-			return true;
+		drive = path.Left(2);
+		rest  = path.Mid(2);
+	}
+	else
+	{
+		rest = path;	//UNC 등 — 아래 규칙에 안 걸리면 허용.
 	}
 
-	//windows 폴더 및 하위 폴더는 모두 보호.
-	if (folder.Find(_T("C:\\Windows")) >= 0)
+	//드라이브 루트("c:\" → rest "\", 또는 "").
+	if (rest.IsEmpty() || rest == _T("\\"))
+	{
+		if (as_destination)
+		{
+			//목적지: 시스템(실행 OS) 드라이브 루트만 금지. 데이터 드라이브 루트는 수신 허용.
+			TCHAR win_dir[MAX_PATH] = { 0, };
+			::GetWindowsDirectory(win_dir, MAX_PATH);
+			CString sys_drive = CString(win_dir).Left(2);	//"C:"
+			sys_drive.MakeLower();
+			return (!drive.IsEmpty() && drive == sys_drive);
+		}
+		//소스: 모든 드라이브 루트 금지(통째 전송/삭제/이름변경 방지).
+		return true;
+	}
+
+	//rest 가 root 자신이거나 그 하위(root + "\")인지.
+	auto is_under = [&rest](const TCHAR* root) -> bool
+	{
+		int len = (int)_tcslen(root);
+		if (rest == root)
+			return true;
+		return (rest.GetLength() > len && rest.Left(len) == root && rest[len] == _T('\\'));
+	};
+
+	//시스템 폴더 + 하위 전체(어느 드라이브든 이름 기반). 소스·목적지 공통 금지.
+	if (is_under(_T("\\windows")) ||
+		is_under(_T("\\program files")) ||
+		is_under(_T("\\program files (x86)")) ||
+		is_under(_T("\\programdata")) ||
+		is_under(_T("\\recovery")) ||
+		is_under(_T("\\system volume information")) ||
+		is_under(_T("\\$recycle.bin")))
 		return true;
 
-
-	std::deque<CString> protected_folder;
-	protected_folder.push_back(_T("C:\\Documents and Settings"));
-	protected_folder.push_back(_T("C:\\Program Files"));
-	protected_folder.push_back(_T("C:\\Program Files (x86)"));
-	protected_folder.push_back(_T("C:\\ProgramData"));
-	protected_folder.push_back(_T("C:\\Recovery"));
-	protected_folder.push_back(_T("C:\\System Volume Information"));
-	protected_folder.push_back(_T("C:\\Windows"));
-	protected_folder.push_back(_T("C:\\Users"));
-
-	int found = find_dqstring(protected_folder, folder, true, false);
-	if (found >= 0)
+	//Users / Documents and Settings 는 루트만 금지(하위 사용자 데이터는 허용).
+	if (rest == _T("\\users") || rest == _T("\\documents and settings"))
 		return true;
+
+	//특수 사용자 폴더(프로필 및 문서/바탕화면/다운로드/음악/사진/비디오)는 소스(삭제/이름변경/전송)에서 금지.
+	//받기(as_destination)는 허용 — 사용자가 이 폴더들로 파일을 다운받을 수 있어야 하기 때문.
+	//폴더 "자신"만 금지하고 그 내용/하위는 허용(exact 비교). 원격(index>=1)도 볼륨에 저장된 경로로 판정된다.
+	//프로필 경로는 문서 폴더의 상위로 도출(문서 = <profile>\Documents 관례). 하위는 로케일 불변 영문명으로 비교.
+	if (!as_destination)
+	{
+		auto normalize = [](CString p) -> CString
+		{
+			p.MakeLower();
+			while (p.GetLength() > 3 && p.Right(1) == _T('\\'))
+				p = p.Left(p.GetLength() - 1);
+			return p;
+		};
+
+		CString docs = get_system_path(index, CSIDL_MYDOCUMENTS);	//"C:\Users\me\Documents"
+		if (!docs.IsEmpty())
+		{
+			CString docs_n = normalize(docs);
+			if (path == docs_n)		//문서 폴더 자신(리다이렉트 대비 직접 비교)
+				return true;
+
+			int slash = docs_n.ReverseFind(_T('\\'));
+			if (slash > 0)
+			{
+				CString profile = docs_n.Left(slash);	//"c:\users\me"
+				static const TCHAR* subs[] = { _T(""), _T("\\desktop"), _T("\\downloads"),
+					_T("\\music"), _T("\\pictures"), _T("\\videos") };
+				for (auto s : subs)
+					if (path == profile + s)
+						return true;
+			}
+		}
+
+		//데스크톱이 리다이렉트된 경우 대비 — 저장된 실제 데스크톱 경로도 직접 비교.
+		CString desk = get_system_path(index, CSIDL_DESKTOP);
+		if (!desk.IsEmpty() && path == normalize(desk))
+			return true;
+	}
 
 	return false;
 }

@@ -716,22 +716,29 @@ void CSCSliderCtrl::OnPaint()
 
 				if (m_tic_show_text)
 				{
-					//range가 0 ~ 100일 때 0은 충분히 표시되지만 100은 우측이 잘리게 된다.
-					//이를 보정하려면 트랙 양쪽을 텍스트가 잘리지 않게 줄여줘야 하지만 좌표 계산들이 여기저기 복잡해진다.
-					//따라서 텍스트를 -6 ~ +6까지 12의 width를 주고 center 정렬하여 표시하고 맨 마지막 틱만 오른쪽 정렬로 처리한다.
-					rtext = CRect(tic_pos - 6, rtrack.bottom, tic_pos + 6, m_rc.bottom);
-
+					//중간 틱은 ±6 width center 정렬. 양 끝 틱은 실제로 그려진 tic 원 rect(rtic)의 가장자리에
+					//직접 맞춰 정렬한다 — 첫 값은 첫 원 왼쪽(rtic.left)에 left 정렬, 끝 값은 마지막 원 오른쪽(rtic.right)에
+					//right 정렬. tic 원 크기(tic_d)가 바뀌어도 rtic 이 그 크기를 반영하므로 정렬이 자동으로 따라간다.
 					if (m_text_style == text_style_percentage)
 						text.Format(_T("%d%%"), tic);
 					else
 						text.Format(_T("%d"), tic);
 
 					if (tic == lower)
+					{
+						rtext = CRect(rtic.left, rtrack.bottom, tic_pos + 6, m_rc.bottom);
 						dc.DrawText(text, rtext, DT_LEFT | DT_TOP | DT_NOCLIP);
+					}
 					else if (tic == upper)
+					{
+						rtext = CRect(tic_pos - 6, rtrack.bottom, rtic.right, m_rc.bottom);
 						dc.DrawText(text, rtext, DT_RIGHT | DT_TOP | DT_NOCLIP);
+					}
 					else
+					{
+						rtext = CRect(tic_pos - 6, rtrack.bottom, tic_pos + 6, m_rc.bottom);
 						dc.DrawText(text, rtext, DT_CENTER | DT_TOP | DT_NOCLIP);
+					}
 				}
 				tic += m_tic_freq;
 			}
@@ -746,7 +753,7 @@ void CSCSliderCtrl::OnPaint()
 
 				if (m_tic_show_text)
 				{
-					rtext = CRect(tic_pos - 6, rtrack.bottom, tic_pos + 6, m_rc.bottom);
+					rtext = CRect(tic_pos - 6, rtrack.bottom, rtic.right, m_rc.bottom);	//마지막 원 오른쪽 가장자리에 right 정렬
 
 					if (m_text_style == text_style_percentage)
 						text.Format(_T("%d%%"), tic);

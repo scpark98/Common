@@ -1414,6 +1414,10 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		else
 			cr_ind_mark = is_disabled ? Gdiplus::Color::Gray : get_distinct_bw_color(cr_ind_fill);
 
+		//체크박스/라디오 indicator(박스/원)와 레이블 사이 간격. Windows 표준(96 DPI)의 무난한 값 6px 을 DPI 스케일한다.
+		//(예전엔 4px 고정 — 표준 하단이라 좁아 보였고, 고DPI 에서 박스는 커지는데 간격은 그대로라 상대적으로 더 좁아졌다.)
+		int box_text_gap = MulDiv(6, dc.GetDeviceCaps(LOGPIXELSX), 96);
+
 		//사각형 안에 v자 체크를 직접 그려준다.
 		if (is_button_style(BS_CHECKBOX, BS_AUTOCHECKBOX) && !is_button_style(BS_PUSHLIKE))
 		{
@@ -1431,7 +1435,7 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 
 			//텍스트는 버튼 전체 높이(rc)에서 DT_VCENTER 로 수직 중앙정렬 — 박스도 버튼 중앙이라 서로 정렬된다.
 			//(예전엔 rText 를 박스 rect(m_check_size 높이)로 잡아 폰트/상태에 따라 미세하게 어긋나 보였다.)
-			rText.left = r.right + 4;
+			rText.left = r.right + box_text_gap;
 			rText.top = rc.top;
 			rText.bottom = rc.bottom;
 			rText.right = rc.right;
@@ -1482,7 +1486,7 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 
 				//텍스트는 버튼 전체 높이(rc)에서 DT_VCENTER 로 수직 중앙정렬 — 원(circle)도 버튼 중앙이라 서로 정렬되고,
 				//checked/unchecked 에 무관하게 동일하게 보인다.
-				rText.left = r.right + 4;
+				rText.left = r.right + box_text_gap;
 				rText.top = rc.top;
 				rText.bottom = rc.bottom;
 				rText.right = rc.right;

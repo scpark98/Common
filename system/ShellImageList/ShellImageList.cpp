@@ -563,6 +563,11 @@ CString	CShellImageList::convert_real_path_to_special_folder(int index, CString 
 	if (index >= (int)m_volume.size())
 		return _T("");
 
+	//드라이브 루트를 역슬래시 없이("D:") 넘겨도 드라이브 루트("D:\\")로 인식하도록 정규화.
+	//(아래 드라이브 판정이 real_path.Mid(1,2)==":\\" 를 요구하므로 "D:" 는 그냥 통과돼 라벨 변환이 안 되던 문제.)
+	if (real_path.GetLength() == 2 && real_path[1] == _T(':'))
+		real_path += _T("\\");
+
 	//real_path는 local에서는(index = 0일 경우) 실제로 존재해야 하는 경로이므로
 	//"c:\\program files"라고 넘어와도 "C:\\Program Files"로 변환해서 비교해줘야 한다.
 	if (index == 0 && PathFileExists(real_path))

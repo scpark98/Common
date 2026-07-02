@@ -1696,7 +1696,7 @@ void CSCThumbCtrl::OnContextMenu(CWnd* pWnd, CPoint point)
 			select_item(index);
 	}
 
-	if (!m_use_context_menu)
+	if (!m_use_own_context_menu)
 	{
 		CWnd* parent = GetParent();
 		if (parent)

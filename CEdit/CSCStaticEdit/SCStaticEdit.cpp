@@ -1208,10 +1208,10 @@ void CSCStaticEdit::OnPaint()
 // ──────────────────────────────────────────────────────────
 void CSCStaticEdit::draw_background(Gdiplus::Graphics& g, const CRect& rc)
 {
-	// disabled : 정상 cr_back 에서 살짝만 회색쪽으로 파생 (테마 일관성 유지).
+	// disabled : CSCEdit 과 동일한 disable 배경색(LightGray)으로 통일 (CSCEdit::m_cr_back_disabled 기본값).
 	// readonly + use_default_readonly_color : 표준 다이얼로그 배경(COLOR_3DFACE) 그대로.
 	Gdiplus::Color cr_back =
-		!IsWindowEnabled()                                       ? get_weak_color(m_theme.cr_back, 16) :
+		!IsWindowEnabled()                                       ? Gdiplus::Color::LightGray           :
 		(m_readonly && m_use_default_readonly_color)             ? get_sys_color(COLOR_3DFACE)         :
 		                                                           m_theme.cr_back;
 
@@ -1236,9 +1236,11 @@ void CSCStaticEdit::draw_border(Gdiplus::Graphics& g, const CRect& rc)
 {
 	if (!m_draw_border) return;
 
+	//disable 시에는 border 를 그리지 않는다(CSCEdit 의 disable 모습과 통일 — 배경만 회색으로).
+	if (!IsWindowEnabled()) return;
+
 	bool focused = (GetFocus() == this);
-	Gdiplus::Color cr_border = !IsWindowEnabled() ? get_weak_color(m_theme.cr_border_inactive, 16)
-		: focused ? m_theme.cr_border_active : m_theme.cr_border_inactive;
+	Gdiplus::Color cr_border = focused ? m_theme.cr_border_active : m_theme.cr_border_inactive;
 
 	Gdiplus::Pen pen(cr_border, (float)m_border_width);
 	// PenAlignmentInset 은 GDI+ 에서 곡선 path 의 AA 파이프라인을 완전히 타지 않아

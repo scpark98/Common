@@ -836,19 +836,21 @@ protected:
 	int				m_auto_scroll_button_size = 24;
 	void			init_auto_scroll_button();
 
-//popup(context) menu (구현중)
-	//프로그램마다 리스트에 대한 팝업메뉴가 다를 수 있으므로 우선 보류.
-	bool			m_use_popup_menu = false;
+//popup(context) menu
+	//true=자체 내장 컨텍스트 메뉴 표시, false=parent(OnContextMenu)로 위임. default = true
+	bool			m_use_own_context_menu = true;
+	//자체 내장 메뉴 command id. 범용 컨트롤이므로 파일 개념 없는 범용 항목만 제공.
 	enum CVTLISTCTRLEX_POPUP_MENU
 	{
-		menu_delete,
-		menu_rename,
-		menu_clear_all,
+		menu_select_all = WM_USER + 1600,
+		menu_unselect_all,
 	};
+	afx_msg void	OnPopupMenu(UINT nID);
 
 protected:
 	DECLARE_MESSAGE_MAP()
 public:
+	void			set_use_own_context_menu(bool use = true) { m_use_own_context_menu = use; }
 	afx_msg void OnLvnGetdispinfo(NMHDR *pNMHDR, LRESULT *pResult);
 	afx_msg void OnLvnOdfinditem(NMHDR *pNMHDR, LRESULT *pResult);
 	afx_msg void OnLvnOdcachehint(NMHDR *pNMHDR, LRESULT *pResult);
@@ -873,7 +875,8 @@ public:
 	afx_msg void OnLButtonUp(UINT nFlags, CPoint point);
 	virtual BOOL PreCreateWindow(CREATESTRUCT& cs);
 	afx_msg BOOL OnLvnItemchanged(NMHDR* pNMHDR, LRESULT* pResult);
-	afx_msg void OnContextMenu(CWnd* /*pWnd*/, CPoint /*point*/);
+	afx_msg void OnContextMenu(CWnd* pWnd, CPoint point);
+	afx_msg BOOL OnNMRClick(NMHDR* pNMHDR, LRESULT* pResult);
 	afx_msg void OnMouseHover(UINT nFlags, CPoint point);
 	afx_msg void OnMouseLeave();
 	afx_msg void OnSetFocus(CWnd* pOldWnd);

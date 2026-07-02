@@ -187,8 +187,8 @@ public:
 		menu_delete_selected,
 	};
 
-	bool		m_use_popup_menu = true;
-	void		use_popup_menu(bool use) { m_use_popup_menu = use; }
+	bool		m_use_own_context_menu = true;
+	void		set_use_own_context_menu(bool use = true) { m_use_own_context_menu = use; }
 	void		OnPopupMenu(UINT nID);
 
 	//1:show, 0:hide, -1:no change

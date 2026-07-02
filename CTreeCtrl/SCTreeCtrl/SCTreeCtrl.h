@@ -322,7 +322,7 @@ public:
 			m_drag_images_id.push_back(id);
 	}
 
-	void			set_use_popup_menu(bool use = true) { m_use_popup_menu = use; }
+	void			set_use_own_context_menu(bool use = true) { m_use_own_context_menu = use; }
 
 	//드래그앤드롭 기능을 사용할 것인지. 드래그앤드롭 기능이 false이면 순서 변경도 의미가 없다.
 	bool			get_use_drag_and_drop() { return m_use_drag_and_drop; }
@@ -487,7 +487,7 @@ protected:
 		menu_favorite,
 	};
 	CSCMenu			m_menu;
-	bool			m_use_popup_menu = false;	//팝업메뉴 사용 여부. default = false
+	bool			m_use_own_context_menu = true;	//true=자체 내장 컨텍스트 메뉴 표시, false=parent(OnContextMenu)로 위임. default = true
 	void			OnPopupMenu(UINT nID);
 	LRESULT			OnMessageCSCMenu(WPARAM wParam, LPARAM lParam);
 

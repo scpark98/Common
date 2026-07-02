@@ -4192,7 +4192,7 @@ void CSCTreeCtrl::OnContextMenu(CWnd* pWnd, CPoint point)
 
 	//자체 popup 사용 안 하면 parent 로 forward — wParam = source hwnd 로 parent OnContextMenu 가
 	//pWnd 로 tree/thumb 구분 가능.
-	if (!m_use_popup_menu)
+	if (!m_use_own_context_menu)
 	{
 		CWnd* parent = GetParent();
 		if (parent)

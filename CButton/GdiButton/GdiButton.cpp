@@ -1533,8 +1533,10 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 						}
 						break;
 					case SC_CLOSE:
-						g.DrawLine(&pen, Gdiplus::Point(cp.x - 5, cp.y - 6), Gdiplus::Point(cp.x + 5, cp.y + 4));
-						g.DrawLine(&pen, Gdiplus::Point(cp.x - 5, cp.y + 4), Gdiplus::Point(cp.x + 5, cp.y - 6));
+						//X 의 두 대각선이 정확히 cp(=rc.CenterPoint())에서 교차하도록 y 를 대칭(-5..+5)으로.
+						//이전 -6..+4 는 교차점이 cp.y-1 이 되어 X 가 사각형 중앙보다 1px 위로 치우쳐 보였다.
+						g.DrawLine(&pen, Gdiplus::Point(cp.x - 5, cp.y - 5), Gdiplus::Point(cp.x + 5, cp.y + 5));
+						g.DrawLine(&pen, Gdiplus::Point(cp.x - 5, cp.y + 5), Gdiplus::Point(cp.x + 5, cp.y - 5));
 						break;
 					//case SC_PIN :
 					//	g.DrawLine(&pen_pin, cp.x - 7, cp.y, cp.x + 7, cp.y);

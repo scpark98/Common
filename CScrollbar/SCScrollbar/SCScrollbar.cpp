@@ -576,11 +576,18 @@ void CSCScrollbar::OnPaint()
 	dc.FillSolidRect(rc, m_theme.cr_back.ToCOLORREF());
 
 	Gdiplus::Graphics g(dc);
-	g.SetSmoothingMode(Gdiplus::SmoothingModeHighQuality);
+
+	//track 배경은 축(axis) 정렬 직사각형 — AA 로 그리면 top/left 가장자리가 배경과 부분 블렌딩돼 RGB(238) 같은
+	//1px 연회색 라인이 생긴다(GDI+ AA rect 의 top/left 부분커버리지 특성. right/bottom 은 풀커버리지라 안 생김).
+	//따라서 track 은 AA 를 끄고 crisp 하게 채워 가장자리도 track 색 그대로 나오게 한다.
+	g.SetSmoothingMode(Gdiplus::SmoothingModeNone);
 
 	//track 배경은 window 전체 (arrow 영역 포함) — 평소에도 그 영역까지 시각적으로 같은 톤.
 	//thumb 의 스크롤 범위는 calc_track_rect (arrow 제외) — calc_thumb_rect 가 그 위에서 계산.
 	draw_track(g, get_visible_rect());
+
+	//arrow chevron / thumb 둥근모서리는 AA 필요.
+	g.SetSmoothingMode(Gdiplus::SmoothingModeHighQuality);
 
 	//arrow 영역은 항상 reserve (thumb 범위 일관) — 삼각형 그리기만 hover 시.
 	if (m_show_arrows && m_window_hovering)

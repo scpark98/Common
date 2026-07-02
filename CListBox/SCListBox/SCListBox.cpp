@@ -1041,7 +1041,7 @@ BOOL CSCListBox::PreTranslateMessage(MSG* pMsg)
 	else if (pMsg->message == WM_CONTEXTMENU)
 	{
 		//return FALSE를 해줘야만 parent에서 이 메시지를 처리할 수 있다.
-		if (!m_use_popup_menu)
+		if (!m_use_own_context_menu)
 			return FALSE;
 	}
 	else if (pMsg->message == WM_KILLFOCUS)
@@ -1151,7 +1151,7 @@ int CSCListBox::set_path(CString root, CString selected_text)
 void CSCListBox::set_as_folder_list()
 {
 	m_use_over = true;
-	m_use_popup_menu = false;
+	m_use_own_context_menu = false;
 	m_as_folder_list = true;
 	m_as_popup = true;
 	m_show_time = false;
@@ -1306,7 +1306,7 @@ void CSCListBox::OnContextMenu(CWnd* pWnd, CPoint point)
 {
 	edit_end();
 
-	if (!m_use_popup_menu)
+	if (!m_use_own_context_menu)
 	{
 		::PostMessage(GetParent()->GetSafeHwnd(), WM_CONTEXTMENU, (WPARAM)m_hWnd, MAKELPARAM(point.x, point.y));
 		return;

@@ -219,7 +219,7 @@ public:
 	bool			get_show_file_extension() { return m_show_extension; }
 	void			set_show_file_extension(bool show) { m_show_extension = show; Invalidate(); }
 
-	void			set_use_context_menu(bool use) { m_use_context_menu = use; }
+	void			set_use_own_context_menu(bool use = true) { m_use_own_context_menu = use; }
 
 
 //color theme
@@ -335,7 +335,7 @@ protected:
 		idRemoveAll,
 		idProperty,
 	};
-	bool			m_use_context_menu = true;
+	bool			m_use_own_context_menu = true;
 	void			on_context_menu(UINT nID);
 
 	void			on_menu_delete();

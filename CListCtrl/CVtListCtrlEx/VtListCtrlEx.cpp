@@ -75,7 +75,9 @@ BEGIN_MESSAGE_MAP(CVtListCtrlEx, CListCtrl)
 	ON_WM_MOUSEMOVE()
 	ON_WM_LBUTTONUP()
 	ON_NOTIFY_REFLECT_EX(LVN_ITEMCHANGED, &CVtListCtrlEx::OnLvnItemchanged)
-	//ON_WM_CONTEXTMENU()
+	ON_WM_CONTEXTMENU()
+	ON_NOTIFY_REFLECT_EX(NM_RCLICK, &CVtListCtrlEx::OnNMRClick)
+	ON_COMMAND_RANGE(menu_select_all, menu_unselect_all, &CVtListCtrlEx::OnPopupMenu)
 	ON_WM_MOUSEHOVER()
 	ON_WM_MOUSELEAVE()
 	ON_WM_SETFOCUS()
@@ -5557,9 +5559,51 @@ void CVtListCtrlEx::capture_selected_items_to_bitmap(CSCGdiplusBitmap* bmp)
 }
 */
 
-void CVtListCtrlEx::OnContextMenu(CWnd* /*pWnd*/, CPoint /*point*/)
+//ListCtrl 의 우클릭이 WM_CONTEXTMENU 를 항상 self 로 보내지는 않으므로(NM_RCLICK 만 발생하는 경우가 있음),
+//우클릭 메뉴 경로를 WM_CONTEXTMENU 하나로 정규화하기 위해 명시적으로 self 에 SendMessage 한다 (CSCTreeCtrl 과 동일 패턴).
+//return TRUE 로 NM_RCLICK 을 소비하여 parent 의 NM_RCLICK 핸들러가 이중 호출되지 않게 한다.
+BOOL CVtListCtrlEx::OnNMRClick(NMHDR* /*pNMHDR*/, LRESULT* pResult)
 {
-	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
+	CPoint pt_screen;
+	GetCursorPos(&pt_screen);
+	SendMessage(WM_CONTEXTMENU, (WPARAM)m_hWnd, MAKELPARAM(pt_screen.x, pt_screen.y));
+
+	*pResult = 1;
+	return TRUE;
+}
+
+void CVtListCtrlEx::OnContextMenu(CWnd* /*pWnd*/, CPoint point)
+{
+	//키보드 컨텍스트 메뉴 키는 (-1,-1) 로 오므로 커서 위치로 정규화.
+	if (point.x == -1 && point.y == -1)
+		point = (CPoint)GetMessagePos();
+
+	//자체 메뉴 미사용 — parent 로 위임. wParam = 소스 hwnd 로 parent 가 어느 리스트인지 구분 가능.
+	if (!m_use_own_context_menu)
+	{
+		CWnd* parent = GetParent();
+		if (parent)
+			parent->SendMessage(WM_CONTEXTMENU, (WPARAM)GetSafeHwnd(), MAKELPARAM(point.x, point.y));
+		return;
+	}
+
+	//자체 내장 메뉴 — 파일 개념이 없는 범용 리스트이므로 범용 항목(모두 선택 / 선택 해제)만 제공.
+	CMenu menu;
+	menu.CreatePopupMenu();
+	menu.AppendMenu(MF_STRING, menu_select_all, _T("모두 선택(&A)\tCtrl+A"));
+	menu.AppendMenu(MF_STRING, menu_unselect_all, _T("선택 해제(&U)"));
+	menu.EnableMenuItem(menu_select_all, MF_BYCOMMAND | (GetItemCount() > 0 ? MF_ENABLED : MF_GRAYED));
+	menu.EnableMenuItem(menu_unselect_all, MF_BYCOMMAND | (GetSelectedCount() > 0 ? MF_ENABLED : MF_GRAYED));
+	menu.TrackPopupMenu(TPM_LEFTALIGN | TPM_RIGHTBUTTON, point.x, point.y, this);
+}
+
+void CVtListCtrlEx::OnPopupMenu(UINT nID)
+{
+	switch (nID)
+	{
+	case menu_select_all:	select_item(-1, true, false, false); break;	//SetItemState(-1) 은 전체 항목에 적용됨
+	case menu_unselect_all:	select_item(-1, false, false, false); break;
+	}
 }
 
 

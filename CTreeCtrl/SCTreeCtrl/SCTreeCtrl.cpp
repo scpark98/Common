@@ -2543,7 +2543,11 @@ void CSCTreeCtrl::DroppedHandler(CWnd* pDragWnd, CWnd* pDropWnd)
 		TRACE(_T("dropped on = %s\n"), pDropTreeCtrl->GetItemText(m_DropItem));
 
 		// 같은 CTreeCtrl 내에서의 이동
-		if ((pDragWnd == pDropWnd) && (m_DragItem != m_DropItem))
+		// [주의] shell 트리(파일시스템 미러)는 노드를 수동으로 옮기면 안 된다 — 앱 핸들러가 실제 파일 이동 후
+		// refresh 로 트리를 재구성한다. 게다가 move_tree_item()은 m_DragItem 핸들을 삭제/무효화하는데,
+		// 바로 아래에서 parent 로 보낸 message_drag_and_drop 핸들러가 get_path(m_DragItem)로 소스 경로를 구하므로
+		// shell 트리에서 이걸 실행하면 소스가 빈 값이 되어 파일 이동이 무동작이 된다. 그래서 shell 트리는 제외.
+		if ((pDragWnd == pDropWnd) && (m_DragItem != m_DropItem) && !m_is_shell_treectrl)
 		{
 			if (m_dropPosition == drop_on_item)
 			{

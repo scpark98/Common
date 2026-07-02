@@ -214,6 +214,10 @@ public:
 	//원래 CStatic 에는 SS_BOTTOM 같은 세로 하단 정렬 스타일이 없으나, 이 컨트롤은 m_text_rect 좌표를 직접 보정하는 방식으로 DT_BOTTOM 도 지원한다.
 	void			set_valign(DWORD valign);
 
+	//텍스트의 '&' 를 니모닉 접두(prefix)로 처리할지 여부. 기본은 스타일(SS_NOPREFIX)에 따름.
+	//파일명 등 '&' 를 글자 그대로 표시해야 하는 경우 set_no_prefix(true) 로 강제한다(DT_NOPREFIX).
+	void			set_no_prefix(bool no_prefix = true) { m_no_prefix = no_prefix; if (::IsWindow(GetSafeHwnd())) Invalidate(); }
+
 	//label + value 형태로 표시될 때 value 의 가로 정렬. DT_LEFT|DT_CENTER|DT_RIGHT 중 하나. 기본값 DT_RIGHT.
 	//편집 모드 진입 시 CSCStaticEdit 의 텍스트 정렬에도 자동 반영된다.
 	void			set_value_halign(DWORD halign);
@@ -485,6 +489,9 @@ protected:
 
 	int				m_halign = -1;
 	int				m_valign = -1;
+
+	//true 면 '&' 를 니모닉 접두로 처리하지 않고 글자 그대로 표시(DT_NOPREFIX 강제). 기본 false(스타일 SS_NOPREFIX 따름).
+	bool			m_no_prefix = false;
 
 	//label + value 형태일 때 value 의 가로 정렬. 기본 DT_RIGHT.
 	DWORD			m_value_halign = DT_RIGHT;

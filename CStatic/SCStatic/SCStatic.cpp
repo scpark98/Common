@@ -406,6 +406,10 @@ void CSCStatic::OnPaint()
 	MAP_STYLE(SS_ENDELLIPSIS,	DT_END_ELLIPSIS				);
 	MAP_STYLE(SS_PATHELLIPSIS,	DT_PATH_ELLIPSIS			);
 
+	//set_no_prefix(true) 로 '&' 를 글자 그대로 표시하도록 강제된 경우(파일명 등). 스타일과 무관하게 DT_NOPREFIX 적용.
+	if (m_no_prefix)
+		dwText |= DT_NOPREFIX;
+
 	//SS_LEFTNOWORDWRAP 스타일은 DT_WORDBREAK와 함께 사용하면 안된다.
 	//즉, SS_LEFTNOWORDWRAP이면 텍스트는 자동으로 SS_LEFT가 되고 자동 줄바꿈 되지 않는다.
 	//다만 SS_CENTERIMAGE까지 포함되면 스타일이 너무 제한되므로 SS_CENTERIMAGE는 체크 대상에서 제외시킨다.

@@ -5347,7 +5347,7 @@ void CVtListCtrlEx::update_drag_auto_scroll(CPoint screen_pt)
 		m_pDropWnd->GetWindowRect(rw);
 
 		const int MARGIN    = 48;	//가장자리 감지 폭(px)
-		const int MAX_LEVEL = 5;	//tick 당 최대 스크롤 단위(level). 가장자리 접할수록 이 값에 근접.
+		const int MAX_LEVEL = 3;	//tick 당 최대 스크롤 단위(level). 가장자리 접할수록 이 값에 근접. (속도 체감 조정: 5→3)
 
 		if (rw.PtInRect(screen_pt))
 		{

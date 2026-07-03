@@ -4983,10 +4983,8 @@ CImageList* CVtListCtrlEx::create_drag_image(CListCtrl* pList, LPPOINT lpPoint)
 			HICON hIcon = pIL->ExtractIcon(m_list_db[it].img_idx);
 			if (hIcon)
 			{
-				//시스템 이미지리스트 아이콘은 32bpp 라 Gdiplus::Bitmap(hIcon)(FromHICON)이 알파를 정확히 읽어 가장자리까지 깔끔.
-				//(DrawIconEx 는 GDI 라 반투명 가장자리 알파를 안 써서 까만 점이 생김.)
-				Gdiplus::Bitmap icon(hIcon);
-				g.DrawImage(&icon, 0, y + (row_h - icon_h) / 2, icon_w, icon_h);
+				//배경 투명 + 반투명 가장자리 깔끔하게 — 32bpp 컬러비트맵의 알파를 직접 추출해 그린다(FromHICON=불투명배경, DrawIconEx=까만점 회피).
+				draw_hicon_alpha(g, hIcon, 0, y + (row_h - icon_h) / 2, icon_w, icon_h);
 				::DestroyIcon(hIcon);
 			}
 		}

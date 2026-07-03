@@ -1312,6 +1312,11 @@ struct	NETWORK_INFO
 	bool		save2raw(CString sfile, uint8_t *data, size_t size);
 	int			RenameFiles(CString folder, CString oldName, CString newName, bool overwrite = false, bool bWholename = true, bool bRecursive = false);
 	bool		delete_file(CString fullpath, bool trash_can = true);
+
+	//HICON(특히 시스템 이미지리스트에서 ExtractIcon 한 32bpp 아이콘)을 알파를 보존하며 Gdiplus Graphics 에 그린다.
+	//FromHICON(Gdiplus::Bitmap(hIcon))은 배경이 불투명, DrawIconEx(GDI)는 반투명 가장자리 알파를 안 써서 까만 점이 생긴다.
+	//→ GetIconInfo + GetDIBits 로 32bpp 컬러 비트맵의 straight-alpha 를 직접 추출해 그려서 배경 투명 + 가장자리 깔끔.
+	void		draw_hicon_alpha(Gdiplus::Graphics& g, HICON hIcon, int x, int y, int w, int h);
 	//pattern 예: "D:\\Downloads\\ManualLauncher*.exe"
 	void		delete_files(const CString& pattern, bool trash_can = true);
 	int			get_text_encoding(CString sfile);

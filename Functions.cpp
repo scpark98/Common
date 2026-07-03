@@ -6304,6 +6304,67 @@ bool delete_file(CString fullpath, bool trash_can)
 	return false;
 }
 
+//HICON 을 알파 보존하며 Gdiplus Graphics 에 그린다. GetIconInfo 로 얻은 32bpp 컬러 비트맵(straight-alpha)을 GetDIBits 로 추출해
+//Gdiplus 로 그린다 → 배경 투명 + 반투명 가장자리 깔끔. (FromHICON=배경 불투명, DrawIconEx=가장자리 까만 점 문제 회피.)
+void draw_hicon_alpha(Gdiplus::Graphics& g, HICON hIcon, int x, int y, int w, int h)
+{
+	if (hIcon == NULL)
+		return;
+
+	ICONINFO ii = { 0 };
+	if (!::GetIconInfo(hIcon, &ii))
+	{
+		Gdiplus::Bitmap icon(hIcon);	//실패 시 FromHICON 폴백.
+		g.DrawImage(&icon, x, y, w, h);
+		return;
+	}
+
+	bool drawn = false;
+
+	BITMAP bm = { 0 };
+	if (ii.hbmColor && ::GetObject(ii.hbmColor, sizeof(bm), &bm) && bm.bmBitsPixel == 32)
+	{
+		int iw = bm.bmWidth, ih = bm.bmHeight;
+
+		BITMAPINFO bi = { 0 };
+		bi.bmiHeader.biSize        = sizeof(BITMAPINFOHEADER);
+		bi.bmiHeader.biWidth       = iw;
+		bi.bmiHeader.biHeight      = -ih;	//top-down
+		bi.bmiHeader.biPlanes      = 1;
+		bi.bmiHeader.biBitCount    = 32;
+		bi.bmiHeader.biCompression = BI_RGB;
+
+		size_t bytes = (size_t)iw * ih * 4;
+		BYTE*  buf   = new BYTE[bytes];
+		HDC    hdc   = ::GetDC(NULL);
+		if (::GetDIBits(hdc, ii.hbmColor, 0, ih, buf, &bi, DIB_RGB_COLORS))
+		{
+			//알파 채널이 전부 0 이면 alpha 없는(마스크 기반) 아이콘 → 폴백. 있으면 straight-alpha 32bpp 로 그린다.
+			bool has_alpha = false;
+			for (size_t i = 3; i < bytes; i += 4)
+				if (buf[i] != 0) { has_alpha = true; break; }
+
+			if (has_alpha)
+			{
+				Gdiplus::Bitmap bmp(iw, ih, iw * 4, PixelFormat32bppARGB, buf);
+				g.DrawImage(&bmp, x, y, w, h);	//DrawImage 가 픽셀을 복사하므로 buf delete 전에 완료.
+				drawn = true;
+			}
+		}
+		::ReleaseDC(NULL, hdc);
+		delete[] buf;
+	}
+
+	if (ii.hbmColor) ::DeleteObject(ii.hbmColor);
+	if (ii.hbmMask)  ::DeleteObject(ii.hbmMask);
+
+	if (!drawn)
+	{
+		Gdiplus::Bitmap icon(hIcon);	//32bpp 알파 없음 아이콘 폴백.
+		g.DrawImage(&icon, x, y, w, h);
+	}
+}
+
 //pattern 예: "D:\\Downloads\\ManualLauncher*.exe"
 void delete_files(const CString& pattern, bool trash_can)
 {

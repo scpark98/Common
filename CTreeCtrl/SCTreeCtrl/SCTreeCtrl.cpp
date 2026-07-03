@@ -109,6 +109,12 @@ void CSCTreeCtrl::PreSubclassWindow()
 	DWORD dwStyle = GetStyle();
 	DWORD exStyle = GetExStyle();
 
+	//native TVS_TRACKSELECT(hot-tracking) 제거 — 이 스타일이 켜져 있으면 native 컨트롤이 hover 항목을
+	//하이퍼링크처럼 밑줄(underline) 로 그린다. 커스텀 드로우가 보통은 CDRF_SKIPDEFAULT 로 억제하지만,
+	//부분 invalidate 로 item rc 가 빈 순간 CDRF_DODEFAULT 로 빠지면 native 밑줄이 새어 보인다(hover 시 간헐 underline).
+	//hover 강조는 이 컨트롤이 m_hot_item(full-row) 으로 직접 처리하므로 native hot-track 은 불필요 → 제거.
+	ModifyStyle(TVS_TRACKSELECT, 0);
+
 	//분명 WS_BORDER 스타일이 있음에도 불구하고 (GetStyle() & WS_BORDER) 값은 false로 나온다.
 	//exStyle까지 함께 체크하니 리소스 에디터에서 테두리 설정 여부에 따라 정상 동작한다.
 	if ((GetStyle() & WS_BORDER) || (exStyle & WS_EX_CLIENTEDGE))

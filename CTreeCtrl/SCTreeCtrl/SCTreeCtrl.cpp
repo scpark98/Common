@@ -2191,7 +2191,10 @@ void CSCTreeCtrl::OnMouseMove(UINT nFlags, CPoint point)
 	}
 
 	//full-row hot tracking — Y 좌표 기준 row 찾고 m_hot_item 갱신. native TVS_TRACKSELECT 의 CDIS_HOT 가 label 영역에서만 발사되는 한계를 보완.
+	//[중요] 드래그 중에는 hot-tracking 금지 — SetCapture 로 커서가 다른 컨트롤(원격 트리 등) 위에 있어도 이 트리의
+	//OnMouseMove 가 계속 불려, point.y 가 자기 항목 행에 매핑되면 엉뚱하게 자기 항목에 hover 가 표시되는 버그 방지.
 	HTREEITEM new_hot = NULL;
+	if (!m_bDragging)
 	{
 		HTREEITEM cur = GetFirstVisibleItem();
 		while (cur)
@@ -3751,7 +3754,10 @@ void CSCTreeCtrl::OnNMCustomDraw(NMHDR* pNMHDR, LRESULT* pResult)
 			Gdiplus::Color crTextNormal = crText;
 
 			//state 색 결정 — DropHilited > Selected > Hot. selected 가 hover 보다 의미상 우선 — selected 인 항목 위에 hover 가 와도 selected 색 유지.
-			if (m_use_drag_and_drop && m_bDragging && hItem == GetDropHilightItem())
+			//드롭 하이라이트: 이 트리가 직접 드래그 중이 아니어도(local tree→remote tree 처럼 *다른 컨트롤*이 드래그 소스로
+			//이 트리 위에 드롭하려는 경우) DropHilightItem 이 설정돼 있으면 표시한다. 기존 m_bDragging 조건은 자기 트리 내
+			//드래그만 커버해, cross-control 드롭 시 대상 트리에 하이라이트가 전혀 안 뜨던 원인.
+			if (m_use_drag_and_drop && GetDropHilightItem() != NULL && hItem == GetDropHilightItem())
 			{
 				SetTimer(timer_expand_for_drag_hover, 1000, NULL);
 				crText = m_theme.cr_text_dropHilited;

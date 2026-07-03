@@ -4919,146 +4919,117 @@ CImageList* CVtListCtrlEx::create_drag_image(CListCtrl* pList, LPPOINT lpPoint)
 		return NULL; // no row selected  
 
 
-	DWORD dwStyle = GetWindowLong(pList->m_hWnd, GWL_STYLE) & LVS_TYPEMASK;
+	//선택 항목들을 아이콘+파일명 행으로 합성한다(트리 드래그 이미지와 동일 방식). 항목이 너무 많으면 최대 높이에서
+	//자르고 하단을 gradient alpha 로 흐리게 처리한다. (기존: 화면 내 항목만·빨강 텍스트·녹색마스크 GDI 방식)
+	const int gap       = 4;
+	const int pad_r     = 8;
+	const int font_size = get_font_size();
 
-	CRect rectComplete(0, 0, 0, 0);
-
-	// Determine List Control Client width size  
-	CRect rectClient;
-	pList->GetClientRect(rectClient);
-	int nWidth = rectClient.Width() + 50;
-
-	// Start and Stop index in view area  
-	int nIndex = pList->GetTopIndex() - 1;
-	int nBottomIndex = pList->GetTopIndex() + pList->GetCountPerPage();
-	if (nBottomIndex > (pList->GetItemCount() - 1))
-		nBottomIndex = pList->GetItemCount() - 1;
-
-	while ((nIndex = pList->GetNextItem(nIndex, LVNI_SELECTED)) != -1)
+	//아이콘 크기(small image list).
+	CImageList* pIL = pList->GetImageList(LVSIL_SMALL);
+	int icon_w = 16, icon_h = 16;
+	if (pIL && pIL->GetSafeHandle())
 	{
-		if (nIndex > nBottomIndex)
-			break;
-
-		CRect rectItem;
-		pList->GetItemRect(nIndex, rectItem, LVIR_BOUNDS);
-
-		if (rectItem.left < 0)
-			rectItem.left = 0;
-
-		if (rectItem.right > nWidth)
-			rectItem.right = nWidth;
-
-		rectComplete.UnionRect(rectComplete, rectItem);
+		int cx = 0, cy = 0;
+		if (ImageList_GetIconSize(pIL->GetSafeHandle(), &cx, &cy) && cx > 0) { icon_w = cx; icon_h = cy; }
 	}
 
-	// Create memory device context  
-	CClientDC dcClient(this);
-	CDC dcMem;
-	CBitmap Bitmap;
+	//행 높이 + lpPoint 앵커(첫 선택 항목의 client top-left).
+	int   first_sel = pList->GetNextItem(-1, LVNI_SELECTED);
+	CRect rAnchor(0, 0, 0, 0);
+	int   row_h = 0;
+	if (first_sel >= 0) { pList->GetItemRect(first_sel, rAnchor, LVIR_BOUNDS); row_h = rAnchor.Height(); }
+	if (row_h < icon_h + 2) row_h = icon_h + 2;
 
-	if (!dcMem.CreateCompatibleDC(&dcClient))
-		return NULL;
+	//최대 높이 + 담을 수 있는 행 수. 초과분이 있으면 clipped.
+	const int MAX_HEIGHT = max(row_h * 3, 300);
+	const int capacity   = max(1, MAX_HEIGHT / row_h);
 
-	if (!Bitmap.CreateCompatibleBitmap(&dcClient
-		, rectComplete.Width()
-		, rectComplete.Height()))
-		return NULL;
-
-	CBitmap* pOldMemDCBitmap = dcMem.SelectObject(&Bitmap);
-	// Use green as mask color  
-	dcMem.FillSolidRect(0
-		, 0
-		, rectComplete.Width()
-		, rectComplete.Height()
-		, RGB(0, 255, 0));
-
-	// 안티알리아스 안된 폰트를 사용하는게 핵심
-	CFont* pFont = pList->GetFont();
-	LOGFONT lf;
-	pFont->GetLogFont(&lf);
-	//lf.lfQuality = NONANTIALIASED_QUALITY;
-	CFont newFont;
-	newFont.CreateFontIndirect(&lf);
-
-	CFont* oldFont = dcMem.SelectObject(&newFont);
-	////////////////////////////////////////////////  
-
-	// Paint each DragImage in the DC  
-	nIndex = pList->GetTopIndex() - 1;
-	while ((nIndex = pList->GetNextItem(nIndex, LVNI_SELECTED)) != -1)
+	std::deque<int> items;
+	bool clipped = false;
+	int  idx = -1;
+	while ((idx = pList->GetNextItem(idx, LVNI_SELECTED)) != -1)
 	{
-		if (nIndex > nBottomIndex)
-			break;
+		if ((int)items.size() >= capacity) { clipped = true; break; }
+		items.push_back(idx);
+	}
+	if (items.empty())
+		return NULL;
 
-		TCHAR buffer[1000];
-		LVITEM item = { 0 };
-		item.mask = LVIF_TEXT | LVIF_IMAGE;
-		item.iItem = nIndex;
-		item.pszText = buffer;
-		item.cchTextMax = 999;
+	//폭 측정(라벨 폭).
+	int max_w = 1;
+	for (int it : items)
+	{
+		CRect rl; pList->GetItemRect(it, rl, LVIR_LABEL);
+		int w = icon_w + gap + rl.Width() + pad_r;
+		if (w > max_w) max_w = w;
+	}
 
-		pList->GetItem(&item);
+	int total_h = (int)items.size() * row_h;
+	if (total_h <= 0) total_h = row_h;
 
-		// Draw the icon  
-		
-		CImageList* pSingleImageList = pList->GetImageList((dwStyle & LVS_ICON)
-			? LVSIL_NORMAL : LVSIL_SMALL);
+	//Gdiplus 비트맵에 합성.
+	CSCGdiplusBitmap drag_img;
+	drag_img.create(max_w, total_h, PixelFormat32bppARGB);
+	Gdiplus::Graphics g(drag_img.m_pBitmap);
 
-		if (pSingleImageList)
+	int y = 0;
+	for (int it : items)
+	{
+		if (pIL && pIL->GetSafeHandle() && it >= 0 && it < (int)m_list_db.size())
 		{
-			CRect rectIcon;
-			pList->GetItemRect(nIndex, rectIcon, LVIR_ICON);
-
-			IMAGEINFO info;
-			pSingleImageList->GetImageInfo(m_list_db[nIndex].img_idx, &info);
-			CPoint p((rectIcon.left - rectComplete.left
-				+ rectIcon.right - rectComplete.left) / 2
-				- (info.rcImage.right - info.rcImage.left) / 2,
-				(rectIcon.top - rectComplete.top
-					+ rectIcon.bottom - rectComplete.top) / 2
-				- (info.rcImage.bottom - info.rcImage.top) / 2
-				+ ((dwStyle == LVS_ICON) ? 2 : 0));
-
-			pSingleImageList->Draw(&dcMem, m_list_db[nIndex].img_idx, p, ILD_TRANSPARENT);
+			HICON hIcon = pIL->ExtractIcon(m_list_db[it].img_idx);
+			if (hIcon)
+			{
+				Gdiplus::Bitmap icon(hIcon);
+				g.DrawImage(&icon, 0, y + (row_h - icon_h) / 2, icon_w, icon_h);
+				::DestroyIcon(hIcon);
+			}
 		}
 
-		// Draw the text  
-		CString text;
-		text = item.pszText;
-		CRect textRect;
-		pList->GetItemRect(nIndex, textRect, LVIR_LABEL);
+		CRect rText(icon_w + gap, y, max_w, y + row_h);
+		::draw_text(g, rText, get_text(it, col_filename), font_size, Gdiplus::FontStyleRegular, 2, 0.0f, m_lf.lfFaceName,
+			m_theme.cr_text, Gdiplus::Color::Transparent, Gdiplus::Color::LightGray, Gdiplus::Color::Transparent, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
 
-		textRect.top -= rectComplete.top - 2;
-		textRect.bottom -= rectComplete.top + 1;
-		textRect.left -= rectComplete.left - 2;
-		textRect.right -= rectComplete.left;
-
-		//dcMem.FillSolidRect(textRect, RGB(255, 0, 0));
-		dcMem.SetTextColor(RGB(255, 0, 0));
-		DWORD flags = DT_END_ELLIPSIS | /*DT_MODIFYSTRING | */DT_NOCLIP;
-		if (dwStyle == LVS_ICON)
-			flags |= DT_CENTER | DT_WORDBREAK;
-		dcMem.DrawText(text, -1, textRect, flags);
+		y += row_h;
 	}
 
-	dcMem.SelectObject(oldFont);
+	//하단 gradient alpha 페이드(선택 항목이 최대 높이를 초과해 잘린 경우) — 아래로 갈수록 투명.
+	if (clipped)
+	{
+		int fade_h = min(row_h * 2, total_h);
+		Gdiplus::Rect lr(0, total_h - fade_h, max_w, fade_h);
+		Gdiplus::BitmapData bd;
+		if (drag_img.m_pBitmap->LockBits(&lr, Gdiplus::ImageLockModeRead | Gdiplus::ImageLockModeWrite, PixelFormat32bppARGB, &bd) == Gdiplus::Ok)
+		{
+			for (int yy = 0; yy < fade_h; yy++)
+			{
+				BYTE* line   = (BYTE*)bd.Scan0 + yy * bd.Stride;
+				int   factor = 255 - (yy * 255 / max(1, fade_h - 1));
+				for (int xx = 0; xx < max_w; xx++)
+				{
+					BYTE* px = line + xx * 4;	//BGRA
+					px[3] = (BYTE)(px[3] * factor / 255);
+				}
+			}
+			drag_img.m_pBitmap->UnlockBits(&bd);
+		}
+	}
 
-	dcMem.SelectObject(pOldMemDCBitmap);
-
-	// Create drag image(list)  
+	//CImageList 로 변환.
 	CImageList* pCompleteImageList = new CImageList;
-	pCompleteImageList->Create(rectComplete.Width()
-		, rectComplete.Height()
-		, ILC_COLOR32 | ILC_MASK
-		, 0
-		, 1);
-	pCompleteImageList->Add(&Bitmap, RGB(0, 255, 0));
-	Bitmap.DeleteObject();
+	pCompleteImageList->Create(max_w, total_h, ILC_COLOR32, 1, 1);
+	HICON hcomposite = NULL;
+	if (drag_img.m_pBitmap->GetHICON(&hcomposite) == Gdiplus::Ok && hcomposite)
+	{
+		pCompleteImageList->Add(hcomposite);
+		::DestroyIcon(hcomposite);
+	}
 
 	if (lpPoint)
 	{
-		lpPoint->x = rectComplete.left;
-		lpPoint->y = rectComplete.top;
+		lpPoint->x = rAnchor.left;
+		lpPoint->y = rAnchor.top;
 	}
 
 	return pCompleteImageList;

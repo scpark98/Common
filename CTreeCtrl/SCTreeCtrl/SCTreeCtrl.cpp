@@ -2164,48 +2164,125 @@ void CSCTreeCtrl::create_drag_image(CSCGdiplusBitmap& drag_img)
 	if (m_DragItem == NULL)
 		return;
 
-	//CImageList* imglist = ctrl->CreateDragImage(hItem);
+	//드래그 항목 + 그 아래 '펼쳐진(현재 화면에 보이는)' 하위 항목들을 하나의 이미지로 합성한다(탐색기처럼 펼친 구조까지 표시).
+	//항목이 너무 많으면 최대 높이에서 자르고, 하단을 gradient alpha 로 흐리게 처리한다.
+	const int base_level = get_indent_level(m_DragItem);
+	const int gap        = 4;	//아이콘-텍스트 간격
+	const int pad_r      = 8;	//텍스트 오른쪽 여유
+	const int font_size  = get_font_size();
 
-	CString text = GetItemText(m_DragItem);
-	CRect rItem;
-
-	GetItemRect(m_DragItem, rItem, TRUE);
-	rItem.MoveToXY(0, 0);
-
-	//이미지가 있다면 크기+여백만큼 넓혀준다.
-	int img_index;
-	int sel_img_index;
-	HICON hIcon = nullptr;
-
-	GetItemImage(m_DragItem, img_index, sel_img_index);
-	if (img_index >= 0)
+	//아이콘 크기 — 트리의 '실제' 이미지리스트에서 얻는다. shell tree 는 시스템 이미지리스트, 그 외는 m_imagelist 를
+	//SetImageList 해두므로 GetImageList(TVSIL_NORMAL) 가 두 경우 모두 올바르다. (m_imagelist 직접 참조는 shell tree 에서 NULL → 크래시였음)
+	CImageList* pIL = GetImageList(TVSIL_NORMAL);
+	int icon_w = m_image_size, icon_h = m_image_size;
+	if (pIL && pIL->GetSafeHandle())
 	{
-		hIcon = m_imagelist.ExtractIcon(img_index);
-
-		if (hIcon)
+		int cx = 0, cy = 0;
+		if (ImageList_GetIconSize(pIL->GetSafeHandle(), &cx, &cy) && cx > 0)
 		{
-			Gdiplus::Bitmap icon(hIcon);
-			rItem.left = 2;
-			rItem.right += (2 + icon.GetWidth() + 4 + 8);	//2=left margin, 4=icon과 text 사이 간격, 8=text의 right 확장 여유롭게 잡음
+			icon_w = cx;
+			icon_h = cy;
 		}
 	}
 
-	drag_img.release();
+	//행 높이.
+	int row_h = 0;
+	{ CRect r; if (GetItemRect(m_DragItem, r, TRUE)) row_h = r.Height(); }
+	if (row_h < icon_h + 2)
+		row_h = icon_h + 2;
 
-	drag_img.create(rItem.Width(), rItem.Height(), PixelFormat32bppARGB);
+	//최대 높이 + 담을 수 있는 행 수(capacity). 초과분이 있으면 clipped.
+	const int MAX_HEIGHT = max(row_h * 3, 300);
+	const int capacity   = max(1, MAX_HEIGHT / row_h);
 
-	Gdiplus::Graphics g(drag_img.m_pBitmap);
-
-	if (hIcon)
+	std::deque<HTREEITEM> rows;
+	rows.push_back(m_DragItem);
+	bool clipped = false;
+	for (HTREEITEM h = GetNextVisibleItem(m_DragItem); h != NULL; h = GetNextVisibleItem(h))
 	{
-		Gdiplus::Bitmap icon(hIcon);
-		g.DrawImage(&icon, rItem.left, (rItem.Height() - icon.GetHeight()) / 2, icon.GetWidth(), icon.GetHeight());
-		rItem.OffsetRect(icon.GetWidth() + 4, 0);
+		if (get_indent_level(h) <= base_level)		//서브트리를 벗어남(형제/상위) → 중단
+			break;
+		if ((int)rows.size() >= capacity)			//최대 높이 초과 → 페이드 처리 대상
+		{
+			clipped = true;
+			break;
+		}
+		rows.push_back(h);
 	}
 
-	int font_size = get_font_size();
-	::draw_text(g, rItem, text, font_size, Gdiplus::FontStyleRegular, 2, 0.0f, m_lf.lfFaceName,
-		m_theme.cr_text, Gdiplus::Color::Transparent, Gdiplus::Color::LightGray, Gdiplus::Color::Transparent, DT_LEFT | DT_VCENTER);
+	//폭 측정 — 트리가 실제로 그리는 아이템 텍스트 폭(GetItemRect, bTextOnly)을 그대로 쓴다(동일 폰트라 wrap 없음).
+	std::deque<int> row_indent;
+	int max_w = 1;
+	for (auto h : rows)
+	{
+		int indent = (get_indent_level(h) - base_level) * get_indent_size();
+		row_indent.push_back(indent);
+
+		int text_w = 0;
+		{ CRect r; if (GetItemRect(h, r, TRUE)) text_w = r.Width(); }
+		int w = indent + icon_w + gap + text_w + pad_r;
+		if (w > max_w)
+			max_w = w;
+	}
+
+	int total_h = (int)rows.size() * row_h;
+	if (total_h <= 0)
+		total_h = row_h;
+
+	drag_img.release();
+	drag_img.create(max_w, total_h, PixelFormat32bppARGB);
+	Gdiplus::Graphics g(drag_img.m_pBitmap);
+
+	int y = 0;
+	for (size_t i = 0; i < rows.size(); i++)
+	{
+		HTREEITEM h      = rows[i];
+		int       indent = row_indent[i];
+
+		//아이콘.
+		int img_index = -1, sel_index = -1;
+		GetItemImage(h, img_index, sel_index);
+		if (pIL && pIL->GetSafeHandle() && img_index >= 0)
+		{
+			HICON hIcon = pIL->ExtractIcon(img_index);
+			if (hIcon)
+			{
+				Gdiplus::Bitmap icon(hIcon);
+				g.DrawImage(&icon, indent, y + (row_h - icon_h) / 2, icon_w, icon_h);
+				::DestroyIcon(hIcon);
+			}
+		}
+
+		//텍스트.
+		CRect rText(indent + icon_w + gap, y, max_w, y + row_h);
+		::draw_text(g, rText, GetItemText(h), font_size, Gdiplus::FontStyleRegular, 2, 0.0f, m_lf.lfFaceName,
+			m_theme.cr_text, Gdiplus::Color::Transparent, Gdiplus::Color::LightGray, Gdiplus::Color::Transparent, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+
+		y += row_h;
+	}
+
+	//하단 gradient alpha 페이드(하위 항목이 최대 높이를 초과해 잘린 경우) — 아래로 갈수록 투명.
+	if (clipped)
+	{
+		int fade_h = min(row_h * 2, total_h);
+		Gdiplus::Rect lr(0, total_h - fade_h, max_w, fade_h);
+		Gdiplus::BitmapData bd;
+		if (drag_img.m_pBitmap->LockBits(&lr, Gdiplus::ImageLockModeRead | Gdiplus::ImageLockModeWrite, PixelFormat32bppARGB, &bd) == Gdiplus::Ok)
+		{
+			for (int yy = 0; yy < fade_h; yy++)
+			{
+				BYTE* line   = (BYTE*)bd.Scan0 + yy * bd.Stride;
+				int   factor = 255 - (yy * 255 / max(1, fade_h - 1));	//위=255(불투명) → 아래=0(투명)
+				for (int xx = 0; xx < max_w; xx++)
+				{
+					BYTE* px = line + xx * 4;	//BGRA
+					px[3] = (BYTE)(px[3] * factor / 255);
+				}
+			}
+			drag_img.m_pBitmap->UnlockBits(&bd);
+		}
+	}
+
 #ifdef _DEBUG
 	drag_img.save(_T("D:\\drag_img.png"));
 #endif

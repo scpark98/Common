@@ -134,6 +134,7 @@ public:
 		message_rename_duplicated,		//중복된 폴더명이 존재할 경우
 		message_edit_item,				//F2키를 누르면 메인에서 편집작업을 수행하기 위해.
 		message_tree_processing,		//폴더들을 노드에 추가할 경우 C:\Windows, C:\Windows\WinSxS 등과 같은 폴더는 그 갯수가 많으므로 parent에게 이를 알린다.
+		message_expand_changed,			//노드 확장/축소로 '펼쳐진 폴더 집합'이 바뀌었음을 parent에게 알린다(dir watcher 재설정용).
 	};
 
 	//해당 아이템의 depth level을 리턴한다. hItem == NULL이면 -1을 리턴한다.

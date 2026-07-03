@@ -3682,6 +3682,9 @@ BOOL CSCTreeCtrl::OnTvnItemexpanded(NMHDR* pNMHDR, LRESULT* pResult)
 	SetRedraw(TRUE);
 	RedrawWindow(NULL, NULL, RDW_INVALIDATE | RDW_ALLCHILDREN);
 
+	//확장/축소로 '펼쳐진 폴더 집합'이 바뀌었음을 parent 에 알림(dir watcher 재설정 등). expand/collapse 모두 이 알림이 온다.
+	::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCTreeCtrl, (WPARAM) & (CSCTreeCtrlMessage(this, message_expand_changed, NULL)), (LPARAM)0);
+
 	return FALSE;
 }
 

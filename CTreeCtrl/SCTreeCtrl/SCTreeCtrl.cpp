@@ -2899,7 +2899,7 @@ BOOL CSCTreeCtrl::move_tree_item(CTreeCtrl* pTree, HTREEITEM hSrcItem, HTREEITEM
 	TV.hItem = hSrcItem;
 	TV.mask = TVIF_TEXT | TVIF_IMAGE | TVIF_SELECTEDIMAGE;
 	TV.pszText = str;
-	TV.cchTextMax = sizeof(str);
+	TV.cchTextMax = _countof(str);	//cchTextMax 는 '문자 수' — sizeof(=바이트 512)면 GetItem 이 256칸 버퍼에 최대 512자 써 스택 오버플로.
 	GetItem(&TV);
 
 	DWORD_PTR dwData = pTree->GetItemData(hSrcItem);
@@ -2968,7 +2968,7 @@ BOOL CSCTreeCtrl::move_child_tree_item(CTreeCtrl* pTree, HTREEITEM hChildItem, H
 		TV.hItem = hSrcItem;
 		TV.mask = TVIF_TEXT | TVIF_IMAGE | TVIF_SELECTEDIMAGE;
 		TV.pszText = str;
-		TV.cchTextMax = sizeof(str);
+		TV.cchTextMax = _countof(str);	//cchTextMax 는 '문자 수' — sizeof(=바이트 512)면 GetItem 이 256칸 버퍼에 최대 512자 써 스택 오버플로.
 		GetItem(&TV);
 
 		DWORD_PTR dwData = pTree->GetItemData(hSrcItem);

@@ -73,6 +73,7 @@ BEGIN_MESSAGE_MAP(CSCTreeCtrl, CTreeCtrl)
 	ON_WM_MOUSEMOVE()
 	ON_WM_LBUTTONDOWN()
 	ON_WM_LBUTTONUP()
+	ON_WM_RBUTTONDOWN()
 	ON_WM_HSCROLL()
 	ON_NOTIFY_REFLECT_EX(TVN_BEGINLABELEDIT, &CSCTreeCtrl::OnTvnBeginlabeledit)
 	ON_NOTIFY_REFLECT_EX(TVN_ENDLABELEDIT, &CSCTreeCtrl::OnTvnEndlabeledit)
@@ -2261,22 +2262,25 @@ void CSCTreeCtrl::create_drag_image(CSCGdiplusBitmap& drag_img)
 		y += row_h;
 	}
 
-	//하단 gradient alpha 페이드(하위 항목이 최대 높이를 초과해 잘린 경우) — 아래로 갈수록 투명.
-	if (clipped)
+	//전체를 균일한 반투명 고스트로 만든다(아이콘=알파255 vs 텍스트=반투명 불일치 제거). 잘린 경우 하단은 추가 gradient 페이드.
 	{
-		int fade_h = min(row_h * 2, total_h);
-		Gdiplus::Rect lr(0, total_h - fade_h, max_w, fade_h);
+		const int GHOST_ALPHA = 180;	//~70% — 아이콘·텍스트를 같은 알파로 낮춰 균일한 드래그 고스트.
+		const int fade_h      = clipped ? min(row_h * 2, total_h) : 0;
+		const int fade_start  = total_h - fade_h;
+		Gdiplus::Rect lr(0, 0, max_w, total_h);
 		Gdiplus::BitmapData bd;
 		if (drag_img.m_pBitmap->LockBits(&lr, Gdiplus::ImageLockModeRead | Gdiplus::ImageLockModeWrite, PixelFormat32bppARGB, &bd) == Gdiplus::Ok)
 		{
-			for (int yy = 0; yy < fade_h; yy++)
+			for (int yy = 0; yy < total_h; yy++)
 			{
-				BYTE* line   = (BYTE*)bd.Scan0 + yy * bd.Stride;
-				int   factor = 255 - (yy * 255 / max(1, fade_h - 1));	//위=255(불투명) → 아래=0(투명)
+				BYTE* line = (BYTE*)bd.Scan0 + yy * bd.Stride;
+				int   f    = GHOST_ALPHA;
+				if (fade_h > 0 && yy >= fade_start)	//하단 페이드(아래로 갈수록 투명)
+					f = GHOST_ALPHA * (255 - ((yy - fade_start) * 255 / max(1, fade_h - 1))) / 255;
 				for (int xx = 0; xx < max_w; xx++)
 				{
 					BYTE* px = line + xx * 4;	//BGRA
-					px[3] = (BYTE)(px[3] * factor / 255);
+					px[3] = (BYTE)(px[3] * f / 255);
 				}
 			}
 			drag_img.m_pBitmap->UnlockBits(&bd);
@@ -2708,6 +2712,17 @@ void CSCTreeCtrl::cancel_drag()
 	m_pDropWnd = NULL;
 
 	Invalidate();
+}
+
+void CSCTreeCtrl::OnRButtonDown(UINT nFlags, CPoint point)
+{
+	//드래그 중 우클릭 = ESC 와 동일하게 드래그 완전 취소(위험 방지).
+	if (m_bDragging)
+	{
+		cancel_drag();
+		return;
+	}
+	CTreeCtrl::OnRButtonDown(nFlags, point);
 }
 
 void CSCTreeCtrl::DroppedHandler(CWnd* pDragWnd, CWnd* pDropWnd)

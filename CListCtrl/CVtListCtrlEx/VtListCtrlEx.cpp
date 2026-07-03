@@ -75,6 +75,7 @@ BEGIN_MESSAGE_MAP(CVtListCtrlEx, CListCtrl)
 	ON_WM_MOUSEMOVE()
 	ON_WM_LBUTTONUP()
 	ON_WM_RBUTTONDOWN()
+	ON_WM_RBUTTONUP()
 	ON_NOTIFY_REFLECT_EX(LVN_ITEMCHANGED, &CVtListCtrlEx::OnLvnItemchanged)
 	ON_WM_CONTEXTMENU()
 	ON_NOTIFY_REFLECT_EX(NM_RCLICK, &CVtListCtrlEx::OnNMRClick)
@@ -4982,14 +4983,10 @@ CImageList* CVtListCtrlEx::create_drag_image(CListCtrl* pList, LPPOINT lpPoint)
 			HICON hIcon = pIL->ExtractIcon(m_list_db[it].img_idx);
 			if (hIcon)
 			{
-				//HICON 을 임시 PARGB 비트맵에 DrawIconEx 로 그린 뒤 DrawImage 로 합성(반투명 가장자리 까만 프린징 방지). FromHICON 은 배경 불투명.
-				Gdiplus::Bitmap tmp(icon_w, icon_h, PixelFormat32bppPARGB);
-				Gdiplus::Graphics gt(&tmp);
-				gt.Clear(Gdiplus::Color(0, 0, 0, 0));
-				HDC hdc = gt.GetHDC();
-				::DrawIconEx(hdc, 0, 0, hIcon, icon_w, icon_h, 0, NULL, DI_NORMAL);
-				gt.ReleaseHDC(hdc);
-				g.DrawImage(&tmp, 0, y + (row_h - icon_h) / 2, icon_w, icon_h);
+				//시스템 이미지리스트 아이콘은 32bpp 라 Gdiplus::Bitmap(hIcon)(FromHICON)이 알파를 정확히 읽어 가장자리까지 깔끔.
+				//(DrawIconEx 는 GDI 라 반투명 가장자리 알파를 안 써서 까만 점이 생김.)
+				Gdiplus::Bitmap icon(hIcon);
+				g.DrawImage(&icon, 0, y + (row_h - icon_h) / 2, icon_w, icon_h);
 				::DestroyIcon(hIcon);
 			}
 		}
@@ -5490,13 +5487,25 @@ void CVtListCtrlEx::cancel_drag()
 
 void CVtListCtrlEx::OnRButtonDown(UINT nFlags, CPoint point)
 {
-	//드래그 중 우클릭 = ESC 와 동일하게 드래그 완전 취소(위험 방지).
+	//드래그 중 우클릭 = ESC 와 동일하게 드래그 완전 취소(위험 방지). 이어질 RBUTTONUP 도 소비해 팝업 메뉴가 안 뜨게 한다.
 	if (m_bDragging)
 	{
 		cancel_drag();
+		m_swallow_rbutton = true;
 		return;
 	}
 	CListCtrl::OnRButtonDown(nFlags, point);
+}
+
+void CVtListCtrlEx::OnRButtonUp(UINT nFlags, CPoint point)
+{
+	//드래그 취소용으로 눌린 우클릭의 UP — 소비(base 미호출)해서 팝업 메뉴가 뜨지 않게 한다.
+	if (m_swallow_rbutton)
+	{
+		m_swallow_rbutton = false;
+		return;
+	}
+	CListCtrl::OnRButtonUp(nFlags, point);
 }
 
 void CVtListCtrlEx::DroppedHandler(CWnd* pDragWnd, CWnd* pDropWnd)

@@ -482,6 +482,7 @@ protected:
 	int				m_drag_scroll_vy = 0;		//드래그 자동 스크롤 속도(세로).
 	void			update_drag_auto_scroll(CPoint screen_pt);	//드래그 중 대상(m_pDropWnd) 가장자리 거리로 속도 산출 + 타이머 관리.
 	void			cancel_drag();								//드래그 중 ESC 등으로 드롭 없이 완전 취소.
+	bool			m_swallow_rbutton = false;					//드래그 취소용 우클릭의 RBUTTONUP 을 소비할지(팝업 메뉴 방지).
 
 	int				m_pending_vscroll_pos = -1;	//timer_vscroll_apply 가 적용할 최신 V 스크롤 목표 pos(-1 = 없음).
 
@@ -644,6 +645,7 @@ public:
 	afx_msg void OnLButtonDown(UINT nFlags, CPoint point);
 	afx_msg void OnLButtonUp(UINT nFlags, CPoint point);
 	afx_msg void OnRButtonDown(UINT nFlags, CPoint point);	//드래그 중 우클릭 = 취소.
+	afx_msg void OnRButtonUp(UINT nFlags, CPoint point);	//취소용 우클릭의 UP 소비(팝업 메뉴 방지).
 	afx_msg void OnHScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar);
 	afx_msg BOOL OnTvnBeginlabeledit(NMHDR* pNMHDR, LRESULT* pResult);
 	afx_msg BOOL OnTvnEndlabeledit(NMHDR* pNMHDR, LRESULT* pResult);

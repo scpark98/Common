@@ -74,6 +74,7 @@ BEGIN_MESSAGE_MAP(CSCTreeCtrl, CTreeCtrl)
 	ON_WM_LBUTTONDOWN()
 	ON_WM_LBUTTONUP()
 	ON_WM_RBUTTONDOWN()
+	ON_WM_RBUTTONUP()
 	ON_WM_HSCROLL()
 	ON_NOTIFY_REFLECT_EX(TVN_BEGINLABELEDIT, &CSCTreeCtrl::OnTvnBeginlabeledit)
 	ON_NOTIFY_REFLECT_EX(TVN_ENDLABELEDIT, &CSCTreeCtrl::OnTvnEndlabeledit)
@@ -2248,16 +2249,10 @@ void CSCTreeCtrl::create_drag_image(CSCGdiplusBitmap& drag_img)
 			HICON hIcon = pIL->ExtractIcon(img_index);
 			if (hIcon)
 			{
-				//HICON 을 임시 PARGB 비트맵에 DrawIconEx 로 그린 뒤 DrawImage 로 합성한다.
-				//- FromHICON(Gdiplus::Bitmap(hIcon))은 배경이 불투명하게 나온다(SCGdiplusBitmap.cpp:739 주석).
-				//- ARGB 캔버스에 DrawIconEx 직접 그리면 반투명 가장자리가 premultiply 불일치로 까맣게 프린징된다 → PARGB 임시 비트맵 경유로 해결.
-				Gdiplus::Bitmap tmp(icon_w, icon_h, PixelFormat32bppPARGB);
-				Gdiplus::Graphics gt(&tmp);
-				gt.Clear(Gdiplus::Color(0, 0, 0, 0));
-				HDC hdc = gt.GetHDC();
-				::DrawIconEx(hdc, 0, 0, hIcon, icon_w, icon_h, 0, NULL, DI_NORMAL);
-				gt.ReleaseHDC(hdc);
-				g.DrawImage(&tmp, indent, y + (row_h - icon_h) / 2, icon_w, icon_h);
+				//시스템 이미지리스트 아이콘은 32bpp 라 Gdiplus::Bitmap(hIcon)(FromHICON)이 알파를 정확히 읽어 가장자리까지 깔끔.
+				//(DrawIconEx 는 GDI 라 반투명 가장자리 알파를 안 써서 까만 점이 생김. FromHICON '깔끔치 않음' 주석은 저색상 리소스 아이콘용.)
+				Gdiplus::Bitmap icon(hIcon);
+				g.DrawImage(&icon, indent, y + (row_h - icon_h) / 2, icon_w, icon_h);
 				::DestroyIcon(hIcon);
 			}
 		}
@@ -2721,13 +2716,26 @@ void CSCTreeCtrl::cancel_drag()
 
 void CSCTreeCtrl::OnRButtonDown(UINT nFlags, CPoint point)
 {
-	//드래그 중 우클릭 = ESC 와 동일하게 드래그 완전 취소(위험 방지).
+	//드래그 중 우클릭 = ESC 와 동일하게 드래그 완전 취소(위험 방지). 이 우클릭 제스처는 여기서 끝 —
+	//이어질 RBUTTONUP 도 소비해 NM_RCLICK/WM_CONTEXTMENU(팝업 메뉴)가 생기지 않게 한다.
 	if (m_bDragging)
 	{
 		cancel_drag();
+		m_swallow_rbutton = true;
 		return;
 	}
 	CTreeCtrl::OnRButtonDown(nFlags, point);
+}
+
+void CSCTreeCtrl::OnRButtonUp(UINT nFlags, CPoint point)
+{
+	//드래그 취소용으로 눌린 우클릭의 UP — 소비(base 미호출)해서 팝업 메뉴가 뜨지 않게 한다.
+	if (m_swallow_rbutton)
+	{
+		m_swallow_rbutton = false;
+		return;
+	}
+	CTreeCtrl::OnRButtonUp(nFlags, point);
 }
 
 void CSCTreeCtrl::DroppedHandler(CWnd* pDragWnd, CWnd* pDropWnd)

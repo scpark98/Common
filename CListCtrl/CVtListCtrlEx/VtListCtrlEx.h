@@ -811,6 +811,7 @@ protected:
 	int				m_drag_scroll_vy = 0;		//드래그 자동 스크롤 속도(세로).
 	void			update_drag_auto_scroll(CPoint screen_pt);	//드래그 중 대상 가장자리 거리로 속도 산출 + 타이머 관리.
 	void			cancel_drag();								//드래그 중 ESC 등으로 드롭 없이 완전 취소.
+	bool			m_swallow_rbutton = false;					//드래그 취소용 우클릭의 RBUTTONUP 을 소비할지(팝업 메뉴 방지).
 	int				m_nDragIndex = -1;			//drag되는 컨트롤이 CListCtrl일 때 그 인덱스(drag를 시작한 컨트롤의 멤버값에 저장됨, 드롭된 클래스에는 저장되지 않음)
 	int				m_nDropIndex = -1;			//drop된 컨트롤이 CListCtrl일 때 그 인덱스(drag를 시작한 컨트롤의 멤버값에 저장됨, 드롭된 클래스에는 저장되지 않음)
 	std::deque<UINT> m_drag_images_id;			//drag할 때 사용하는 이미지들의 resource id 저장(단일파일용 이미지, 싱글파일용 이미지를 차례대로 넣고 drag되는 개수에 따라 맞는 이미지를 사용한다)
@@ -878,6 +879,7 @@ public:
 	afx_msg void OnMouseMove(UINT nFlags, CPoint point);
 	afx_msg void OnLButtonUp(UINT nFlags, CPoint point);
 	afx_msg void OnRButtonDown(UINT nFlags, CPoint point);	//드래그 중 우클릭 = 취소.
+	afx_msg void OnRButtonUp(UINT nFlags, CPoint point);	//취소용 우클릭의 UP 소비(팝업 메뉴 방지).
 	afx_msg void OnTimer(UINT_PTR nIDEvent);	//드래그 자동 스크롤 연속 tick.
 	virtual BOOL PreCreateWindow(CREATESTRUCT& cs);
 	afx_msg BOOL OnLvnItemchanged(NMHDR* pNMHDR, LRESULT* pResult);

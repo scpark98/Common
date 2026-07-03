@@ -1573,6 +1573,29 @@ void CSCTreeCtrl::set_path(CString fullpath, bool expand)
 		SelectItem(item);
 }
 
+//set_path 의 경로-walk 를 재사용하되 강제 확장/선택 없이, 이미 로드된 노드만 찾아 반환한다(없으면 NULL).
+HTREEITEM CSCTreeCtrl::get_item_by_fullpath(CString fullpath)
+{
+	fullpath = m_pShellImageList->convert_real_path_to_special_folder(!m_is_local, fullpath);
+	if (fullpath.GetLength() > 0 && fullpath.Right(1) == '\\')
+		truncate(fullpath, 1);
+
+	//':)' 있는 드라이브 경로면 맨 앞에 '내 PC' 라벨을 붙인다(set_path 와 동일).
+	if (fullpath.Find(_T(":)")) > 0)
+		fullpath = concat_path(m_pShellImageList->m_volume[!m_is_local].get_label(CSIDL_DRIVES), fullpath);
+
+	std::deque<CString> dq;
+	get_exact_token_str(fullpath, dq, '\\');
+	if (dq.size() == 0)
+		return NULL;
+
+	HTREEITEM item = find_item(dq[0]);
+	for (int i = 1; item != NULL && i < (int)dq.size(); i++)
+		item = find_children_item(dq[i], item);	//중간 노드 자식이 로드 안 됐으면 NULL — 강제 확장하지 않는다.
+
+	return item;
+}
+
 void CSCTreeCtrl::iterate_tree(HTREEITEM hItem)
 {
 	if (hItem)

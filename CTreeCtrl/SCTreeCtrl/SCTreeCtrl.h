@@ -228,6 +228,9 @@ public:
 	//hItem이 NULL이면 현재 선택된 폴더의 fullpath return.
 	CString		get_path(HTREEITEM hItem = NULL);
 	void		set_path(CString fullpath, bool expand = true);
+	//real 또는 특수폴더 표시형 fullpath 에 해당하는 노드를 찾는다. 이미 로드(펼쳐진 경로상)된 노드만 반환하며
+	//중간 노드의 자식이 로드 안 됐으면 강제 확장하지 않고 NULL 을 반환한다(감시 콜백 등에서 '보이는 노드만' 갱신용).
+	HTREEITEM	get_item_by_fullpath(CString fullpath);
 
 	HTREEITEM	insert_special_folder(int csidl);
 	void		insert_drive(CDiskDriveInfo drive_info);

@@ -4949,12 +4949,10 @@ CImageList* CVtListCtrlEx::create_drag_image(CListCtrl* pList, LPPOINT lpPoint)
 	std::deque<int> items;
 	bool clipped = false;
 	int  idx = -1;
-	TRACE(_T("[DRAG] GetSelectedCount=%d\n"), (int)pList->GetSelectedCount());
 	while ((idx = pList->GetNextItem(idx, LVNI_SELECTED)) != -1)
 	{
 		if ((int)items.size() >= capacity) { clipped = true; break; }
 		items.push_back(idx);
-		TRACE(_T("[DRAG] sel idx=%d text=[%s]\n"), idx, get_text(idx, col_filename));
 	}
 	if (items.empty())
 		return NULL;
@@ -4984,10 +4982,14 @@ CImageList* CVtListCtrlEx::create_drag_image(CListCtrl* pList, LPPOINT lpPoint)
 			HICON hIcon = pIL->ExtractIcon(m_list_db[it].img_idx);
 			if (hIcon)
 			{
-				//Gdiplus::Bitmap(hIcon)(FromHICON)은 배경이 불투명하게 나온다(SCGdiplusBitmap.cpp:739 주석). GetHDC+DrawIconEx 로 알파 보존.
-				HDC hdc = g.GetHDC();
-				::DrawIconEx(hdc, 0, y + (row_h - icon_h) / 2, hIcon, icon_w, icon_h, 0, NULL, DI_NORMAL);
-				g.ReleaseHDC(hdc);
+				//HICON 을 임시 PARGB 비트맵에 DrawIconEx 로 그린 뒤 DrawImage 로 합성(반투명 가장자리 까만 프린징 방지). FromHICON 은 배경 불투명.
+				Gdiplus::Bitmap tmp(icon_w, icon_h, PixelFormat32bppPARGB);
+				Gdiplus::Graphics gt(&tmp);
+				gt.Clear(Gdiplus::Color(0, 0, 0, 0));
+				HDC hdc = gt.GetHDC();
+				::DrawIconEx(hdc, 0, 0, hIcon, icon_w, icon_h, 0, NULL, DI_NORMAL);
+				gt.ReleaseHDC(hdc);
+				g.DrawImage(&tmp, 0, y + (row_h - icon_h) / 2, icon_w, icon_h);
 				::DestroyIcon(hIcon);
 			}
 		}
@@ -5099,6 +5101,14 @@ void CVtListCtrlEx::OnLvnBeginDrag(NMHDR* pNMHDR, LRESULT* pResult)
 	//drag_image가 없다면 노드 자체 아이콘 및 레이블을 이용한다.
 	//GDI를 이용해서 create_drag_image()를 사용했으나 아이콘과 함께 레이블을 출력할 때 오동작함. 수정 필요.
 	//GDIPlus를 이용한 create_drag_image()를 직접 만드는 것도 좋을듯함.
+	//[중요] 드래그 항목이 바뀌면 드래그 이미지도 반드시 새로 생성해야 한다. 이전 것을 재사용하면 다른 폴더/항목을
+	//드래그해도 옛 이미지가 그대로 표시된다(stale). 매 드래그 시작마다 파기 후 재생성.
+	if (m_pDragImage)
+	{
+		delete m_pDragImage;
+		m_pDragImage = NULL;
+	}
+
 	if (m_pDragImage == NULL || m_pDragImage->m_hImageList == NULL)
 	{
 		if (m_drag_images_id.size() == 0)

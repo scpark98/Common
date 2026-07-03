@@ -2248,10 +2248,16 @@ void CSCTreeCtrl::create_drag_image(CSCGdiplusBitmap& drag_img)
 			HICON hIcon = pIL->ExtractIcon(img_index);
 			if (hIcon)
 			{
-				//Gdiplus::Bitmap(hIcon)(FromHICON)은 배경이 불투명하게 나온다(SCGdiplusBitmap.cpp:739 주석). GetHDC+DrawIconEx 로 알파 보존.
-				HDC hdc = g.GetHDC();
-				::DrawIconEx(hdc, indent, y + (row_h - icon_h) / 2, hIcon, icon_w, icon_h, 0, NULL, DI_NORMAL);
-				g.ReleaseHDC(hdc);
+				//HICON 을 임시 PARGB 비트맵에 DrawIconEx 로 그린 뒤 DrawImage 로 합성한다.
+				//- FromHICON(Gdiplus::Bitmap(hIcon))은 배경이 불투명하게 나온다(SCGdiplusBitmap.cpp:739 주석).
+				//- ARGB 캔버스에 DrawIconEx 직접 그리면 반투명 가장자리가 premultiply 불일치로 까맣게 프린징된다 → PARGB 임시 비트맵 경유로 해결.
+				Gdiplus::Bitmap tmp(icon_w, icon_h, PixelFormat32bppPARGB);
+				Gdiplus::Graphics gt(&tmp);
+				gt.Clear(Gdiplus::Color(0, 0, 0, 0));
+				HDC hdc = gt.GetHDC();
+				::DrawIconEx(hdc, 0, 0, hIcon, icon_w, icon_h, 0, NULL, DI_NORMAL);
+				gt.ReleaseHDC(hdc);
+				g.DrawImage(&tmp, indent, y + (row_h - icon_h) / 2, icon_w, icon_h);
 				::DestroyIcon(hIcon);
 			}
 		}

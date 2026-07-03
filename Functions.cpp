@@ -5911,20 +5911,33 @@ bool has_sub_folders(CString path)
 	if (path.GetLength() > 2 && path.Right(1) == _T("\\"))
 		truncate(path, 1);
 
-	CString file;
-	CFileFind filefind;
-	bool bWorking = filefind.FindFile(path + _T("\\*"));
+	//CFileFind 는 경로가 MAX_PATH(260) 근처/초과면 내부(GetFilePath 로 root+자식 합성 시 등)에서 CInvalidArgException 을
+	//던져 앱이 죽는다(긴 폴더의 자식폴더 유무 판정 시 재현). 예외를 던지지 않는 원시 FindFirstFile 로 대체하고,
+	//로컬 절대경로엔 \\?\ 확장 프리픽스를 붙여 260 을 넘어도 정상 열거되게 한다.
+	CString search = path + _T("\\*");
+	if (path.GetLength() >= 3 && path[1] == _T(':') && path[2] == _T('\\'))
+		search = _T("\\\\?\\") + search;	//X:\... 형태의 로컬 절대경로에만(네트워크/상대경로 제외)
 
-	while (bWorking)
+	WIN32_FIND_DATA fd;
+	HANDLE h = ::FindFirstFile(search, &fd);
+	if (h == INVALID_HANDLE_VALUE)
+		return false;
+
+	bool found = false;
+	do
 	{
-		bWorking = filefind.FindNextFile();
-		file = filefind.GetFilePath();
+		if ((fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+			&& !(fd.dwFileAttributes & FILE_ATTRIBUTE_HIDDEN)
+			&& _tcscmp(fd.cFileName, _T(".")) != 0
+			&& _tcscmp(fd.cFileName, _T("..")) != 0)
+		{
+			found = true;
+			break;
+		}
+	} while (::FindNextFile(h, &fd));
 
-		if (!filefind.IsDots() && filefind.IsDirectory() && !filefind.IsHidden())
-			return true;
-	}
-
-	return false;
+	::FindClose(h);
+	return found;
 }
 
 #if (_MSVC_LANG >= _std_cpp17)

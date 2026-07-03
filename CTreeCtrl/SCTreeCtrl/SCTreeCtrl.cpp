@@ -4186,7 +4186,10 @@ void CSCTreeCtrl::OnTimer(UINT_PTR nIDEvent)
 	if (nIDEvent == timer_expand_for_drag_hover)
 	{
 		KillTimer(timer_expand_for_drag_hover);
-		Expand(GetDropHilightItem(), TVE_EXPAND);
+		//1초 뒤 발화라 그 사이 드래그가 항목을 벗어났으면 GetDropHilightItem()==NULL → Expand(NULL) 방지.
+		HTREEITEM h = GetDropHilightItem();
+		if (h != NULL)
+			Expand(h, TVE_EXPAND);
 	}
 
 	CTreeCtrl::OnTimer(nIDEvent);

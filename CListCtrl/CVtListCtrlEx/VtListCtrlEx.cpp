@@ -5349,6 +5349,18 @@ void CVtListCtrlEx::update_drag_auto_scroll(CPoint screen_pt)
 		CRect rw;
 		m_pDropWnd->GetWindowRect(rw);
 
+		//리스트 대상은 상단 컬럼 헤더를 트리거 존에서 제외한다(헤더 위에서 세로 스크롤이 걸려 '반응 위치 애매'하던 것).
+		if (m_pDropWnd->IsKindOf(RUNTIME_CLASS(CVtListCtrlEx)))
+		{
+			CHeaderCtrl* ph = ((CListCtrl*)m_pDropWnd)->GetHeaderCtrl();
+			if (ph && ph->GetSafeHwnd() && ph->IsWindowVisible())
+			{
+				CRect rh; ph->GetWindowRect(rh);
+				if (rh.bottom > rw.top && rh.bottom < rw.bottom)
+					rw.top = rh.bottom;
+			}
+		}
+
 		const int MARGIN    = 48;	//가장자리 감지 폭(px)
 		const int MAX_LEVEL = 3;	//tick 당 최대 스크롤 단위(level). 가장자리 접할수록 이 값에 근접. (속도 체감 조정: 5→3)
 
@@ -5834,6 +5846,7 @@ void CVtListCtrlEx::OnHScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar)
 	if (m_in_editing)
 		edit_end();
 	CListCtrl::OnHScroll(nSBCode, nPos, pScrollBar);
+	sync_scrollbar();	//가로 오버레이 스크롤바(m_scrollbar_h) 연동 — 드래그 자동 가로스크롤 등 WM_HSCROLL 시 스크롤바가 안 따라오던 것.
 }
 
 

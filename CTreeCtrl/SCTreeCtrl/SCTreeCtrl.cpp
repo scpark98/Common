@@ -1018,7 +1018,14 @@ void CSCTreeCtrl::insert_folder(HTREEITEM hParent, CString sParentPath)
 
 		if (dq[i].dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
 		{
-			insert_folder(hParent, &dq[i], has_sub_folders(m_pShellImageList->convert_special_folder_to_real_path(!m_is_local, dq[i].cFileName)));
+			//[LP] 긴 경로 크래시 추적용 TRACE — 어느 단계에서 죽는지 마지막 마커로 확정. (확정 후 제거 예정)
+			TRACE(_T("[LP] i=%d name=[%s] len=%d\n"), i, dq[i].cFileName, (int)_tcslen(dq[i].cFileName));
+			CString child_real = m_pShellImageList->convert_special_folder_to_real_path(!m_is_local, dq[i].cFileName);
+			TRACE(_T("[LP] i=%d convert_ok real_len=%d\n"), i, child_real.GetLength());
+			bool child_has_sub = has_sub_folders(child_real);
+			TRACE(_T("[LP] i=%d has_sub=%d -> insert_folder\n"), i, (int)child_has_sub);
+			insert_folder(hParent, &dq[i], child_has_sub);
+			TRACE(_T("[LP] i=%d insert_folder_done\n"), i);
 			folder_inserted = true;
 		}
 	}

@@ -220,6 +220,11 @@ BOOL CSCTreeCtrl::PreTranslateMessage(MSG* pMsg)
 			}
 			case VK_ESCAPE:
 			{
+				if (m_bDragging)	//드래그 중 ESC = 드롭 없이 드래그 완전 취소(위험 방지).
+				{
+					cancel_drag();
+					return TRUE;
+				}
 				if (m_in_editing)
 				{
 					edit_end(false);
@@ -1953,9 +1958,19 @@ BOOL CSCTreeCtrl::OnTvnBegindrag(NMHDR* pNMHDR, LRESULT* pResult)
 
 	m_DragItem = pNMTreeView->itemNew.hItem;
 	CString path;
-	
+
 	if (m_is_shell_treectrl)
+	{
 		path = m_pShellImageList->convert_special_folder_to_real_path(!m_is_local, get_path(m_DragItem));
+
+		//보호 폴더(드라이브 루트·시스템 폴더 등)는 소스가 될 수 없다 — 드래그 시작 자체를 차단(위험 원천 차단).
+		if (m_pShellImageList->is_protected(!m_is_local, path))
+		{
+			m_DragItem = NULL;
+			*pResult = 0;
+			return FALSE;
+		}
+	}
 	
 	//focus가 없거나 선택되지 않은 상태에서 바로 drag가 시작되면
 	//drag 이미지만 표시되므로 focus를 주고 drag하고 있는 아이템을 선택상태로 표시해줘야 한다.
@@ -2581,6 +2596,41 @@ void CSCTreeCtrl::OnLButtonUp(UINT nFlags, CPoint point)
 	}
 
 	CTreeCtrl::OnLButtonUp(nFlags, point);
+}
+
+//드래그 중 ESC 등으로 드래그를 '드롭 없이' 완전 취소한다. DroppedHandler 를 부르지 않으므로 어떤 이동/전송도 일어나지 않는다.
+void CSCTreeCtrl::cancel_drag()
+{
+	if (!m_bDragging)
+		return;
+
+	ReleaseCapture();
+	m_bDragging = false;
+
+	KillTimer(timer_drag_auto_scroll);
+	KillTimer(timer_expand_for_drag_hover);
+	m_drag_scroll_vx = 0;
+	m_drag_scroll_vy = 0;
+
+	if (m_pDragImage)
+	{
+		m_pDragImage->DragLeave(GetDesktopWindow());
+		m_pDragImage->EndDrag();
+		delete m_pDragImage;
+		m_pDragImage = NULL;
+	}
+
+	//드롭 하이라이트/삽입마크 해제(자기 + 대상 트리 모두).
+	SelectDropTarget(NULL);
+	if (m_pDropWnd && m_pDropWnd != this && m_pDropWnd->IsKindOf(RUNTIME_CLASS(CTreeCtrl)))
+		((CTreeCtrl*)m_pDropWnd)->SelectDropTarget(NULL);
+	clear_insert_mark();
+
+	m_DragItem = NULL;
+	m_DropItem = NULL;
+	m_pDropWnd = NULL;
+
+	Invalidate();
 }
 
 void CSCTreeCtrl::DroppedHandler(CWnd* pDragWnd, CWnd* pDropWnd)

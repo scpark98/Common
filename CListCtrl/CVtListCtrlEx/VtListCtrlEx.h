@@ -707,7 +707,7 @@ public:
 	//x, y위치의 item, sub_item 인덱스를 구할 수 있다. item의 인덱스만을 필요로 할 경우는 리턴값만 이용하면 된다.
 	int				index_from_point(int x, int y, int* item = NULL, int* sub_item = NULL);
 
-	//Drag&Drop 드래깅 관련
+	//Drag&Drop 드래깅 관련.
 	template <typename ... Types> void add_drag_images(Types... args) //(단일파일용 이미지, 싱글파일용 이미지를 차례대로 넣고 drag되는 개수에 따라 맞는 이미지를 사용한다)
 	{
 		int n = sizeof...(args);
@@ -810,6 +810,7 @@ protected:
 	int				m_drag_scroll_vx = 0;		//드래그 자동 스크롤 속도(가로, tick당 level, 부호=방향). 0=스크롤 안 함.
 	int				m_drag_scroll_vy = 0;		//드래그 자동 스크롤 속도(세로).
 	void			update_drag_auto_scroll(CPoint screen_pt);	//드래그 중 대상 가장자리 거리로 속도 산출 + 타이머 관리.
+	void			cancel_drag();								//드래그 중 ESC 등으로 드롭 없이 완전 취소.
 	int				m_nDragIndex = -1;			//drag되는 컨트롤이 CListCtrl일 때 그 인덱스(drag를 시작한 컨트롤의 멤버값에 저장됨, 드롭된 클래스에는 저장되지 않음)
 	int				m_nDropIndex = -1;			//drop된 컨트롤이 CListCtrl일 때 그 인덱스(drag를 시작한 컨트롤의 멤버값에 저장됨, 드롭된 클래스에는 저장되지 않음)
 	std::deque<UINT> m_drag_images_id;			//drag할 때 사용하는 이미지들의 resource id 저장(단일파일용 이미지, 싱글파일용 이미지를 차례대로 넣고 drag되는 개수에 따라 맞는 이미지를 사용한다)

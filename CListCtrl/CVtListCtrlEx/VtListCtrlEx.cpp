@@ -1656,6 +1656,11 @@ BOOL CVtListCtrlEx::PreTranslateMessage(MSG* pMsg)
 			}
 			case VK_ESCAPE:
 			{
+				if (m_bDragging)	//드래그 중 ESC = 드롭 없이 드래그 완전 취소(위험 방지).
+				{
+					cancel_drag();
+					return TRUE;
+				}
 				if (m_in_editing)
 				{
 					edit_end(false);
@@ -5076,6 +5081,23 @@ void CVtListCtrlEx::OnLvnBeginDrag(NMHDR* pNMHDR, LRESULT* pResult)
 
 	m_nDragIndex = pNMLV->iItem;
 
+	//보호 항목(시스템 폴더·드라이브 루트 등)이 드래그 대상(선택)에 하나라도 포함되면 드래그 시작 자체를 차단(위험 원천 차단).
+	if (m_pShellImageList)
+	{
+		bool any_sel = false;
+		POSITION pos = GetFirstSelectedItemPosition();
+		while (pos)
+		{
+			any_sel = true;
+			int sel = GetNextSelectedItem(pos);
+			if (m_pShellImageList->is_protected(!m_is_local, get_win32_find_data(sel).cFileName))
+				return;
+		}
+		//선택이 없으면 드래그를 시작시킨 항목 기준으로 검사.
+		if (!any_sel && m_nDragIndex >= 0 && m_pShellImageList->is_protected(!m_is_local, get_win32_find_data(m_nDragIndex).cFileName))
+			return;
+	}
+
 	CPoint pt;
 	int nOffset = -10; //offset in pixels for drag image (positive is up and to the left; neg is down and to the right)
 
@@ -5443,6 +5465,41 @@ void CVtListCtrlEx::OnLButtonUp(UINT nFlags, CPoint point)
 	}
 
 	CListCtrl::OnLButtonUp(nFlags, point);
+}
+
+//드래그 중 ESC 등으로 드래그를 '드롭 없이' 완전 취소한다. DroppedHandler 를 부르지 않으므로 어떤 전송/이동도 일어나지 않는다.
+void CVtListCtrlEx::cancel_drag()
+{
+	if (!m_bDragging)
+		return;
+
+	ReleaseCapture();
+	m_bDragging = FALSE;
+
+	KillTimer(TIMER_ID_DRAG_AUTO_SCROLL);
+	m_drag_scroll_vx = 0;
+	m_drag_scroll_vy = 0;
+
+	if (m_pDragImage)
+	{
+		m_pDragImage->DragLeave(GetDesktopWindow());
+		m_pDragImage->EndDrag();
+	}
+
+	//드롭 하이라이트 해제(대상이 리스트면 전 항목, 트리면 SelectDropTarget(NULL)). 자기 리스트도 해제.
+	if (m_pDropWnd)
+	{
+		if (m_pDropWnd->IsKindOf(RUNTIME_CLASS(CVtListCtrlEx)))
+			((CVtListCtrlEx*)m_pDropWnd)->SetItemState(-1, 0, LVIS_DROPHILITED);
+		else if (m_pDropWnd->IsKindOf(RUNTIME_CLASS(CTreeCtrl)))
+			((CTreeCtrl*)m_pDropWnd)->SelectDropTarget(NULL);
+	}
+	SetItemState(-1, 0, LVIS_DROPHILITED);
+
+	m_nDropIndex = -1;
+	m_pDropWnd = NULL;
+
+	Invalidate();
 }
 
 void CVtListCtrlEx::DroppedHandler(CWnd* pDragWnd, CWnd* pDropWnd)

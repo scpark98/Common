@@ -809,6 +809,7 @@ protected:
 	bool			m_bDragging = false;		//T during a drag operation
 	int				m_drag_scroll_vx = 0;		//드래그 자동 스크롤 속도(가로, tick당 level, 부호=방향). 0=스크롤 안 함.
 	int				m_drag_scroll_vy = 0;		//드래그 자동 스크롤 속도(세로).
+	CWnd*			m_drag_scroll_target = NULL;	//자동 스크롤을 실제로 보낼 리스트/트리(오버레이 스크롤바 위여도 이 컨트롤로 전송).
 	void			update_drag_auto_scroll(CPoint screen_pt);	//드래그 중 대상 가장자리 거리로 속도 산출 + 타이머 관리.
 	void			cancel_drag();								//드래그 중 ESC 등으로 드롭 없이 완전 취소.
 	bool			m_swallow_rbutton = false;					//드래그 취소용 우클릭의 RBUTTONUP 을 소비할지(팝업 메뉴 방지).

@@ -4354,17 +4354,17 @@ void CSCTreeCtrl::OnTimer(UINT_PTR nIDEvent)
 	}
 	else if (nIDEvent == timer_drag_auto_scroll)
 	{
-		if (!m_bDragging || m_pDropWnd == NULL || (m_drag_scroll_vx == 0 && m_drag_scroll_vy == 0))
+		if (!m_bDragging || m_drag_scroll_target == NULL || (m_drag_scroll_vx == 0 && m_drag_scroll_vy == 0))
 		{
 			KillTimer(timer_drag_auto_scroll);
 		}
 		else
 		{
-			//level 만큼 SB_LINE 반복 전송 → 대상 트리/리스트가 스크롤되고 오버레이 스크롤바도 연동.
+			//m_pDropWnd 가 아니라 m_drag_scroll_target — 커서가 오버레이 스크롤바 위에 있어도 실제 트리/리스트로 보낸다.
 			for (int i = 0; i < abs(m_drag_scroll_vy); i++)
-				m_pDropWnd->SendMessage(WM_VSCROLL, (m_drag_scroll_vy < 0) ? SB_LINEUP   : SB_LINEDOWN);
+				m_drag_scroll_target->SendMessage(WM_VSCROLL, (m_drag_scroll_vy < 0) ? SB_LINEUP   : SB_LINEDOWN);
 			for (int i = 0; i < abs(m_drag_scroll_vx); i++)
-				m_pDropWnd->SendMessage(WM_HSCROLL, (m_drag_scroll_vx < 0) ? SB_LINELEFT : SB_LINERIGHT);
+				m_drag_scroll_target->SendMessage(WM_HSCROLL, (m_drag_scroll_vx < 0) ? SB_LINELEFT : SB_LINERIGHT);
 		}
 	}
 
@@ -4378,10 +4378,35 @@ void CSCTreeCtrl::update_drag_auto_scroll(CPoint screen_pt)
 	m_drag_scroll_vx = 0;
 	m_drag_scroll_vy = 0;
 
-	if (m_pDropWnd)
+	//오버레이 스크롤바/헤더는 부모 다이얼로그의 자식이라 커서가 그 위면 WindowFromPoint(→m_pDropWnd)가 트리/리스트가
+	//아니게 된다. → 직전까지 유효했던 트리/리스트를 스크롤 대상으로 유지하고, 커서가 그 컨트롤 window rect 밖이면 해제.
+	if (m_pDropWnd && (m_pDropWnd->IsKindOf(RUNTIME_CLASS(CTreeCtrl)) || m_pDropWnd->IsKindOf(RUNTIME_CLASS(CListCtrl))))
+		m_drag_scroll_target = m_pDropWnd;
+
+	if (m_drag_scroll_target)
+	{
+		CRect rwin;
+		m_drag_scroll_target->GetWindowRect(rwin);
+		if (!rwin.PtInRect(screen_pt))
+			m_drag_scroll_target = NULL;
+	}
+
+	if (m_drag_scroll_target)
 	{
 		CRect rw;
-		m_pDropWnd->GetWindowRect(rw);
+		m_drag_scroll_target->GetWindowRect(rw);
+
+		//리스트 대상은 상단 컬럼 헤더를 트리거 존에서 제외(헤더 위에서 세로 스크롤이 걸리는 것 방지).
+		if (m_drag_scroll_target->IsKindOf(RUNTIME_CLASS(CListCtrl)))
+		{
+			CHeaderCtrl* ph = ((CListCtrl*)m_drag_scroll_target)->GetHeaderCtrl();
+			if (ph && ph->GetSafeHwnd() && ph->IsWindowVisible())
+			{
+				CRect rh; ph->GetWindowRect(rh);
+				if (rh.bottom > rw.top && rh.bottom < rw.bottom)
+					rw.top = rh.bottom;
+			}
+		}
 
 		const int MARGIN    = 48;	//가장자리 감지 폭(px)
 		const int MAX_LEVEL = 3;	//tick 당 최대 스크롤 단위(level)

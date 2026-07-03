@@ -5344,15 +5344,29 @@ void CVtListCtrlEx::update_drag_auto_scroll(CPoint screen_pt)
 	m_drag_scroll_vx = 0;
 	m_drag_scroll_vy = 0;
 
-	if (m_pDropWnd)
+	//오버레이 스크롤바/헤더는 '부모 다이얼로그의 자식' 이라 커서가 그 위에 있으면 WindowFromPoint(→m_pDropWnd)가 리스트/트리가
+	//아니라 스크롤바를 반환한다. 그래서 리스트 가장자리(스크롤바 띠)에서 자동스크롤이 깨졌다(가로 미연동 포함).
+	//→ 직전까지 유효했던 리스트/트리를 스크롤 대상으로 유지하고, 커서가 그 컨트롤 window rect(스크롤바 띠 포함) 밖이면 해제.
+	if (m_pDropWnd && (m_pDropWnd->IsKindOf(RUNTIME_CLASS(CVtListCtrlEx)) || m_pDropWnd->IsKindOf(RUNTIME_CLASS(CTreeCtrl))))
+		m_drag_scroll_target = m_pDropWnd;
+
+	if (m_drag_scroll_target)
+	{
+		CRect rwin;
+		m_drag_scroll_target->GetWindowRect(rwin);
+		if (!rwin.PtInRect(screen_pt))
+			m_drag_scroll_target = NULL;	//커서가 대상 컨트롤(스크롤바 띠 포함) 밖 → 스크롤 안 함.
+	}
+
+	if (m_drag_scroll_target)
 	{
 		CRect rw;
-		m_pDropWnd->GetWindowRect(rw);
+		m_drag_scroll_target->GetWindowRect(rw);
 
 		//리스트 대상은 상단 컬럼 헤더를 트리거 존에서 제외한다(헤더 위에서 세로 스크롤이 걸려 '반응 위치 애매'하던 것).
-		if (m_pDropWnd->IsKindOf(RUNTIME_CLASS(CVtListCtrlEx)))
+		if (m_drag_scroll_target->IsKindOf(RUNTIME_CLASS(CVtListCtrlEx)))
 		{
-			CHeaderCtrl* ph = ((CListCtrl*)m_pDropWnd)->GetHeaderCtrl();
+			CHeaderCtrl* ph = ((CListCtrl*)m_drag_scroll_target)->GetHeaderCtrl();
 			if (ph && ph->GetSafeHwnd() && ph->IsWindowVisible())
 			{
 				CRect rh; ph->GetWindowRect(rh);
@@ -5389,17 +5403,18 @@ void CVtListCtrlEx::OnTimer(UINT_PTR nIDEvent)
 {
 	if (nIDEvent == TIMER_ID_DRAG_AUTO_SCROLL)
 	{
-		if (!m_bDragging || m_pDropWnd == NULL || (m_drag_scroll_vx == 0 && m_drag_scroll_vy == 0))
+		if (!m_bDragging || m_drag_scroll_target == NULL || (m_drag_scroll_vx == 0 && m_drag_scroll_vy == 0))
 		{
 			KillTimer(TIMER_ID_DRAG_AUTO_SCROLL);
 			return;
 		}
 
-		//level 만큼 SB_LINE 을 반복 전송 → 대상이 트리면 m_h_scroll_pos/native V 로, 리스트면 native 로 스크롤되고 오버레이 스크롤바도 연동.
+		//level 만큼 SB_LINE 을 반복 전송 → 대상(리스트/트리)이 native/m_h_scroll_pos 로 스크롤되고 오버레이 스크롤바도 연동.
+		//(m_pDropWnd 가 아니라 m_drag_scroll_target — 커서가 오버레이 스크롤바 위에 있어도 실제 리스트/트리로 보낸다.)
 		for (int i = 0; i < abs(m_drag_scroll_vy); i++)
-			m_pDropWnd->SendMessage(WM_VSCROLL, (m_drag_scroll_vy < 0) ? SB_LINEUP   : SB_LINEDOWN);
+			m_drag_scroll_target->SendMessage(WM_VSCROLL, (m_drag_scroll_vy < 0) ? SB_LINEUP   : SB_LINEDOWN);
 		for (int i = 0; i < abs(m_drag_scroll_vx); i++)
-			m_pDropWnd->SendMessage(WM_HSCROLL, (m_drag_scroll_vx < 0) ? SB_LINELEFT : SB_LINERIGHT);
+			m_drag_scroll_target->SendMessage(WM_HSCROLL, (m_drag_scroll_vx < 0) ? SB_LINELEFT : SB_LINERIGHT);
 
 		return;
 	}

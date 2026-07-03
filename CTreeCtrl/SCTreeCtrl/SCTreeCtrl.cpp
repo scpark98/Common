@@ -2510,6 +2510,7 @@ void CSCTreeCtrl::OnLButtonUp(UINT nFlags, CPoint point)
 		m_pDragImage->DragLeave(GetDesktopWindow());
 		m_pDragImage->EndDrag();
 		delete m_pDragImage;
+		m_pDragImage = NULL;	//[중요] NULL 처리 안 하면 다음 드래그 OnTvnBegindrag 의 'if (m_pDragImage && GetSafeHandle())' 가드가 해제된 메모리를 역참조 → 크래시.
 
 		// clear_insert_mark()를 여기서 호출하지 않는다.
 		// DroppedHandler() 내부에서 m_dropPosition을 사용한 후 clear_insert_mark()가 호출됨.

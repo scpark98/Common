@@ -101,7 +101,11 @@ BEGIN_MESSAGE_MAP(CVtListCtrlEx, CListCtrl)
 	ON_WM_MOUSEWHEEL()
 	ON_WM_MOUSEHWHEEL()
 	ON_REGISTERED_MESSAGE(Message_CSCScrollbar, &CVtListCtrlEx::on_message_CSCScrollbar)
+	ON_WM_TIMER()
 END_MESSAGE_MAP()
+
+//드래그 중 대상 컨트롤(트리/리스트) 가장자리 호버 시 연속 자동 스크롤용 타이머 ID.
+#define TIMER_ID_DRAG_AUTO_SCROLL	0x7A31
 
 
 
@@ -5257,25 +5261,9 @@ void CVtListCtrlEx::OnMouseMove(UINT nFlags, CPoint point)
 		//if (pDropWnd->IsKindOf(RUNTIME_CLASS(CListCtrl)))
 		m_pDropWnd = pDropWnd;
 
-		//드롭 대상 컨트롤의 상단, 하단에 마우스가 hovering되면 자동 스크롤 시켜줘야 한다.
-		if (m_pDropWnd)
-		{
-			CRect rw;
-			m_pDropWnd->GetWindowRect(rw);
-
-			if (rw.PtInRect(pt))
-			{
-				if (pt.x < rw.left + 32)
-					m_pDropWnd->SendMessage(WM_HSCROLL, SB_LINELEFT);
-				else if (pt.x > rw.right - 32)
-					m_pDropWnd->SendMessage(WM_HSCROLL, SB_LINERIGHT);
-
-				if (pt.y < rw.top + 32)
-					m_pDropWnd->SendMessage(WM_VSCROLL, SB_LINEUP);
-				else if (pt.y > rw.bottom - 32)
-					m_pDropWnd->SendMessage(WM_VSCROLL, SB_LINEDOWN);
-			}
-		}
+		//드롭 대상 컨트롤(트리/리스트) 가장자리에 마우스가 hovering 되면 자동 스크롤.
+		//가장자리와의 거리에 비례해 속도 조절 + 타이머로 연속 스크롤(마우스가 멈춰 있어도) — update_drag_auto_scroll() 로 위임.
+		update_drag_auto_scroll(pt);	//pt = screen 좌표
 
 		// Convert from screen coordinates to drop target client coordinates
 		pDropWnd->ScreenToClient(&pt);
@@ -5346,6 +5334,64 @@ void CVtListCtrlEx::OnMouseMove(UINT nFlags, CPoint point)
 }
 
 
+//드래그 중, 대상 컨트롤(m_pDropWnd) 가장자리 근처면 자동 스크롤 방향/속도(level)를 정하고 타이머로 연속 스크롤한다.
+//속도는 가장자리와의 '거리에 비례'(가까울수록 빠름). 상/하/좌/우 4방향 각각. screen_pt = 스크린 좌표.
+void CVtListCtrlEx::update_drag_auto_scroll(CPoint screen_pt)
+{
+	m_drag_scroll_vx = 0;
+	m_drag_scroll_vy = 0;
+
+	if (m_pDropWnd)
+	{
+		CRect rw;
+		m_pDropWnd->GetWindowRect(rw);
+
+		const int MARGIN    = 48;	//가장자리 감지 폭(px)
+		const int MAX_LEVEL = 5;	//tick 당 최대 스크롤 단위(level). 가장자리 접할수록 이 값에 근접.
+
+		if (rw.PtInRect(screen_pt))
+		{
+			//가장자리로부터의 거리 d(0=가장자리) → level = 1 + (MARGIN-d)*(MAX-1)/MARGIN. d=0 → MAX, d=MARGIN → 1.
+			if (screen_pt.x < rw.left + MARGIN)
+				m_drag_scroll_vx = -(1 + (MARGIN - (screen_pt.x - rw.left)) * (MAX_LEVEL - 1) / MARGIN);
+			else if (screen_pt.x > rw.right - MARGIN)
+				m_drag_scroll_vx =  (1 + (MARGIN - (rw.right - screen_pt.x)) * (MAX_LEVEL - 1) / MARGIN);
+
+			if (screen_pt.y < rw.top + MARGIN)
+				m_drag_scroll_vy = -(1 + (MARGIN - (screen_pt.y - rw.top)) * (MAX_LEVEL - 1) / MARGIN);
+			else if (screen_pt.y > rw.bottom - MARGIN)
+				m_drag_scroll_vy =  (1 + (MARGIN - (rw.bottom - screen_pt.y)) * (MAX_LEVEL - 1) / MARGIN);
+		}
+	}
+
+	if (m_drag_scroll_vx != 0 || m_drag_scroll_vy != 0)
+		SetTimer(TIMER_ID_DRAG_AUTO_SCROLL, 70, NULL);	//~14fps 연속 스크롤(마우스가 멈춰 있어도 계속)
+	else
+		KillTimer(TIMER_ID_DRAG_AUTO_SCROLL);
+}
+
+void CVtListCtrlEx::OnTimer(UINT_PTR nIDEvent)
+{
+	if (nIDEvent == TIMER_ID_DRAG_AUTO_SCROLL)
+	{
+		if (!m_bDragging || m_pDropWnd == NULL || (m_drag_scroll_vx == 0 && m_drag_scroll_vy == 0))
+		{
+			KillTimer(TIMER_ID_DRAG_AUTO_SCROLL);
+			return;
+		}
+
+		//level 만큼 SB_LINE 을 반복 전송 → 대상이 트리면 m_h_scroll_pos/native V 로, 리스트면 native 로 스크롤되고 오버레이 스크롤바도 연동.
+		for (int i = 0; i < abs(m_drag_scroll_vy); i++)
+			m_pDropWnd->SendMessage(WM_VSCROLL, (m_drag_scroll_vy < 0) ? SB_LINEUP   : SB_LINEDOWN);
+		for (int i = 0; i < abs(m_drag_scroll_vx); i++)
+			m_pDropWnd->SendMessage(WM_HSCROLL, (m_drag_scroll_vx < 0) ? SB_LINELEFT : SB_LINERIGHT);
+
+		return;
+	}
+
+	__super::OnTimer(nIDEvent);
+}
+
 void CVtListCtrlEx::OnLButtonUp(UINT nFlags, CPoint point)
 {
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
@@ -5366,6 +5412,11 @@ void CVtListCtrlEx::OnLButtonUp(UINT nFlags, CPoint point)
 
 		// Note that we are NOT in a drag operation
 		m_bDragging = FALSE;
+
+		//드래그 자동 스크롤 타이머 정지.
+		KillTimer(TIMER_ID_DRAG_AUTO_SCROLL);
+		m_drag_scroll_vx = 0;
+		m_drag_scroll_vy = 0;
 
 		// End dragging image
 		m_pDragImage->DragLeave(GetDesktopWindow());

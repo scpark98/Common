@@ -2633,44 +2633,35 @@ void CSCTreeCtrl::OnHScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar)
 			m_h_internal_thumb ? 1 : 0, m_h_scroll_pos);
 	}
 
-	//mouse driver 가 H wheel 을 WM_HSCROLL SB_LINELEFT/RIGHT 로 발사하는 경우 — base default line width (=한 글자) 라 굴려도 변화 미미.
-	//SendMessage(SB_THUMBPOSITION) 로 dispatch 해 큰 chunk 보정. PeekMessage 로 같은 SBCode 의 누적 메시지 합치고 page/2 cap.
-	//(base CTreeCtrl::OnHScroll 호출 시 Default() 가 m_lastSentMsg.lParam 사용 → 우리가 인자 변경해도 무효. SendMessage 가 정공.)
-	if (nSBCode == SB_LINELEFT || nSBCode == SB_LINERIGHT)
+	//트리 가로 스크롤은 native 가 아니라 m_h_scroll_pos + customdraw paint-shift 로 동작한다(native H scroll 불가).
+	//따라서 외부에서 온 WM_HSCROLL(마우스 H-wheel, 드래그 자동스크롤 등)도 여기서 m_h_scroll_pos 를 직접 옮겨야
+	//화면 스크롤 + 오버레이 가로 스크롤바(m_scrollbar_h)가 함께 연동된다. (기존엔 native si.nPos(SB_HORZ)만 건드려
+	//화면도 스크롤바도 아무 반응이 없었음 = 드래그 자동 가로스크롤 미동작의 원인.)
+	if (nSBCode == SB_LINELEFT || nSBCode == SB_LINERIGHT || nSBCode == SB_PAGELEFT || nSBCode == SB_PAGERIGHT)
 	{
-		SCROLLINFO si = { sizeof(si), SIF_ALL };
-		if (::GetScrollInfo(m_hWnd, SB_HORZ, &si))
+		CRect rc; GetClientRect(&rc);
+		int right_limit_h = rc.Width() - (m_v_visible_state ? m_scrollbar.get_width() : 0);
+		int max_pos = max(0, m_h_content_width - right_limit_h);
+
+		//같은 SBCode 로 밀려온 메시지들을 합쳐(chunk) 한 번에 이동 — 깜빡임/지연 방지.
+		int chunks = 1;
+		MSG peek_msg;
+		while (::PeekMessage(&peek_msg, m_hWnd, WM_HSCROLL, WM_HSCROLL, PM_NOREMOVE))
 		{
-			int chunks = 1;
-			MSG peek_msg;
-			while (::PeekMessage(&peek_msg, m_hWnd, WM_HSCROLL, WM_HSCROLL, PM_NOREMOVE))
-			{
-				if (LOWORD(peek_msg.wParam) != nSBCode)
-					break;
-				::PeekMessage(&peek_msg, m_hWnd, WM_HSCROLL, WM_HSCROLL, PM_REMOVE);
-				chunks++;
-			}
-
-			int direction = (nSBCode == SB_LINELEFT) ? -1 : 1;
-			int total_px = chunks * 60;
-			int cap = max(60, (int)si.nPage / 2);
-			if (total_px > cap)
-				total_px = cap;
-
-			int max_pos = max(0, si.nMax - (int)si.nPage + 1);
-			int new_pos = (int)si.nPos + direction * total_px;
-			if (new_pos < 0)
-				new_pos = 0;
-			if (new_pos > max_pos)
-				new_pos = max_pos;
-
-			m_h_internal_thumb = true;
-			::SendMessage(m_hWnd, WM_HSCROLL, MAKEWPARAM(SB_THUMBPOSITION, (WORD)new_pos), 0);
-			::SendMessage(m_hWnd, WM_HSCROLL, MAKEWPARAM(SB_ENDSCROLL, 0), 0);
-			m_h_internal_thumb = false;
+			if (LOWORD(peek_msg.wParam) != nSBCode)
+				break;
+			::PeekMessage(&peek_msg, m_hWnd, WM_HSCROLL, WM_HSCROLL, PM_REMOVE);
+			chunks++;
 		}
-		else
-			CTreeCtrl::OnHScroll(nSBCode, nPos, pScrollBar);
+
+		bool is_page  = (nSBCode == SB_PAGELEFT || nSBCode == SB_PAGERIGHT);
+		int  direction = (nSBCode == SB_LINELEFT || nSBCode == SB_PAGELEFT) ? -1 : 1;
+		int  step = is_page ? max(60, right_limit_h - 40) : (chunks * 60);
+
+		int new_pos = m_h_scroll_pos + direction * step;
+		if (new_pos < 0)       new_pos = 0;
+		if (new_pos > max_pos) new_pos = max_pos;
+		m_h_scroll_pos = new_pos;
 	}
 	else
 		CTreeCtrl::OnHScroll(nSBCode, nPos, pScrollBar);

@@ -807,6 +807,9 @@ protected:
 	CWnd*			m_pDropWnd = NULL;			//Which ListCtrl we are dropping ON
 	CImageList*		m_pDragImage = NULL;		//For creating and managing the drag-image
 	bool			m_bDragging = false;		//T during a drag operation
+	int				m_drag_scroll_vx = 0;		//드래그 자동 스크롤 속도(가로, tick당 level, 부호=방향). 0=스크롤 안 함.
+	int				m_drag_scroll_vy = 0;		//드래그 자동 스크롤 속도(세로).
+	void			update_drag_auto_scroll(CPoint screen_pt);	//드래그 중 대상 가장자리 거리로 속도 산출 + 타이머 관리.
 	int				m_nDragIndex = -1;			//drag되는 컨트롤이 CListCtrl일 때 그 인덱스(drag를 시작한 컨트롤의 멤버값에 저장됨, 드롭된 클래스에는 저장되지 않음)
 	int				m_nDropIndex = -1;			//drop된 컨트롤이 CListCtrl일 때 그 인덱스(drag를 시작한 컨트롤의 멤버값에 저장됨, 드롭된 클래스에는 저장되지 않음)
 	std::deque<UINT> m_drag_images_id;			//drag할 때 사용하는 이미지들의 resource id 저장(단일파일용 이미지, 싱글파일용 이미지를 차례대로 넣고 drag되는 개수에 따라 맞는 이미지를 사용한다)
@@ -873,6 +876,7 @@ public:
 	afx_msg void OnLvnBeginDrag(NMHDR* pNMHDR, LRESULT* pResult);
 	afx_msg void OnMouseMove(UINT nFlags, CPoint point);
 	afx_msg void OnLButtonUp(UINT nFlags, CPoint point);
+	afx_msg void OnTimer(UINT_PTR nIDEvent);	//드래그 자동 스크롤 연속 tick.
 	virtual BOOL PreCreateWindow(CREATESTRUCT& cs);
 	afx_msg BOOL OnLvnItemchanged(NMHDR* pNMHDR, LRESULT* pResult);
 	afx_msg void OnContextMenu(CWnd* pWnd, CPoint point);

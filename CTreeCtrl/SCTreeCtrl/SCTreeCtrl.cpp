@@ -2248,8 +2248,10 @@ void CSCTreeCtrl::create_drag_image(CSCGdiplusBitmap& drag_img)
 			HICON hIcon = pIL->ExtractIcon(img_index);
 			if (hIcon)
 			{
-				Gdiplus::Bitmap icon(hIcon);
-				g.DrawImage(&icon, indent, y + (row_h - icon_h) / 2, icon_w, icon_h);
+				//Gdiplus::Bitmap(hIcon)(FromHICON)은 배경이 불투명하게 나온다(SCGdiplusBitmap.cpp:739 주석). GetHDC+DrawIconEx 로 알파 보존.
+				HDC hdc = g.GetHDC();
+				::DrawIconEx(hdc, indent, y + (row_h - icon_h) / 2, hIcon, icon_w, icon_h, 0, NULL, DI_NORMAL);
+				g.ReleaseHDC(hdc);
 				::DestroyIcon(hIcon);
 			}
 		}
@@ -2262,25 +2264,22 @@ void CSCTreeCtrl::create_drag_image(CSCGdiplusBitmap& drag_img)
 		y += row_h;
 	}
 
-	//전체를 균일한 반투명 고스트로 만든다(아이콘=알파255 vs 텍스트=반투명 불일치 제거). 잘린 경우 하단은 추가 gradient 페이드.
+	//하단 gradient alpha 페이드 — 하위 항목이 최대 높이를 초과해 '잘린 경우에만' 하단을 아래로 갈수록 투명하게.
+	if (clipped)
 	{
-		const int GHOST_ALPHA = 180;	//~70% — 아이콘·텍스트를 같은 알파로 낮춰 균일한 드래그 고스트.
-		const int fade_h      = clipped ? min(row_h * 2, total_h) : 0;
-		const int fade_start  = total_h - fade_h;
-		Gdiplus::Rect lr(0, 0, max_w, total_h);
+		int fade_h = min(row_h * 2, total_h);
+		Gdiplus::Rect lr(0, total_h - fade_h, max_w, fade_h);
 		Gdiplus::BitmapData bd;
 		if (drag_img.m_pBitmap->LockBits(&lr, Gdiplus::ImageLockModeRead | Gdiplus::ImageLockModeWrite, PixelFormat32bppARGB, &bd) == Gdiplus::Ok)
 		{
-			for (int yy = 0; yy < total_h; yy++)
+			for (int yy = 0; yy < fade_h; yy++)
 			{
-				BYTE* line = (BYTE*)bd.Scan0 + yy * bd.Stride;
-				int   f    = GHOST_ALPHA;
-				if (fade_h > 0 && yy >= fade_start)	//하단 페이드(아래로 갈수록 투명)
-					f = GHOST_ALPHA * (255 - ((yy - fade_start) * 255 / max(1, fade_h - 1))) / 255;
+				BYTE* line   = (BYTE*)bd.Scan0 + yy * bd.Stride;
+				int   factor = 255 - (yy * 255 / max(1, fade_h - 1));
 				for (int xx = 0; xx < max_w; xx++)
 				{
 					BYTE* px = line + xx * 4;	//BGRA
-					px[3] = (BYTE)(px[3] * f / 255);
+					px[3] = (BYTE)(px[3] * factor / 255);
 				}
 			}
 			drag_img.m_pBitmap->UnlockBits(&bd);

@@ -1032,13 +1032,13 @@ void CSCTreeCtrl::insert_folder(HTREEITEM hParent, CString sParentPath)
 	m_content_width_dirty = true;
 }
 
-void CSCTreeCtrl::insert_folder(HTREEITEM hParent, WIN32_FIND_DATA* data, bool has_children)
+HTREEITEM CSCTreeCtrl::insert_folder(HTREEITEM hParent, WIN32_FIND_DATA* data, bool has_children, HTREEITEM hInsertAfter)
 {
 	TV_INSERTSTRUCT tvInsertItem;
 	tvInsertItem.item.mask = TVIF_TEXT | TVIF_IMAGE | TVIF_SELECTEDIMAGE | TVIF_CHILDREN;
 	tvInsertItem.item.iImage = m_pShellImageList->GetSystemImageListIcon(0, _T("C:\\windows"));
 	tvInsertItem.item.iSelectedImage = m_pShellImageList->GetSystemImageListIcon(0, _T("C:\\windows")) + 1;
-	tvInsertItem.hInsertAfter = TVI_LAST;
+	tvInsertItem.hInsertAfter = hInsertAfter;
 	tvInsertItem.hParent = hParent;
 
 	//cFileName이 fullpath인 경우는 폴더명만 취해야 한다.
@@ -1076,6 +1076,27 @@ void CSCTreeCtrl::insert_folder(HTREEITEM hParent, WIN32_FIND_DATA* data, bool h
 	tvItem.hItem = hParent;
 	tvItem.cChildren = true;
 	SetItem(&tvItem);
+
+	return hItem;
+}
+
+//is_greater_with_numeric(탐색기식 숫자 인식) 정렬 순서에 맞는 위치를 찾아 폴더 노드 1개를 삽입한다.
+//열거(insert_folder(hParent, path))가 쓰는 std::sort 비교자와 동일 규칙이라, 단일 노드 삽입 후에도 정렬이 어긋나지 않는다.
+HTREEITEM CSCTreeCtrl::insert_folder_sorted(HTREEITEM hParent, WIN32_FIND_DATA* data)
+{
+	//data->cFileName 이 fullpath 일 수 있으므로 leaf 폴더명으로 비교한다.
+	CString name = (get_char_count(data->cFileName, '\\') > 0) ? get_part(data->cFileName, fn_leaf_folder) : CString(data->cFileName);
+
+	//이미 오름차순 정렬된 형제들 사이에서 name 보다 큰 첫 형제 '앞'(=그 이전 형제 뒤)에 삽입.
+	HTREEITEM hAfter = TVI_FIRST;
+	for (HTREEITEM hChild = GetChildItem(hParent); hChild != NULL; hChild = GetNextSiblingItem(hChild))
+	{
+		if (is_greater_with_numeric(GetItemText(hChild), name))	//child > name → 여기서 멈추고 그 앞에 삽입
+			break;
+		hAfter = hChild;										//child <= name → name 은 이 형제 뒤로
+	}
+
+	return insert_folder(hParent, data, true, hAfter);
 }
 
 //local이면 drive_list를 NULL로 주고 remote이면 실제 리스트를 주고 갱신시킨다.

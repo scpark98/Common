@@ -232,7 +232,9 @@ public:
 	HTREEITEM	insert_special_folder(int csidl);
 	void		insert_drive(CDiskDriveInfo drive_info);
 	void		insert_folder(HTREEITEM hParent, CString sParentPath);
-	void		insert_folder(HTREEITEM hParent, WIN32_FIND_DATA* pFindFileData, bool has_children = true);
+	HTREEITEM	insert_folder(HTREEITEM hParent, WIN32_FIND_DATA* pFindFileData, bool has_children = true, HTREEITEM hInsertAfter = TVI_LAST);
+	//is_greater_with_numeric(탐색기식 숫자 인식) 정렬 위치에 폴더 노드 1개를 삽입 — 단일 노드 추가 시에도 오름차순 유지.
+	HTREEITEM	insert_folder_sorted(HTREEITEM hParent, WIN32_FIND_DATA* pFindFileData);
 
 	//local이면 drive_list를 NULL로 주고 remote이면 실제 리스트를 주고 갱신시킨다.
 	void		update_drive_list(CString thisPC, std::deque<CDiskDriveInfo>* drive_list = NULL);

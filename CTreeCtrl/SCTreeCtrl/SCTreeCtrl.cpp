@@ -4360,11 +4360,24 @@ void CSCTreeCtrl::OnTimer(UINT_PTR nIDEvent)
 		}
 		else
 		{
-			//m_pDropWnd 가 아니라 m_drag_scroll_target — 커서가 오버레이 스크롤바 위에 있어도 실제 트리/리스트로 보낸다.
-			for (int i = 0; i < abs(m_drag_scroll_vy); i++)
-				m_drag_scroll_target->SendMessage(WM_VSCROLL, (m_drag_scroll_vy < 0) ? SB_LINEUP   : SB_LINEDOWN);
-			for (int i = 0; i < abs(m_drag_scroll_vx); i++)
-				m_drag_scroll_target->SendMessage(WM_HSCROLL, (m_drag_scroll_vx < 0) ? SB_LINELEFT : SB_LINERIGHT);
+			//m_pDropWnd 가 아니라 m_drag_scroll_target — 커서가 오버레이 스크롤바 위여도 실제 트리/리스트로 보낸다.
+			if (m_drag_scroll_target->IsKindOf(RUNTIME_CLASS(CListCtrl)))
+			{
+				//리스트는 WM_*SCROLL SB_LINE 이 안 먹으므로 LVM_SCROLL(픽셀). 드래그 이미지가 화면 lock 해 repaint 안 되므로
+				//DragShowNolock(FALSE)로 내리고 스크롤 + UpdateWindow 후 다시 올린다.
+				CListCtrl* pl = (CListCtrl*)m_drag_scroll_target;
+				if (m_pDragImage) m_pDragImage->DragShowNolock(FALSE);
+				pl->Scroll(CSize(m_drag_scroll_vx * 30, m_drag_scroll_vy * 20));
+				pl->UpdateWindow();
+				if (m_pDragImage) m_pDragImage->DragShowNolock(TRUE);
+			}
+			else
+			{
+				for (int i = 0; i < abs(m_drag_scroll_vy); i++)
+					m_drag_scroll_target->SendMessage(WM_VSCROLL, (m_drag_scroll_vy < 0) ? SB_LINEUP   : SB_LINEDOWN);
+				for (int i = 0; i < abs(m_drag_scroll_vx); i++)
+					m_drag_scroll_target->SendMessage(WM_HSCROLL, (m_drag_scroll_vx < 0) ? SB_LINELEFT : SB_LINERIGHT);
+			}
 		}
 	}
 
@@ -4385,18 +4398,16 @@ void CSCTreeCtrl::update_drag_auto_scroll(CPoint screen_pt)
 
 	if (m_drag_scroll_target)
 	{
-		CRect rwin;
-		m_drag_scroll_target->GetWindowRect(rwin);
-		if (!rwin.PtInRect(screen_pt))
-			m_drag_scroll_target = NULL;
-	}
-
-	if (m_drag_scroll_target)
-	{
 		CRect rw;
 		m_drag_scroll_target->GetWindowRect(rw);
 
-		//리스트 대상은 상단 컬럼 헤더를 트리거 존에서 제외(헤더 위에서 세로 스크롤이 걸리는 것 방지).
+		//[의도적] rc 를 벗어나면 스크롤을 멈추던 두 게이트(!rwin.PtInRect → target=NULL, rw.PtInRect 안쪽만 계산)를 제거.
+		//요구사항이 "SetCapture 처럼 rc 를 벗어나도 드래그·스크롤 계속"이므로 아래 거리 공식만으로 판단한다: 가운데면
+		//d>=MARGIN 이라 자연히 0(스크롤 안 함), 가장자리에 가까워지면 시작, rc 밖으로(d 음수) 멀어질수록 빨라져 MAX_LEVEL 로 clamp.
+		//커서가 오버레이 스크롤바(=부모 dlg 의 자식) 위여서 WindowFromPoint 가 트리/리스트를 못 짚어도, 위에서
+		//m_drag_scroll_target 을 직전 유효 컨트롤로 유지하므로 계속 동작. (CVtListCtrlEx 와 동일 규칙)
+		//리스트 대상은 상단 컬럼 헤더를 세로 트리거 존에서 제외(헤더 위에서 세로 스크롤이 걸리는 것 방지).
+		int top_ref = rw.top;
 		if (m_drag_scroll_target->IsKindOf(RUNTIME_CLASS(CListCtrl)))
 		{
 			CHeaderCtrl* ph = ((CListCtrl*)m_drag_scroll_target)->GetHeaderCtrl();
@@ -4404,25 +4415,24 @@ void CSCTreeCtrl::update_drag_auto_scroll(CPoint screen_pt)
 			{
 				CRect rh; ph->GetWindowRect(rh);
 				if (rh.bottom > rw.top && rh.bottom < rw.bottom)
-					rw.top = rh.bottom;
+					top_ref = rh.bottom;
 			}
 		}
 
 		const int MARGIN    = 48;	//가장자리 감지 폭(px)
 		const int MAX_LEVEL = 3;	//tick 당 최대 스크롤 단위(level)
 
-		if (rw.PtInRect(screen_pt))
-		{
-			if (screen_pt.x < rw.left + MARGIN)
-				m_drag_scroll_vx = -(1 + (MARGIN - (screen_pt.x - rw.left)) * (MAX_LEVEL - 1) / MARGIN);
-			else if (screen_pt.x > rw.right - MARGIN)
-				m_drag_scroll_vx =  (1 + (MARGIN - (rw.right - screen_pt.x)) * (MAX_LEVEL - 1) / MARGIN);
+		//가장자리로부터의 거리 d(안쪽 양수 / 넘어가면 음수). d<MARGIN 이면 스크롤: 가장자리에 가깝거나 넘을수록 빠르게(최대 MAX).
+		int dl = screen_pt.x - rw.left;			//왼쪽 가장자리까지
+		int dr = rw.right - screen_pt.x;		//오른쪽
+		int dt = screen_pt.y - top_ref;			//위(리스트면 헤더 아래 기준)
+		int db = rw.bottom - screen_pt.y;		//아래
 
-			if (screen_pt.y < rw.top + MARGIN)
-				m_drag_scroll_vy = -(1 + (MARGIN - (screen_pt.y - rw.top)) * (MAX_LEVEL - 1) / MARGIN);
-			else if (screen_pt.y > rw.bottom - MARGIN)
-				m_drag_scroll_vy =  (1 + (MARGIN - (rw.bottom - screen_pt.y)) * (MAX_LEVEL - 1) / MARGIN);
-		}
+		if (dl < MARGIN)      m_drag_scroll_vx = -min(MAX_LEVEL, 1 + (MARGIN - dl) * (MAX_LEVEL - 1) / MARGIN);
+		else if (dr < MARGIN) m_drag_scroll_vx =  min(MAX_LEVEL, 1 + (MARGIN - dr) * (MAX_LEVEL - 1) / MARGIN);
+
+		if (dt < MARGIN)      m_drag_scroll_vy = -min(MAX_LEVEL, 1 + (MARGIN - dt) * (MAX_LEVEL - 1) / MARGIN);
+		else if (db < MARGIN) m_drag_scroll_vy =  min(MAX_LEVEL, 1 + (MARGIN - db) * (MAX_LEVEL - 1) / MARGIN);
 	}
 
 	if (m_drag_scroll_vx != 0 || m_drag_scroll_vy != 0)

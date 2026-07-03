@@ -721,6 +721,12 @@ public:
 	void			set_use_drag_and_drop(bool use_drag = true) { m_use_drag_and_drop = use_drag; }
 	int				get_drop_index() { return m_nDropIndex; }
 
+	//드래그 자동 스크롤 등 '외부(드래그 소스 컨트롤)'가 이 리스트를 스크롤할 때 쓰는 정상 경로 진입점.
+	//가로는 shift+휠/가로휠과 동일하게 m_h_scroll_pos 갱신+sync_scrollbar 로 가로바·헤더까지 동기화한다.
+	//(raw Scroll() 만 호출하면 LVN_ENDSCROLL→sync_scrollbar 가 stale m_h_scroll_pos 로 thumb 을 리셋해 가로바가 안 따라옴.)
+	//dx_px: +오른쪽/-왼쪽(px). dy_lines: +아래/-위(라인 수).
+	void			drag_scroll_by(int dx_px, int dy_lines);
+
 	//text = "     some text"일 경우 앞의 공백을 들여쓰기 용도로 사용한다.
 	//"     " 만큼 들여써서 "some text"를 출력한다. 아이콘도 함께 적용된다.
 	void			use_indent_from_prefix_space(bool use_indent) { m_use_indent_from_prefix_space = use_indent; }

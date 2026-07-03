@@ -5352,18 +5352,16 @@ void CVtListCtrlEx::update_drag_auto_scroll(CPoint screen_pt)
 
 	if (m_drag_scroll_target)
 	{
-		CRect rwin;
-		m_drag_scroll_target->GetWindowRect(rwin);
-		if (!rwin.PtInRect(screen_pt))
-			m_drag_scroll_target = NULL;	//커서가 대상 컨트롤(스크롤바 띠 포함) 밖 → 스크롤 안 함.
-	}
-
-	if (m_drag_scroll_target)
-	{
 		CRect rw;
 		m_drag_scroll_target->GetWindowRect(rw);
 
-		//리스트 대상은 상단 컬럼 헤더를 트리거 존에서 제외한다(헤더 위에서 세로 스크롤이 걸려 '반응 위치 애매'하던 것).
+		//[의도적] 예전엔 rw 를 120 inflate 한 bound 밖이면 스크롤을 멈췄으나(→ rc 를 조금만 벗어나도 정지), 요구사항은
+		//"SetCapture 처럼 rc 를 벗어나도 드래그·스크롤이 계속"이므로 경계 게이트를 제거한다. 아래 거리 공식은 rc 안쪽
+		//가운데면 d>=MARGIN 이라 자연히 0(스크롤 안 함), 가장자리에 가까워지면 시작, rc 를 벗어나(d 음수) 멀어질수록
+		//빨라져 MAX_LEVEL 로 clamp 되므로 별도 상한 없이도 안전하다. 커서가 오버레이 스크롤바(=부모 dlg 의 자식) 위여서
+		//WindowFromPoint 가 리스트를 못 짚어도, 위쪽에서 m_drag_scroll_target 을 직전 유효 리스트/트리로 유지하므로 계속 동작.
+		//세로 상단 기준: 리스트는 헤더 아래. (헤더 위로 올라가면 up 이 멈추는 게 아니라 계속 위로 — top_ref 를 넘는 음수 거리 → 최대속도)
+		int top_ref = rw.top;
 		if (m_drag_scroll_target->IsKindOf(RUNTIME_CLASS(CVtListCtrlEx)))
 		{
 			CHeaderCtrl* ph = ((CListCtrl*)m_drag_scroll_target)->GetHeaderCtrl();
@@ -5371,32 +5369,52 @@ void CVtListCtrlEx::update_drag_auto_scroll(CPoint screen_pt)
 			{
 				CRect rh; ph->GetWindowRect(rh);
 				if (rh.bottom > rw.top && rh.bottom < rw.bottom)
-					rw.top = rh.bottom;
+					top_ref = rh.bottom;
 			}
 		}
 
 		const int MARGIN    = 48;	//가장자리 감지 폭(px)
-		const int MAX_LEVEL = 3;	//tick 당 최대 스크롤 단위(level). 가장자리 접할수록 이 값에 근접. (속도 체감 조정: 5→3)
+		const int MAX_LEVEL = 3;	//tick 당 최대 스크롤 단위(level)
 
-		if (rw.PtInRect(screen_pt))
-		{
-			//가장자리로부터의 거리 d(0=가장자리) → level = 1 + (MARGIN-d)*(MAX-1)/MARGIN. d=0 → MAX, d=MARGIN → 1.
-			if (screen_pt.x < rw.left + MARGIN)
-				m_drag_scroll_vx = -(1 + (MARGIN - (screen_pt.x - rw.left)) * (MAX_LEVEL - 1) / MARGIN);
-			else if (screen_pt.x > rw.right - MARGIN)
-				m_drag_scroll_vx =  (1 + (MARGIN - (rw.right - screen_pt.x)) * (MAX_LEVEL - 1) / MARGIN);
+		//가장자리로부터의 거리 d(안쪽 양수 / 넘어가면 음수). d<MARGIN 이면 스크롤: 가장자리에 가깝거나 넘을수록 빠르게(최대 MAX).
+		int dl = screen_pt.x - rw.left;			//왼쪽 가장자리까지
+		int dr = rw.right - screen_pt.x;		//오른쪽
+		int dt = screen_pt.y - top_ref;			//위(헤더 아래 기준)
+		int db = rw.bottom - screen_pt.y;		//아래
 
-			if (screen_pt.y < rw.top + MARGIN)
-				m_drag_scroll_vy = -(1 + (MARGIN - (screen_pt.y - rw.top)) * (MAX_LEVEL - 1) / MARGIN);
-			else if (screen_pt.y > rw.bottom - MARGIN)
-				m_drag_scroll_vy =  (1 + (MARGIN - (rw.bottom - screen_pt.y)) * (MAX_LEVEL - 1) / MARGIN);
-		}
+		if (dl < MARGIN)      m_drag_scroll_vx = -min(MAX_LEVEL, 1 + (MARGIN - dl) * (MAX_LEVEL - 1) / MARGIN);
+		else if (dr < MARGIN) m_drag_scroll_vx =  min(MAX_LEVEL, 1 + (MARGIN - dr) * (MAX_LEVEL - 1) / MARGIN);
+
+		if (dt < MARGIN)      m_drag_scroll_vy = -min(MAX_LEVEL, 1 + (MARGIN - dt) * (MAX_LEVEL - 1) / MARGIN);
+		else if (db < MARGIN) m_drag_scroll_vy =  min(MAX_LEVEL, 1 + (MARGIN - db) * (MAX_LEVEL - 1) / MARGIN);
 	}
 
 	if (m_drag_scroll_vx != 0 || m_drag_scroll_vy != 0)
 		SetTimer(TIMER_ID_DRAG_AUTO_SCROLL, 70, NULL);	//~14fps 연속 스크롤(마우스가 멈춰 있어도 계속)
 	else
 		KillTimer(TIMER_ID_DRAG_AUTO_SCROLL);
+}
+
+//드래그 자동 스크롤 등 외부(드래그 소스)가 이 리스트를 스크롤할 때의 정상 경로.
+//가로: shift+휠/가로휠(OnMouseHWheel)과 동일 — m_h_scroll_pos 를 먼저 갱신해야 Scroll() 이 유발하는
+//LVN_ENDSCROLL→sync_scrollbar 에서 thumb 이 stale 로 리셋되지 않는다. Scroll 후 sync_scrollbar 로 가로바 위치·헤더 offset 반영.
+//세로: report list 는 WM_VSCROLL SB_LINE 이 native bottom-align 규칙을 지키므로 라인 단위로 보낸다.
+void CVtListCtrlEx::drag_scroll_by(int dx_px, int dy_lines)
+{
+	if (!::IsWindow(m_hWnd))
+		return;
+
+	for (int i = 0; i < abs(dy_lines); i++)
+		SendMessage(WM_VSCROLL, (dy_lines < 0) ? SB_LINEUP : SB_LINEDOWN);
+
+	if (dx_px != 0)
+	{
+		m_h_scroll_pos += dx_px;
+		Scroll(CSize(dx_px, 0));
+	}
+
+	UpdateWindow();
+	sync_scrollbar();
 }
 
 void CVtListCtrlEx::OnTimer(UINT_PTR nIDEvent)
@@ -5409,12 +5427,26 @@ void CVtListCtrlEx::OnTimer(UINT_PTR nIDEvent)
 			return;
 		}
 
-		//level 만큼 SB_LINE 을 반복 전송 → 대상(리스트/트리)이 native/m_h_scroll_pos 로 스크롤되고 오버레이 스크롤바도 연동.
-		//(m_pDropWnd 가 아니라 m_drag_scroll_target — 커서가 오버레이 스크롤바 위에 있어도 실제 리스트/트리로 보낸다.)
-		for (int i = 0; i < abs(m_drag_scroll_vy); i++)
-			m_drag_scroll_target->SendMessage(WM_VSCROLL, (m_drag_scroll_vy < 0) ? SB_LINEUP   : SB_LINEDOWN);
-		for (int i = 0; i < abs(m_drag_scroll_vx); i++)
-			m_drag_scroll_target->SendMessage(WM_HSCROLL, (m_drag_scroll_vx < 0) ? SB_LINELEFT : SB_LINERIGHT);
+		//m_pDropWnd 가 아니라 m_drag_scroll_target 로 — 커서가 오버레이 스크롤바 위여도 실제 리스트/트리로 스크롤.
+		if (m_drag_scroll_target->IsKindOf(RUNTIME_CLASS(CVtListCtrlEx)))
+		{
+			//CImageList 드래그가 desktop 을 lock 해 배경 snapshot 을 덮으므로, 스크롤해도 옛 배경이 다시 그려져 화면상 안 움직인다.
+			//DragShowNolock 은 배경 재캡처를 안 함 → DragLeave(오버레이 제거+배경 복원) 후 실제 스크롤+그리고, DragEnter 로 '새 배경' 재캡처+오버레이.
+			//[핵심] raw Scroll 대신 대상의 drag_scroll_by() 로 위임 — 가로는 m_h_scroll_pos 갱신+sync_scrollbar 로 가로바/헤더까지
+			//동기화되고(예전엔 raw Scroll 만이라 가로바가 안 따라오고 stale thumb 리셋으로 안쪽 트리거가 안 보였음), 세로는 WM_VSCROLL SB_LINE.
+			CVtListCtrlEx* pl = (CVtListCtrlEx*)m_drag_scroll_target;
+			CPoint cur; GetCursorPos(&cur);
+			if (m_pDragImage) m_pDragImage->DragLeave(GetDesktopWindow());
+			pl->drag_scroll_by(m_drag_scroll_vx * 30, m_drag_scroll_vy);	//가로 px, 세로 라인 수
+			if (m_pDragImage) m_pDragImage->DragEnter(GetDesktopWindow(), cur);
+		}
+		else
+		{
+			for (int i = 0; i < abs(m_drag_scroll_vy); i++)
+				m_drag_scroll_target->SendMessage(WM_VSCROLL, (m_drag_scroll_vy < 0) ? SB_LINEUP   : SB_LINEDOWN);
+			for (int i = 0; i < abs(m_drag_scroll_vx); i++)
+				m_drag_scroll_target->SendMessage(WM_HSCROLL, (m_drag_scroll_vx < 0) ? SB_LINELEFT : SB_LINERIGHT);
+		}
 
 		return;
 	}
@@ -5861,7 +5893,7 @@ void CVtListCtrlEx::OnHScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar)
 	if (m_in_editing)
 		edit_end();
 	CListCtrl::OnHScroll(nSBCode, nPos, pScrollBar);
-	sync_scrollbar();	//가로 오버레이 스크롤바(m_scrollbar_h) 연동 — 드래그 자동 가로스크롤 등 WM_HSCROLL 시 스크롤바가 안 따라오던 것.
+	sync_scrollbar();	//가로 오버레이 스크롤바(m_scrollbar_h) 연동.
 }
 
 

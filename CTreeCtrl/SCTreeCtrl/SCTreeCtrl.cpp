@@ -2258,6 +2258,9 @@ void CSCTreeCtrl::OnMouseMove(UINT nFlags, CPoint point)
 
 		m_pDropWnd = pDropWnd;
 
+		//drag되는 위치가 대상 컨트롤(트리/리스트) 가장자리면 자동 스크롤(거리 비례 속도 + 타이머 연속). point 는 아직 screen 좌표.
+		update_drag_auto_scroll(point);
+
 		pDropWnd->ScreenToClient(&point);
 
 		//drag되는 위치가 컨트롤의 상하끝단에 위치하면 스크롤시켜줘야 한다.
@@ -2538,6 +2541,11 @@ void CSCTreeCtrl::OnLButtonUp(UINT nFlags, CPoint point)
 		ReleaseCapture();
 
 		m_bDragging = false;
+
+		//드래그 자동 스크롤 타이머 정지.
+		KillTimer(timer_drag_auto_scroll);
+		m_drag_scroll_vx = 0;
+		m_drag_scroll_vy = 0;
 
 		m_pDragImage->DragLeave(GetDesktopWindow());
 		m_pDragImage->EndDrag();
@@ -4191,8 +4199,58 @@ void CSCTreeCtrl::OnTimer(UINT_PTR nIDEvent)
 		if (h != NULL)
 			Expand(h, TVE_EXPAND);
 	}
+	else if (nIDEvent == timer_drag_auto_scroll)
+	{
+		if (!m_bDragging || m_pDropWnd == NULL || (m_drag_scroll_vx == 0 && m_drag_scroll_vy == 0))
+		{
+			KillTimer(timer_drag_auto_scroll);
+		}
+		else
+		{
+			//level 만큼 SB_LINE 반복 전송 → 대상 트리/리스트가 스크롤되고 오버레이 스크롤바도 연동.
+			for (int i = 0; i < abs(m_drag_scroll_vy); i++)
+				m_pDropWnd->SendMessage(WM_VSCROLL, (m_drag_scroll_vy < 0) ? SB_LINEUP   : SB_LINEDOWN);
+			for (int i = 0; i < abs(m_drag_scroll_vx); i++)
+				m_pDropWnd->SendMessage(WM_HSCROLL, (m_drag_scroll_vx < 0) ? SB_LINELEFT : SB_LINERIGHT);
+		}
+	}
 
 	CTreeCtrl::OnTimer(nIDEvent);
+}
+
+//드래그 중, 대상 컨트롤(m_pDropWnd) 가장자리 근처면 자동 스크롤 방향/속도(level)를 정하고 타이머로 연속 스크롤한다.
+//속도는 가장자리와의 '거리에 비례'(가까울수록 빠름). 상/하/좌/우 4방향. screen_pt = 스크린 좌표. (CVtListCtrlEx 와 동일 규칙)
+void CSCTreeCtrl::update_drag_auto_scroll(CPoint screen_pt)
+{
+	m_drag_scroll_vx = 0;
+	m_drag_scroll_vy = 0;
+
+	if (m_pDropWnd)
+	{
+		CRect rw;
+		m_pDropWnd->GetWindowRect(rw);
+
+		const int MARGIN    = 48;	//가장자리 감지 폭(px)
+		const int MAX_LEVEL = 3;	//tick 당 최대 스크롤 단위(level)
+
+		if (rw.PtInRect(screen_pt))
+		{
+			if (screen_pt.x < rw.left + MARGIN)
+				m_drag_scroll_vx = -(1 + (MARGIN - (screen_pt.x - rw.left)) * (MAX_LEVEL - 1) / MARGIN);
+			else if (screen_pt.x > rw.right - MARGIN)
+				m_drag_scroll_vx =  (1 + (MARGIN - (rw.right - screen_pt.x)) * (MAX_LEVEL - 1) / MARGIN);
+
+			if (screen_pt.y < rw.top + MARGIN)
+				m_drag_scroll_vy = -(1 + (MARGIN - (screen_pt.y - rw.top)) * (MAX_LEVEL - 1) / MARGIN);
+			else if (screen_pt.y > rw.bottom - MARGIN)
+				m_drag_scroll_vy =  (1 + (MARGIN - (rw.bottom - screen_pt.y)) * (MAX_LEVEL - 1) / MARGIN);
+		}
+	}
+
+	if (m_drag_scroll_vx != 0 || m_drag_scroll_vy != 0)
+		SetTimer(timer_drag_auto_scroll, 70, NULL);	//~14fps 연속 스크롤(마우스가 멈춰 있어도 계속)
+	else
+		KillTimer(timer_drag_auto_scroll);
 }
 
 

@@ -475,7 +475,12 @@ protected:
 	{
 		timer_expand_for_drag_hover = 0,	//drag하여 트리 항목위에 머물경우 해당 트리를 expand시켜준다.
 		timer_vscroll_apply,				//세로 스크롤바 드래그 coalesce — 연속 pos 는 목표값만 갱신, 타이머가 마지막만 적용.
+		timer_drag_auto_scroll,				//트리에서 드래그 중 대상 컨트롤 가장자리 호버 시 연속 자동 스크롤.
 	};
+
+	int				m_drag_scroll_vx = 0;		//드래그 자동 스크롤 속도(가로, tick당 level, 부호=방향). 0=안 함.
+	int				m_drag_scroll_vy = 0;		//드래그 자동 스크롤 속도(세로).
+	void			update_drag_auto_scroll(CPoint screen_pt);	//드래그 중 대상(m_pDropWnd) 가장자리 거리로 속도 산출 + 타이머 관리.
 
 	int				m_pending_vscroll_pos = -1;	//timer_vscroll_apply 가 적용할 최신 V 스크롤 목표 pos(-1 = 없음).
 

@@ -2352,8 +2352,8 @@ void CSCTreeCtrl::OnMouseMove(UINT nFlags, CPoint point)
 		TRACE(_T("this = %p, pDropWnd = %p\n"), this, pDropWnd);
 		ASSERT(pDropWnd); //make sure we have a window
 
-		//대상 창이 바뀌면 이전 창의 drop-highlight 를 그 창 타입 기준으로 해제한다. 기존엔 정리 없이 m_pDropWnd 를 덮어써서
-		//드래그가 컨트롤을 벗어나도 이전 하이라이트(리스트 LVIS_DROPHILITED / 트리 SelectDropTarget)가 남았다. (by claude)
+		//20260704 by claude. 대상 창이 바뀌면 이전 창의 drop-highlight 를 그 창 타입 기준으로 해제한다. 기존엔 정리 없이
+		//m_pDropWnd 를 덮어써서 드래그가 컨트롤을 벗어나도 이전 하이라이트(리스트 LVIS_DROPHILITED / 트리 SelectDropTarget)가 남았다.
 		if (pDropWnd != m_pDropWnd)
 		{
 			clear_drop_highlight(m_pDropWnd);
@@ -3977,11 +3977,11 @@ void CSCTreeCtrl::OnNMCustomDraw(NMHDR* pNMHDR, LRESULT* pResult)
 			//드래그만 커버해, cross-control 드롭 시 대상 트리에 하이라이트가 전혀 안 뜨던 원인.
 			if (m_use_drag_and_drop && GetDropHilightItem() != NULL && hItem == GetDropHilightItem())
 			{
-				//drop-hilight 항목이 그려지는 동안(드래그로 폴더 위 hover) 1초 뒤 자동 확장 타이머 무장. m_bDragging 으로 가드하지
-				//않는다 — cross-control 드래그(리스트→트리)에서는 대상 트리의 m_bDragging 이 false 라 가드하면 확장이 안 걸린다.
-				//우클릭은 이제 OnRButtonDown 이 base 를 호출하지 않아 drop-hilight 를 만들지 않으므로(GetDropHilightItem()==NULL)
-				//여기 진입하지 않는다 → 우클릭 자동펼침 재발 없음. leave 시 clear_drop_highlight 가 SelectDropTarget(NULL) 하고
-				//OnTimer 의 GetDropHilightItem() NULL 가드가 있어 스퍼리어스 확장도 없다. (by claude)
+				//20260704 by claude. drop-hilight 항목이 그려지는 동안(드래그로 폴더 위 hover) 1초 뒤 자동 확장 타이머 무장.
+				//m_bDragging 으로 가드하지 않는다 — cross-control 드래그(리스트→트리)에서는 대상 트리의 m_bDragging 이 false 라
+				//가드하면 확장이 안 걸린다. 우클릭은 이제 OnRButtonDown 이 base 를 호출하지 않아 drop-hilight 를 만들지 않으므로
+				//(GetDropHilightItem()==NULL) 여기 진입하지 않는다 → 우클릭 자동펼침 재발 없음. leave 시 clear_drop_highlight 가
+				//SelectDropTarget(NULL) 하고 OnTimer 의 GetDropHilightItem() NULL 가드가 있어 스퍼리어스 확장도 없다.
 				SetTimer(timer_expand_for_drag_hover, 1000, NULL);
 				crText = m_theme.cr_text_dropHilited;
 				crBack = m_theme.cr_back_dropHilited;

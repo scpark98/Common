@@ -35,7 +35,7 @@
 #include <endpointvolume.h>	//for IAudioMeterInformation
 
 #include "Functions.h"
-#include <afxcmn.h>		//CListCtrl / CTreeCtrl / LVIS_DROPHILITED (clear_drop_highlight) (by claude)
+#include <afxcmn.h>		//20260704 by claude. CListCtrl / CTreeCtrl / LVIS_DROPHILITED (clear_drop_highlight)
 #include "text_encoding/utf-8/utf8.h"
 #include "win_compat/dwm.h"
 
@@ -1221,7 +1221,7 @@ void	clear_drop_highlight(CWnd* pWnd)
 	if (pWnd == NULL)
 		return;
 
-	//리스트뷰는 native 가 LVIS_DROPHILITED 를 그리므로 전 항목(-1) 해제 후 커스텀드로 재그리기 위해 Invalidate. (by claude)
+	//20260704 by claude. 리스트뷰는 native 가 LVIS_DROPHILITED 를 그리므로 전 항목(-1) 해제 후 커스텀드로 재그리기 위해 Invalidate.
 	if (pWnd->IsKindOf(RUNTIME_CLASS(CListCtrl)))
 	{
 		((CListCtrl*)pWnd)->SetItemState(-1, 0, LVIS_DROPHILITED);

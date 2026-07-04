@@ -6,6 +6,7 @@
 #include "../../Functions.h"
 #include "../../MemoryDC.h"
 #include "../../SCGdiPlusBitmap.h"
+#include "../../CListCtrl/CVtListCtrlEx/VtListCtrlEx.h"		//20260704 by claude. 드래그 자동스크롤 시 리스트 대상은 drag_scroll_by() 로 위임(가로바 동기)
 
 #include <fstream>
 // CSCTreeCtrl
@@ -3548,7 +3549,36 @@ void CSCTreeCtrl::edit_item(HTREEITEM hItem)
 			return;
 	}
 
+	//20260704 by claude. EnsureVisible 는 부분적으로 가려진 항목을 native H-scroll 로 reveal 하는데(스마트 동작 — 유지),
+	//트리의 가로 스크롤은 native 가 아니라 m_h_scroll_pos + paint-shift 모델이라 이 native reveal 이 오버레이 바/m_h_scroll_pos
+	//와 어긋난다(콘텐츠는 스크롤됐는데 바는 0). → native reveal 델타를 custom m_h_scroll_pos 로 접고 native 는 원위치로
+	//되돌린다: 화면(paint-shift 로 동일 reveal) + 오버레이 바가 함께 동기화된다. (V-wheel 의 native H 부수효과 복원 패턴과 동일.)
+	SCROLLINFO si_h_before = { sizeof(si_h_before), SIF_POS };
+	::GetScrollInfo(m_hWnd, SB_HORZ, &si_h_before);
+
 	EnsureVisible(hItem);
+
+	SCROLLINFO si_h_after = { sizeof(si_h_after), SIF_POS };
+	::GetScrollInfo(m_hWnd, SB_HORZ, &si_h_after);
+
+	int native_h_delta = si_h_after.nPos - si_h_before.nPos;
+	if (native_h_delta != 0)
+	{
+		//native H 를 EnsureVisible 이전 위치로 되돌림(트리 모델: native H = 0, 전량 over_shift).
+		::SendMessage(m_hWnd, WM_HSCROLL, MAKEWPARAM(SB_THUMBPOSITION, (WORD)si_h_before.nPos), 0);
+		::SendMessage(m_hWnd, WM_HSCROLL, MAKEWPARAM(SB_ENDSCROLL, 0), 0);
+
+		//reveal 량을 custom paint-shift 로 접기 + 오버레이 바 동기.
+		CRect rc;
+		GetClientRect(&rc);
+		int right_limit_h = rc.Width() - (m_v_visible_state ? m_scrollbar.get_width() : 0);
+		int max_pos = max(0, m_h_content_width - right_limit_h);
+		int new_pos = m_h_scroll_pos + native_h_delta;
+		if (new_pos < 0)       new_pos = 0;
+		if (new_pos > max_pos) new_pos = max_pos;
+		m_h_scroll_pos = new_pos;
+		sync_scrollbar();
+	}
 
 	m_edit_item = hItem;
 	m_edit_old_text = GetItemText(hItem);
@@ -3560,6 +3590,10 @@ void CSCTreeCtrl::edit_item(HTREEITEM hItem)
 	CRect r;
 
 	GetItemRect(hItem, r, TRUE);
+
+	//20260704 by claude. 가로 over-scroll 은 paint-only 시프트(get_over_shift)라 GetItemRect(native 좌표)엔 반영 안 됨.
+	//그리기와 동일하게 -over_shift 를 적용해 edit 을 실제 보이는 노드 위치에 배치(체크박스/확장 hit-test 와 동일 처리).
+	r.OffsetRect(-get_over_shift(), 0);
 
 	//아이템이 선택되었을 때 label의 크기가 좌우 타이트하여 left -= 2;
 	//CustomDraw에서도 -2하여 그림.
@@ -4406,18 +4440,35 @@ void CSCTreeCtrl::OnTimer(UINT_PTR nIDEvent)
 		else
 		{
 			//m_pDropWnd 가 아니라 m_drag_scroll_target — 커서가 오버레이 스크롤바 위여도 실제 트리/리스트로 보낸다.
-			if (m_drag_scroll_target->IsKindOf(RUNTIME_CLASS(CListCtrl)))
+			//20260704 by claude. CVtListCtrlEx 는 자체 오버레이 가로 스크롤바(m_h_scroll_pos) 모델이라 raw Scroll() 로 밀면
+			//바가 안 따라와 desync 된다(콘텐츠만 스크롤, 바는 그대로). 리스트가 노출한 정상 경로 drag_scroll_by() 로 위임하면
+			//m_h_scroll_pos+sync_scrollbar 까지 동기화된다(리스트가 드래그 소스일 때의 OnTimer 와 동일 경로). 트리 드래그
+			//이미지는 아직 CImageList 라 DragShowNolock 로 화면 lock 을 잠깐 내렸다 올린다.
+			if (m_drag_scroll_target->IsKindOf(RUNTIME_CLASS(CVtListCtrlEx)))
 			{
-				//리스트는 WM_*SCROLL SB_LINE 이 안 먹으므로 LVM_SCROLL(픽셀). 드래그 이미지가 화면 lock 해 repaint 안 되므로
-				//DragShowNolock(FALSE)로 내리고 스크롤 + UpdateWindow 후 다시 올린다.
+				CVtListCtrlEx* pl = (CVtListCtrlEx*)m_drag_scroll_target;
+				if (m_pDragImage) m_pDragImage->DragShowNolock(FALSE);
+				pl->drag_scroll_by(m_drag_scroll_vx * 30, m_drag_scroll_vy);	//가로 px, 세로 라인 수
+				if (m_pDragImage) m_pDragImage->DragShowNolock(TRUE);
+			}
+			else if (m_drag_scroll_target->IsKindOf(RUNTIME_CLASS(CListCtrl)))
+			{
+				//일반 CListCtrl(오버레이 바 없음)은 WM_*SCROLL SB_LINE 이 안 먹으므로 raw Scroll(픽셀).
 				CListCtrl* pl = (CListCtrl*)m_drag_scroll_target;
 				if (m_pDragImage) m_pDragImage->DragShowNolock(FALSE);
 				pl->Scroll(CSize(m_drag_scroll_vx * 30, m_drag_scroll_vy * 20));
 				pl->UpdateWindow();
 				if (m_pDragImage) m_pDragImage->DragShowNolock(TRUE);
 			}
+			else if (m_drag_scroll_target->IsKindOf(RUNTIME_CLASS(CSCTreeCtrl)))
+			{
+				//20260704 by claude. 트리 대상은 픽셀 단위 drag_scroll_by 로 — 가로를 vx*30px 로(기존 SB_LINELEFT 는 vx*60px 라 빨랐음)
+				//리스트와 동일한 속도감으로 낮춘다. 세로는 라인 수 그대로.
+				((CSCTreeCtrl*)m_drag_scroll_target)->drag_scroll_by(m_drag_scroll_vx * 30, m_drag_scroll_vy);
+			}
 			else
 			{
+				//일반 CTreeCtrl 등 — 기존 SB_LINE 경로.
 				for (int i = 0; i < abs(m_drag_scroll_vy); i++)
 					m_drag_scroll_target->SendMessage(WM_VSCROLL, (m_drag_scroll_vy < 0) ? SB_LINEUP   : SB_LINEDOWN);
 				for (int i = 0; i < abs(m_drag_scroll_vx); i++)
@@ -4484,6 +4535,33 @@ void CSCTreeCtrl::update_drag_auto_scroll(CPoint screen_pt)
 		SetTimer(timer_drag_auto_scroll, 70, NULL);	//~14fps 연속 스크롤(마우스가 멈춰 있어도 계속)
 	else
 		KillTimer(timer_drag_auto_scroll);
+}
+
+//20260704 by claude. 드래그 자동스크롤 실행 경로. 가로는 m_h_scroll_pos 를 px 단위로 직접 옮기고(OnHScroll 과 동일 clamp)
+//sync_scrollbar 로 오버레이 바까지 맞춘다 — SB_LINELEFT(60px, 휠/스크롤바 공유)를 쓰지 않아 더 세밀·느린 가로 스텝이 가능.
+//세로는 기존과 같이 SB_LINE 라인 단위. (자기 트리·다른 트리 인스턴스 모두 이 메서드로 스크롤)
+void CSCTreeCtrl::drag_scroll_by(int dx_px, int dy_lines)
+{
+	if (!::IsWindow(m_hWnd))
+		return;
+
+	for (int i = 0; i < abs(dy_lines); i++)
+		SendMessage(WM_VSCROLL, (dy_lines < 0) ? SB_LINEUP : SB_LINEDOWN);
+
+	if (dx_px != 0)
+	{
+		CRect rc;
+		GetClientRect(&rc);
+		int right_limit_h = rc.Width() - (m_v_visible_state ? m_scrollbar.get_width() : 0);
+		int max_pos = max(0, m_h_content_width - right_limit_h);
+		int new_pos = m_h_scroll_pos + dx_px;
+		if (new_pos < 0)       new_pos = 0;
+		if (new_pos > max_pos) new_pos = max_pos;
+		m_h_scroll_pos = new_pos;
+	}
+
+	Invalidate(FALSE);
+	sync_scrollbar();
 }
 
 

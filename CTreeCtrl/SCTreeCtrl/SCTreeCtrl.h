@@ -482,6 +482,9 @@ protected:
 	int				m_drag_scroll_vy = 0;		//드래그 자동 스크롤 속도(세로).
 	CWnd*			m_drag_scroll_target = NULL;	//자동 스크롤을 실제로 보낼 트리/리스트(오버레이 스크롤바 위여도 이 컨트롤로 전송).
 	void			update_drag_auto_scroll(CPoint screen_pt);	//드래그 중 대상(m_pDropWnd) 가장자리 거리로 속도 산출 + 타이머 관리.
+	//20260704 by claude. 드래그 자동스크롤 실행: 가로는 m_h_scroll_pos 직접 px(+clamp+sync_scrollbar), 세로는 SB_LINE 라인 수.
+	//WM_HSCROLL SB_LINELEFT(=60px, 마우스휠/스크롤바와 공유) 대신 이 픽셀 경로로 더 세밀·느린 가로 자동스크롤을 낸다.
+	void			drag_scroll_by(int dx_px, int dy_lines);
 	void			cancel_drag();								//드래그 중 ESC 등으로 드롭 없이 완전 취소.
 	bool			m_swallow_rbutton = false;					//드래그 취소용 우클릭의 RBUTTONUP 을 소비할지(팝업 메뉴 방지).
 

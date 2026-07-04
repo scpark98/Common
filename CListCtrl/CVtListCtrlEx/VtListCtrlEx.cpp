@@ -5735,17 +5735,10 @@ void CVtListCtrlEx::capture_selected_items_to_bitmap(CSCGdiplusBitmap* bmp)
 }
 */
 
-//ListCtrl 의 우클릭이 WM_CONTEXTMENU 를 항상 self 로 보내지는 않으므로(NM_RCLICK 만 발생하는 경우가 있음),
-//우클릭 메뉴 경로를 WM_CONTEXTMENU 하나로 정규화하기 위해 명시적으로 self 에 SendMessage 한다 (CSCTreeCtrl 과 동일 패턴).
-//return TRUE 로 NM_RCLICK 을 소비하여 parent 의 NM_RCLICK 핸들러가 이중 호출되지 않게 한다.
 BOOL CVtListCtrlEx::OnNMRClick(NMHDR* /*pNMHDR*/, LRESULT* pResult)
 {
-	CPoint pt_screen;
-	GetCursorPos(&pt_screen);
-	SendMessage(WM_CONTEXTMENU, (WPARAM)m_hWnd, MAKELPARAM(pt_screen.x, pt_screen.y));
-
-	*pResult = 1;
-	return TRUE;
+	*pResult = 0;
+	return FALSE;
 }
 
 void CVtListCtrlEx::OnContextMenu(CWnd* /*pWnd*/, CPoint point)

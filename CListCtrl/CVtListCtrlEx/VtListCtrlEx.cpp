@@ -346,10 +346,11 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		//단 대상 항목이 파일인 경우는 drop hilited 표시를 하지 않는다.
 		else if (is_drophilited) //ok
 		{
-			//트리와 drop-hilight 색 통일 — 선택색(cr_*_selected)이 아니라 테마의 전용 drop 색(cr_*_dropHilited)을 쓴다. (by claude)
-			if (crText.GetValue() == listctrlex_unused_color.GetValue() || crText.GetValue() == listctrlex_weak_color.GetValue())
+			//20260704 by claude. 트리와 drop-hilight 색 통일 — 선택색(cr_*_selected)이 아니라 테마의 전용 drop 색(cr_*_dropHilited)을 쓴다.
+			//20260704 scpark. 설령 어떤 항목이 특정색으로 표시되고 있어도 drop-hilighted는 그 지정색으로 표시해줘야 한다.
+			//if (crText.GetValue() == listctrlex_unused_color.GetValue() || crText.GetValue() == listctrlex_weak_color.GetValue())
 				crText = m_theme.cr_text_dropHilited;
-			if (crBack.GetValue() == listctrlex_unused_color.GetValue())
+			//if (crBack.GetValue() == listctrlex_unused_color.GetValue())
 				crBack = m_theme.cr_back_dropHilited;
 		}
 		else
@@ -5202,9 +5203,9 @@ void CVtListCtrlEx::OnMouseMove(UINT nFlags, CPoint point)
 		CVtListCtrlEx* pList = NULL;
 		CTreeCtrl* pTree = NULL;
 
-		//대상 창이 바뀌면 이전 창의 drop-highlight 를 그 창 타입 기준으로 확실히 해제한다. 기존엔 새 창(pDropWnd) 타입으로
-		//분기 + m_pDropWnd 를 미스캐스트해, old=리스트·new=트리 등 list↔tree 전환에서 이전 하이라이트가 잔존했다.
-		//m_nDropIndex 는 이전 리스트 대상용이므로 컨트롤이 바뀌면 무효화. (by claude)
+		//20260704 by claude. 대상 창이 바뀌면 이전 창의 drop-highlight 를 그 창 타입 기준으로 확실히 해제한다. 기존엔 새 창
+		//(pDropWnd) 타입으로 분기 + m_pDropWnd 를 미스캐스트해, old=리스트·new=트리 등 list↔tree 전환에서 이전 하이라이트가 잔존했다.
+		//m_nDropIndex 는 이전 리스트 대상용이므로 컨트롤이 바뀌면 무효화.
 		if (pDropWnd != m_pDropWnd)
 		{
 			clear_drop_highlight(m_pDropWnd);

@@ -35,6 +35,7 @@
 #include <endpointvolume.h>	//for IAudioMeterInformation
 
 #include "Functions.h"
+#include <afxcmn.h>		//CListCtrl / CTreeCtrl / LVIS_DROPHILITED (clear_drop_highlight) (by claude)
 #include "text_encoding/utf-8/utf8.h"
 #include "win_compat/dwm.h"
 
@@ -1213,6 +1214,23 @@ CString	concat_path(CString src, CString sub, TCHAR path_sep)
 		return src + sub;
 
 	return src + path_sep + sub;
+}
+
+void	clear_drop_highlight(CWnd* pWnd)
+{
+	if (pWnd == NULL)
+		return;
+
+	//리스트뷰는 native 가 LVIS_DROPHILITED 를 그리므로 전 항목(-1) 해제 후 커스텀드로 재그리기 위해 Invalidate. (by claude)
+	if (pWnd->IsKindOf(RUNTIME_CLASS(CListCtrl)))
+	{
+		((CListCtrl*)pWnd)->SetItemState(-1, 0, LVIS_DROPHILITED);
+		pWnd->Invalidate(FALSE);
+	}
+	else if (pWnd->IsKindOf(RUNTIME_CLASS(CTreeCtrl)))
+	{
+		((CTreeCtrl*)pWnd)->SelectDropTarget(NULL);
+	}
 }
 
 //새 폴더, 새 폴더 (2)와 같이 폴더내에 새 항목을 만들 때 사용 가능한 인덱스를 리턴한다.

@@ -2352,6 +2352,15 @@ void CSCTreeCtrl::OnMouseMove(UINT nFlags, CPoint point)
 		TRACE(_T("this = %p, pDropWnd = %p\n"), this, pDropWnd);
 		ASSERT(pDropWnd); //make sure we have a window
 
+		//대상 창이 바뀌면 이전 창의 drop-highlight 를 그 창 타입 기준으로 해제한다. 기존엔 정리 없이 m_pDropWnd 를 덮어써서
+		//드래그가 컨트롤을 벗어나도 이전 하이라이트(리스트 LVIS_DROPHILITED / 트리 SelectDropTarget)가 남았다. (by claude)
+		if (pDropWnd != m_pDropWnd)
+		{
+			clear_drop_highlight(m_pDropWnd);
+			m_nDropIndex = -1;
+			m_DropItem = NULL;
+		}
+
 		m_pDropWnd = pDropWnd;
 
 		//drag되는 위치가 대상 컨트롤(트리/리스트) 가장자리면 자동 스크롤(거리 비례 속도 + 타이머 연속). point 는 아직 screen 좌표.

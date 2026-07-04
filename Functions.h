@@ -1268,6 +1268,11 @@ struct	NETWORK_INFO
 	//src 폴더 경로에 sub 폴더 경로를 붙여주는 단순한 함수지만 드라이브 루트일때와 아닐때 등의 처리때문에 검사하여 결합해주는 목적으로 추가.
 	CString		concat_path(CString src, CString sub, TCHAR path_sep = '\\');
 
+	//드래그 중 hover 대상 컨트롤을 벗어났을 때, 그 컨트롤의 drop-highlight 를 컨트롤 타입에 맞게 해제한다.
+	//CListCtrl(파생 포함)=전 항목 LVIS_DROPHILITED 해제 + Invalidate, CTreeCtrl(파생 포함)=SelectDropTarget(NULL).
+	//pWnd 가 NULL 이거나 둘 다 아니면 무시. cross-control 드래그에서 이전 하이라이트가 잔존하는 것을 막는 용도. (by claude)
+	void		clear_drop_highlight(CWnd* pWnd);
+
 	//새 폴더, 새 폴더 (2)와 같이 폴더내에 새 항목을 만들 때 사용 가능한 인덱스를 리턴한다.
 	//zero_prefix가 2이면 001, 002로 된 인덱스가 붙은 파일/폴더들만 대상으로 하려 했으나 아직 미구현.
 	int			get_file_index(CString folder, CString title, int zero_prefix = 0);

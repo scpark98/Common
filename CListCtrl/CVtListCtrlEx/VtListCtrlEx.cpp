@@ -5201,68 +5201,15 @@ void CVtListCtrlEx::OnMouseMove(UINT nFlags, CPoint point)
 		CVtListCtrlEx* pList = NULL;
 		CTreeCtrl* pTree = NULL;
 
-		//// If we drag outside current window we need to adjust the highlights displayed
+		//대상 창이 바뀌면 이전 창의 drop-highlight 를 그 창 타입 기준으로 확실히 해제한다. 기존엔 새 창(pDropWnd) 타입으로
+		//분기 + m_pDropWnd 를 미스캐스트해, old=리스트·new=트리 등 list↔tree 전환에서 이전 하이라이트가 잔존했다.
+		//m_nDropIndex 는 이전 리스트 대상용이므로 컨트롤이 바뀌면 무효화. (by claude)
 		if (pDropWnd != m_pDropWnd)
 		{
-			TRACE(_T("pDropWnd != m_pDropWnd\n"));
-
-			if (pDropWnd->IsKindOf(RUNTIME_CLASS(CVtListCtrlEx)) && m_pDropWnd->IsKindOf(RUNTIME_CLASS(CVtListCtrlEx)))
-			{
-				pList = (CVtListCtrlEx*)m_pDropWnd;
-
-				if (m_nDropIndex != -1) //If we drag over the CListCtrl header, turn off the hover highlight
-				{
-					TRACE(_T("m_nDropIndex != -1\n"));
-					VERIFY(pList->SetItemState(m_nDropIndex, 0, LVIS_DROPHILITED));
-					// redraw item
-					VERIFY(pList->RedrawItems(m_nDropIndex, m_nDropIndex));
-					pList->UpdateWindow();
-					m_nDropIndex = -1;
-				}
-				else //If we drag out of the CListCtrl altogether
-				{
-					int i = 0;
-					int nCount = pList->GetItemCount();
-
-					TRACE(_T("m_nDropIndex is not -1, nCount = %d\n"), nCount);
-
-					for (i = 0; i < nCount; i++)
-					{
-						pList->SetItemState(i, 0, LVIS_DROPHILITED);
-					}
-					pList->RedrawItems(0, nCount);
-					pList->UpdateWindow();
-				}
-			}
-			else if (pDropWnd->IsKindOf(RUNTIME_CLASS(CTreeCtrl)))
-			{
-				pTree = (CTreeCtrl*)m_pDropWnd;
-				UINT uFlags;
-
-				HTREEITEM hItem = pTree->HitTest(pt, &uFlags);
-
-				if ((hItem != NULL) && (TVHT_ONITEM & uFlags))
-				{
-					pTree->SelectDropTarget(hItem);
-					ASSERT(pTree->GetDropHilightItem() == hItem);
-				}
-			}
-			else
-			{
-				if (pList && m_nDropIndex >= 0)
-				{
-					pList->SetItemState(m_nDropIndex, 0, LVIS_DROPHILITED);
-				}
-
-				if (pTree)
-				{
-					pTree->SelectDropTarget(NULL);
-				}
-			}
+			clear_drop_highlight(m_pDropWnd);
+			m_nDropIndex = -1;
 		}
 
-		// Save current window pointer as the CListCtrl we are dropping onto
-		//if (pDropWnd->IsKindOf(RUNTIME_CLASS(CListCtrl)))
 		m_pDropWnd = pDropWnd;
 
 		//드롭 대상 컨트롤(트리/리스트) 가장자리에 마우스가 hovering 되면 자동 스크롤.

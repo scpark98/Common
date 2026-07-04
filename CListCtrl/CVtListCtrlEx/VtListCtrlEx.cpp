@@ -346,10 +346,11 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		//단 대상 항목이 파일인 경우는 drop hilited 표시를 하지 않는다.
 		else if (is_drophilited) //ok
 		{
+			//트리와 drop-hilight 색 통일 — 선택색(cr_*_selected)이 아니라 테마의 전용 drop 색(cr_*_dropHilited)을 쓴다. (by claude)
 			if (crText.GetValue() == listctrlex_unused_color.GetValue() || crText.GetValue() == listctrlex_weak_color.GetValue())
-				crText = m_theme.cr_text_selected;
+				crText = m_theme.cr_text_dropHilited;
 			if (crBack.GetValue() == listctrlex_unused_color.GetValue())
-				crBack = m_theme.cr_back_selected;
+				crBack = m_theme.cr_back_dropHilited;
 		}
 		else
 		{

@@ -1983,9 +1983,11 @@ BOOL CSCTreeCtrl::OnTvnBegindrag(NMHDR* pNMHDR, LRESULT* pResult)
 	bool sub_folder_exist = (m_is_shell_treectrl ? has_sub_folders(path) : false);
 	CSCGdiplusBitmap drag_img(64, 64, Gdiplus::Color(128, 255, 0, 0), PixelFormat32bppARGB);
 
-	if (m_pDragImage && m_pDragImage->GetSafeHandle())
+	//이전 드래그의 잔여 이미지 파기. m_pDragImage 는 new CImageList 이므로 DeleteImageList()(=HIMAGELIST 만 해제)가
+	//아니라 delete 로 C++ 객체까지 해제해야 한다(그냥 =NULL 하면 wrapper 8바이트 릭). delete 는 소멸자에서 DeleteImageList 호출.
+	if (m_pDragImage)
 	{
-		m_pDragImage->DeleteImageList();
+		delete m_pDragImage;
 		m_pDragImage = NULL;
 	}
 
@@ -2019,6 +2021,7 @@ BOOL CSCTreeCtrl::OnTvnBegindrag(NMHDR* pNMHDR, LRESULT* pResult)
 	HICON hicon;
 	drag_img.m_pBitmap->GetHICON(&hicon);
 	m_pDragImage->Add(hicon);
+	DestroyIcon(hicon);		//Add 가 imagelist 로 복사하므로 원본 HICON 은 파기(안 하면 드래그마다 HICON 릭).
 
 	ASSERT(m_pDragImage); //make sure it was created
 
@@ -2722,7 +2725,18 @@ void CSCTreeCtrl::OnRButtonDown(UINT nFlags, CPoint point)
 		m_swallow_rbutton = true;
 		return;
 	}
-	CTreeCtrl::OnRButtonDown(nFlags, point);
+
+	//우클릭 항목을 먼저 선택 + 즉시 동기 paint 로 selected(skyblue) 표시한다. native base(CTreeCtrl::OnRButtonDown)는 호출하지
+	//않는다 — native 는 우클릭 항목을 drop-hilight(blue)로 잡아 blue↔skyblue 깜빡임의 원인이므로. base 를 건너뛰면 drop-hilight
+	//가 애초에 안 생긴다. 컨텍스트 메뉴는 OnRButtonUp 에서 직접 띄운다(base 미호출이라 native 의 NM_RCLICK 은 발생하지 않는다).
+	UINT uFlags = 0;
+	HTREEITEM hItem = HitTest(point, &uFlags);
+	if (hItem)
+	{
+		SelectItem(hItem);
+		SetFocus();
+		UpdateWindow();		//SelectItem/SetFocus 의 무효화를 즉시 그려 우클릭 순간 selected 로 보이게(그 뒤 UP 에서 메뉴).
+	}
 }
 
 void CSCTreeCtrl::OnRButtonUp(UINT nFlags, CPoint point)
@@ -2733,7 +2747,24 @@ void CSCTreeCtrl::OnRButtonUp(UINT nFlags, CPoint point)
 		m_swallow_rbutton = false;
 		return;
 	}
-	CTreeCtrl::OnRButtonUp(nFlags, point);
+
+	//OnRButtonDown 이 base 를 호출하지 않아 native NM_RCLICK 이 없으므로 여기서 직접 WM_CONTEXTMENU 를 띄운다.
+	//선택은 이미 DOWN 에서 완료됐다. (기존 OnNMRClick → WM_CONTEXTMENU 경로를 대체.)
+	UINT uFlags = 0;
+	HTREEITEM hItem = HitTest(point, &uFlags);
+	if (hItem)
+	{
+		CPoint pt_screen = point;
+		ClientToScreen(&pt_screen);
+
+		m_in_context_menu = true;
+		SendMessage(WM_CONTEXTMENU, (WPARAM)m_hWnd, MAKELPARAM(pt_screen.x, pt_screen.y));
+		m_in_context_menu = false;
+
+		CRect rc_item;
+		if (GetItemRect(hItem, &rc_item, FALSE))
+			InvalidateRect(rc_item, FALSE);
+	}
 }
 
 void CSCTreeCtrl::DroppedHandler(CWnd* pDragWnd, CWnd* pDropWnd)
@@ -3937,7 +3968,12 @@ void CSCTreeCtrl::OnNMCustomDraw(NMHDR* pNMHDR, LRESULT* pResult)
 			//드래그만 커버해, cross-control 드롭 시 대상 트리에 하이라이트가 전혀 안 뜨던 원인.
 			if (m_use_drag_and_drop && GetDropHilightItem() != NULL && hItem == GetDropHilightItem())
 			{
-				SetTimer(timer_expand_for_drag_hover, 1000, NULL);
+				//hover 확장 타이머는 '실제 드래그 중'에만 무장한다. paint 는 우클릭 select 등 드래그와 무관하게도 호출되는데,
+				//이전 드래그의 drop-hilight 가 남아 있으면(SelectDropTarget(NULL) 미호출) 그 항목 repaint 마다 이 타이머가
+				//무장돼 우클릭 1초 뒤 폴더가 제멋대로 펼쳐지던 버그. 색상 표시(아래)는 cross-control 대상 트리 하이라이트를
+				//위해 m_bDragging 무관하게 유지하되, 타이머 무장만 m_bDragging 으로 가드한다.
+				if (m_bDragging)
+					SetTimer(timer_expand_for_drag_hover, 1000, NULL);
 				crText = m_theme.cr_text_dropHilited;
 				crBack = m_theme.cr_back_dropHilited;
 				state_highlight = true;
@@ -4459,6 +4495,10 @@ BOOL CSCTreeCtrl::OnNMRClick(NMHDR* pNMHDR, LRESULT* pResult)
 	{
 		m_in_context_menu = true;
 		SelectItem(hItem);
+		//native RBUTTONDOWN 처리가 우클릭 항목을 drop-hilight(TVIS_DROPHILITED)로 잡아 두는데, 드래그가 아니므로
+		//우리 CustomDraw 는 이를 drop 색으로 그린다(우선순위 DropHilited>Selected). 좌클릭엔 없는 상태이므로 제거해
+		//우클릭도 좌클릭과 동일하게 selected 색으로 표시되게 한다.
+		SelectDropTarget(NULL);
 	}
 
 	SendMessage(WM_CONTEXTMENU, (WPARAM)m_hWnd, MAKELPARAM(pt_screen.x, pt_screen.y));
@@ -4493,6 +4533,8 @@ void CSCTreeCtrl::OnContextMenu(CWnd* pWnd, CPoint point)
 		return;
 
 	SelectItem(hItem);
+	//OnNMRClick 과 동일 — 드래그가 아닌 우클릭에서 native 가 남긴 drop-hilight 를 제거해 selected 색으로 표시.
+	SelectDropTarget(NULL);
 
 	//자체 popup 사용 안 하면 parent 로 forward — wParam = source hwnd 로 parent OnContextMenu 가
 	//pWnd 로 tree/thumb 구분 가능.

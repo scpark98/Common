@@ -4917,7 +4917,7 @@ void CVtListCtrlEx::add_file(CString path, uint64_t size, CString date, bool is_
 
 //https://jiniya.net/tt/594/
 //이 함수는 드래그 이미지를 직접 생성해주는 코드지만 취약점이 많은 코드이므로 사용 중지! 참고만 할것.
-CImageList* CVtListCtrlEx::create_drag_image(CListCtrl* pList, LPPOINT lpPoint)
+CImageList* CVtListCtrlEx::create_drag_image(CListCtrl* pList, LPPOINT lpPoint, CSCGdiplusBitmap* out_bmp)
 {
 	if (pList->GetSelectedCount() <= 0)
 		return NULL; // no row selected  
@@ -5020,6 +5020,10 @@ CImageList* CVtListCtrlEx::create_drag_image(CListCtrl* pList, LPPOINT lpPoint)
 		}
 	}
 
+	//20260704 by claude. 합성한 드래그 비트맵을 호출자에 넘겨 CSCShapeDlg(레이어드) 로 표시. (아래 CImageList 반환은 하위호환용.)
+	if (out_bmp)
+		drag_img.deep_copy(out_bmp);
+
 	//CImageList 로 변환.
 	CImageList* pCompleteImageList = new CImageList;
 	pCompleteImageList->Create(max_w, total_h, ILC_COLOR32, 1, 1);
@@ -5093,54 +5097,27 @@ void CVtListCtrlEx::OnLvnBeginDrag(NMHDR* pNMHDR, LRESULT* pResult)
 	//	m_pDragImage = NULL;
 	//}
 
-	CSCGdiplusBitmap bmpRes;// (64, 64, PixelFormat32bppARGB, Gdiplus::Color(128, 255, 0, 0));
-	
-	//drag_image가 없다면 노드 자체 아이콘 및 레이블을 이용한다.
-	//GDI를 이용해서 create_drag_image()를 사용했으나 아이콘과 함께 레이블을 출력할 때 오동작함. 수정 필요.
-	//GDIPlus를 이용한 create_drag_image()를 직접 만드는 것도 좋을듯함.
-	//[중요] 드래그 항목이 바뀌면 드래그 이미지도 반드시 새로 생성해야 한다. 이전 것을 재사용하면 다른 폴더/항목을
-	//드래그해도 옛 이미지가 그대로 표시된다(stale). 매 드래그 시작마다 파기 후 재생성.
-	if (m_pDragImage)
+	//20260704 by claude. 드래그 이미지를 레이어드 팝업(CSCShapeDlg)으로 표시한다. 기존 CImageList 는 화면을 lock 해서
+	//자동 스크롤 시 매 tick 이미지를 숨겼다 보여야 했고(깜빡임), 릭도 잦았다. 레이어드 창은 화면 lock 이 없어 아래 스크롤과
+	//완전히 독립 → 깜빡임 없음. 합성 비트맵을 create_drag_image(out_bmp) 또는 preset load 로 얻어 set_image 로 넘긴다.
+	CSCGdiplusBitmap bmpRes;
+	if (m_drag_images_id.size() == 0)
 	{
-		delete m_pDragImage;
-		m_pDragImage = NULL;
-	}
-
-	if (m_pDragImage == NULL || m_pDragImage->m_hImageList == NULL)
-	{
-		if (m_drag_images_id.size() == 0)
+		CImageList* tmp = create_drag_image((CListCtrl*)this, &pNMLV->ptAction, &bmpRes);	//bmpRes 만 사용, CImageList 는 파기.
+		if (tmp)
 		{
-			//bmpRes.create_drag_image(this);
-			m_pDragImage = create_drag_image((CListCtrl*)this, &pNMLV->ptAction);
-		}
-		else
-		{
-			if (m_drag_images_id.size() == 1)
-			{
-				bmpRes.load(m_drag_images_id[0]);
-			}
-			else if (m_drag_images_id.size() > 1)
-			{
-				bmpRes.load(sel_count == 1 ? m_drag_images_id[0] : m_drag_images_id[1]);
-			}
-
-			//bmpRes.draw_text(bmpRes.width / 2 - 4, bmpRes.height / 2 + 4, i2S(sel_count), 20, 2,
-			//	_T("Arial"), Gdiplus::Color(255, 0, 0, 0), Gdiplus::Color(255, 255, 128, 128), DT_CENTER | DT_VCENTER);
-
-			m_pDragImage = new CImageList();
-			m_pDragImage->Create(bmpRes.width, bmpRes.height, ILC_COLOR32, 1, 1);
-
-			HICON hicon;
-			bmpRes.m_pBitmap->GetHICON(&hicon);
-			m_pDragImage->Add(hicon);
-			DestroyIcon(hicon);		//Add 가 imagelist 로 복사하므로 원본 HICON 은 파기(안 하면 드래그마다 HICON 릭).
+			tmp->DeleteImageList();
+			delete tmp;
 		}
 	}
+	else
+	{
+		bmpRes.load(m_drag_images_id.size() == 1 ? m_drag_images_id[0]
+			: (sel_count == 1 ? m_drag_images_id[0] : m_drag_images_id[1]));
+	}
 
-//	SendMessageToDescendants(WM_SETFONT, (WPARAM)pFontDefault->GetSafeHandle(), 1, TRUE, FALSE);
-
-	//CreateDragImage(m_nDragIndex, &pt);
-	ASSERT(m_pDragImage); //make sure it was created
+	if (bmpRes.m_pBitmap == NULL)
+		return;		//드래그 이미지가 없으면 드래그 시작 안 함.
 
 	//// Set dragging flag and others
 	m_bDragging = TRUE;	//we are in a drag and drop operation
@@ -5151,10 +5128,15 @@ void CVtListCtrlEx::OnLvnBeginDrag(NMHDR* pNMHDR, LRESULT* pResult)
 	//// Capture all mouse messages
 	SetCapture();
 
-	//// Change the cursor to the drag image
-	////	(still must perform DragMove() in OnMouseMove() to show it moving)
-	m_pDragImage->BeginDrag(0, CPoint(nOffset, nOffset - 4));
-	m_pDragImage->DragEnter(GetDesktopWindow(), pNMLV->ptAction);
+	//레이어드 드래그 이미지 표시. use_control(false) → WS_EX_TRANSPARENT(마우스 통과 → WindowFromPoint 가 아래 리스트/트리를
+	//반환, 드롭 판정 정상) + 포커스 안 뺏음. set_image 는 deep_copy 라 매 드래그 최신 이미지, 창은 hidden 생성이라 위치 후 show.
+	m_drag_shape.set_image(GetTopLevelParent(), &bmpRes, true);	//20260704 by claude. popup owner 는 최상위 창(리스트 child 아님)
+	m_drag_shape.use_control(false);
+	m_drag_shape_offset = CPoint(nOffset, nOffset - 4);
+	CPoint scr;
+	GetCursorPos(&scr);
+	m_drag_shape.SetWindowPos(&CWnd::wndTopMost, scr.x + m_drag_shape_offset.x, scr.y + m_drag_shape_offset.y, 0, 0, SWP_NOSIZE | SWP_NOACTIVATE);
+	m_drag_shape.ShowWindow(SW_SHOWNOACTIVATE);
 
 	TRACE(_T("start drag...\n"));
 
@@ -5192,9 +5174,9 @@ void CVtListCtrlEx::OnMouseMove(UINT nFlags, CPoint point)
 		//// Move the drag image
 		CPoint pt(point);	//get our current mouse coordinates
 		ClientToScreen(&pt); //convert to screen coordinates
-		m_pDragImage->DragMove(pt); //move the drag image to those coordinates
-		// Unlock window updates (this allows the dragging image to be shown smoothly)
-		//m_pDragImage->DragShowNolock(false);
+		//20260704 by claude. 레이어드 드래그 이미지를 커서+오프셋으로 이동(위치만, 재렌더 없음). topmost 유지.
+		if (::IsWindow(m_drag_shape.GetSafeHwnd()))
+			m_drag_shape.SetWindowPos(&CWnd::wndTopMost, pt.x + m_drag_shape_offset.x, pt.y + m_drag_shape_offset.y, 0, 0, SWP_NOSIZE | SWP_NOACTIVATE);
 
 		//// Get the CWnd pointer of the window that is under the mouse cursor
 		CWnd* pDropWnd = WindowFromPoint(pt);
@@ -5279,8 +5261,7 @@ void CVtListCtrlEx::OnMouseMove(UINT nFlags, CPoint point)
 			// to note that we cannot drop here
 			::SetCursor(AfxGetApp()->LoadStandardCursor(MAKEINTRESOURCE(IDC_NO)));
 		}
-		// Lock window updates
-		m_pDragImage->DragShowNolock(true);
+		//20260704 by claude. (레이어드 드래그이미지는 화면 lock 이 없어 DragShowNolock 불필요 — 제거)
 	}
 
 	CListCtrl::OnMouseMove(nFlags, point);
@@ -5380,15 +5361,11 @@ void CVtListCtrlEx::OnTimer(UINT_PTR nIDEvent)
 		//m_pDropWnd 가 아니라 m_drag_scroll_target 로 — 커서가 오버레이 스크롤바 위여도 실제 리스트/트리로 스크롤.
 		if (m_drag_scroll_target->IsKindOf(RUNTIME_CLASS(CVtListCtrlEx)))
 		{
-			//CImageList 드래그가 desktop 을 lock 해 배경 snapshot 을 덮으므로, 스크롤해도 옛 배경이 다시 그려져 화면상 안 움직인다.
-			//DragShowNolock 은 배경 재캡처를 안 함 → DragLeave(오버레이 제거+배경 복원) 후 실제 스크롤+그리고, DragEnter 로 '새 배경' 재캡처+오버레이.
-			//[핵심] raw Scroll 대신 대상의 drag_scroll_by() 로 위임 — 가로는 m_h_scroll_pos 갱신+sync_scrollbar 로 가로바/헤더까지
-			//동기화되고(예전엔 raw Scroll 만이라 가로바가 안 따라오고 stale thumb 리셋으로 안쪽 트리거가 안 보였음), 세로는 WM_VSCROLL SB_LINE.
+			//20260704 by claude. 레이어드 드래그이미지는 화면 lock 이 없으므로 스크롤 전후로 이미지를 내렸다 올릴 필요가 없다
+			//(예전 CImageList 는 DragLeave→scroll→DragEnter 로 매 tick 깜빡였다). 그냥 스크롤만 한다.
+			//drag_scroll_by(): 가로는 m_h_scroll_pos 갱신+sync_scrollbar 로 가로바/헤더까지 동기화, 세로는 WM_VSCROLL SB_LINE.
 			CVtListCtrlEx* pl = (CVtListCtrlEx*)m_drag_scroll_target;
-			CPoint cur; GetCursorPos(&cur);
-			if (m_pDragImage) m_pDragImage->DragLeave(GetDesktopWindow());
 			pl->drag_scroll_by(m_drag_scroll_vx * 30, m_drag_scroll_vy);	//가로 px, 세로 라인 수
-			if (m_pDragImage) m_pDragImage->DragEnter(GetDesktopWindow(), cur);
 		}
 		else
 		{
@@ -5430,12 +5407,8 @@ void CVtListCtrlEx::OnLButtonUp(UINT nFlags, CPoint point)
 		m_drag_scroll_vx = 0;
 		m_drag_scroll_vy = 0;
 
-		// End dragging image
-		m_pDragImage->DragLeave(GetDesktopWindow());
-		m_pDragImage->EndDrag();
-		//drag 시작마다 new 로 만든 CImageList — 드롭 완료 시 여기서 해제해야 마지막 드래그분이 종료 시까지 남지 않는다.
-		delete m_pDragImage;
-		m_pDragImage = NULL;
+		//20260704 by claude. 레이어드 드래그이미지 숨김(파괴 대신 재사용 — 다음 드래그의 set_image 가 갱신). CImageList 릭 경로 소멸.
+		m_drag_shape.ShowWindow(SW_HIDE);
 
 		CPoint pt(point); //Get current mouse coordinates
 		ClientToScreen(&pt); //Convert to screen coordinates
@@ -5472,13 +5445,8 @@ void CVtListCtrlEx::cancel_drag()
 	m_drag_scroll_vx = 0;
 	m_drag_scroll_vy = 0;
 
-	if (m_pDragImage)
-	{
-		m_pDragImage->DragLeave(GetDesktopWindow());
-		m_pDragImage->EndDrag();
-		delete m_pDragImage;
-		m_pDragImage = NULL;
-	}
+	//20260704 by claude. 레이어드 드래그이미지 숨김(재사용).
+	m_drag_shape.ShowWindow(SW_HIDE);
 
 	//드롭 하이라이트 해제(대상이 리스트면 전 항목, 트리면 SelectDropTarget(NULL)). 자기 리스트도 해제.
 	if (m_pDropWnd)

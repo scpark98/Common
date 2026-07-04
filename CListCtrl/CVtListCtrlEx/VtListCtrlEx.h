@@ -12,6 +12,7 @@
 #include "../../system/ShellImageList/ShellImageList.h"
 #include "../../CEdit/CSCStaticEdit/SCStaticEdit.h"
 #include "../../CScrollbar/SCScrollbar/SCScrollbar.h"
+#include "../../CDialog/SCShapeDlg/SCShapeDlg.h"		//20260704 by claude. 드래그 이미지를 레이어드 팝업으로(깜빡임 없음)
 
 /*
 * CVtListCtrlEx를 사용하기 위해 프로젝트에 추가해야 하는 소스들
@@ -812,6 +813,9 @@ protected:
 	CWnd*			m_pDragWnd = NULL;			//Which ListCtrl we are dragging FROM
 	CWnd*			m_pDropWnd = NULL;			//Which ListCtrl we are dropping ON
 	CImageList*		m_pDragImage = NULL;		//For creating and managing the drag-image
+	//20260704 by claude. 드래그 이미지를 CImageList(화면 lock→스크롤 시 깜빡임) 대신 레이어드 팝업으로 표시. set_image 가 창을 지연 생성.
+	CSCShapeDlg		m_drag_shape;
+	CPoint			m_drag_shape_offset = CPoint(-10, -14);		//커서 → 이미지 좌상단 오프셋
 	bool			m_bDragging = false;		//T during a drag operation
 	int				m_drag_scroll_vx = 0;		//드래그 자동 스크롤 속도(가로, tick당 level, 부호=방향). 0=스크롤 안 함.
 	int				m_drag_scroll_vy = 0;		//드래그 자동 스크롤 속도(세로).
@@ -826,7 +830,8 @@ protected:
 
 	//https://jiniya.net/tt/594/
 	//이 함수는 드래그 이미지를 직접 생성해주는 코드지만 취약점이 많은 코드이므로 참고만 할것.
-	CImageList* create_drag_image(CListCtrl* pList, LPPOINT lpPoint);
+	//20260704 by claude. out_bmp 를 주면 합성한 드래그 비트맵을 deep_copy 로 반환(CSCShapeDlg::set_image 용). CImageList 반환은 하위호환.
+	CImageList* create_drag_image(CListCtrl* pList, LPPOINT lpPoint, CSCGdiplusBitmap* out_bmp = nullptr);
 
 	bool			m_use_indent_from_prefix_space = false;
 

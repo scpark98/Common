@@ -3977,12 +3977,12 @@ void CSCTreeCtrl::OnNMCustomDraw(NMHDR* pNMHDR, LRESULT* pResult)
 			//드래그만 커버해, cross-control 드롭 시 대상 트리에 하이라이트가 전혀 안 뜨던 원인.
 			if (m_use_drag_and_drop && GetDropHilightItem() != NULL && hItem == GetDropHilightItem())
 			{
-				//hover 확장 타이머는 '실제 드래그 중'에만 무장한다. paint 는 우클릭 select 등 드래그와 무관하게도 호출되는데,
-				//이전 드래그의 drop-hilight 가 남아 있으면(SelectDropTarget(NULL) 미호출) 그 항목 repaint 마다 이 타이머가
-				//무장돼 우클릭 1초 뒤 폴더가 제멋대로 펼쳐지던 버그. 색상 표시(아래)는 cross-control 대상 트리 하이라이트를
-				//위해 m_bDragging 무관하게 유지하되, 타이머 무장만 m_bDragging 으로 가드한다.
-				if (m_bDragging)
-					SetTimer(timer_expand_for_drag_hover, 1000, NULL);
+				//drop-hilight 항목이 그려지는 동안(드래그로 폴더 위 hover) 1초 뒤 자동 확장 타이머 무장. m_bDragging 으로 가드하지
+				//않는다 — cross-control 드래그(리스트→트리)에서는 대상 트리의 m_bDragging 이 false 라 가드하면 확장이 안 걸린다.
+				//우클릭은 이제 OnRButtonDown 이 base 를 호출하지 않아 drop-hilight 를 만들지 않으므로(GetDropHilightItem()==NULL)
+				//여기 진입하지 않는다 → 우클릭 자동펼침 재발 없음. leave 시 clear_drop_highlight 가 SelectDropTarget(NULL) 하고
+				//OnTimer 의 GetDropHilightItem() NULL 가드가 있어 스퍼리어스 확장도 없다. (by claude)
+				SetTimer(timer_expand_for_drag_hover, 1000, NULL);
 				crText = m_theme.cr_text_dropHilited;
 				crBack = m_theme.cr_back_dropHilited;
 				state_highlight = true;

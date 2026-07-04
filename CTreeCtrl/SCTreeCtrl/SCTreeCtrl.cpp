@@ -82,7 +82,6 @@ BEGIN_MESSAGE_MAP(CSCTreeCtrl, CTreeCtrl)
 	ON_NOTIFY_REFLECT(NM_CUSTOMDRAW, &CSCTreeCtrl::OnNMCustomDraw)
 	ON_WM_TIMER()
 	ON_WM_CONTEXTMENU()
-	ON_NOTIFY_REFLECT_EX(NM_RCLICK, &CSCTreeCtrl::OnNMRClick)
 	ON_REGISTERED_MESSAGE(Message_CSCMenu, &CSCTreeCtrl::OnMessageCSCMenu)
 	ON_REGISTERED_MESSAGE(Message_CSCScrollbar, &CSCTreeCtrl::on_message_CSCScrollbar)
 	ON_WM_VSCROLL()
@@ -2748,23 +2747,24 @@ void CSCTreeCtrl::OnRButtonUp(UINT nFlags, CPoint point)
 		return;
 	}
 
-	//OnRButtonDown 이 base 를 호출하지 않아 native NM_RCLICK 이 없으므로 여기서 직접 WM_CONTEXTMENU 를 띄운다.
-	//선택은 이미 DOWN 에서 완료됐다. (기존 OnNMRClick → WM_CONTEXTMENU 경로를 대체.)
-	UINT uFlags = 0;
-	HTREEITEM hItem = HitTest(point, &uFlags);
-	if (hItem)
-	{
-		CPoint pt_screen = point;
-		ClientToScreen(&pt_screen);
+	//OnRButtonDown 이 native base 를 호출하지 않으므로(drop-hilight 방지) native 가 보내던 NM_RCLICK 통지와 WM_CONTEXTMENU 를
+	//여기서 서로 '독립적으로' 낸다. 이 둘은 별개다 — 컨텍스트 메뉴는 WM_CONTEXTMENU 로만 처리하고, NM_RCLICK 은 순수 통지다.
 
-		m_in_context_menu = true;
-		SendMessage(WM_CONTEXTMENU, (WPARAM)m_hWnd, MAKELPARAM(pt_screen.x, pt_screen.y));
-		m_in_context_menu = false;
+	//(1) NM_RCLICK 통지 — 우클릭됨을 parent 에 알린다(원하는 앱만 ON_NOTIFY(NM_RCLICK) 로 처리; 컨트롤 자체가 처리하려면
+	//    subclass 가 ON_NOTIFY_REFLECT 를 추가). 메뉴와 무관 — 여기서 메뉴를 띄우지 않는다.
+	NMHDR nmhdr;
+	nmhdr.hwndFrom = m_hWnd;
+	nmhdr.idFrom   = (UINT_PTR)GetDlgCtrlID();
+	nmhdr.code     = NM_RCLICK;
 
-		CRect rc_item;
-		if (GetItemRect(hItem, &rc_item, FALSE))
-			InvalidateRect(rc_item, FALSE);
-	}
+	CWnd* parent = GetParent();
+	if (parent)
+		parent->SendMessage(WM_NOTIFY, (WPARAM)nmhdr.idFrom, (LPARAM)&nmhdr);
+
+	//(2) WM_CONTEXTMENU 요청(정석 단일 경로) — OnContextMenu 가 받아 m_use_own_context_menu==false 면 parent 로 forward 한다.
+	CPoint pt_screen = point;
+	ClientToScreen(&pt_screen);
+	SendMessage(WM_CONTEXTMENU, (WPARAM)m_hWnd, MAKELPARAM(pt_screen.x, pt_screen.y));
 }
 
 void CSCTreeCtrl::DroppedHandler(CWnd* pDragWnd, CWnd* pDropWnd)
@@ -4478,43 +4478,6 @@ void CSCTreeCtrl::update_drag_auto_scroll(CPoint screen_pt)
 }
 
 
-BOOL CSCTreeCtrl::OnNMRClick(NMHDR* pNMHDR, LRESULT* pResult)
-{
-	//CTreeCtrl 의 default RBUTTONDOWN/UP 처리가 WM_CONTEXTMENU 를 생성하지 않아 OnContextMenu 가 단일 우클릭으로
-	//호출되지 않음 (이중 우클릭만). 명시적으로 WM_CONTEXTMENU 를 self 에 SendMessage 해야 함.
-
-	//우클릭 위치의 item 을 즉시 선택 + active 색 paint — focus 가 popup_menu 로 가기 전 시점.
-	CPoint pt_screen;
-	GetCursorPos(&pt_screen);
-	CPoint pt_client = pt_screen;
-	ScreenToClient(&pt_client);
-
-	UINT uFlags = 0;
-	HTREEITEM hItem = HitTest(pt_client, &uFlags);
-	if (hItem)
-	{
-		m_in_context_menu = true;
-		SelectItem(hItem);
-		//native RBUTTONDOWN 처리가 우클릭 항목을 drop-hilight(TVIS_DROPHILITED)로 잡아 두는데, 드래그가 아니므로
-		//우리 CustomDraw 는 이를 drop 색으로 그린다(우선순위 DropHilited>Selected). 좌클릭엔 없는 상태이므로 제거해
-		//우클릭도 좌클릭과 동일하게 selected 색으로 표시되게 한다.
-		SelectDropTarget(NULL);
-	}
-
-	SendMessage(WM_CONTEXTMENU, (WPARAM)m_hWnd, MAKELPARAM(pt_screen.x, pt_screen.y));
-
-	if (hItem)
-	{
-		m_in_context_menu = false;
-		CRect rc_item;
-		if (GetItemRect(hItem, &rc_item, FALSE))
-			InvalidateRect(rc_item, FALSE);
-	}
-
-	*pResult = 1;
-	return TRUE;
-}
-
 //context menu를 컨트롤 내부에서 처리하면 레이블 변경, 삭제, 추가 등의 일반적인 메뉴항목들을 처리하는 것이 간단해지지만
 //로그를 남기는 등 별도의 추가 처리가 복잡해진다. 따라서 가능한 한 parent에서 처리하는 것이 맞다.
 void CSCTreeCtrl::OnContextMenu(CWnd* pWnd, CPoint point)
@@ -4533,7 +4496,7 @@ void CSCTreeCtrl::OnContextMenu(CWnd* pWnd, CPoint point)
 		return;
 
 	SelectItem(hItem);
-	//OnNMRClick 과 동일 — 드래그가 아닌 우클릭에서 native 가 남긴 drop-hilight 를 제거해 selected 색으로 표시.
+	//드래그가 아닌 우클릭/메뉴키 진입이므로, 혹시 남아있을 drop-hilight 를 제거해 selected 색으로 표시(방어).
 	SelectDropTarget(NULL);
 
 	//자체 popup 사용 안 하면 parent 로 forward — wParam = source hwnd 로 parent OnContextMenu 가
@@ -4600,8 +4563,16 @@ void CSCTreeCtrl::OnContextMenu(CWnd* pWnd, CPoint point)
 		menu.AppendMenu(MF_STRING, menu_delete_item, (m_is_shell_treectrl ? _T("삭제(&D)") : _T("삭제(&D)")));
 	}
 
+	//메뉴 표시(modal) 중 focus 가 menu 로 가도 우클릭한 항목이 active 색으로 유지되도록 가드 — parent-forward 분기와 동일.
+	//(기존엔 OnNMRClick 이 WM_CONTEXTMENU 전송 전체에 이 플래그를 걸어 양 분기를 커버했음. OnNMRClick 제거로 여기 이관.)
+	m_in_context_menu = true;
 	menu.TrackPopupMenu(TPM_LEFTALIGN, point.x, point.y, this);
+	m_in_context_menu = false;
 	menu.DestroyMenu();
+
+	CRect rc_item;
+	if (GetItemRect(hItem, &rc_item, FALSE))
+		InvalidateRect(rc_item, FALSE);
 }
 
 void CSCTreeCtrl::OnPopupMenu(UINT nMenuID)

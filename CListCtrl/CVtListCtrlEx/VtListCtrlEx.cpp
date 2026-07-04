@@ -5131,6 +5131,7 @@ void CVtListCtrlEx::OnLvnBeginDrag(NMHDR* pNMHDR, LRESULT* pResult)
 			HICON hicon;
 			bmpRes.m_pBitmap->GetHICON(&hicon);
 			m_pDragImage->Add(hicon);
+			DestroyIcon(hicon);		//Add 가 imagelist 로 복사하므로 원본 HICON 은 파기(안 하면 드래그마다 HICON 릭).
 		}
 	}
 
@@ -5483,7 +5484,9 @@ void CVtListCtrlEx::OnLButtonUp(UINT nFlags, CPoint point)
 		// End dragging image
 		m_pDragImage->DragLeave(GetDesktopWindow());
 		m_pDragImage->EndDrag();
-		//delete m_pDragImage; //must delete it because it was created at the beginning of the drag
+		//drag 시작마다 new 로 만든 CImageList — 드롭 완료 시 여기서 해제해야 마지막 드래그분이 종료 시까지 남지 않는다.
+		delete m_pDragImage;
+		m_pDragImage = NULL;
 
 		CPoint pt(point); //Get current mouse coordinates
 		ClientToScreen(&pt); //Convert to screen coordinates
@@ -5524,6 +5527,8 @@ void CVtListCtrlEx::cancel_drag()
 	{
 		m_pDragImage->DragLeave(GetDesktopWindow());
 		m_pDragImage->EndDrag();
+		delete m_pDragImage;
+		m_pDragImage = NULL;
 	}
 
 	//드롭 하이라이트 해제(대상이 리스트면 전 항목, 트리면 SelectDropTarget(NULL)). 자기 리스트도 해제.

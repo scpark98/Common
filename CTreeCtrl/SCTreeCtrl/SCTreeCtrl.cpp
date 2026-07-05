@@ -185,13 +185,29 @@ void CSCTreeCtrl::reconstruct_font()
 
 	m_font_size = get_font_size_from_pixel_size(m_hWnd, m_lf.lfHeight);
 
-	//폰트 height와 line height중에 큰 값으로 조정
+	//20260705 by claude. 명시 지정(set_line_height, m_line_height>0)이 있으면 그 값으로 고정 — 폰트 변경으로 이 함수가 다시 불려도
+	//라인 간격 유지. 없으면 기존대로 폰트픽셀높이+12 와 현재 높이 중 큰 값.
 	int height = GetItemHeight();
-	SetItemHeight(MAX(height, -m_lf.lfHeight + 12));
+	if (m_line_height > 0)
+		SetItemHeight(m_line_height);
+	else
+		SetItemHeight(MAX(height, -m_lf.lfHeight + 12));
 
 	m_content_width_dirty = true;	//폰트가 바뀌면 라벨 폭이 달라지므로 콘텐츠 폭 재측정 필요.
 
 	ASSERT(bCreated);
+}
+
+//20260705 by claude. 항목(행) 높이를 명시 고정. reconstruct_font·이미지 설정이 m_line_height>0 이면 이 값을 그대로 SetItemHeight.
+void CSCTreeCtrl::set_line_height(int height, bool invalidate)
+{
+	m_line_height = height;
+
+	if (GetSafeHwnd() && height > 0)
+		SetItemHeight(height);
+
+	if (invalidate)
+		Invalidate();
 }
 
 BOOL CSCTreeCtrl::PreTranslateMessage(MSG* pMsg)
@@ -760,6 +776,10 @@ void CSCTreeCtrl::set_as_shell_treectrl(CShellImageList* pShellImageList, bool i
 	m_use_own_imagelist = true;
 	m_image_size = 16;
 	m_pShellImageList = pShellImageList;
+
+	//20260705 by claude. shell 트리(탐색기 용도)는 윈도우11 탐색기와 유사하게 라인 간격을 고정(현재 28px. 리스트
+	//set_as_shell_listctrl 의 set_line_height(26) 과 동일 패턴). m_line_height 를 세팅해 두면 이후 imagelist SetItemHeight·reconstruct_font 가 이 값을 존중.
+	set_line_height(28, false);
 
 	if (GetImageList(TVSIL_NORMAL) == NULL)
 		SetImageList(m_pShellImageList->get_imagelist(true), TVSIL_NORMAL);
@@ -3106,7 +3126,10 @@ void CSCTreeCtrl::create_imagelist()
 	SetImageList(&m_imagelist, TVSIL_NORMAL);
 
 	int height = GetItemHeight();
-	SetItemHeight(MAX(m_image_size, height));
+	if (m_line_height > 0)
+		SetItemHeight(m_line_height);		//20260705 by claude. 명시 line height 우선.
+	else
+		SetItemHeight(MAX(m_image_size, height));
 
 	Invalidate();
 }
@@ -3128,7 +3151,10 @@ void CSCTreeCtrl::set_imagelist(const std::vector<HICON>& icons, int image_size)
 	SetImageList(&m_imagelist, TVSIL_NORMAL);
 
 	int height = GetItemHeight();
-	SetItemHeight(MAX(image_size, height));
+	if (m_line_height > 0)
+		SetItemHeight(m_line_height);		//20260705 by claude. 명시 line height 우선.
+	else
+		SetItemHeight(MAX(image_size, height));
 
 	Invalidate();
 }

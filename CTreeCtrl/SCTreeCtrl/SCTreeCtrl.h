@@ -388,6 +388,11 @@ public:
 	void			set_font_bold(bool bold = true);
 	void			set_font_italic(bool italic = true);
 
+	//20260705 by claude. 항목(행) 높이를 명시 지정. > 0 이면 그 값으로 고정(폰트/이미지 변경으로 reconstruct_font 가 다시 불려도 유지).
+	//0(기본)이면 기존대로 폰트픽셀높이+12·이미지크기 기준 자동 산출. 탐색기와 동일한 라인 간격을 원할 때 사용(예: 30).
+	void			set_line_height(int height, bool invalidate = true);
+	int				get_line_height() { return m_line_height; }
+
 //색상 관련
 	//std::function<void()>	function_check_dim_text;
 	//void			set_dim_text_function(std::function<void()> func) { function_check_dim_text = func; }
@@ -558,6 +563,7 @@ protected:
 	CImageList		m_imagelist;			//자체 이미지 리스트
 	std::deque<UINT>m_image_IDs;			//이미지 리스트에 추가한 resource id. 이를 저장하는 이유는 icon size 동적 변경도 지원하기 위해.
 	int				m_image_size = -1;		//-1(not yet set), 16 or 32?
+	int				m_line_height = 0;		//20260705 by claude. > 0 이면 항목 높이를 이 값으로 고정(set_line_height). 0 = 자동(폰트/이미지 기준).
 	bool			m_use_own_imagelist = false;	//자체 이미지리스트를 쓸 것인지
 	void			create_imagelist();
 

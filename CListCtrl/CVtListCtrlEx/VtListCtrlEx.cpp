@@ -4453,8 +4453,8 @@ void CVtListCtrlEx::set_as_shell_listctrl(CShellImageList* pShellImageList, bool
 	//set_font_name(_T("맑은 고딕"));
 	//set_font_size(), set_font_name()을 호출하지 않고 set_header_height()을 호출하면
 	//CHeaderCtrlEx::OnLayout()에서 에러가 발생한다.
-	set_header_height(24);
-	set_line_height(21);
+	set_header_height(26);
+	set_line_height(26);
 
 	set_column_data_type(col_filesize, column_data_type_numeric);
 

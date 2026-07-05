@@ -2,6 +2,7 @@
 
 #include <deque>
 #include <list>
+#include <functional>
 #include <Afxwin.h>
 #include "list_data.h"
 #include "HeaderCtrlEx.h"
@@ -718,6 +719,14 @@ public:
 			m_drag_images_id.push_back(id);
 	}
 
+	//20260705 by claude. 드래그 중 드래그 이미지 하단 문구(예: "+ 대상폴더(으)로 복사")를 app 이 계산해 돌려주는 provider(§2.3:
+	//메커니즘은 컨트롤, 정책은 app). 빈 문자열이면 밴드 없이 원본만. 미설정이면 문구 없음(하위호환). pt 는 screen 좌표.
+	void			set_drag_hint_provider(std::function<CString(CWnd* pDropWnd, CPoint pt_screen)> fn) { m_fn_drag_hint = fn; }
+	//20260705 by claude. 드래그 이미지 문구 갱신. hint 가 비면 원본만, 아니면 원본 하단에 밴드+문구 합성. 값이 이전과 같으면 재합성 안 함(캐시).
+	void			update_drag_hint(const CString& hint_text);
+	//20260705 by claude. 현재 커서 위치 기준으로 provider 를 재호출해 문구 갱신(드래그 중 Ctrl/Shift 토글처럼 마우스가 안 움직여도).
+	void			refresh_drag_hint();
+
 	bool			get_use_drag_and_drop() { return m_use_drag_and_drop; }
 	void			set_use_drag_and_drop(bool use_drag = true) { m_use_drag_and_drop = use_drag; }
 	int				get_drop_index() { return m_nDropIndex; }
@@ -816,6 +825,11 @@ protected:
 	//20260704 by claude. 드래그 이미지를 CImageList(화면 lock→스크롤 시 깜빡임) 대신 레이어드 팝업으로 표시. set_image 가 창을 지연 생성.
 	CSCShapeDlg		m_drag_shape;
 	CPoint			m_drag_shape_offset = CPoint(-10, -14);		//커서 → 이미지 좌상단 오프셋
+	CSCGdiplusBitmap m_drag_base_img;			//20260705 by claude. 밴드(문구) 없는 원본 드래그 이미지 — 문구 갱신 때 base+band 재합성용
+	CString			m_drag_hint_text;			//20260705 by claude. 현재 표시 중인 문구(캐시) — 값이 바뀔 때만 재합성
+	std::function<CString(CWnd* pDropWnd, CPoint pt_screen)> m_fn_drag_hint;		//드래그 문구 provider(app 설정)
+	//20260705 by claude. base 이미지 하단에 문구 밴드를 붙인 새 비트맵을 out 에 합성. XP 호환 위해 리스트 자체 폰트(m_lf) 사용.
+	void			compose_drag_image_with_hint(CSCGdiplusBitmap& base, const CString& text, CSCGdiplusBitmap& out);
 	bool			m_bDragging = false;		//T during a drag operation
 	int				m_drag_scroll_vx = 0;		//드래그 자동 스크롤 속도(가로, tick당 level, 부호=방향). 0=스크롤 안 함.
 	int				m_drag_scroll_vy = 0;		//드래그 자동 스크롤 속도(세로).

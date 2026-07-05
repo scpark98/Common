@@ -972,6 +972,20 @@ void CVtListCtrlEx::set_line_height(int height, bool invalidate)
 	if (m_use_own_imagelist && hPrev)
 		ListView_SetImageList(m_hWnd, hPrev, LVSIL_SMALL);
 
+	//20260705 by claude. owner-draw fixed 리스트는 WM_MEASUREITEM 이 생성 시 1회만 발화되고 item height 를 캐시한다. 위 imagelist
+	//스왑만으로는 재측정이 항상 트리거되지 않아, resize 이벤트가 없는 컨텍스트(고정 크기로 임베드된 리스트)에서는 다음 WM_SIZE
+	//전까지 새 line height 가 미반영됐다(사용자 리사이즈해야만 적용). set_header_height 와 동일하게 listview 크기를 1px 늘렸다
+	//되돌려 실제 WM_SIZE 2회를 발생시켜 item height 재측정을 강제한다.
+	if (m_hWnd != NULL)
+	{
+		CRect rc;
+		GetWindowRect(rc);
+		int w = rc.Width();
+		int h = rc.Height();
+		SetWindowPos(NULL, 0, 0, w, h + 1, SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
+		SetWindowPos(NULL, 0, 0, w, h,     SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
+	}
+
 	if (invalidate)
 		Invalidate();
 }
@@ -1617,6 +1631,13 @@ BOOL CVtListCtrlEx::PreTranslateMessage(MSG* pMsg)
 		::TranslateMessage(pMsg);
 		::DispatchMessage(pMsg);
 		return TRUE;
+	}
+
+	//20260705 by claude. 드래그 중 Ctrl/Shift 눌림·뗌 = 이동↔복사 토글 → 마우스가 안 움직여도 문구를 즉시 갱신(소비 안 함).
+	if ((pMsg->message == WM_KEYDOWN || pMsg->message == WM_KEYUP) &&
+		(pMsg->wParam == VK_CONTROL || pMsg->wParam == VK_SHIFT) && m_bDragging)
+	{
+		refresh_drag_hint();
 	}
 
 	//마우스 back button up
@@ -2968,10 +2989,16 @@ bool CVtListCtrlEx::delete_item(int index, bool delete_physical_file)
 
 	if (res)
 	{
-		CListCtrl::DeleteItem(index);
-		m_list_db.erase(m_list_db.begin() + index);
-		SetItemCount(m_list_db.size());
-		sync_scrollbar();
+		//20260705 by claude. delete_file(SHFileOperation)은 내부 메시지 펌프를 돌려 재진입(디렉터리 워처 refresh 등)으로 m_list_db 가
+		//이미 재구성됐을 수 있다. 그 상태에서 stale index 로 erase 하면 end() 를 넘겨 크래시(deque iterator past end)한다. erase 직전
+		//범위를 재확인하고, 넘거나 그 자리 항목이 방금 지운 파일이 아니면(다른 항목으로 대체됨) 이중 erase 를 생략한다(이미 반영됨).
+		if (index >= 0 && index < (int)m_list_db.size())
+		{
+			CListCtrl::DeleteItem(index);
+			m_list_db.erase(m_list_db.begin() + index);
+			SetItemCount(m_list_db.size());
+			sync_scrollbar();
+		}
 	}
 
 	return res;
@@ -5043,6 +5070,108 @@ CImageList* CVtListCtrlEx::create_drag_image(CListCtrl* pList, LPPOINT lpPoint, 
 	return pCompleteImageList;
 }
 
+//20260705 by claude. base 드래그 이미지(위) 하단에 tagged 문구(아래)를 CSCParagraph 로 그려 out 비트맵에 합성.
+void CVtListCtrlEx::compose_drag_image_with_hint(CSCGdiplusBitmap& base, const CString& tagged_text, CSCGdiplusBitmap& out)
+{
+	const int	band_pad_x = 10;	//문구-배경 좌우 여백
+	const int	band_pad_y = 4;		//문구-배경 상하 여백
+	const int	gap        = 4;		//base 이미지와 문구 밴드 사이 간격
+
+	//문구 기본 속성 — XP 호환 위해 컨트롤 폰트(m_lf). <b>/<cr=..> 태그가 개별 run 을 override(강조).
+	CSCTextProperty tp;
+	_tcsncpy_s(tp.name, _countof(tp.name), m_lf.lfFaceName, _TRUNCATE);
+	tp.size    = (float)get_font_size() + 1.0f;
+	tp.style   = Gdiplus::FontStyleRegular;
+	tp.cr_text = Gdiplus::Color(255, 40, 40, 40);	//폴더명 등 기본(어두운 회색)
+
+	//태그 파싱 → para. calc_text_rect 가 출력 크기를 자동 산출(MeasureString 불필요).
+	std::deque<std::deque<CSCParagraph>> para;
+	CString t = tagged_text;
+	CSCParagraph::build_paragraph_str(t, para, &tp);
+
+	//<b> 강조 run 에 같은 색 stroke 로 굵기 보강(faux-bold). 실제 bold face 가 있어도 작은 크기에선 weight 차가 약해 stroke 로 보강.
+	//단, 기호(+/→)는 얇아서 강하게(0.7), 한글/영문 단어는 stroke 가 과하면 글자가 뭉개지므로 약하게(0.3, semibold) 준다.
+	for (auto& line : para)
+		for (auto& run : line)
+		{
+			if (!(run.text_prop.style & Gdiplus::FontStyleBold))
+				continue;
+			bool has_word_char = false;
+			for (int k = 0; k < run.text.GetLength(); k++)
+			{
+				TCHAR c = run.text[k];
+				if (_istalnum(c) || (c >= 0xAC00 && c <= 0xD7A3)) { has_word_char = true; break; }
+			}
+			run.text_prop.thickness = has_word_char ? 0.0f : 0.7f;	//단어는 실제 bold 만(stroke 0 — CJK 뭉개짐 방지), 기호만 stroke 로 강조
+			run.text_prop.cr_stroke  = run.text_prop.cr_text;
+		}
+
+	CClientDC dc(this);
+	CRect tr = CSCParagraph::calc_text_rect(CRect(0, 0, 4096, 256), &dc, para, DT_LEFT | DT_TOP);	//넉넉한 박스 → 반환 rect = 실제 문구 크기
+	int band_w = tr.Width()  + band_pad_x * 2;
+	int band_h = tr.Height() + band_pad_y * 2;
+
+	int W = max(base.width, band_w);
+	int H = base.height + gap + band_h;
+
+	out.release();
+	out.create(W, H, PixelFormat32bppARGB);
+	Gdiplus::Graphics g(out.m_pBitmap);
+	g.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
+
+	//원본 드래그 이미지(위, 가로 중앙).
+	int img_x = (W - base.width) / 2;
+	g.DrawImage(base.m_pBitmap, img_x, 0, base.width, base.height);
+
+	//문구 밴드 배경(둥근 사각형) — near-white 반투명 + 옅은 테두리.
+	int band_x = (W - band_w) / 2;
+	Gdiplus::Rect band(band_x, base.height + gap, band_w, band_h);
+	draw_round_rect(&g, band, Gdiplus::Color(255, 120, 120, 120), Gdiplus::Color(240, 250, 250, 250), 5);
+
+	//문구(아래). calc_text_rect 는 수직 위치를 rc.top 이 아니라 0 기준으로 잡으므로(내부 구현), 전체 폭 W 에 가로 중앙
+	//(DT_CENTER|DT_TOP)으로 배치해 y=0 에 둔 뒤 각 run 을 밴드 안쪽 top 으로 직접 내린다.
+	int band_content_top = base.height + gap + band_pad_y - 1;	//-1: 시각적으로 살짝 아래로 치우쳐 보여 1px 위로
+	CSCParagraph::calc_text_rect(CRect(0, 0, W, 4096), &dc, para, DT_CENTER | DT_TOP);
+	for (auto& line : para)
+		for (auto& run : line)
+			run.r.OffsetRect(0, band_content_top);
+
+	g.SetTextRenderingHint(Gdiplus::TextRenderingHintAntiAlias);	//layered 창(per-pixel alpha)엔 grayscale AA 가 깔끔 — 안 하면 계단현상. draw_text 는 AA_from_pt=0 이면 이 hint 를 그대로 사용.
+	CSCParagraph::draw_text(g, para);
+}
+
+void CVtListCtrlEx::update_drag_hint(const CString& hint_text)
+{
+	if (hint_text == m_drag_hint_text)
+		return;
+	m_drag_hint_text = hint_text;
+
+	if (!::IsWindow(m_drag_shape.GetSafeHwnd()))
+		return;
+
+	if (hint_text.IsEmpty())
+	{
+		//밴드 없이 원본만(예: 같은 드라이브 이동).
+		m_drag_shape.set_image(GetTopLevelParent(), &m_drag_base_img, true);
+		return;
+	}
+
+	CSCGdiplusBitmap composed;
+	compose_drag_image_with_hint(m_drag_base_img, hint_text, composed);
+	m_drag_shape.set_image(GetTopLevelParent(), &composed, true);
+}
+
+void CVtListCtrlEx::refresh_drag_hint()
+{
+	if (!m_bDragging || !m_fn_drag_hint)
+		return;
+	CPoint pt;
+	GetCursorPos(&pt);
+	CWnd* pDropWnd = WindowFromPoint(pt);
+	if (pDropWnd)
+		update_drag_hint(m_fn_drag_hint(pDropWnd, pt));	//update_drag_hint 가 값 변화 시에만 재합성(캐시)
+}
+
 void CVtListCtrlEx::OnLvnBeginDrag(NMHDR* pNMHDR, LRESULT* pResult)
 {
 	if (!m_use_drag_and_drop)
@@ -5130,6 +5259,8 @@ void CVtListCtrlEx::OnLvnBeginDrag(NMHDR* pNMHDR, LRESULT* pResult)
 
 	//레이어드 드래그 이미지 표시. use_control(false) → WS_EX_TRANSPARENT(마우스 통과 → WindowFromPoint 가 아래 리스트/트리를
 	//반환, 드롭 판정 정상) + 포커스 안 뺏음. set_image 는 deep_copy 라 매 드래그 최신 이미지, 창은 hidden 생성이라 위치 후 show.
+	bmpRes.deep_copy(&m_drag_base_img);	//20260705 by claude. 문구 밴드 없는 원본 보관(base+band 재합성용)
+	m_drag_hint_text = _T("\x01");		//20260705 by claude. 문구 캐시 무효화 — 첫 update_drag_hint 는 무조건 반영
 	m_drag_shape.set_image(GetTopLevelParent(), &bmpRes, true);	//20260704 by claude. popup owner 는 최상위 창(리스트 child 아님)
 	m_drag_shape.use_control(false);
 	m_drag_shape_offset = CPoint(nOffset, nOffset - 4);
@@ -5195,6 +5326,10 @@ void CVtListCtrlEx::OnMouseMove(UINT nFlags, CPoint point)
 		}
 
 		m_pDropWnd = pDropWnd;
+
+		//20260705 by claude. 드래그 중 대상에 맞는 문구를 app provider 로 계산해 이미지에 반영(값 변화 시에만 재합성). pt = screen 좌표.
+		if (m_fn_drag_hint)
+			update_drag_hint(m_fn_drag_hint(pDropWnd, pt));
 
 		//드롭 대상 컨트롤(트리/리스트) 가장자리에 마우스가 hovering 되면 자동 스크롤.
 		//가장자리와의 거리에 비례해 속도 조절 + 타이머로 연속 스크롤(마우스가 멈춰 있어도) — update_drag_auto_scroll() 로 위임.

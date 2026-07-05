@@ -1866,7 +1866,10 @@ void CVtListCtrlEx::OnPaint()
 		//컬럼 폭 드래그 같은 partial invalidate 케이스에서 erase 프레임이 그대로 화면에 노출돼
 		//변경된 컬럼만 깜빡인다. memory DC 에 모두 그린 뒤 destructor 가 BitBlt 으로 한 번에
 		//paintDC 로 옮기면 erase 단계가 보이지 않는다 (비-overlay 분기와 동일한 패턴).
-		CMemoryDC mdc(&dc1, &rcFull, true);
+		//20260705 by claude. bBg=false: 예전엔 true 라 매 paint 마다 화면 전체를 buffer 로 SRCCOPY 읽어왔는데, 바로 아래에서
+		//cornerTop + rc 배경을 전부 다시 칠하고 DefWindowProc 가 header/items 를 덮으므로 그 읽기는 100% 버려졌다(비싼 VRAM read).
+		//false 로 하면 buffer 를 bk color 로 채우기만 하고 어차피 전부 overpaint → 결과 동일, 화면 되읽기 제거.
+		CMemoryDC mdc(&dc1, &rcFull, false);
 		CDC* pDC = &mdc;
 
 		if (!rcCornerTop.IsRectEmpty())
@@ -6081,9 +6084,12 @@ void CVtListCtrlEx::OnSize(UINT nType, int cx, int cy)
 				total_column_width += GetColumnWidth(i);
 		}
 		set_column_width(m_fixed_width_column, rc.Width() - total_column_width - 2);
-	}
 
-	sync_scrollbar();
+		//20260705 by claude. 고정 컬럼 폭이 방금 바뀌었으니 여기서만 재동기화. (그 외 순수 resize 의 sync 는 아래처럼 제거 —
+		//OnWindowPosChanged 가 WM_SIZE 안 뜨는 케이스까지 포함해 size/move 변화마다 이미 sync 하므로, OnSize 의 무조건 호출은
+		//리스트당 sync 2회 중복이었다. 측정: sync_scrollbar 739회 → 절반 이상이 이 중복.)
+		sync_scrollbar();
+	}
 
 	//WS_CLIPCHILDREN + 자식 스크롤바 환경에서 대각 resize 로 새로 확장된 client 영역이
 	//listctrl native invalidate 만으로는 stale pixel 남음 — 부모가 그릴 영역 강제 invalidate.

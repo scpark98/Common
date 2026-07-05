@@ -439,7 +439,14 @@ void CSCThemeDlg::OnPaint()
 	CRect rc;
 	GetClientRect(rc);
 
-	CMemoryDC dc(&dc1, &rc);
+	//20260705 by claude. 전체 client 대신 실제 무효영역(m_ps.rcPaint)만 더블버퍼링한다. 그리기 로직은 client 좌표(rc) 그대로 —
+	//CMemoryDC 가 SetWindowOrg 로 좌표를 맞추고 소멸자가 rcPaint 만 화면에 blit 하므로 결과는 동일. 부분 무효화(아래 OnSize 의
+	//타이틀바만 invalidate, 또는 OS 가 새로 노출한 영역만 invalidate) 시 전체 크기 offscreen 비트맵 할당·전체 그리기가 사라진다.
+	CRect rc_paint = dc1.m_ps.rcPaint;
+	if (rc_paint.IsRectEmpty())
+		return;
+
+	CMemoryDC dc(&dc1, &rc_paint);
 
 	Gdiplus::Graphics g(dc.GetSafeHdc());
 	g.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
@@ -670,7 +677,20 @@ void CSCThemeDlg::OnSize(UINT nType, int cx, int cy)
 		return;
 
 	m_sys_buttons.adjust(0, cx);
-	Invalidate();
+
+	//20260705 by claude. 리사이즈 시 실제로 바뀌는 건 타이틀바(폭 변화)뿐이다 — 전체 Invalidate() 는 바뀌지도 않은 client 전체를
+	//매 프레임 재버퍼링/재그리기하게 만든다. WS_CLIPCHILDREN 이 켜진 dlg 는 자식이 스스로 그리고 새로 노출된 배경은 OS 가 자동
+	//invalidate 하므로, 테마가 그리는 '타이틀바 영역'만 무효화하면 충분하다(정석). WS_CLIPCHILDREN 이 없는 dlg 는 자식 밑 배경
+	//overdraw 방지를 위해 기존대로 전체 Invalidate() (다른 파생 dlg 회귀 방지).
+	if (GetStyle() & WS_CLIPCHILDREN)
+	{
+		if (m_titlebar_height > 0)
+			InvalidateRect(CRect(0, 0, cx, m_titlebar_height));
+	}
+	else
+	{
+		Invalidate();
+	}
 }
 
 void CSCThemeDlg::set_titlebar_text_color(Gdiplus::Color cr)

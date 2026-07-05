@@ -441,13 +441,12 @@ void CSCStatic::OnPaint()
 
 	m_text_rect = rc;
 
-	//아이콘 또는 헤더 이미지와 텍스트 사이의 갭 크기지만 이미지의 여백, 크기 정도에 따라 갭은 비율로 조정되도록 수정되어야 한다.
-	int gap = 4;
+	//20260705 by claude. 아이콘/헤더이미지와 텍스트 사이의 간격 — set_header_gap 으로 조정(기본 4). 예전엔 여기 gap=4 하드코딩.
+	int gap = m_header_gap;
 
 	//아이콘이 있으면 아이콘을 그려준다.
 	if (m_hIcon != NULL)
 	{
-		gap = 4;
 
 		CRect rIcon = m_text_rect;
 		CSize szIcon = m_sz_icon;
@@ -577,7 +576,7 @@ void CSCStatic::OnPaint()
 			}
 			else
 			{
-				rImg.left = 2;
+				rImg.left = (m_margin.left > 0) ? m_margin.left : 2;	//20260705 by claude. 라운드 좌측 여백 — set_margin(left,...) 으로 조절(기본 2).
 				m_text_rect.left = rImg.left + szImg.cx + gap;
 			}
 		}
@@ -2263,6 +2262,18 @@ void CSCStatic::draw_word_hover_rect(bool draw, Gdiplus::Color cr_rect)
 		m_cr_word_hover_rect = cr_rect;
 }
 
+//20260705 by claude. 좌측 헤더이미지/아이콘이 차지하는 폭(2 + 이미지폭 + gap). 없으면 0. 단락 모드 layout·정렬이 이만큼 우측에서 시작.
+int CSCStatic::get_header_lead_width()
+{
+	int inset = (m_margin.left > 0) ? m_margin.left : 2;	//라운드 좌측 여백(OnPaint 의 rImg.left 와 동일 규칙)
+	int idx = m_header_image_index;
+	if (idx >= 0 && idx < (int)m_header_images.size() && m_header_images[idx])
+		return inset + m_header_images[idx]->width + m_header_gap;
+	if (m_hIcon)
+		return inset + m_sz_icon.cx + m_header_gap;
+	return 0;
+}
+
 void CSCStatic::rebuild_layout()
 {
 	if (m_para.empty())
@@ -2274,6 +2285,11 @@ void CSCStatic::rebuild_layout()
 	CClientDC dc(this);
 	CRect rc;
 	GetClientRect(&rc);
+
+	//20260705 by claude. 헤더이미지/아이콘이 있으면 단락 텍스트가 그 폭만큼 우측에서 시작하도록 rc.left 를 민다. plain-text 경로는
+	//OnPaint 에서 m_text_rect.left 로 오프셋하지만, 단락 모드는 calc_text_rect(rc)+apply_halign 으로 layout 하므로 rc 를 직접
+	//줄이지 않으면 텍스트가 x=0 부터 그려져 아이콘과 겹친다. 같은 오프셋을 apply_halign 에도 적용해야 최종 정렬에서 상쇄되지 않는다.
+	rc.left += get_header_lead_width();
 
 	//DT_NOCLIP 만 넘겨 baseline 배치만 얻는다 — halign/valign 은 별도 단계로 적용.
 	m_text_rect = CSCParagraph::calc_text_rect(rc, &dc, m_para, DT_NOCLIP);
@@ -2345,6 +2361,9 @@ CRect CSCStatic::apply_halign()
 
 	CRect rc;
 	GetClientRect(&rc);
+
+	//20260705 by claude. 헤더이미지/아이콘 폭만큼 좌측을 밀어 텍스트가 아이콘 우측부터 정렬되게 한다(rebuild_layout 과 동일 오프셋).
+	rc.left += get_header_lead_width();
 
 	//global halign — -1 sentinel(기본값) 은 DT_LEFT 로 해석.
 	DWORD global_halign = (m_halign < 0) ? DT_LEFT : (DWORD)m_halign;

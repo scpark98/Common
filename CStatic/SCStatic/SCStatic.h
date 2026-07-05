@@ -369,6 +369,9 @@ public:
 
 	//png 이미지를 label의 앞에 표시한다. 2장 이상일 경우 alt효과를 줄 수 있다. id가 0이면 clear()로 동작한다.
 	void			add_header_image(UINT id, bool left_align_fix = false);
+	//20260705 by claude. 아이콘/헤더이미지와 라벨(텍스트) 사이의 간격(px). 기본 4. (예전엔 OnPaint 에 gap=4 로 하드코딩돼 조정 불가였음.)
+	void			set_header_gap(int gap) { m_header_gap = gap; if (::IsWindow(GetSafeHwnd())) Invalidate(); }
+	int				get_header_gap() { return m_header_gap; }
 	//png 이미지를 label의 앞에 표시한다. 2장 이상일 경우 alt효과를 줄 수 있다.
 	template <typename ... T> void set_header_images(T... args)
 	{
@@ -521,6 +524,7 @@ protected:
 	//label의 앞에 그려질 이미지이며 만약 2개 이상일 경우 타이머에 의해 alt되기도 한다.
 	std::deque<CSCGdiplusBitmap*> m_header_images;
 	int				m_header_image_index;
+	int				m_header_gap = 4;		//20260705 by claude. 아이콘/헤더이미지 ↔ 라벨 간격(px). set_header_gap 으로 조정.
 
 	//텍스트 앞에 표시되는 아이콘 또는 헤더 이미지를 텍스트와 별개로 무조건 왼쪽에 그려줄 경우
 	//CSCMessageBox에서 아이콘은 왼쪽에, 텍스트는 중앙정렬되어 표시되야 하므로 이 옵션이 추가됨.
@@ -567,6 +571,7 @@ protected:
 	CRect			reapply_line_spacings();
 	CRect			apply_halign();
 	CRect			apply_valign();
+	int				get_header_lead_width();	//20260705 by claude. 좌측 헤더이미지/아이콘 폭(2+폭+gap). 단락 layout·정렬 좌측 오프셋용.
 
 	int				m_max_width = 0;
 	int				m_max_width_line = 0;

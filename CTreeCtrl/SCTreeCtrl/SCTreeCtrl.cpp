@@ -196,6 +196,14 @@ void CSCTreeCtrl::reconstruct_font()
 
 BOOL CSCTreeCtrl::PreTranslateMessage(MSG* pMsg)
 {
+	//20260705 by claude. 드래그 중 Ctrl/Shift 눌림·뗌 = 이동↔복사 토글 → 마우스가 안 움직여도 문구를 즉시 갱신.
+	//(GetAsyncKeyState 는 이 시점의 실시간 키 상태를 반영. 소비하지 않고 계속 진행.)
+	if ((pMsg->message == WM_KEYDOWN || pMsg->message == WM_KEYUP) &&
+		(pMsg->wParam == VK_CONTROL || pMsg->wParam == VK_SHIFT) && m_bDragging)
+	{
+		refresh_drag_hint();
+	}
+
 	// TODO: 여기에 특수화된 코드를 추가 및/또는 기본 클래스를 호출합니다.
 	if (pMsg->message == WM_KEYDOWN)
 	{
@@ -2016,15 +2024,6 @@ BOOL CSCTreeCtrl::OnTvnBegindrag(NMHDR* pNMHDR, LRESULT* pResult)
 	//drag_img.draw_text(drag_img.width / 2 + 10, drag_img.height / 2, i2S(item_count), 20, 2,
 	//	_T("맑은 고딕"), Gdiplus::Color(192, 0, 0, 0), Gdiplus::Color(192, 255, 128, 128), DT_CENTER | DT_VCENTER);
 
-	m_pDragImage = new CImageList();
-	m_pDragImage->Create(drag_img.width, drag_img.height, ILC_COLOR32, 1, 1);
-	HICON hicon;
-	drag_img.m_pBitmap->GetHICON(&hicon);
-	m_pDragImage->Add(hicon);
-	DestroyIcon(hicon);		//Add 가 imagelist 로 복사하므로 원본 HICON 은 파기(안 하면 드래그마다 HICON 릭).
-
-	ASSERT(m_pDragImage); //make sure it was created
-
 	//// Set dragging flag and others
 	m_bDragging = TRUE;	//we are in a drag and drop operation
 	m_pDragWnd = this; //make note of which list we are dragging from
@@ -2033,10 +2032,18 @@ BOOL CSCTreeCtrl::OnTvnBegindrag(NMHDR* pNMHDR, LRESULT* pResult)
 	//// Capture all mouse messages
 	SetCapture();
 
-	//// Change the cursor to the drag image
-	////	(still must perform DragMove() in OnMouseMove() to show it moving)
-	m_pDragImage->BeginDrag(0, CPoint(-10, -14));	//이 좌표를 주지 않으면 move할때 이미지가 잘못된 위치에 표시된다.
-	m_pDragImage->DragEnter(GetDesktopWindow(), pNMTreeView->ptDrag);
+	//20260705 by claude. 레이어드 드래그 이미지 표시(리스트 CVtListCtrlEx 와 동일 방식). use_control(false) → WS_EX_TRANSPARENT
+	//(마우스 통과 → WindowFromPoint 가 아래 트리/리스트를 반환, 드롭 판정 정상) + 포커스 안 뺏음. 문구는 이미지 아래에 CSCParagraph
+	//로 그려 하나의 비트맵으로 합성(update_drag_hint). 이미지(위)만 먼저 표시하고, 대상에 따라 문구가 붙으면 재합성해 set_image.
+	drag_img.deep_copy(&m_drag_base_img);	//문구 없는 원본 보관(이미지+문구 재합성용)
+	m_drag_hint_text = _T("\x01");			//문구 캐시 무효화 — 첫 update_drag_hint 는 무조건 반영
+	m_drag_shape.set_image(GetTopLevelParent(), &drag_img, true);
+	m_drag_shape.use_control(false);
+	m_drag_shape_offset = CPoint(-10, -14);
+	CPoint scr;
+	GetCursorPos(&scr);
+	m_drag_shape.SetWindowPos(&CWnd::wndTopMost, scr.x + m_drag_shape_offset.x, scr.y + m_drag_shape_offset.y, 0, 0, SWP_NOSIZE | SWP_NOACTIVATE);
+	m_drag_shape.ShowWindow(SW_SHOWNOACTIVATE);
 
 	TRACE(_T("start drag...\n"));
 
@@ -2293,6 +2300,108 @@ void CSCTreeCtrl::create_drag_image(CSCGdiplusBitmap& drag_img)
 #endif
 }
 
+//20260705 by claude. base 드래그 이미지(위) 하단에 tagged 문구(아래)를 CSCParagraph 로 그려 out 비트맵에 합성.
+void CSCTreeCtrl::compose_drag_image_with_hint(CSCGdiplusBitmap& base, const CString& tagged_text, CSCGdiplusBitmap& out)
+{
+	const int	band_pad_x = 10;	//문구-배경 좌우 여백
+	const int	band_pad_y = 4;		//문구-배경 상하 여백
+	const int	gap        = 4;		//base 이미지와 문구 밴드 사이 간격
+
+	//문구 기본 속성 — XP 호환 위해 컨트롤 폰트(m_lf). <b>/<cr=..> 태그가 개별 run 을 override(강조).
+	CSCTextProperty tp;
+	_tcsncpy_s(tp.name, _countof(tp.name), m_lf.lfFaceName, _TRUNCATE);
+	tp.size    = (float)get_font_size() + 1.0f;
+	tp.style   = Gdiplus::FontStyleRegular;
+	tp.cr_text = Gdiplus::Color(255, 40, 40, 40);	//폴더명 등 기본(어두운 회색)
+
+	//태그 파싱 → para. calc_text_rect 가 출력 크기를 자동 산출(MeasureString 불필요).
+	std::deque<std::deque<CSCParagraph>> para;
+	CString t = tagged_text;
+	CSCParagraph::build_paragraph_str(t, para, &tp);
+
+	//<b> 강조 run 에 같은 색 stroke 로 굵기 보강(faux-bold). 실제 bold face 가 있어도 작은 크기에선 weight 차가 약해 stroke 로 보강.
+	//단, 기호(+/→)는 얇아서 강하게(0.7), 한글/영문 단어는 stroke 가 과하면 글자가 뭉개지므로 약하게(0.3, semibold) 준다.
+	for (auto& line : para)
+		for (auto& run : line)
+		{
+			if (!(run.text_prop.style & Gdiplus::FontStyleBold))
+				continue;
+			bool has_word_char = false;
+			for (int k = 0; k < run.text.GetLength(); k++)
+			{
+				TCHAR c = run.text[k];
+				if (_istalnum(c) || (c >= 0xAC00 && c <= 0xD7A3)) { has_word_char = true; break; }
+			}
+			run.text_prop.thickness = has_word_char ? 0.0f : 0.7f;	//단어는 실제 bold 만(stroke 0 — CJK 뭉개짐 방지), 기호만 stroke 로 강조
+			run.text_prop.cr_stroke  = run.text_prop.cr_text;
+		}
+
+	CClientDC dc(this);
+	CRect tr = CSCParagraph::calc_text_rect(CRect(0, 0, 4096, 256), &dc, para, DT_LEFT | DT_TOP);	//넉넉한 박스 → 반환 rect = 실제 문구 크기
+	int band_w = tr.Width()  + band_pad_x * 2;
+	int band_h = tr.Height() + band_pad_y * 2;
+
+	int W = max(base.width, band_w);
+	int H = base.height + gap + band_h;
+
+	out.release();
+	out.create(W, H, PixelFormat32bppARGB);
+	Gdiplus::Graphics g(out.m_pBitmap);
+	g.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
+
+	//원본 드래그 이미지(위, 가로 중앙).
+	int img_x = (W - base.width) / 2;
+	g.DrawImage(base.m_pBitmap, img_x, 0, base.width, base.height);
+
+	//문구 밴드 배경(둥근 사각형) — near-white 반투명 + 옅은 테두리.
+	int band_x = (W - band_w) / 2;
+	Gdiplus::Rect band(band_x, base.height + gap, band_w, band_h);
+	draw_round_rect(&g, band, Gdiplus::Color(255, 120, 120, 120), Gdiplus::Color(240, 250, 250, 250), 5);
+
+	//문구(아래). calc_text_rect 는 수직 위치를 rc.top 이 아니라 0 기준으로 잡으므로(내부 구현), 전체 폭 W 에 가로 중앙
+	//(DT_CENTER|DT_TOP)으로 배치해 y=0 에 둔 뒤 각 run 을 밴드 안쪽 top 으로 직접 내린다.
+	int band_content_top = base.height + gap + band_pad_y - 1;	//-1: 시각적으로 살짝 아래로 치우쳐 보여 1px 위로
+	CSCParagraph::calc_text_rect(CRect(0, 0, W, 4096), &dc, para, DT_CENTER | DT_TOP);
+	for (auto& line : para)
+		for (auto& run : line)
+			run.r.OffsetRect(0, band_content_top);
+
+	g.SetTextRenderingHint(Gdiplus::TextRenderingHintAntiAlias);	//layered 창(per-pixel alpha)엔 grayscale AA 가 깔끔 — 안 하면 계단현상. draw_text 는 AA_from_pt=0 이면 이 hint 를 그대로 사용.
+	CSCParagraph::draw_text(g, para);
+}
+
+void CSCTreeCtrl::update_drag_hint(const CString& hint_text)
+{
+	if (hint_text == m_drag_hint_text)
+		return;
+	m_drag_hint_text = hint_text;
+
+	if (!::IsWindow(m_drag_shape.GetSafeHwnd()))
+		return;
+
+	if (hint_text.IsEmpty())
+	{
+		//밴드 없이 원본만(예: 같은 드라이브 이동).
+		m_drag_shape.set_image(GetTopLevelParent(), &m_drag_base_img, true);
+		return;
+	}
+
+	CSCGdiplusBitmap composed;
+	compose_drag_image_with_hint(m_drag_base_img, hint_text, composed);
+	m_drag_shape.set_image(GetTopLevelParent(), &composed, true);
+}
+
+void CSCTreeCtrl::refresh_drag_hint()
+{
+	if (!m_bDragging || !m_fn_drag_hint)
+		return;
+	CPoint pt;
+	GetCursorPos(&pt);
+	CWnd* pDropWnd = WindowFromPoint(pt);
+	if (pDropWnd)
+		update_drag_hint(m_fn_drag_hint(pDropWnd, pt));	//update_drag_hint 가 값 변화 시에만 재합성(캐시)
+}
+
 void CSCTreeCtrl::OnMouseMove(UINT nFlags, CPoint point)
 {
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
@@ -2342,11 +2451,9 @@ void CSCTreeCtrl::OnMouseMove(UINT nFlags, CPoint point)
 	if (m_bDragging)
 	{
 		GetCursorPos(&point);
-		TRACE(_T("cursor = %d, %d\n"), point.x, point.y);
-		m_pDragImage->DragMove(point); //move the drag image to those coordinates
-
-		// Unlock window updates (this allows the dragging image to be shown smoothly)
-		//m_pDragImage->DragShowNolock(false);
+		//20260705 by claude. 레이어드 드래그 이미지를 커서+오프셋으로 이동(위치만, 재렌더 없음). point 는 screen 좌표(GetCursorPos).
+		if (::IsWindow(m_drag_shape.GetSafeHwnd()))
+			m_drag_shape.SetWindowPos(&CWnd::wndTopMost, point.x + m_drag_shape_offset.x, point.y + m_drag_shape_offset.y, 0, 0, SWP_NOSIZE | SWP_NOACTIVATE);
 
 		//// Get the CWnd pointer of the window that is under the mouse cursor
 		CWnd* pDropWnd = WindowFromPoint(point);
@@ -2363,6 +2470,11 @@ void CSCTreeCtrl::OnMouseMove(UINT nFlags, CPoint point)
 		}
 
 		m_pDropWnd = pDropWnd;
+
+		//20260705 by claude. 드래그 중 대상에 맞는 문구(예: "+ 대상폴더(으)로 복사")를 app provider 로 계산해 이미지에 반영.
+		//update_drag_hint 가 값 변화 시에만 재합성하므로 매 mousemove 호출해도 안전(캐시). point 는 아직 screen 좌표.
+		if (m_fn_drag_hint)
+			update_drag_hint(m_fn_drag_hint(pDropWnd, point));
 
 		//drag되는 위치가 대상 컨트롤(트리/리스트) 가장자리면 자동 스크롤(거리 비례 속도 + 타이머 연속). point 는 아직 screen 좌표.
 		update_drag_auto_scroll(point);
@@ -2455,7 +2567,7 @@ void CSCTreeCtrl::OnMouseMove(UINT nFlags, CPoint point)
 			// 삽입 마크 위치가 변경되면 다시 그리기
 			if (hOldInsertMark != m_hInsertMarkItem || oldDropPos != m_dropPosition)
 			{
-				m_pDragImage->DragShowNolock(FALSE);
+				//20260705 by claude. 레이어드 드래그 이미지는 화면 lock 이 없어 DragShowNolock 불필요(CImageList 잔재 제거).
 
 				// 이전 삽입 마크가 걸쳐있던 아이템 행 전체를 무효화
 				if (hOldInsertMark && oldDropPos != drop_on_item)
@@ -2521,7 +2633,6 @@ void CSCTreeCtrl::OnMouseMove(UINT nFlags, CPoint point)
 				}
 
 				UpdateWindow();
-				m_pDragImage->DragShowNolock(TRUE);
 			}
 
 			ASSERT(m_DropItem == NULL || m_dropPosition != drop_on_item || m_DropItem == pTree->GetDropHilightItem());
@@ -2532,8 +2643,6 @@ void CSCTreeCtrl::OnMouseMove(UINT nFlags, CPoint point)
 			// to note that we cannot drop here
 			::SetCursor(AfxGetApp()->LoadStandardCursor(MAKEINTRESOURCE(IDC_NO)));
 		}
-		// Lock window updates
-		m_pDragImage->DragShowNolock(true);
 	}
 
 	CTreeCtrl::OnMouseMove(nFlags, point);
@@ -2653,10 +2762,8 @@ void CSCTreeCtrl::OnLButtonUp(UINT nFlags, CPoint point)
 		m_drag_scroll_vx = 0;
 		m_drag_scroll_vy = 0;
 
-		m_pDragImage->DragLeave(GetDesktopWindow());
-		m_pDragImage->EndDrag();
-		delete m_pDragImage;
-		m_pDragImage = NULL;	//[중요] NULL 처리 안 하면 다음 드래그 OnTvnBegindrag 의 'if (m_pDragImage && GetSafeHandle())' 가드가 해제된 메모리를 역참조 → 크래시.
+		//20260705 by claude. 레이어드 드래그이미지 숨김(파괴 대신 재사용 — 다음 드래그의 set_image 가 갱신). CImageList 릭 경로 소멸.
+		m_drag_shape.ShowWindow(SW_HIDE);
 
 		// clear_insert_mark()를 여기서 호출하지 않는다.
 		// DroppedHandler() 내부에서 m_dropPosition을 사용한 후 clear_insert_mark()가 호출됨.
@@ -2703,13 +2810,8 @@ void CSCTreeCtrl::cancel_drag()
 	m_drag_scroll_vx = 0;
 	m_drag_scroll_vy = 0;
 
-	if (m_pDragImage)
-	{
-		m_pDragImage->DragLeave(GetDesktopWindow());
-		m_pDragImage->EndDrag();
-		delete m_pDragImage;
-		m_pDragImage = NULL;
-	}
+	//20260705 by claude. 레이어드 드래그이미지 숨김(파괴 대신 재사용).
+	m_drag_shape.ShowWindow(SW_HIDE);
 
 	//드롭 하이라이트/삽입마크 해제(자기 + 대상 트리 모두).
 	SelectDropTarget(NULL);
@@ -4442,23 +4544,19 @@ void CSCTreeCtrl::OnTimer(UINT_PTR nIDEvent)
 			//m_pDropWnd 가 아니라 m_drag_scroll_target — 커서가 오버레이 스크롤바 위여도 실제 트리/리스트로 보낸다.
 			//20260704 by claude. CVtListCtrlEx 는 자체 오버레이 가로 스크롤바(m_h_scroll_pos) 모델이라 raw Scroll() 로 밀면
 			//바가 안 따라와 desync 된다(콘텐츠만 스크롤, 바는 그대로). 리스트가 노출한 정상 경로 drag_scroll_by() 로 위임하면
-			//m_h_scroll_pos+sync_scrollbar 까지 동기화된다(리스트가 드래그 소스일 때의 OnTimer 와 동일 경로). 트리 드래그
-			//이미지는 아직 CImageList 라 DragShowNolock 로 화면 lock 을 잠깐 내렸다 올린다.
+			//m_h_scroll_pos+sync_scrollbar 까지 동기화된다(리스트가 드래그 소스일 때의 OnTimer 와 동일 경로).
+			//20260705 by claude. 트리 드래그 이미지도 레이어드 팝업(CSCShapeDlg)이라 화면 lock(DragShowNolock)이 불필요.
 			if (m_drag_scroll_target->IsKindOf(RUNTIME_CLASS(CVtListCtrlEx)))
 			{
 				CVtListCtrlEx* pl = (CVtListCtrlEx*)m_drag_scroll_target;
-				if (m_pDragImage) m_pDragImage->DragShowNolock(FALSE);
 				pl->drag_scroll_by(m_drag_scroll_vx * 30, m_drag_scroll_vy);	//가로 px, 세로 라인 수
-				if (m_pDragImage) m_pDragImage->DragShowNolock(TRUE);
 			}
 			else if (m_drag_scroll_target->IsKindOf(RUNTIME_CLASS(CListCtrl)))
 			{
 				//일반 CListCtrl(오버레이 바 없음)은 WM_*SCROLL SB_LINE 이 안 먹으므로 raw Scroll(픽셀).
 				CListCtrl* pl = (CListCtrl*)m_drag_scroll_target;
-				if (m_pDragImage) m_pDragImage->DragShowNolock(FALSE);
 				pl->Scroll(CSize(m_drag_scroll_vx * 30, m_drag_scroll_vy * 20));
 				pl->UpdateWindow();
-				if (m_pDragImage) m_pDragImage->DragShowNolock(TRUE);
 			}
 			else if (m_drag_scroll_target->IsKindOf(RUNTIME_CLASS(CSCTreeCtrl)))
 			{

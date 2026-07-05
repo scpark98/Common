@@ -59,6 +59,7 @@
 #include "../../CScrollbar/SCScrollbar/SCScrollbar.h"
 #include "../../CEdit/CSCStaticEdit/SCStaticEdit.h"
 #include "../../Json/rapid_json/json.h"
+#include "../../CDialog/SCShapeDlg/SCShapeDlg.h"		//20260705 by claude. 드래그 이미지를 레이어드 팝업으로(깜빡임 없음 + 드래그 중 문구 동적 갱신)
 
 
 static const UINT Message_CSCTreeCtrl = ::RegisterWindowMessage(_T("MessageString_CSCTreeCtrl"));
@@ -328,6 +329,17 @@ public:
 			m_drag_images_id.push_back(id);
 	}
 
+	//20260705 by claude. 드래그 중 드래그 이미지 하단에 표시할 문구(예: "+ 대상폴더(으)로 복사")를 app 이 계산해 돌려주는 provider.
+	//문구 내용은 드라이브 비교·local/remote(side) 판정 등 app 지식이 필요하므로 컨트롤이 아니라 app 이 정한다(§2.3: 메커니즘은
+	//컨트롤, 정책은 app). 빈 문자열을 반환하면 밴드 없이 원본 이미지만. 미설정이면 문구 없음(하위호환). pt 는 screen 좌표.
+	void			set_drag_hint_provider(std::function<CString(CWnd* pDropWnd, CPoint pt_screen)> fn) { m_fn_drag_hint = fn; }
+	//20260705 by claude. 드래그 이미지 문구 갱신. hint 가 빈 문자열이면 원본만, 아니면 원본 하단에 밴드+문구 합성. 값이 이전과
+	//같으면 재합성하지 않는다(캐시). 보통 OnMouseMove 가 provider 결과로 호출하지만 외부에서 직접 호출해도 된다.
+	void			update_drag_hint(const CString& hint_text);
+	//20260705 by claude. 현재 커서 위치 기준으로 provider 를 재호출해 문구를 갱신. 드래그 중 Ctrl/Shift 토글처럼 마우스가 안 움직여도
+	//문구를 바꿔야 할 때 호출(PreTranslateMessage 의 키 이벤트에서). 마우스 이동 시엔 OnMouseMove 가 같은 일을 한다.
+	void			refresh_drag_hint();
+
 	void			set_use_own_context_menu(bool use = true) { m_use_own_context_menu = use; }
 
 	//드래그앤드롭 기능을 사용할 것인지. 드래그앤드롭 기능이 false이면 순서 변경도 의미가 없다.
@@ -577,6 +589,13 @@ protected:
 	CWnd*			m_pDragWnd = nullptr;		//Which wnd we are dragging FROM
 	CWnd*			m_pDropWnd = nullptr;		//Which wnd we are dropping ON
 	CImageList*		m_pDragImage = nullptr;		//For creating and managing the drag-image
+	//20260705 by claude. 드래그 이미지 = 레이어드 팝업(CSCShapeDlg). CImageList(m_pDragImage) 는 화면 lock 방식이라 자동 스크롤
+	//시 매 tick 깜빡였고 드래그 중 이미지 교체도 EndDrag/BeginDrag 재생성이 필요했다. 레이어드 창은 set_image 재호출만으로
+	//즉시 갱신 → 드래그 중 "…로 이동/복사" 문구를 깜빡임 없이 실시간 반영 가능.
+	CSCShapeDlg		m_drag_shape;				//드래그 이미지(파일 아이콘/프리뷰 위 + tagged 문구 아래를 하나로 합성)
+	CPoint			m_drag_shape_offset = CPoint(-10, -14);		//커서 → 이미지 좌상단 오프셋
+	CSCGdiplusBitmap m_drag_base_img;			//20260705 by claude. 문구 없는 원본 드래그 이미지 — 문구 갱신 때 이미지+문구 재합성용
+	CString			m_drag_hint_text;			//20260705 by claude. 현재 표시 중인 문구(캐시) — 값이 바뀔 때만 재합성
 	bool			m_bDragging = false;		//T during a drag operation
 	std::deque<UINT> m_drag_images_id;			//drag할 때 사용하는 이미지들의 resource id 저장(단일파일용 이미지, 싱글파일용 이미지를 차례대로 넣고 drag되는 개수에 따라 맞는 이미지를 사용한다)
 	void			DroppedHandler(CWnd* pDragWnd, CWnd* pDropWnd);
@@ -584,6 +603,11 @@ protected:
 	//이 함수는 드래그 이미지를 직접 생성해주는 코드지만 취약점이 많은 코드이므로 참고만 할것.
 	CImageList*		create_drag_image(CTreeCtrl* pList, LPPOINT lpPoint);
 	void			create_drag_image(CSCGdiplusBitmap& drag_img);
+
+	//20260705 by claude. base 이미지(위) 하단에 tagged 문구(아래)를 CSCParagraph 로 그려 합성한 새 비트맵을 out 에 만든다.
+	//문구 크기는 CSCParagraph::calc_text_rect 가 자동 산출(MeasureString 불필요), <b>/<cr=..> 태그로 강조 스타일 적용.
+	void			compose_drag_image_with_hint(CSCGdiplusBitmap& base, const CString& tagged_text, CSCGdiplusBitmap& out);
+	std::function<CString(CWnd* pDropWnd, CPoint pt_screen)> m_fn_drag_hint;		//드래그 문구 provider(app 설정)
 
 	// 드롭 위치 판별 및 삽입 마크 관련
 	DropPosition	m_dropPosition = drop_on_item;

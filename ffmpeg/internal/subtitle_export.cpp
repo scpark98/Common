@@ -1,4 +1,5 @@
 ﻿#include "subtitle_export.h"
+#include "ffmpeg_internal.h"	//20260705 by claude. open_share_delete / close_share_delete
 #include "../../log/SCLog/SCLog.h"
 #include "../../subtitle/Subtitle.h"
 
@@ -65,23 +66,17 @@ bool list_embedded_subtitle_streams(LPCTSTR media_path, std::vector<EmbeddedSubt
 	if (!media_path || !*media_path)
 		return false;
 
-	//wide path → utf-8.
-	int u8len = WideCharToMultiByte(CP_UTF8, 0, media_path, -1, NULL, 0, NULL, NULL);
-	if (u8len <= 0) return false;
-	std::string u8path(u8len, 0);
-	WideCharToMultiByte(CP_UTF8, 0, media_path, -1, &u8path[0], u8len, NULL, NULL);
-
-	AVFormatContext* fmt = NULL;
-	int hr = avformat_open_input(&fmt, u8path.c_str(), NULL, NULL);
-	if (hr < 0 || !fmt)
+	//20260705 by claude. share-delete 헬퍼로 연다 — 자막 목록 조회 중에도 파일이 잠기지 않는다.
+	AVFormatContext* fmt = ffi::open_share_delete(media_path);
+	if (!fmt)
 	{
-		//logWrite(_T("[sub_export/list] open fail hr=%d"), hr);
+		//logWrite(_T("[sub_export/list] open_share_delete fail"));
 		return false;
 	}
 
 	if (avformat_find_stream_info(fmt, NULL) < 0)
 	{
-		avformat_close_input(&fmt);
+		ffi::close_share_delete(&fmt);
 		return false;
 	}
 
@@ -101,7 +96,7 @@ bool list_embedded_subtitle_streams(LPCTSTR media_path, std::vector<EmbeddedSubt
 	}
 
 	//logWrite(_T("[sub_export/list] %d subtitle streams"), (int)out.size());
-	avformat_close_input(&fmt);
+	ffi::close_share_delete(&fmt);
 	return true;
 }
 
@@ -172,58 +167,54 @@ bool export_subtitle_stream(LPCTSTR media_path, int stream_index, LPCTSTR out_pa
 	if (!media_path || !*media_path || !out_path || !*out_path || stream_index < 0)
 		return false;
 
-	int u8len = WideCharToMultiByte(CP_UTF8, 0, media_path, -1, NULL, 0, NULL, NULL);
-	if (u8len <= 0) return false;
-	std::string u8path(u8len, 0);
-	WideCharToMultiByte(CP_UTF8, 0, media_path, -1, &u8path[0], u8len, NULL, NULL);
-
-	AVFormatContext* in_fmt = NULL;
-	if (avformat_open_input(&in_fmt, u8path.c_str(), NULL, NULL) < 0 || !in_fmt)
+	//20260705 by claude. share-delete 헬퍼로 연다 — 자막 추출 중에도 파일이 잠기지 않는다.
+	AVFormatContext* in_fmt = ffi::open_share_delete(media_path);
+	if (!in_fmt)
 	{
-		//logWrite(_T("[sub_export/export] open fail"));
+		//logWrite(_T("[sub_export/export] open_share_delete fail"));
 		return false;
 	}
 	if (avformat_find_stream_info(in_fmt, NULL) < 0)
 	{
-		avformat_close_input(&in_fmt);
+		ffi::close_share_delete(&in_fmt);
 		return false;
 	}
 	if (stream_index < 0 || stream_index >= (int)in_fmt->nb_streams)
 	{
-		avformat_close_input(&in_fmt);
+		ffi::close_share_delete(&in_fmt);
 		return false;
 	}
 
 	AVStream* st = in_fmt->streams[stream_index];
 	if (!st || !st->codecpar || st->codecpar->codec_type != AVMEDIA_TYPE_SUBTITLE)
 	{
-		avformat_close_input(&in_fmt);
+		ffi::close_share_delete(&in_fmt);
 		return false;
 	}
 	if (!codec_is_text_subtitle(st->codecpar->codec_id))
 	{
 		//logWrite(_T("[sub_export/export] non-text codec — skip"));
-		avformat_close_input(&in_fmt);
+		ffi::close_share_delete(&in_fmt);
 		return false;
 	}
 
 	const AVCodec* codec = avcodec_find_decoder(st->codecpar->codec_id);
 	if (!codec)
 	{
-		avformat_close_input(&in_fmt);
+		ffi::close_share_delete(&in_fmt);
 		return false;
 	}
 	AVCodecContext* dec = avcodec_alloc_context3(codec);
 	if (!dec)
 	{
-		avformat_close_input(&in_fmt);
+		ffi::close_share_delete(&in_fmt);
 		return false;
 	}
 	if (avcodec_parameters_to_context(dec, st->codecpar) < 0 ||
 	    avcodec_open2(dec, codec, NULL) < 0)
 	{
 		avcodec_free_context(&dec);
-		avformat_close_input(&in_fmt);
+		ffi::close_share_delete(&in_fmt);
 		return false;
 	}
 
@@ -244,7 +235,7 @@ bool export_subtitle_stream(LPCTSTR media_path, int stream_index, LPCTSTR out_pa
 	if (!pkt)
 	{
 		avcodec_free_context(&dec);
-		avformat_close_input(&in_fmt);
+		ffi::close_share_delete(&in_fmt);
 		return false;
 	}
 
@@ -342,7 +333,7 @@ bool export_subtitle_stream(LPCTSTR media_path, int stream_index, LPCTSTR out_pa
 
 	av_packet_free(&pkt);
 	avcodec_free_context(&dec);
-	avformat_close_input(&in_fmt);
+	ffi::close_share_delete(&in_fmt);
 
 	//logWrite(_T("[sub_export/export] decoded %d captions"), caption_count);
 

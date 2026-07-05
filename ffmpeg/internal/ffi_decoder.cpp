@@ -1,4 +1,5 @@
 ﻿#include "ffi_decoder.h"
+#include "ffmpeg_internal.h"	//20260705 by claude. open_share_delete / close_share_delete
 
 #include "../../Functions.h"
 #include "../../log/SCLog/SCLog.h"
@@ -56,42 +57,6 @@ namespace ffi
 		close();
 	}
 
-	int CDecoder::avio_read_cb(void* opaque, uint8_t* buf, int buf_size)
-	{
-		CDecoder* self = (CDecoder*)opaque;
-		DWORD read = 0;
-		if (!::ReadFile(self->m_file_handle, buf, (DWORD)buf_size, &read, NULL))
-			return AVERROR(EIO);
-		if (read == 0)
-			return AVERROR_EOF;
-		return (int)read;
-	}
-
-	int64_t CDecoder::avio_seek_cb(void* opaque, int64_t offset, int whence)
-	{
-		CDecoder* self = (CDecoder*)opaque;
-		if (whence == AVSEEK_SIZE)
-		{
-			LARGE_INTEGER sz;
-			if (!::GetFileSizeEx(self->m_file_handle, &sz))
-				return AVERROR(EIO);
-			return sz.QuadPart;
-		}
-		DWORD method;
-		switch (whence & ~AVSEEK_FORCE)
-		{
-			case SEEK_CUR: method = FILE_CURRENT; break;
-			case SEEK_END: method = FILE_END;	  break;
-			default:	   method = FILE_BEGIN;	  break;
-		}
-		LARGE_INTEGER pos;
-		pos.QuadPart = offset;
-		LARGE_INTEGER new_pos;
-		if (!::SetFilePointerEx(self->m_file_handle, pos, &new_pos, method))
-			return AVERROR(EIO);
-		return new_pos.QuadPart;
-	}
-
 	bool CDecoder::open(const wchar_t* utf16_path)
 	{
 		if (m_fmt)
@@ -101,67 +66,18 @@ namespace ffi
 
 		m_path = utf16_path;	//백그라운드 duration 스캐너가 2nd context 로 다시 열 때 사용.
 
-		//Win32 CreateFile 로 직접 handle 열기 — FILE_SHARE_DELETE 포함해 외부 rename / move 시
-		//sharing violation 회피. avformat 기본 file protocol (_wsopen 기반) 은 FILE_SHARE_DELETE 미설정.
-		HANDLE h = ::CreateFileW(utf16_path, GENERIC_READ,
-			FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
-			NULL, OPEN_EXISTING,
-			FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN, NULL);
-		if (h == INVALID_HANDLE_VALUE)
-		{
-			//logWrite(_T("[ffi/dec] CreateFile fail err=%u"), ::GetLastError());
-			return false;
-		}
-		m_file_handle = h;
-
-		//custom AVIOContext — avio_alloc_context 의 buffer 는 av_malloc, avformat 이 내부에서 재할당 가능.
-		//close 시 m_avio->buffer 를 av_freep + avio_context_free 필요.
-		const int kAvioBufSize = 32 * 1024;
-		uint8_t* avio_buf = (uint8_t*)av_malloc(kAvioBufSize);
-		if (!avio_buf)
-		{
-			::CloseHandle(m_file_handle);
-			m_file_handle = nullptr;
-			return false;
-		}
-		m_avio = avio_alloc_context(avio_buf, kAvioBufSize, 0 /*write_flag*/,
-			this, &CDecoder::avio_read_cb, NULL, &CDecoder::avio_seek_cb);
-		if (!m_avio)
-		{
-			av_free(avio_buf);
-			::CloseHandle(m_file_handle);
-			m_file_handle = nullptr;
-			return false;
-		}
-
-		m_fmt = avformat_alloc_context();
+		//20260705 by claude. FILE_SHARE_DELETE custom-IO 헬퍼로 연다(미디어 재생 중에도 탐색기 삭제·이름변경 가능).
+		//GENPTS: pts 없는 packet 에 dts/frame duration 으로 pts 생성 (AVI 등 미종료 녹화 = pts 없음 / dts=프레임인덱스).
+		//이 flag 가 없으면 첫 video packet pts 가 NOPTS → video_has_pts()==false → LAV fallback → 내장 path 현재시간/동기 불동작.
+		//정상 파일엔 영향 없음(누락분만 생성).
+		m_fmt = open_share_delete(utf16_path, AVFMT_FLAG_GENPTS);
 		if (!m_fmt)
 		{
-			av_freep(&m_avio->buffer);
-			avio_context_free(&m_avio);
-			::CloseHandle(m_file_handle);
-			m_file_handle = nullptr;
-			return false;
-		}
-		m_fmt->pb = m_avio;
-		m_fmt->flags |= AVFMT_FLAG_CUSTOM_IO;
-		//pts 가 없는 packet 에 대해 dts/frame duration 으로 pts 를 생성한다 (AVI 등 미종료 녹화 = pts 없음 / dts=프레임인덱스).
-		//이 flag 가 없으면 첫 video packet 의 pts 가 NOPTS → video_has_pts()==false → LAV 로 fallback 하고
-		//내장 path 의 현재재생시간/동기가 동작 안 한다. genpts 는 pts 가 이미 있는 정상 파일엔 영향 없다 (누락분만 생성).
-		m_fmt->flags |= AVFMT_FLAG_GENPTS;
-
-		//URL=NULL 이면 avformat 이 m_fmt->pb 사용. probe 도 callback 으로 처리.
-		int hr = avformat_open_input(&m_fmt, NULL, NULL, NULL);
-		if (hr < 0)
-		{
-			char buf[256];
-			//logWrite(_T("[ffi/dec] avformat_open_input fail hr=%d (%hs)"), hr, ffi::err_str(hr, buf, sizeof(buf)));
-			//avformat_open_input 실패 시 m_fmt 는 자동 해제 (NULL set). close() 가 m_avio + handle 정리.
-			close();
+			//logWrite(_T("[ffi/dec] open_share_delete fail"));
 			return false;
 		}
 
-		hr = avformat_find_stream_info(m_fmt, NULL);
+		int hr = avformat_find_stream_info(m_fmt, NULL);
 		if (hr < 0)
 		{
 			char buf[256];
@@ -596,15 +512,10 @@ namespace ffi
 	//재생 중인 m_fmt 를 건드리지 않도록 독립된 2nd AVFormatContext 로 연다. m_scan_quit 로 취소 가능.
 	void CDecoder::scan_duration_worker()
 	{
-		//wstring → utf8 (FFmpeg file protocol 은 Windows 에서 utf8 경로를 내부적으로 wide 변환해 처리).
-		int u8len = ::WideCharToMultiByte(CP_UTF8, 0, m_path.c_str(), -1, NULL, 0, NULL, NULL);
-		if (u8len <= 0)
-			return;
-		std::string u8(u8len, '\0');
-		::WideCharToMultiByte(CP_UTF8, 0, m_path.c_str(), -1, &u8[0], u8len, NULL, NULL);
-
-		AVFormatContext* fmt = nullptr;
-		if (avformat_open_input(&fmt, u8.c_str(), NULL, NULL) < 0)
+		//20260705 by claude. 2nd context 도 주 핸들과 동일한 FILE_SHARE_DELETE 헬퍼로 연다.
+		//이전 URL 기반 avformat_open_input 은 share-delete 가 없어 전체 스캔 동안(수 초~수십 초) 파일이 잠겼다.
+		AVFormatContext* fmt = open_share_delete(m_path.c_str());
+		if (!fmt)
 			return;
 
 		//video / audio stream 둘 다 찾는다.
@@ -746,7 +657,7 @@ namespace ffi
 			}
 		}
 
-		avformat_close_input(&fmt);
+		close_share_delete(&fmt);
 	}
 
 	//시간(ms) → 파일 byte 위치를 seek 인덱스에서 보간. 인덱스 비었으면 -1. ms 가 끝 너머면 마지막 byte 로 clamp (content end).
@@ -808,20 +719,9 @@ namespace ffi
 			av_buffer_unref(&m_hw_device_ctx);
 		m_hw_pix_fmt = AV_PIX_FMT_NONE;
 
+		//20260705 by claude. custom pb buffer + AVIOContext + Win32 handle 까지 한 번에 정리.
 		if (m_fmt)
-			avformat_close_input(&m_fmt);
-
-		//AVFMT_FLAG_CUSTOM_IO 라 avformat_close_input 이 m_fmt->pb 를 정리하지 않음 — caller 책임.
-		if (m_avio)
-		{
-			av_freep(&m_avio->buffer);
-			avio_context_free(&m_avio);
-		}
-		if (m_file_handle)
-		{
-			::CloseHandle(m_file_handle);
-			m_file_handle = nullptr;
-		}
+			close_share_delete(&m_fmt);
 
 		m_video_stream_idx = -1;
 		m_probe_w = 0;

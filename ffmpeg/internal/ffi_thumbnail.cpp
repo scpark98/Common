@@ -1,4 +1,5 @@
 ﻿#include "ffi_thumbnail.h"
+#include "ffmpeg_internal.h"	//20260705 by claude. open_share_delete / close_share_delete
 
 #include "../../SCGdiplusBitmap.h"
 #include "../../log/SCLog/SCLog.h"
@@ -17,17 +18,11 @@ namespace ffi
 	{
 		close();
 
-		//avformat 는 UTF-8 경로. ffi_decoder 는 custom AVIO 를 쓰지만 thumbnail 은 단순 동기 read 라 표준 file protocol 로 충분.
-		char path_utf8[1024] = { 0 };
-		if (WideCharToMultiByte(CP_UTF8, 0, utf16_path, -1, path_utf8, sizeof(path_utf8), NULL, NULL) == 0)
-			return false;
-
-		int hr = avformat_open_input(&m_fmt, path_utf8, NULL, NULL);
-		if (hr < 0)
+		//20260705 by claude. share-delete 헬퍼로 연다 — 썸네일 추출 중에도 파일이 잠기지 않는다.
+		m_fmt = open_share_delete(utf16_path);
+		if (!m_fmt)
 		{
-			char buf[256];
-			//logWrite(_T("[ffi/thumb] open fail hr=%d (%hs)"), hr, err_str(hr, buf, sizeof(buf)));
-			m_fmt = nullptr;
+			//logWrite(_T("[ffi/thumb] open_share_delete fail"));
 			return false;
 		}
 
@@ -86,7 +81,7 @@ namespace ffi
 		if (m_vctx)
 			avcodec_free_context(&m_vctx);
 		if (m_fmt)
-			avformat_close_input(&m_fmt);
+			close_share_delete(&m_fmt);	//20260705 by claude. share-delete 헬퍼 정리
 		m_video_idx = -1;
 	}
 

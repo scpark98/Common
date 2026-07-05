@@ -14,11 +14,150 @@
 #include <afxstr.h>
 #include <atomic>
 #include <chrono>
+#include <new>
 #include <thread>
 #include <vector>
 
+//20260705 by claude. open_share_delete 의 custom-IO backing. avio->opaque 에 이 struct 포인터를 실어
+//read/seek 콜백이 Win32 handle 로 직접 ReadFile/SetFilePointerEx 한다. 파일 protocol 을 우회하므로
+//CreateFileW 의 FILE_SHARE_DELETE 공유 모드가 그대로 적용된다.
+namespace
+{
+	struct share_io
+	{
+		HANDLE h = nullptr;
+	};
+
+	int share_read_cb(void* opaque, uint8_t* buf, int buf_size)
+	{
+		share_io* s = (share_io*)opaque;
+		DWORD read = 0;
+		if (!::ReadFile(s->h, buf, (DWORD)buf_size, &read, NULL))
+			return AVERROR(EIO);
+		if (read == 0)
+			return AVERROR_EOF;
+		return (int)read;
+	}
+
+	int64_t share_seek_cb(void* opaque, int64_t offset, int whence)
+	{
+		share_io* s = (share_io*)opaque;
+		if (whence == AVSEEK_SIZE)
+		{
+			LARGE_INTEGER sz;
+			if (!::GetFileSizeEx(s->h, &sz))
+				return AVERROR(EIO);
+			return sz.QuadPart;
+		}
+		DWORD method;
+		switch (whence & ~AVSEEK_FORCE)
+		{
+			case SEEK_CUR: method = FILE_CURRENT; break;
+			case SEEK_END: method = FILE_END;	  break;
+			default:	   method = FILE_BEGIN;	  break;
+		}
+		LARGE_INTEGER pos;
+		pos.QuadPart = offset;
+		LARGE_INTEGER new_pos;
+		if (!::SetFilePointerEx(s->h, pos, &new_pos, method))
+			return AVERROR(EIO);
+		return new_pos.QuadPart;
+	}
+}
+
 namespace ffi
 {
+	AVFormatContext* open_share_delete(const wchar_t* utf16_path, int extra_flags)
+	{
+		if (!utf16_path)
+			return nullptr;
+
+		HANDLE h = ::CreateFileW(utf16_path, GENERIC_READ,
+			FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+			NULL, OPEN_EXISTING,
+			FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN, NULL);
+		if (h == INVALID_HANDLE_VALUE)
+			return nullptr;
+
+		share_io* io = new (std::nothrow) share_io();
+		if (!io)
+		{
+			::CloseHandle(h);
+			return nullptr;
+		}
+		io->h = h;
+
+		//avio_alloc_context 의 buffer 는 av_malloc, avformat 이 내부에서 재할당 가능.
+		//close 시 avio->buffer 를 av_freep + avio_context_free 필요.
+		const int kAvioBufSize = 32 * 1024;
+		uint8_t* avio_buf = (uint8_t*)av_malloc(kAvioBufSize);
+		if (!avio_buf)
+		{
+			::CloseHandle(h);
+			delete io;
+			return nullptr;
+		}
+		AVIOContext* avio = avio_alloc_context(avio_buf, kAvioBufSize, 0 /*write_flag*/,
+			io, &share_read_cb, NULL, &share_seek_cb);
+		if (!avio)
+		{
+			av_free(avio_buf);
+			::CloseHandle(h);
+			delete io;
+			return nullptr;
+		}
+
+		AVFormatContext* fmt = avformat_alloc_context();
+		if (!fmt)
+		{
+			av_freep(&avio->buffer);
+			avio_context_free(&avio);
+			::CloseHandle(h);
+			delete io;
+			return nullptr;
+		}
+		fmt->pb = avio;
+		fmt->flags |= AVFMT_FLAG_CUSTOM_IO;
+		fmt->flags |= extra_flags;
+
+		//URL=NULL 이면 avformat 이 fmt->pb 사용. probe 도 콜백으로 처리.
+		int hr = avformat_open_input(&fmt, NULL, NULL, NULL);
+		if (hr < 0)
+		{
+			//실패 시 fmt 는 avformat 이 자동 해제(NULL). CUSTOM_IO 라 pb(avio)+handle 은 우리 책임.
+			av_freep(&avio->buffer);
+			avio_context_free(&avio);
+			::CloseHandle(h);
+			delete io;
+			return nullptr;
+		}
+		return fmt;
+	}
+
+	void close_share_delete(AVFormatContext** pfmt)
+	{
+		if (!pfmt || !*pfmt)
+			return;
+
+		AVFormatContext* fmt = *pfmt;
+		AVIOContext* avio = fmt->pb;
+		share_io* io = (avio && avio->opaque) ? (share_io*)avio->opaque : nullptr;
+
+		//AVFMT_FLAG_CUSTOM_IO 라 avformat_close_input 이 pb 를 정리하지 않음 — 아래에서 직접.
+		avformat_close_input(pfmt);
+		if (avio)
+		{
+			av_freep(&avio->buffer);
+			avio_context_free(&avio);
+		}
+		if (io)
+		{
+			if (io->h && io->h != INVALID_HANDLE_VALUE)
+				::CloseHandle(io->h);
+			delete io;
+		}
+	}
+
 	//FFmpeg log callback — libav* 내부 로그를 우리 logWrite 로 라우팅.
 	//AV_LOG_WARNING 이상만 캡처 (TRACE / DEBUG 너무 verbose).
 	//ffmpeg 일부 내부 log 가 %s 에 NULL pointer 를 va_arg 로 전달, vsnprintf 안에서 access violation.
@@ -109,28 +248,20 @@ namespace ffi
 		if (!utf16_path)
 			return AVERROR(EINVAL);
 
-		//UTF-16 → UTF-8 변환 — FFmpeg 의 file API 는 UTF-8 경로를 받아 내부에서 Windows _wfopen 등으로 처리.
-		int u8_len = ::WideCharToMultiByte(CP_UTF8, 0, utf16_path, -1, NULL, 0, NULL, NULL);
-		if (u8_len <= 0)
-			return AVERROR(EINVAL);
-		std::vector<char> u8(u8_len);
-		::WideCharToMultiByte(CP_UTF8, 0, utf16_path, -1, u8.data(), u8_len, NULL, NULL);
-
-		AVFormatContext* fmt = NULL;
-		int hr = avformat_open_input(&fmt, u8.data(), NULL, NULL);
-		if (hr < 0)
+		//20260705 by claude. 파일을 여는 동안 탐색기 삭제·이름변경이 막히지 않도록 share-delete 헬퍼로 연다.
+		AVFormatContext* fmt = open_share_delete(utf16_path);
+		if (!fmt)
 		{
-			char buf[256];
-			//logWrite(_T("[ffi/dump] avformat_open_input fail hr=%d (%hs)"), hr, ffi::err_str(hr, buf, sizeof(buf)));
-			return hr;
+			//logWrite(_T("[ffi/dump] open_share_delete fail"));
+			return AVERROR(EIO);
 		}
 
-		hr = avformat_find_stream_info(fmt, NULL);
+		int hr = avformat_find_stream_info(fmt, NULL);
 		if (hr < 0)
 		{
 			char buf[256];
 			//logWrite(_T("[ffi/dump] find_stream_info fail hr=%d (%hs)"), hr, ffi::err_str(hr, buf, sizeof(buf)));
-			avformat_close_input(&fmt);
+			close_share_delete(&fmt);
 			return hr;
 		}
 
@@ -175,7 +306,7 @@ namespace ffi
 			}
 		}
 
-		avformat_close_input(&fmt);
+		close_share_delete(&fmt);
 		return 0;
 	}
 

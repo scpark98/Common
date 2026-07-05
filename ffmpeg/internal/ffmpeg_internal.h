@@ -66,4 +66,14 @@ namespace ffi
 		av_strerror(err_code, buf, buf_size);
 		return buf;
 	}
+
+	//20260705 by claude. FILE_SHARE_DELETE 로 연 Win32 handle 기반 custom-IO 로 AVFormatContext 를 연다.
+	//avformat 기본 file protocol(_wsopen 기반)은 FILE_SHARE_DELETE 를 안 줘, 미디어를 여는 동안 탐색기에서
+	//삭제·이름변경이 막힌다. 이 헬퍼로 열면 재생·스캔·썸네일·자막추출 어느 경로든 파일을 잠그지 않는다.
+	//extra_flags 는 open 전에 fmt->flags 에 OR (예: AVFMT_FLAG_GENPTS). find_stream_info 는 호출하지 않음(호출자 몫).
+	//성공 시 열린 context, 실패 시 nullptr(모든 자원 정리됨). 반드시 close_share_delete 로 해제.
+	AVFormatContext*	open_share_delete(const wchar_t* utf16_path, int extra_flags = 0);
+
+	//open_share_delete 로 연 context 를 해제(custom pb buffer + AVIOContext + Win32 handle 까지). *pfmt 는 nullptr 로.
+	void				close_share_delete(AVFormatContext** pfmt);
 }

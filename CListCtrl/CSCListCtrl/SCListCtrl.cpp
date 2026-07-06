@@ -1142,17 +1142,24 @@ int CSCListCtrl::hit_test(CPoint pt, int& item, int& subItem, bool include_icon)
 		last  = MIN(size(), first + GetCountPerPage());
 	}
 
+	//20260706 by claude. 맨 우측 컬럼 오른쪽(컬럼 총폭 밖)은 항목이 아닌 빈 영역으로 본다(탐색기와 동일). item 검사 우측 한계를
+	//컬럼 총폭(가로 스크롤 반영)으로 제한 → 우측 빈 영역 클릭/드래그는 item=-1 → 마퀴 선택 시작 등 빈 공간 처리로 이어진다.
+	int col_right = 0;
+	for (int c = 0; c < get_column_count(); c++)
+		col_right += GetColumnWidth(c);
+	col_right -= GetScrollPos(SB_HORZ);
+
 	for (int i = first; i < last; i++)
 	{
-		//LVIR_BOUNDS로 itemRect를 구하면 맨 끝 컬럼의 우측 클릭 시 범위안에 들어오지 않으므로
-		//item도 -1을 리턴한다. itemRect.right는 rc.right로 검사해줘야 subItem은 -1이더라도 item은 알 수 있다.
+		//20260706 by claude. item 검사 우측 한계 = 컬럼 총폭(col_right). 그 오른쪽 빈 영역은 항목으로 잡지 않아(item=-1)
+		//빈 공간 처리(마퀴 등)로 넘어간다. col_right 가 rc.right 보다 크면(컬럼이 화면을 넘침) rc.right 로 클램프.
 		GetItemRect(i, &itemRect, LVIR_BOUNDS);
 		if (m_smooth_scroll)
 		{
 			itemRect.top    = header + i * rowH - m_scroll_y;
 			itemRect.bottom = itemRect.top + rowH;
 		}
-		itemRect.right = rc.right;
+		itemRect.right = min((LONG)rc.right, (LONG)col_right);
 
 		if (itemRect.PtInRect(pt))
 		{
@@ -1966,10 +1973,12 @@ void CSCListCtrl::OnPaint()
 			}
 			if (pOldFont)
 				pDC->SelectObject(pOldFont);
+			draw_marquee(pDC);		//20260706 by claude. 마퀴 사각형은 행 위에.
 			return;
 		}
 
 		DefWindowProc(WM_PAINT, (WPARAM)pDC->m_hDC, (LPARAM)0);
+		draw_marquee(pDC);			//20260706 by claude. native 그리기 후 마퀴 사각형 오버레이.
 		return;
 	}
 
@@ -5409,6 +5418,15 @@ void CSCListCtrl::OnMouseMove(UINT nFlags, CPoint point)
 	}
 
 
+	//20260706 by claude. 마퀴 드래그 중이면 사각형 갱신 + 겹치는 항목 선택(시작 시 고정한 ctrl 모드).
+	if (m_marquee_active)
+	{
+		m_marquee_cur = point;
+		apply_marquee_selection(m_marquee_ctrl);
+		Invalidate(FALSE);
+		return;
+	}
+
 	//// If we are in a drag/drop procedure (m_bDragging is true)
 	if (m_bDragging)
 	{
@@ -5636,6 +5654,14 @@ void CSCListCtrl::OnLButtonUp(UINT nFlags, CPoint point)
 	//	1) Release the mouse capture
 	//	2) Set m_bDragging to false to signify we are not dragging
 	//	3) Actually drop the item (we call a separate function to do that)
+
+	//20260706 by claude. 마퀴 드래그 종료 — capture 해제 + 사각형 지우기(선택은 이미 이동 중 반영됨).
+	if (m_marquee_active)
+	{
+		end_marquee();
+		CListCtrl::OnLButtonUp(nFlags, point);
+		return;
+	}
 
 	//If we are in a drag and drop operation (otherwise we don't do anything)
 	if (m_bDragging)
@@ -6105,43 +6131,140 @@ void CSCListCtrl::toggle_check(int item)
 }
 
 
+//20260706 by claude. 마퀴(rubber-band) 선택 — 빈 공간 드래그로 사각형에 겹치는 항목 선택. smooth/native 공용.
+//행 화면 rect: smooth 는 m_scroll_y 픽셀 기준, native 는 GetItemRect. report 뷰라 가로는 전체폭.
+void CSCListCtrl::row_screen_rect(int item, CRect& out)
+{
+	CRect rc;
+	GetClientRect(&rc);
+	if (m_smooth_scroll)
+	{
+		int rowH = (m_line_height > 0) ? m_line_height : 16;
+		int top = get_header_height() + item * rowH - m_scroll_y;
+		out = CRect(rc.left, top, rc.right, top + rowH);
+	}
+	else
+	{
+		GetItemRect(item, &out, LVIR_BOUNDS);
+		out.left  = rc.left;
+		out.right = rc.right;
+	}
+}
+
+void CSCListCtrl::start_marquee(CPoint point, bool ctrl)
+{
+	m_marquee_active = true;
+	m_marquee_start  = point;
+	m_marquee_cur    = point;
+	m_marquee_ctrl   = ctrl;
+	SetCapture();
+
+	m_marquee_base.clear();
+	if (ctrl)
+		get_selected_items(&m_marquee_base);	//Ctrl 드래그 = 기존 선택 유지 + 사각형 추가.
+	else
+		SetItemState(-1, 0, LVIS_SELECTED);		//plain = 기존 선택 해제 후 사각형만.
+	Invalidate(FALSE);
+}
+
+void CSCListCtrl::end_marquee()
+{
+	if (!m_marquee_active)
+		return;
+	m_marquee_active = false;
+	if (::GetCapture() == m_hWnd)
+		ReleaseCapture();
+	m_marquee_base.clear();
+	Invalidate(FALSE);	//사각형 지우기.
+}
+
+void CSCListCtrl::apply_marquee_selection(bool ctrl)
+{
+	CRect m(m_marquee_start, m_marquee_cur);
+	m.NormalizeRect();
+
+	//20260706 by claude. 가로: 마퀴가 실제 컬럼 영역([rc.left, col_right])에 겹칠 때만 선택한다. 우측 빈 영역에서 시작해
+	//거기만 걸쳐 있는 동안(m.left >= col_right)은 선택 안 되고, 드래그가 col_right 왼쪽으로 넘어오는 순간부터 선택된다.
+	CRect rc;
+	GetClientRect(&rc);
+	int col_right = 0;
+	for (int c = 0; c < get_column_count(); c++)
+		col_right += GetColumnWidth(c);
+	col_right -= GetScrollPos(SB_HORZ);
+	bool h_overlap = (m.left < col_right) && (m.right > rc.left);
+
+	int total = size();
+	for (int i = 0; i < total; i++)
+	{
+		CRect r;
+		row_screen_rect(i, r);
+		bool in = h_overlap && (r.top < m.bottom && r.bottom > m.top);	//컬럼 영역 가로 겹침 + 행 세로 겹침.
+		bool base_sel = false;
+		if (ctrl)
+			for (int b : m_marquee_base)
+				if (b == i) { base_sel = true; break; }
+		bool want = ctrl ? (base_sel || in) : in;
+		bool cur  = (GetItemState(i, LVIS_SELECTED) & LVIS_SELECTED) != 0;
+		if (want != cur)
+			SetItemState(i, want ? LVIS_SELECTED : 0, LVIS_SELECTED);
+	}
+}
+
+void CSCListCtrl::draw_marquee(CDC* pDC)
+{
+	if (!m_marquee_active)
+		return;
+	CRect m(m_marquee_start, m_marquee_cur);
+	m.NormalizeRect();
+	if (m.Width() < 1 || m.Height() < 1)
+		return;
+	//선택색 계열 반투명 채움 + 실선 테두리.
+	draw_rect(pDC, m, Gdiplus::Color(200, 0, 120, 215), Gdiplus::Color(60, 0, 120, 215), 1);
+}
+
+
 void CSCListCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 {
+	int item = -1, subItem = -1;
+	hit_test(point, item, subItem, true);
+	int total = size();
+	bool ctrl  = (nFlags & MK_CONTROL) != 0;
+	bool shift = (nFlags & MK_SHIFT) != 0;
+	bool multi = (GetStyle() & LVS_SINGLESEL) == 0;
+
+	//20260706 by claude. 빈 공간(항목 밖) 눌림 → 마퀴(rubber-band) 선택. smooth/native 공용.
+	//"빈 공간"(항목 아래 + 맨 우측 컬럼 오른쪽) 판정은 hit_test 가 담당 — 우측 빈 영역이면 item=-1 을 반환한다.
+	//multi 선택 리스트에서 shift 없이 드래그 시작(ctrl 은 기존 선택에 추가). 단일선택/shift 는 종전대로 해제만.
+	if (item < 0)
+	{
+		SetFocus();
+		if (multi && !shift)
+			start_marquee(point, ctrl);
+		else if (!ctrl && !shift)
+			SetItemState(-1, 0, LVIS_SELECTED);
+		if (!m_marquee_active)
+			Invalidate(FALSE);
+		return;
+	}
+
 	//20260706 by claude. [smooth] native 선택은 native 세로 스크롤 기준이라 픽셀 페인트와 어긋난다 → 직접 선택 처리.
-	//hit_test(smooth 인지)로 클릭 행을 구하고 ctrl/shift 조합에 따라 SetItemState. (owner-data 도 SetItemState 로 선택상태·LVN_ITEMCHANGED 정상.)
 	if (m_smooth_scroll)
 	{
 		SetFocus();
-		int item = -1, subItem = -1;
-		hit_test(point, item, subItem, true);
-		int total = size();
-		bool ctrl  = (nFlags & MK_CONTROL) != 0;
-		bool shift = (nFlags & MK_SHIFT) != 0;
-		bool multi = (GetStyle() & LVS_SINGLESEL) == 0;
+		//마우스 클릭 정책: ctrl+shift=기존 선택에 anchor~item 범위 추가, ctrl=토글, shift=anchor~item 범위(나머지 해제), plain=단일.
+		bool anchor_valid = (m_focus_anchor >= 0 && m_focus_anchor < total);
+		if (multi && ctrl && shift && anchor_valid)
+			select_range_add(m_focus_anchor, item);
+		else if (multi && ctrl)
+			toggle_item_select(item);
+		else if (multi && shift && anchor_valid)
+			select_range(m_focus_anchor, item);
+		else
+			select_single(item);
+		SetItemState(item, LVIS_FOCUSED, LVIS_FOCUSED);
 
-		if (item >= 0 && item < total)
-		{
-			//마우스 클릭 정책: ctrl+shift=기존 선택에 anchor~item 범위 추가, ctrl=토글, shift=anchor~item 범위(나머지 해제), plain=단일.
-			bool anchor_valid = (m_focus_anchor >= 0 && m_focus_anchor < total);
-			if (multi && ctrl && shift && anchor_valid)
-				select_range_add(m_focus_anchor, item);
-			else if (multi && ctrl)
-				toggle_item_select(item);
-			else if (multi && shift && anchor_valid)
-				select_range(m_focus_anchor, item);
-			else
-				select_single(item);
-			SetItemState(item, LVIS_FOCUSED, LVIS_FOCUSED);
-		}
-		else if (!ctrl && !shift)
-		{
-			SetItemState(-1, 0, LVIS_SELECTED);		//빈 영역 클릭 → 전체 선택 해제.
-		}
-
-		//20260706 by claude. [smooth §4] 클릭 후처리(체크박스 토글·재클릭 편집진입)의 단일 출처는 OnNMClick 이다.
-		//smooth 는 native 를 우회해 NM_CLICK 이 안 뜨므로, 여기서 합성 NMITEMACTIVATE(ptAction=클릭좌표)로 OnNMClick 을
-		//직접 호출한다. OnNMClick 내부 hit_test 는 smooth-aware(m_scroll_y 반영)라 좌표만으로 올바른 항목을 찾는다.
-		//선택은 위에서 이미 처리했고(native 좌표 기준 선택을 못 쓰므로), OnNMClick 은 좌표만 필요한 후처리만 담당한다.
+		//[smooth §4] 클릭 후처리(체크박스 토글·재클릭 편집진입)의 단일 출처는 OnNMClick. smooth 는 NM_CLICK 이 안 뜨므로
+		//합성 NMITEMACTIVATE(ptAction=클릭좌표)로 직접 호출(내부 hit_test 가 smooth-aware).
 		NMITEMACTIVATE nmia = { 0 };
 		nmia.hdr.hwndFrom = m_hWnd;
 		nmia.hdr.idFrom   = (UINT_PTR)GetDlgCtrlID();

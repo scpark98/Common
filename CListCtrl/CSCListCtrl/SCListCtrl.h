@@ -849,6 +849,18 @@ protected:
 	std::deque<UINT> m_drag_images_id;			//drag할 때 사용하는 이미지들의 resource id 저장(단일파일용 이미지, 싱글파일용 이미지를 차례대로 넣고 drag되는 개수에 따라 맞는 이미지를 사용한다)
 	void			DroppedHandler(CWnd* pDragWnd, CWnd* pDropWnd);
 
+	//20260706 by claude. 마퀴(rubber-band) 선택 — 빈 공간을 드래그해 사각형에 겹치는 항목을 선택. 아이템 드래그(m_bDragging)와 별개.
+	bool			m_marquee_active = false;			//마퀴 드래그 중.
+	CPoint			m_marquee_start = CPoint(0, 0);		//드래그 시작(client 좌표).
+	CPoint			m_marquee_cur = CPoint(0, 0);		//현재 커서(client 좌표).
+	bool			m_marquee_ctrl = false;				//드래그 시작 시 Ctrl 눌림 여부(추가 모드) — 드래그 내내 고정.
+	std::deque<int>	m_marquee_base;						//드래그 시작 시점의 선택 스냅샷(Ctrl 드래그 = 기존 선택에 추가).
+	void			start_marquee(CPoint point, bool ctrl);	//빈 공간 눌림 → 마퀴 시작(capture, 스냅샷, plain 이면 선택 해제).
+	void			end_marquee();						//마퀴 종료(capture 해제, 사각형 지우기).
+	void			apply_marquee_selection(bool ctrl);	//현재 마퀴 사각형으로 선택 갱신.
+	void			row_screen_rect(int item, CRect& out);	//item 행의 화면 rect(smooth=m_scroll_y 기준, native=GetItemRect).
+	void			draw_marquee(CDC* pDC);				//OnPaint 에서 마퀴 사각형 렌더.
+
 	//https://jiniya.net/tt/594/
 	//이 함수는 드래그 이미지를 직접 생성해주는 코드지만 취약점이 많은 코드이므로 참고만 할것.
 	//20260704 by claude. out_bmp 를 주면 합성한 드래그 비트맵을 deep_copy 로 반환(CSCShapeDlg::set_image 용). CImageList 반환은 하위호환.

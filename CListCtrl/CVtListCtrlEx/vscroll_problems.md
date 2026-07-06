@@ -1,4 +1,4 @@
-# CVtListCtrlEx 세로 스크롤 문제 — 조사 기록 및 인수인계
+﻿# CVtListCtrlEx 세로 스크롤 문제 — 조사 기록 및 인수인계
 
 > **작성**: 2026-07-06 (nFTDServer/파일전송 앱 세션 중). 파일전송 전용 앱에서 계속 파기 어려워 문서로 이관.
 > **대상 파일**: `D:\1.Projects_C++\Common\CListCtrl\CVtListCtrlEx\VtListCtrlEx.cpp` / `.h`

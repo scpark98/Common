@@ -5,6 +5,7 @@
 #include "../../Functions.h"
 #include "../../MemoryDC.h"
 #include "../../win_compat/dwm.h"
+//#include "../../log/SCLog/SCLog.h"	//20260706 by claude. [진단 임시·주석] apply_client_titlebar_layout 측정 로그용. 재조사 시 해제. §2J
 
 //Dwmapi.lib 정적 링크는 XP에서 dwmapi.dll 부재로 로드 실패. win_compat::dwm 가 LoadLibrary 로 안전 호출하므로 정적 링크 제거.
 //#pragma comment(lib, "Dwmapi.lib")
@@ -201,18 +202,36 @@ void CSCThemeDlg::apply_client_titlebar_layout(const CRect& rc_template_client)
 	int want_cw = rc_template_client.Width();
 	int want_ch = rc_template_client.Height() + m_titlebar_height;
 
-	CRect rc_now;
-	GetClientRect(rc_now);
-
-	int dw = want_cw - rc_now.Width();
-	int dh = want_ch - rc_now.Height();
-	if (dw != 0 || dh != 0)
+	//20260706 by claude. client 를 want 로 *수렴* 시킨다. 단발 SetWindowPos 는 borderless 비-resizable 창에서 resize 가
+	//유발하는 WM_NCCALCSIZE 로 client 가 want 에 못 닿는다(로그 확정: ExistFileDlg after=want-12, 정상 창은 after=want).
+	//원인은 window delta 를 client delta 로 가정한 것 — 이 창군은 그 가정이 깨진다. 잔차(want-현재 client)를 재적용해
+	//수렴시키면 창 종류에 무관하게 client==want 가 된다. 이미 맞는 창은 1패스에 종료(no-op)라 회귀 없음.
+	//(이 창의 NC 는 resize 1회로 정착 안 함 — SWP_FRAMECHANGED 를 줘도 resizes=2 였음. 측정→보정하는 수렴이 유일하게 견고.)
+	for (int pass = 0; pass < 4; pass++)
 	{
+		CRect rc_c;
+		GetClientRect(rc_c);
+		int ddw = want_cw - rc_c.Width();
+		int ddh = want_ch - rc_c.Height();
+		if (ddw == 0 && ddh == 0)
+			break;
+
 		CRect rc_win;
 		GetWindowRect(rc_win);
-		SetWindowPos(nullptr, 0, 0, rc_win.Width() + dw, rc_win.Height() + dh,
+		SetWindowPos(nullptr, 0, 0, rc_win.Width() + ddw, rc_win.Height() + ddh,
 			SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
 	}
+
+	//20260706 by claude. [진단 임시·주석] 폭/높이 복원 측정 로그. 재조사 시 아래 블록 + 상단 SCLog.h include 를 함께 해제.
+	//(모든 CSCThemeDlg 창마다 매번 찍혀 로그가 시끄러우므로 평시엔 주석 유지. §2J)
+	//{
+	//	CRect rc_now;    GetClientRect(rc_now);
+	//	CRect rc_after;  GetClientRect(rc_after);   //수렴 후 결과
+	//	int dw = want_cw - rc_now.Width(), dh = want_ch - rc_now.Height();
+	//	logWrite(_T("[TBLAYOUT] template=%dx%d  want=%dx%d  after=%dx%d  tb=%d dw=%d dh=%d"),
+	//		rc_template_client.Width(), rc_template_client.Height(), want_cw, want_ch,
+	//		rc_after.Width(), rc_after.Height(), m_titlebar_height, dw, dh);
+	//}
 
 	if (m_titlebar_height <= 0)
 		return;

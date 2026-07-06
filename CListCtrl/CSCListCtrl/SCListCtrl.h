@@ -895,6 +895,17 @@ public:
 	virtual void DrawItem(LPDRAWITEMSTRUCT /*lpDrawItemStruct*/);
 	//20260706 by claude. 한 행(모든 셀)을 주어진 픽셀 rect 에 그린다 — DrawItem(native 위임) 과 smooth 픽셀 페인트가 공용.
 	void		draw_row(CDC* pDC, int iItem, const CRect& row_bounds);
+	//20260706 by claude. [smooth §3] 키보드 네비게이션 — 방향키/PageUp·Down/Home·End 로 포커스 이동+선택+가시유지. 처리하면 true.
+	bool		smooth_key_navigate(UINT vk);
+	//20260706 by claude. [smooth §3] item 이 항목 영역에 완전히 보이도록 m_scroll_y 최소 조정(native EnsureVisible 의 픽셀판).
+	void		smooth_ensure_visible(int item);
+	//20260706 by claude. 선택 원자연산 — 마우스(L/R)·키보드 핸들러가 공유(중복 방지). 정책(ctrl/shift 의미)은 각 핸들러가 결정하고 연산만 공용.
+	void		select_single(int item);			//item 만 선택, 나머지 해제, m_focus_anchor=item.
+	void		select_range(int anchor, int item);	//[anchor,item] 구간 선택, 나머지 해제(anchor 불변).
+	void		select_range_add(int anchor, int item);	//[anchor,item] 구간을 기존 선택에 추가(나머지 유지) — Ctrl+Shift.
+	void		toggle_item_select(int item);		//item 선택 토글, m_focus_anchor=item.
+	//20260706 by claude. 체크박스 토글 — 키보드(Space)·마우스(OnNMClick) 공유. 토글 + 재그리기 + parent(message_checked_item) 통지.
+	void		toggle_check(int item);
 	afx_msg void OnLvnColumnclick(NMHDR *pNMHDR, LRESULT *pResult);
 	virtual void PreSubclassWindow();
 	virtual BOOL PreTranslateMessage(MSG* pMsg);

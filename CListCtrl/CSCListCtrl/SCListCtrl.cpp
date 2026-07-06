@@ -1716,6 +1716,12 @@ BOOL CSCListCtrl::PreTranslateMessage(MSG* pMsg)
 		}
 
 		TRACE(_T("VtListCtrl key = %d\n"), pMsg->wParam);
+		//20260706 by claude. [smooth §3] 픽셀 페인트 모드에서는 native 세로 스크롤을 안 쓰므로 방향키/Page/Home/End 를
+		//직접 처리해 포커스 이동 + 선택 + m_scroll_y 로 가시 유지한다. native 위임 시 native 는 자기 세로 top 기준으로
+		//선택·스크롤해 픽셀 뷰포트(m_scroll_y)와 어긋난다. 처리한 키는 TRUE 로 소비(native 스크롤과 m_scroll_y 충돌 방지).
+		if (m_smooth_scroll && smooth_key_navigate((UINT)pMsg->wParam))
+			return TRUE;
+
 		switch (pMsg->wParam)
 		{
 			case VK_RETURN:
@@ -1748,14 +1754,18 @@ BOOL CSCListCtrl::PreTranslateMessage(MSG* pMsg)
 
 				if (GetExtendedStyle() & LVS_EX_CHECKBOXES)
 				{
-					int selected = get_selected_index();
-					if (selected < 0 || selected >= size())
+					//20260706 by claude. 다중 선택이면 선택된 항목 전부를 같은 상태로(첫 선택 항목 기준 토글) — 1개만 되던 문제 수정.
+					std::deque<int> sel;
+					get_selected_items(&sel);
+					if (sel.empty())
 						return FALSE;
 
-					m_list_db[selected].checked = !m_list_db[selected].checked;
-					TRACE(_T("checkbox toggle by spacebar. m_list_db[%d].checked = %d\n"), selected, m_list_db[selected].checked);
+					bool target = !get_check(sel.front());
+					for (int idx : sel)
+						set_check(idx, target);
 					Invalidate();
-					::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCListCtrl, (WPARAM) & (CSCListCtrlMessage(this, message_checked_item, NULL)), selected);
+					for (int idx : sel)
+						::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCListCtrl, (WPARAM) & (CSCListCtrlMessage(this, message_checked_item, NULL)), idx);
 					return TRUE;
 				}
 				break;
@@ -1865,6 +1875,11 @@ void CSCListCtrl::OnLvnOdstatechanged(NMHDR *pNMHDR, LRESULT *pResult)
 {
 	LPNMLVODSTATECHANGE pStateChanged = reinterpret_cast<LPNMLVODSTATECHANGE>(pNMHDR);
 	// TODO: Add your control notification handler code here
+	//20260706 by claude. owner-data 범위 상태변경(전체선택/해제 = iFrom..iTo, SetItemState(-1)) 알림. smooth 모드는 우리가
+	//픽셀 위치로 그리므로, native 의 per-item 무효화(native 좌표라 픽셀 뷰포트와 어긋남)에 의존하면 하단 잔상이 남는다.
+	//항목 영역을 통째로 무효화해 OnPaint 가 올바른 픽셀 위치로 다시 그리게 한다.
+	if (m_smooth_scroll)
+		Invalidate(FALSE);
 	*pResult = 0;
 }
 
@@ -2085,10 +2100,16 @@ CSCStaticEdit* CSCListCtrl::edit_item(int item, int subItem)
 	// The returned pointer should not be saved
 
 	// Make sure that the item is visible
-	if (!EnsureVisible(item, false)) 
+	//20260706 by claude. [smooth §4] native EnsureVisible 은 native 세로 top 을 움직일 뿐 픽셀 뷰포트(m_scroll_y)와 무관 →
+	//편집 박스가 실제 그려진 행과 다른 Y 에 뜬다. smooth 모드는 픽셀 EnsureVisible 로 항목을 화면에 들인다.
+	if (m_smooth_scroll)
+	{
+		smooth_ensure_visible(item);
+	}
+	else if (!EnsureVisible(item, false))
 	{
 		//InsertItem()
-		if (!EnsureVisible(item, TRUE)) 
+		if (!EnsureVisible(item, TRUE))
 			return NULL;
 	}
 
@@ -2097,6 +2118,18 @@ CSCStaticEdit* CSCListCtrl::edit_item(int item, int subItem)
 
 	CRect r = get_item_rect(item, subItem);
 	CRect rc;
+
+	//20260706 by claude. [smooth §4] get_item_rect 의 Y 는 native GetItemRect(=native 세로 top) 기준이라 픽셀 페인트와 어긋난다.
+	//행 Y 는 OnPaint 픽셀 루프와 동일 식(header + item*rowH - m_scroll_y)으로 덮어 편집 박스를 실제 그려진 행 위에 정확히 올린다.
+	//X(컬럼/가로스크롤)는 get_item_rect 가 native 가로 스크롤 기준으로 이미 맞다(smooth 도 가로는 native 사용).
+	if (m_smooth_scroll)
+	{
+		int rowH   = (m_line_height > 0) ? m_line_height : 16;
+		int header = get_header_height();
+		int y = header + item * rowH - m_scroll_y;
+		r.top    = y;
+		r.bottom = y + rowH;
+	}
 
 	//r.OffsetRect(0, 1);
 
@@ -4225,10 +4258,7 @@ BOOL CSCListCtrl::OnNMClick(NMHDR *pNMHDR, LRESULT *pResult)
 	{
 		if (ht == LVHT_ONITEMSTATEICON)
 		{
-			m_list_db[item].checked = !m_list_db[item].checked;
-			TRACE(_T("checkbox clicked. m_list_db[%d].checked = %d\n"), item, m_list_db[item].checked);
-			Invalidate();
-			::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCListCtrl, (WPARAM) & (CSCListCtrlMessage(this, message_checked_item, NULL)), item);
+			toggle_check(item);
 			return FALSE;
 		}
 	}
@@ -5695,15 +5725,9 @@ void CSCListCtrl::OnRButtonDown(UINT nFlags, CPoint point)
 		hit_test(point, item, subItem, true);
 		if (item >= 0 && item < size())
 		{
+			//우클릭 정책: 미선택이면 단일선택, 이미 선택돼 있으면 다중선택 유지.
 			if (!(GetItemState(item, LVIS_SELECTED) & LVIS_SELECTED))
-			{
-				int total = size();
-				for (int i = 0; i < total; i++)
-					if (i != item)
-						SetItemState(i, 0, LVIS_SELECTED);
-				SetItemState(item, LVIS_SELECTED, LVIS_SELECTED);
-				m_focus_anchor = item;
-			}
+				select_single(item);
 			SetItemState(item, LVIS_FOCUSED, LVIS_FOCUSED);
 			Invalidate(FALSE);
 		}
@@ -5778,6 +5802,12 @@ BOOL CSCListCtrl::OnLvnItemchanged(NMHDR* pNMHDR, LRESULT* pResult)
 
 	if (pNMListView->uNewState & LVIS_SELECTED)
 		set_auto_scroll(false);
+
+	//20260706 by claude. smooth 모드는 선택 하이라이트를 우리가 픽셀 위치로 그린다. native 의 per-item 무효화는 native 좌표라
+	//픽셀 뷰포트와 어긋나 잔상이 남으므로, 상태 변경 시 항목 영역을 무효화해 OnPaint 로 올바르게 다시 그린다.
+	//(더블버퍼 OnPaint 라 다중 SetItemState 로 여러 번 호출돼도 WM_PAINT 는 1회로 합쳐져 깜빡임 없음.)
+	if (m_smooth_scroll)
+		Invalidate(FALSE);
 
 	//trace(pNMListView->iItem);
 
@@ -6024,6 +6054,54 @@ void CSCListCtrl::get_remote_file_info(CString fullpath, WIN32_FIND_DATA* data)
 }
 
 
+//20260706 by claude. 선택 원자연산 — L/R 마우스·키보드 핸들러가 공유. 각 핸들러는 ctrl/shift 의 *의미*만 결정하고
+//실제 SetItemState 조작은 여기로 모은다(중복 방지).
+void CSCListCtrl::select_single(int item)
+{
+	int total = size();
+	for (int i = 0; i < total; i++)
+		if (i != item)
+			SetItemState(i, 0, LVIS_SELECTED);
+	SetItemState(item, LVIS_SELECTED, LVIS_SELECTED);
+	m_focus_anchor = item;
+}
+
+void CSCListCtrl::select_range(int anchor, int item)
+{
+	int total = size();
+	int a = min(anchor, item);
+	int b = max(anchor, item);
+	for (int i = 0; i < total; i++)
+		SetItemState(i, (i >= a && i <= b) ? LVIS_SELECTED : 0, LVIS_SELECTED);
+}
+
+void CSCListCtrl::select_range_add(int anchor, int item)
+{
+	int total = size();
+	int a = max(0, min(anchor, item));
+	int b = min(total - 1, max(anchor, item));
+	for (int i = a; i <= b; i++)
+		SetItemState(i, LVIS_SELECTED, LVIS_SELECTED);
+}
+
+void CSCListCtrl::toggle_item_select(int item)
+{
+	UINT st = GetItemState(item, LVIS_SELECTED);
+	SetItemState(item, (st & LVIS_SELECTED) ? 0 : LVIS_SELECTED, LVIS_SELECTED);
+	m_focus_anchor = item;
+}
+
+//20260706 by claude. 체크박스 토글 — 키보드(Space)·마우스(OnNMClick) 공유(중복 방지). 상태 변경은 기존 set_check/get_check 재사용.
+void CSCListCtrl::toggle_check(int item)
+{
+	if (item < 0 || item >= size())
+		return;
+	set_check(item, !get_check(item));
+	Invalidate();
+	::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCListCtrl, (WPARAM) & (CSCListCtrlMessage(this, message_checked_item, NULL)), item);
+}
+
+
 void CSCListCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 {
 	//20260706 by claude. [smooth] native 선택은 native 세로 스크롤 기준이라 픽셀 페인트와 어긋난다 → 직접 선택 처리.
@@ -6040,39 +6118,129 @@ void CSCListCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 
 		if (item >= 0 && item < total)
 		{
-			if (multi && ctrl)
-			{
-				UINT st = GetItemState(item, LVIS_SELECTED);
-				SetItemState(item, (st & LVIS_SELECTED) ? 0 : LVIS_SELECTED, LVIS_SELECTED);
-				m_focus_anchor = item;
-			}
-			else if (multi && shift && m_focus_anchor >= 0 && m_focus_anchor < total)
-			{
-				int a = min(m_focus_anchor, item);
-				int b = max(m_focus_anchor, item);
-				for (int i = 0; i < total; i++)
-					SetItemState(i, (i >= a && i <= b) ? LVIS_SELECTED : 0, LVIS_SELECTED);
-			}
+			//마우스 클릭 정책: ctrl+shift=기존 선택에 anchor~item 범위 추가, ctrl=토글, shift=anchor~item 범위(나머지 해제), plain=단일.
+			bool anchor_valid = (m_focus_anchor >= 0 && m_focus_anchor < total);
+			if (multi && ctrl && shift && anchor_valid)
+				select_range_add(m_focus_anchor, item);
+			else if (multi && ctrl)
+				toggle_item_select(item);
+			else if (multi && shift && anchor_valid)
+				select_range(m_focus_anchor, item);
 			else
-			{
-				for (int i = 0; i < total; i++)
-					if (i != item)
-						SetItemState(i, 0, LVIS_SELECTED);
-				SetItemState(item, LVIS_SELECTED, LVIS_SELECTED);
-				m_focus_anchor = item;
-			}
+				select_single(item);
 			SetItemState(item, LVIS_FOCUSED, LVIS_FOCUSED);
 		}
 		else if (!ctrl && !shift)
 		{
-			for (int i = 0; i < total; i++)
-				SetItemState(i, 0, LVIS_SELECTED);
+			SetItemState(-1, 0, LVIS_SELECTED);		//빈 영역 클릭 → 전체 선택 해제.
 		}
+
+		//20260706 by claude. [smooth §4] 클릭 후처리(체크박스 토글·재클릭 편집진입)의 단일 출처는 OnNMClick 이다.
+		//smooth 는 native 를 우회해 NM_CLICK 이 안 뜨므로, 여기서 합성 NMITEMACTIVATE(ptAction=클릭좌표)로 OnNMClick 을
+		//직접 호출한다. OnNMClick 내부 hit_test 는 smooth-aware(m_scroll_y 반영)라 좌표만으로 올바른 항목을 찾는다.
+		//선택은 위에서 이미 처리했고(native 좌표 기준 선택을 못 쓰므로), OnNMClick 은 좌표만 필요한 후처리만 담당한다.
+		NMITEMACTIVATE nmia = { 0 };
+		nmia.hdr.hwndFrom = m_hWnd;
+		nmia.hdr.idFrom   = (UINT_PTR)GetDlgCtrlID();
+		nmia.hdr.code     = NM_CLICK;
+		nmia.ptAction     = point;
+		LRESULT nmres = 0;
+		OnNMClick((NMHDR*)&nmia, &nmres);
+
 		Invalidate(FALSE);
 		return;
 	}
 
 	CListCtrl::OnLButtonDown(nFlags, point);
+}
+
+
+//20260706 by claude. [smooth §3] 방향키/Page/Home/End 로 포커스 이동 + 선택 갱신 + m_scroll_y 로 가시 유지.
+//처리하면 true(호출측이 native 로 넘기지 않고 소비). 선택 모델은 OnLButtonDown(smooth) 과 동일 —
+//shift=anchor~target 범위, ctrl=포커스만 이동, plain=단일선택. 단일선택 스타일이면 shift/ctrl 도 plain 취급.
+bool CSCListCtrl::smooth_key_navigate(UINT vk)
+{
+	int total = size();
+	if (total <= 0)
+		return false;
+
+	int rowH = (m_line_height > 0) ? m_line_height : 16;
+	CRect rc;
+	GetClientRect(&rc);
+	int header = get_header_height();
+	int area_h = max(0, rc.Height() - header);
+	int page_rows = max(1, area_h / rowH);
+
+	int focus = GetNextItem(-1, LVNI_FOCUSED);
+	if (focus < 0)
+		focus = get_selected_index();
+	if (focus < 0)
+		focus = 0;
+
+	int target = focus;
+	switch (vk)
+	{
+	case VK_UP:		target = focus - 1;			break;
+	case VK_DOWN:	target = focus + 1;			break;
+	case VK_PRIOR:	target = focus - page_rows;	break;
+	case VK_NEXT:	target = focus + page_rows;	break;
+	case VK_HOME:	target = 0;					break;
+	case VK_END:	target = total - 1;			break;
+	default:
+		return false;
+	}
+	target = max(0, min(target, total - 1));
+
+	bool shift = (GetKeyState(VK_SHIFT)   & 0x8000) != 0;
+	bool ctrl  = (GetKeyState(VK_CONTROL) & 0x8000) != 0;
+	bool multi = (GetStyle() & LVS_SINGLESEL) == 0;
+
+	//키보드 정책: shift=anchor~target 범위, ctrl=포커스만 이동(선택 유지, 탐색기 동작), plain=단일.
+	if (multi && shift)
+	{
+		if (m_focus_anchor < 0 || m_focus_anchor >= total)
+			m_focus_anchor = focus;
+		select_range(m_focus_anchor, target);
+	}
+	else if (multi && ctrl)
+	{
+		//포커스만 이동(기존 선택 유지, anchor 불변).
+	}
+	else
+	{
+		select_single(target);
+	}
+	SetItemState(target, LVIS_FOCUSED, LVIS_FOCUSED);
+
+	smooth_ensure_visible(target);
+	Invalidate(FALSE);
+	logWrite(_T("[smooth-nav] vk=0x%X focus=%d->%d page_rows=%d m_scroll_y=%d"), vk, focus, target, page_rows, m_scroll_y);
+	return true;
+}
+
+
+//20260706 by claude. [smooth §3] item 이 항목 영역에 완전히 보이도록 m_scroll_y 를 최소 조정한다(native EnsureVisible 의 픽셀판).
+//위로 벗어나면 item.top 에 맞추고, 아래로 벗어나면 item.bottom 이 영역 바닥에 닿게 한다. 최종 클램프·썸 반영은 sync_scrollbar.
+void CSCListCtrl::smooth_ensure_visible(int item)
+{
+	if (!m_smooth_scroll || item < 0)
+		return;
+
+	int rowH = (m_line_height > 0) ? m_line_height : 16;
+	CRect rc;
+	GetClientRect(&rc);
+	int header = get_header_height();
+	int area_h = max(0, rc.Height() - header);
+
+	int item_top    = item * rowH;
+	int item_bottom = item_top + rowH;
+
+	if (item_top < m_scroll_y)
+		m_scroll_y = item_top;
+	else if (item_bottom > m_scroll_y + area_h)
+		m_scroll_y = item_bottom - area_h;
+
+	sync_scrollbar();	//[0, content-area] 최종 클램프 + 세로 썸 위치 반영.
 }
 
 

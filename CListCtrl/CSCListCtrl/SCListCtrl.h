@@ -652,6 +652,10 @@ public:
 	int			get_line_height() { return m_line_height; }
 	void		set_line_height(int height, bool invalidate = false);
 
+	//20260706 by claude. 픽셀 페인트(부분행/여백0) 모드 on/off. off(기본) 면 기존 native 위임 동작 그대로.
+	void		set_smooth_scroll(bool smooth = true) { m_smooth_scroll = smooth; if (::IsWindow(m_hWnd)) { sync_scrollbar(); Invalidate(); } }
+	bool		is_smooth_scroll() { return m_smooth_scroll; }
+
 	void		set_column_width(int nCol, int cx, bool invalidate = false);
 	//레지스트리에 저장된 각 컬럼너비를 복원한다.
 	void		restore_column_width(CWinApp* pApp, CString sSection, bool invalidate = false);
@@ -889,6 +893,8 @@ public:
 	afx_msg void OnLvnOdfinditem(NMHDR *pNMHDR, LRESULT *pResult);
 	afx_msg void OnLvnOdcachehint(NMHDR *pNMHDR, LRESULT *pResult);
 	virtual void DrawItem(LPDRAWITEMSTRUCT /*lpDrawItemStruct*/);
+	//20260706 by claude. 한 행(모든 셀)을 주어진 픽셀 rect 에 그린다 — DrawItem(native 위임) 과 smooth 픽셀 페인트가 공용.
+	void		draw_row(CDC* pDC, int iItem, const CRect& row_bounds);
 	afx_msg void OnLvnColumnclick(NMHDR *pNMHDR, LRESULT *pResult);
 	virtual void PreSubclassWindow();
 	virtual BOOL PreTranslateMessage(MSG* pMsg);
@@ -947,6 +953,11 @@ public:
 	int				m_bottom_reserve = 0;		//세로바 시 하단 partial row 예약 px — OnNcCalcSize 가 설정, sync(바 위치)·OnNcPaint(빈영역 fill)가 읽음
 	bool			m_syncing = false;			//framechange 재진입 가드 (SWP_FRAMECHANGED → OnSize → sync 재진입 차단)
 	bool			m_snapping = false;			//top 항목 헤더 스냅 재진입 가드 (Scroll → LVN_ENDSCROLL 재귀 차단)
+	//20260706 by claude. [smooth scroll — 픽셀 페인트 모드] true 면 native 위임 대신 항목을 직접 픽셀 위치에 그려 부분행/여백0 을 구현.
+	//off(기본) 면 기존 native 위임 경로 100% 그대로(회귀 0). m_scroll_y = 픽셀 세로 오프셋(항목 영역 기준, 헤더 아래).
+	bool			m_smooth_scroll = false;
+	int				m_scroll_y = 0;
+	int				m_focus_anchor = -1;		//smooth 모드 shift-range 선택 기준 항목.
 	//WS_BORDER/WS_EX_CLIENTEDGE 가 켜져 있으면 PreSubclassWindow 에서 native border 제거하고 이 플래그를 켠 뒤
 	//OnNcCalcSize 에서 1px NC 확보 → OnNcPaint 가 theme 색으로 직접 그린다. (CSCTreeCtrl 와 동일 패턴.)
 	bool			m_draw_border = false;

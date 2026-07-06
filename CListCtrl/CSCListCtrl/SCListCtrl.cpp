@@ -6090,6 +6090,13 @@ void CSCListCtrl::OnHScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar)
 	if (m_in_editing)
 		edit_end();
 	CListCtrl::OnHScroll(nSBCode, nPos, pScrollBar);
+	//20260706 by claude. [§5-2 가로휠 썸 동기] native 리스트뷰는 마우스 가로휠(WM_MOUSEHWHEEL)을 자체적으로 WM_HSCROLL 로
+	//변환해 가로 스크롤한다(우리 OnMouseHWheel 우회). 이 경로는 m_h_scroll_pos 를 갱신하지 않아 오버레이 가로 썸이 안 따라온다.
+	//OnHScroll 은 native 자체 가로 스크롤에서만 불린다(우리 Scroll() 은 LVM_SCROLL 로 직접 스크롤 → WM_HSCROLL 미발생 →
+	//이 핸들러 미진입). 따라서 여기서 native 실제 가로 위치를 m_h_scroll_pos 로 미러링하면 native hwheel 이 썸에 반영되고
+	//우리 자체 스크롤 경로(드래그/휠/OnMouseHWheel)에는 영향이 없다.
+	m_h_scroll_pos = GetScrollPos(SB_HORZ);
+	logWrite(_T("[hscroll] nSBCode=%u native SB_HORZ=%d -> m_h_scroll_pos=%d"), nSBCode, GetScrollPos(SB_HORZ), m_h_scroll_pos);
 	sync_scrollbar();	//가로 오버레이 스크롤바(m_scrollbar_h) 연동.
 }
 
@@ -6531,6 +6538,14 @@ void CSCListCtrl::sync_scrollbar()
 	if (!m_scrollbar_setup || !::IsWindow(m_scrollbar.m_hWnd))
 		return;
 
+	//20260706 by claude. [진단 폭주 §5-2] sync_scrollbar 가 어떤 메시지 처리 중 호출되는지 특정 완료(WM_HSCROLL 0x0114
+	//148회 / WM_NOTIFY 0x004E 144회 = native hwheel→WM_HSCROLL smooth-scroll 스텝). 폭주라 상시 노이즈 → 주석 처리.
+	//{
+	//	const MSG* pm = GetCurrentMessage();
+	//	logWrite(_T("[sync-caller] curmsg=0x%04X wParam=0x%IX lParam=0x%IX"),
+	//		pm ? pm->message : 0, pm ? (UINT_PTR)pm->wParam : 0, pm ? (UINT_PTR)pm->lParam : 0);
+	//}
+
 	//native scrollbar 의 시각화는 setup_scrollbar 의 SWP_FRAMECHANGED + OnNcCalcSize(NC=0) 가
 	//영구 차단 — sync 마다 ShowScrollBar 토글은 무용하면서 OS 가 NCCALCSIZE/paint 사이클을 발화시켜
 	//컬럼 폭 드래그 중 변경 컬럼이 추가 repaint 되는 flicker 원인. 따라서 sync 진입부에선 호출 X.
@@ -6679,6 +6694,18 @@ void CSCListCtrl::sync_scrollbar()
 			m_scrollbar_h.MoveWindow(rTargetH);
 	}
 
+	//20260706 by claude. [smooth §5-1] m_scroll_y 는 오버플로 유무와 무관하게 항상 클램프한다.
+	//항목 많은 폴더에서 스크롤(m_scroll_y 큰 값) 후 항목 적은(오버플로 없는) 폴더로 이동하면 need_v=false 라
+	//아래 else-if(smooth) 클램프가 스킵된다. 잔류한 큰 m_scroll_y 로 OnPaint 의 first=m_scroll_y/rowH 가 total 을
+	//넘어 한 행도 안 그려져 리스트가 통째로 빈 것처럼 보인다. 여기서 항상 [0, content−area] 로 조인다(오버플로 없으면 0).
+	if (m_smooth_scroll)
+	{
+		int rowH = (m_line_height > 0) ? m_line_height : 16;
+		int area_h = max(0, rc.Height() - header);
+		int max_scroll = max(0, total * rowH - area_h);
+		m_scroll_y = max(0, min(m_scroll_y, max_scroll));
+	}
+
 	//IsWindowVisible() 는 부모 chain 의 WS_VISIBLE 까지 검사 — OnInitDialog 안에서는
 	//dialog 가 아직 SW_SHOW 전이라 false 반환 → toggle 가드용으로 쓰면 자식의 WS_VISIBLE
 	//비트가 켜진 채로 hide 가 스킵되어 dialog 가 보이는 순간 overlay 가 그대로 남는다.
@@ -6690,13 +6717,10 @@ void CSCListCtrl::sync_scrollbar()
 	else if (m_smooth_scroll)
 	{
 		//20260706 by claude. [smooth] 세로 스크롤바를 픽셀 단위로 구동 — range=콘텐츠 전체 높이(total*rowH), page=항목영역 높이, pos=m_scroll_y.
-		//바닥까지 내리면 마지막 행이 항목영역 바닥에 flush(여백 0), 맨 위는 부분행. m_scroll_y 를 [0, content−area] 로 클램프.
+		//바닥까지 내리면 마지막 행이 항목영역 바닥에 flush(여백 0), 맨 위는 부분행. (m_scroll_y 클램프는 위에서 항상 수행.)
 		int rowH = (m_line_height > 0) ? m_line_height : 16;
 		int content_h = total * rowH;
 		int area_h = max(0, rc.Height() - header);
-		int max_scroll = max(0, content_h - area_h);
-		if (m_scroll_y > max_scroll) m_scroll_y = max_scroll;
-		if (m_scroll_y < 0) m_scroll_y = 0;
 		m_scrollbar.set_range(0, content_h - 1);
 		m_scrollbar.set_page(area_h);
 		m_scrollbar.set_pos(m_scroll_y);
@@ -6723,6 +6747,9 @@ void CSCListCtrl::sync_scrollbar()
 		m_scrollbar.SetWindowPos(&CWnd::wndTop, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
 	}
 
+	//20260706 by claude. [진단 hsync §5-2] 가로 sync 진입값 측정 — sync 마다 폭주라 주석 처리(필요시 해제).
+	//logWrite(_T("[hsync] need_h=%d m_h_scroll_pos(in)=%d total_col_width=%d content_view_w=%d"),
+	//	(int)need_h, m_h_scroll_pos, total_col_width, content_view_w);
 	if (!need_h)
 	{
 		m_scrollbar_h.ShowWindow(SW_HIDE);
@@ -6741,6 +6768,8 @@ void CSCListCtrl::sync_scrollbar()
 		m_scrollbar_h.set_range(0, total_h_range - 1);
 		m_scrollbar_h.set_page(content_view_w);
 		m_scrollbar_h.set_pos(m_h_scroll_pos);
+		//logWrite(_T("[hsync] set thumb: max_h=%d range=[0,%d] page=%d pos=%d"),
+		//	max_h, total_h_range - 1, content_view_w, m_h_scroll_pos);
 		m_scrollbar_h.ShowWindow(SW_SHOW);
 		//parent dialog 의 child 라 형제인 listctrl 위로 z-order 올려야 보인다.
 		m_scrollbar_h.SetWindowPos(&CWnd::wndTop, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
@@ -6858,6 +6887,9 @@ LRESULT CSCListCtrl::on_message_CSCScrollbar(WPARAM wParam, LPARAM lParam)
 
 BOOL CSCListCtrl::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
 {
+	//20260706 by claude. [진단 §5-2] 진입 확인 — 가로휠이 WM_MOUSEWHEEL 로 오는지, MK_SHIFT 유무.
+	logWrite(_T("[wheel-entry] OnMouseWheel nFlags=0x%X zDelta=%d shift=%d setup=%d count=%d"),
+		nFlags, zDelta, (nFlags & MK_SHIFT) ? 1 : 0, (int)m_scrollbar_setup, GetItemCount());
 	if (m_scrollbar_setup && GetItemCount() > 0)
 	{
 		m_last_user_scroll_at = GetTickCount();
@@ -6867,8 +6899,11 @@ BOOL CSCListCtrl::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
 			int dx = -zDelta / WHEEL_DELTA * 60;
 			if (dx == 0)
 				dx = (zDelta > 0) ? -60 : 60;
+			//20260706 by claude. [진단 shiftwheel §5-2] 정상 동작하는 shift+세로휠 가로 경로 — hwheel 과 비교용.
+			int before_pos = m_h_scroll_pos;
 			m_h_scroll_pos += dx;
 			Scroll(CSize(dx, 0));
+			logWrite(_T("[shiftwheel] zDelta=%d dx=%d m_h_scroll_pos %d->%d"), zDelta, dx, before_pos, m_h_scroll_pos);
 			UpdateWindow();
 			sync_scrollbar();
 			return TRUE;
@@ -6920,16 +6955,26 @@ BOOL CSCListCtrl::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
 
 void CSCListCtrl::OnMouseHWheel(UINT nFlags, short zDelta, CPoint pt)
 {
+	//20260706 by claude. [진단 §5-2] 진입 확인 — 가로휠이 이 핸들러로 오는지.
+	logWrite(_T("[hwheel-entry] OnMouseHWheel nFlags=0x%X zDelta=%d setup=%d"), nFlags, zDelta, (int)m_scrollbar_setup);
 	if (m_scrollbar_setup)
 	{
 		m_last_user_scroll_at = GetTickCount();
 		int dx = zDelta / WHEEL_DELTA * 60;
 		if (dx == 0)
 			dx = (zDelta > 0) ? 60 : -60;
+		//20260706 by claude. [진단 hwheel §5-2] 가로휠 시 썸 미동기 측정.
+		int before_pos = m_h_scroll_pos;
+		int before_native = GetScrollPos(SB_HORZ);
+		int before_limit = GetScrollLimit(SB_HORZ);
 		m_h_scroll_pos += dx;
 		Scroll(CSize(dx, 0));
+		int after_native = GetScrollPos(SB_HORZ);
+		logWrite(_T("[hwheel] zDelta=%d dx=%d m_h_scroll_pos %d->%d | native SB_HORZ %d->%d limit=%d"),
+			zDelta, dx, before_pos, m_h_scroll_pos, before_native, after_native, before_limit);
 		UpdateWindow();
 		sync_scrollbar();
+		logWrite(_T("[hwheel] after sync_scrollbar: m_h_scroll_pos=%d"), m_h_scroll_pos);
 		return;
 	}
 	CListCtrl::OnMouseHWheel(nFlags, zDelta, pt);

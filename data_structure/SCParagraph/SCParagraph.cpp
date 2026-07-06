@@ -794,7 +794,61 @@ CRect CSCParagraph::calc_text_rect(CRect rc, CDC* pDC, std::deque<std::deque<CSC
 	}
 	*/
 
+	//20260706 by claude. 각 라인에 저장된 valign(line_align) 재적용 — 위에서 run 들을 top 정렬로 재계산했으므로,
+	//DT_TOP 이 아닌 라인만 라인 최대높이 기준으로 다시 정렬한다(재레이아웃돼도 데이터에 남아 지속). 기본(DT_TOP)은 무동작이라 회귀 없음.
+	for (i = 0; i < (int)para.size(); i++)
+	{
+		if (!para[i].empty() && para[i][0].line_align != DT_TOP)
+			set_per_line_align(para, i, para[i][0].line_align);
+	}
+
 	return rect_text;
+}
+
+//특정 라인(line_idx)의 run 들을 그 라인 최대높이 기준으로 valign(DT_TOP/DT_VCENTER/DT_BOTTOM) 재배치한다.
+//line_idx < 0 이면 모든 라인에 적용. calc_text_rect() 로 각 run 의 r 이 결정된 뒤(= 기본 top 정렬 상태) 호출한다.
+//calc_text_rect 는 한 라인의 run 들을 같은 top 에 놓으므로, 라인 top = run 들의 최소 top(이미 center/bottom 이어도 안전),
+//라인 높이 = run 들의 최대 height 로 잡아 각 run 을 정렬 방식에 맞춰 세로로만 이동(가로 위치·글자 높이 불변, 라인 stacking 불변).
+void CSCParagraph::set_per_line_align(std::deque<std::deque<CSCParagraph>>& para, int line_idx, DWORD align)
+{
+	int begin = (line_idx < 0) ? 0 : line_idx;
+	int end   = (line_idx < 0) ? (int)para.size() - 1 : line_idx;
+
+	if (begin < 0 || end >= (int)para.size())
+		return;
+
+	for (int i = begin; i <= end; i++)
+	{
+		if (para[i].empty())
+			continue;
+
+		int line_top = para[i][0].r.top;
+		int line_h   = 0;
+		for (int j = 0; j < (int)para[i].size(); j++)
+		{
+			if (para[i][j].r.top < line_top)
+				line_top = para[i][j].r.top;
+			if (para[i][j].r.Height() > line_h)
+				line_h = para[i][j].r.Height();
+		}
+
+		for (int j = 0; j < (int)para[i].size(); j++)
+		{
+			para[i][j].line_align = align;				//라인의 valign 을 데이터(para)에 저장 → calc_text_rect 재실행 시 자동 재적용(지속).
+
+			int rh = para[i][j].r.Height();
+
+			int target_top = line_top;					//DT_TOP (기본)
+			if (align & DT_VCENTER)
+				target_top = line_top + (line_h - rh) / 2;
+			else if (align & DT_BOTTOM)
+				target_top = line_top + (line_h - rh);
+
+			int dy = target_top - para[i][j].r.top;
+			if (dy != 0)
+				para[i][j].r.OffsetRect(0, dy);
+		}
+	}
 }
 
 int CSCParagraph::get_max_width_line(std::deque<std::deque<CSCParagraph>>& para)

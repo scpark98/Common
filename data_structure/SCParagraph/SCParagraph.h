@@ -90,6 +90,11 @@ public:
 	//값은 "기본 줄간격(보이는 여백)의 배수" — 1.0 = 기본, 0.5 = 절반, 0 = 딱 붙음, 2.0 = 2배.
 	float			line_spacing = -1.0f;
 
+	//이 라인의 세로 정렬(DT_TOP/DT_VCENTER/DT_BOTTOM). set_per_line_align 이 세팅하며, calc_text_rect 끝에서 라인마다 재적용된다.
+	//DT_TOP(기본) = run 들이 라인 top 에 정렬(기존 동작, 무동작). 라인 안에 크기가 다른 run(예: 큰 화살표+작은 텍스트)이 있을 때
+	//라인 최대높이 기준으로 세로 정렬. 데이터(para)에 저장되므로 재레이아웃돼도 지속된다. 라인의 각 run 에 동일 값 저장(대표=para[i][0]).
+	DWORD			line_align = DT_TOP;
+
 	//calc_text_rect 가 채우는 실측 글자 높이(폰트 ascent+descent 기준). r.Height()(글자 박스)는 패딩을 포함해 더 크다.
 	//set_line_spacing 이 <ls> 줄간격을 "보이는 여백 = pitch - ink_height" 로 계산할 때 사용.
 	float			ink_height = 0.0f;
@@ -160,6 +165,10 @@ public:
 
 	//calc_text_rect()에서 이미 각 paragraph의 r이 align에 따라 정해지지만 이를 동적으로 변경하고자 할 경우 호출.
 	static CRect	set_text_align(CRect rc, std::deque<std::deque<CSCParagraph>>& para, DWORD align);
+
+	//특정 라인의 세로 정렬을 별도로 설정할 경우 호출. 만약 line_idx < 0이면 모든 라인에 적용된다.
+	//align = DT_TOP or DT_VCENTER or DT_BOTTOM
+	static void		set_per_line_align(std::deque<std::deque<CSCParagraph>>& para, int line_idx, DWORD line_align);
 
 	//텍스트 상하좌우 여백
 	//static void		set_margin(std::deque<std::deque<CSCParagraph>>& para, float margin);

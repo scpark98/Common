@@ -856,7 +856,10 @@ protected:
 	bool			m_marquee_ctrl = false;				//드래그 시작 시 Ctrl 눌림 여부(추가 모드) — 드래그 내내 고정.
 	std::deque<int>	m_marquee_base;						//드래그 시작 시점의 선택 스냅샷(Ctrl 드래그 = 기존 선택에 추가).
 	void			start_marquee(CPoint point, bool ctrl);	//빈 공간 눌림 → 마퀴 시작(capture, 스냅샷, plain 이면 선택 해제).
-	void			end_marquee();						//마퀴 종료(capture 해제, 사각형 지우기).
+	void			end_marquee();						//마퀴 종료(capture 해제, 타이머 정지, 사각형 지우기).
+	int				m_marquee_scroll_vx = 0;			//마퀴 자동 스크롤 속도(가로, tick당 level, 부호=방향). 거리비례 가속.
+	int				m_marquee_scroll_vy = 0;			//마퀴 자동 스크롤 속도(세로).
+	void			update_marquee_auto_scroll(CPoint client_pt);	//커서의 client 가장자리 거리로 속도 산출 + 타이머 관리.
 	void			apply_marquee_selection(bool ctrl);	//현재 마퀴 사각형으로 선택 갱신.
 	void			row_screen_rect(int item, CRect& out);	//item 행의 화면 rect(smooth=m_scroll_y 기준, native=GetItemRect).
 	void			draw_marquee(CDC* pDC);				//OnPaint 에서 마퀴 사각형 렌더.
@@ -909,6 +912,8 @@ public:
 	void		draw_row(CDC* pDC, int iItem, const CRect& row_bounds);
 	//20260706 by claude. [smooth §3] 키보드 네비게이션 — 방향키/PageUp·Down/Home·End 로 포커스 이동+선택+가시유지. 처리하면 true.
 	bool		smooth_key_navigate(UINT vk);
+	//20260706 by claude. 행 높이(픽셀) — m_line_height 미설정(0 이하) 시 16 기본. 픽셀 페인트/히트테스트/스크롤 계산이 공유.
+	int			row_height() const { return (m_line_height > 0) ? m_line_height : 16; }
 	//20260706 by claude. [smooth §3] item 이 항목 영역에 완전히 보이도록 m_scroll_y 최소 조정(native EnsureVisible 의 픽셀판).
 	void		smooth_ensure_visible(int item);
 	//20260706 by claude. subItem 컬럼이 가로 뷰포트에 완전히 들어오도록 가로 스크롤(편집 진입 전 셀 노출). smooth/native 공용.
@@ -994,6 +999,7 @@ public:
 	int				m_last_top_index = -1;
 	int				m_h_scroll_pos = 0;		//가로 scroll 누적 pixel offset — WS_HSCROLL 제거 후 GetScrollPos(SB_HORZ) 가 stale 이라 자체 추적.
 	DWORD			m_last_user_scroll_at = 0;	//사용자 입력에 의한 scroll tick — 자동 ensure_visible 호출 측에서 sticky timeout 으로 사용.
+	DWORD			m_last_hsync_tick = 0;		//20260706 by claude. 가로 스크롤 sync 스로틀용 마지막 sync tick(WM_HSCROLL 폭주 완화).
 	void			setup_scrollbar();
 	void			sync_scrollbar();
 	LRESULT			on_message_CSCScrollbar(WPARAM wParam, LPARAM lParam);

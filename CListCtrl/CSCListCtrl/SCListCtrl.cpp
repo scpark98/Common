@@ -109,6 +109,8 @@ END_MESSAGE_MAP()
 
 //드래그 중 대상 컨트롤(트리/리스트) 가장자리 호버 시 연속 자동 스크롤용 타이머 ID.
 #define TIMER_ID_DRAG_AUTO_SCROLL	0x7A31
+//20260706 by claude. 가로 스크롤 폭주(native hwheel→다수 WM_HSCROLL) 스로틀의 trailing sync 용 타이머 ID.
+#define TIMER_ID_HSYNC_TRAILING		0x7A32
 
 
 
@@ -682,6 +684,19 @@ void CSCListCtrl::draw_row(CDC* pDC, int iItem, const CRect& row_bounds)
 			draw_rect(pDC, rowRect, m_theme.cr_selected_border, Gdiplus::Color::Transparent, m_selected_border_width, Gdiplus::PenAlignmentInset, m_selected_border_style);
 	}
 
+	//20260706 by claude. 포커스 항목 표시(점선) — 선택과 별개의 '현재 포커스' 표시. 선택 안 된 항목에만 그려 선택 테두리와 겹치지
+	//않게 한다. Ctrl+방향키처럼 선택은 그대로 두고 포커스만 이동하는 조작이 시각적으로 보이게 한다(없으면 '무반응'처럼 보임).
+	if (m_has_focus && !is_selected && (GetItemState(iItem, LVIS_FOCUSED) & LVIS_FOCUSED))
+	{
+		CRect rfocus;
+		GetSubItemRect(iItem, 0, LVIR_BOUNDS, rfocus);
+		rfocus.top    = row_bounds.top;
+		rfocus.bottom = row_bounds.bottom;
+		if (!is_full_row_selection)
+			rfocus.right = rfocus.left + GetColumnWidth(0);
+		draw_rect(pDC, rfocus, m_theme.cr_selected_border, Gdiplus::Color::Transparent, 1, Gdiplus::PenAlignmentInset, Gdiplus::DashStyleDot);
+	}
+
 	GetSubItemRect(iItem, 0, LVIR_BOUNDS, rowRect);
 	rowRect.top    = row_bounds.top;		//20260706 by claude. Y 만 호출자 행 위치로 (native no-op / smooth 픽셀).
 	rowRect.bottom = row_bounds.bottom;
@@ -1129,7 +1144,7 @@ int CSCListCtrl::hit_test(CPoint pt, int& item, int& subItem, bool include_icon)
 
 	//20260706 by claude. smooth 모드: 행 위치가 native 스크롤이 아니라 m_scroll_y(픽셀) 기준 → 후보 행 범위·Y 판정을 m_scroll_y 로.
 	int header = get_header_height();
-	int rowH   = (m_line_height > 0) ? m_line_height : 16;
+	int rowH   = row_height();
 	int first, last;
 	if (m_smooth_scroll)
 	{
@@ -1956,7 +1971,7 @@ void CSCListCtrl::OnPaint()
 			//viewport = 콘텐츠의 [m_scroll_y, m_scroll_y+항목영역높이] 구간 → 맨 위/아래 부분행이 자연 발생, 바닥까지 스크롤 시 하단 여백 0.
 			//X(컬럼/가로스크롤)는 draw_row 내부 GetSubItemRect 가 담당(세로 위치 무관), Y 만 여기서 픽셀로 계산해 넘긴다.
 			//부분행이 헤더/코너를 침범하지 않게 항목 영역(rc)으로 클립. 헤더 child 는 WS_CLIPCHILDREN 로 별도 보존.
-			int rowH = (m_line_height > 0) ? m_line_height : 16;
+			int rowH = row_height();
 			int total = size();
 			int area_bottom = rcFull.bottom;
 			pDC->IntersectClipRect(&rc);
@@ -2136,7 +2151,7 @@ CSCStaticEdit* CSCListCtrl::edit_item(int item, int subItem)
 	//X(컬럼/가로스크롤)는 get_item_rect 가 native 가로 스크롤 기준으로 이미 맞다(smooth 도 가로는 native 사용).
 	if (m_smooth_scroll)
 	{
-		int rowH   = (m_line_height > 0) ? m_line_height : 16;
+		int rowH   = row_height();
 		int header = get_header_height();
 		int y = header + item * rowH - m_scroll_y;
 		r.top    = y;
@@ -5418,11 +5433,12 @@ void CSCListCtrl::OnMouseMove(UINT nFlags, CPoint point)
 	}
 
 
-	//20260706 by claude. 마퀴 드래그 중이면 사각형 갱신 + 겹치는 항목 선택(시작 시 고정한 ctrl 모드).
+	//20260706 by claude. 마퀴 드래그 중이면 사각형 갱신 + 겹치는 항목 선택(시작 시 고정한 ctrl 모드) + 가장자리 자동 스크롤.
 	if (m_marquee_active)
 	{
 		m_marquee_cur = point;
 		apply_marquee_selection(m_marquee_ctrl);
+		update_marquee_auto_scroll(point);	//가장자리 근접 시 타이머 시작(OnTimer 가 tick 마다 스크롤).
 		Invalidate(FALSE);
 		return;
 	}
@@ -5469,7 +5485,6 @@ void CSCListCtrl::OnMouseMove(UINT nFlags, CPoint point)
 		//If we are hovering over a CListCtrl we need to adjust the highlights
 		if (pDropWnd->IsKindOf(RUNTIME_CLASS(CSCListCtrl)))
 		{
-			UINT uFlags;
 			pList = (CSCListCtrl*)pDropWnd;
 
 			//target listctrl이 drag&drop 가능이 아니면 그냥 리턴.
@@ -5488,7 +5503,12 @@ void CSCListCtrl::OnMouseMove(UINT nFlags, CPoint point)
 			pList->RedrawItems(m_nDropIndex, m_nDropIndex);
 
 			// Get the item that is below cursor
-			m_nDropIndex = ((CSCListCtrl*)pDropWnd)->HitTest(pt, &uFlags);
+			//20260706 by claude. [smooth] native HitTest 는 native 세로 위치 기준이라 픽셀 페인트(m_scroll_y)와 어긋나 드롭
+			//하이라이트가 엉뚱한 행에 뜨고 엉뚱한 곳에 드롭된다. 대상 리스트의 smooth-aware hit_test 로 커서 아래 실제 행을 구한다.
+			//(native 모드에선 hit_test 도 native 좌표를 쓰므로 동일 결과 → 회귀 없음.)
+			int drop_item = -1, drop_sub = -1;
+			((CSCListCtrl*)pDropWnd)->hit_test(pt, drop_item, drop_sub, true);
+			m_nDropIndex = drop_item;
 			// Highlight it (폴더인 경우에만 hilite시킨다)
 			if (m_nDropIndex >= 0 && ((CSCListCtrl*)pDropWnd)->GetItemText(m_nDropIndex, col_filesize) == _T(""))
 				pList->SetItemState(m_nDropIndex, LVIS_DROPHILITED, LVIS_DROPHILITED);
@@ -5613,8 +5633,65 @@ void CSCListCtrl::drag_scroll_by(int dx_px, int dy_lines)
 
 void CSCListCtrl::OnTimer(UINT_PTR nIDEvent)
 {
+	//20260706 by claude. [§5 폭주 완화] 가로 스크롤 스로틀의 trailing sync — WM_HSCROLL 버스트가 멎은 뒤 최종 위치를 한 번 반영.
+	if (nIDEvent == TIMER_ID_HSYNC_TRAILING)
+	{
+		KillTimer(TIMER_ID_HSYNC_TRAILING);
+		m_last_hsync_tick = GetTickCount();
+		sync_scrollbar();
+		return;
+	}
+
 	if (nIDEvent == TIMER_ID_DRAG_AUTO_SCROLL)
 	{
+		//20260706 by claude. 마퀴 자동 스크롤 tick — 속도만큼 스크롤하고, 스크롤로 내용이 움직인 만큼 마퀴 시작 앵커를
+		//콘텐츠에 고정한 뒤 선택을 다시 반영한다. 세로는 기준항목(0)의 화면 이동량으로 delta 를 재 measure 해 smooth/native 공용.
+		if (m_marquee_active)
+		{
+			if (m_marquee_scroll_vx == 0 && m_marquee_scroll_vy == 0)
+			{
+				KillTimer(TIMER_ID_DRAG_AUTO_SCROLL);
+				return;
+			}
+
+			CRect ref_before;
+			bool have_ref = (size() > 0);
+			if (have_ref)
+				row_screen_rect(0, ref_before);
+			int h_before = GetScrollPos(SB_HORZ);
+
+			if (m_marquee_scroll_vy != 0)
+			{
+				if (m_smooth_scroll)
+				{
+					m_scroll_y += m_marquee_scroll_vy * row_height();	//level 당 1행/tick.
+					sync_scrollbar();									//[0, content-area] 클램프 + 세로 썸.
+				}
+				else
+				{
+					UINT code = (m_marquee_scroll_vy < 0) ? SB_LINEUP : SB_LINEDOWN;
+					for (int i = 0; i < abs(m_marquee_scroll_vy); i++)
+						SendMessage(WM_VSCROLL, code);
+					sync_scrollbar();
+				}
+			}
+			if (m_marquee_scroll_vx != 0)
+				Scroll(CSize(m_marquee_scroll_vx * 30, 0));	//가로는 두 모드 다 native scroll(OnHScroll 이 m_h_scroll_pos 미러+sync).
+
+			//시작 앵커를 콘텐츠에 고정: 기준항목의 화면 이동량(세로)·가로 스크롤 delta 만큼 시작점(client)을 이동.
+			if (have_ref)
+			{
+				CRect ref_after;
+				row_screen_rect(0, ref_after);
+				m_marquee_start.y += (ref_after.top - ref_before.top);
+			}
+			m_marquee_start.x -= (GetScrollPos(SB_HORZ) - h_before);
+
+			apply_marquee_selection(m_marquee_ctrl);
+			Invalidate(FALSE);
+			return;
+		}
+
 		if (!m_bDragging || m_drag_scroll_target == NULL || (m_drag_scroll_vx == 0 && m_drag_scroll_vy == 0))
 		{
 			KillTimer(TIMER_ID_DRAG_AUTO_SCROLL);
@@ -6139,7 +6216,7 @@ void CSCListCtrl::row_screen_rect(int item, CRect& out)
 	GetClientRect(&rc);
 	if (m_smooth_scroll)
 	{
-		int rowH = (m_line_height > 0) ? m_line_height : 16;
+		int rowH = row_height();
 		int top = get_header_height() + item * rowH - m_scroll_y;
 		out = CRect(rc.left, top, rc.right, top + rowH);
 	}
@@ -6172,10 +6249,44 @@ void CSCListCtrl::end_marquee()
 	if (!m_marquee_active)
 		return;
 	m_marquee_active = false;
+	KillTimer(TIMER_ID_DRAG_AUTO_SCROLL);
+	m_marquee_scroll_vx = 0;
+	m_marquee_scroll_vy = 0;
 	if (::GetCapture() == m_hWnd)
 		ReleaseCapture();
 	m_marquee_base.clear();
 	Invalidate(FALSE);	//사각형 지우기.
+}
+
+//20260706 by claude. 마퀴 드래그 중 커서가 가장자리에 가까우면 자동 스크롤(거리비례 가속). update_drag_auto_scroll 과 같은 감각의
+//공식(MARGIN/MAX_LEVEL)이나 대상이 항상 자기 자신이고 client 좌표 기준이라 별도 함수. 실제 스크롤은 OnTimer 에서 tick 마다.
+void CSCListCtrl::update_marquee_auto_scroll(CPoint client_pt)
+{
+	m_marquee_scroll_vx = 0;
+	m_marquee_scroll_vy = 0;
+
+	CRect rc;
+	GetClientRect(&rc);
+	int top_ref = rc.top + get_header_height();		//세로 상단 기준 = 헤더 아래.
+
+	const int MARGIN    = 48;	//가장자리 감지 폭(px).
+	const int MAX_LEVEL = 3;	//tick 당 최대 스크롤 level.
+
+	int dl = client_pt.x - rc.left;		//왼쪽 가장자리까지 거리(안쪽 양수).
+	int dr = rc.right - client_pt.x;	//오른쪽.
+	int dt = client_pt.y - top_ref;		//위(헤더 아래 기준).
+	int db = rc.bottom - client_pt.y;	//아래.
+
+	if (dl < MARGIN)      m_marquee_scroll_vx = -min(MAX_LEVEL, 1 + (MARGIN - dl) * (MAX_LEVEL - 1) / MARGIN);
+	else if (dr < MARGIN) m_marquee_scroll_vx =  min(MAX_LEVEL, 1 + (MARGIN - dr) * (MAX_LEVEL - 1) / MARGIN);
+
+	if (dt < MARGIN)      m_marquee_scroll_vy = -min(MAX_LEVEL, 1 + (MARGIN - dt) * (MAX_LEVEL - 1) / MARGIN);
+	else if (db < MARGIN) m_marquee_scroll_vy =  min(MAX_LEVEL, 1 + (MARGIN - db) * (MAX_LEVEL - 1) / MARGIN);
+
+	if (m_marquee_scroll_vx != 0 || m_marquee_scroll_vy != 0)
+		SetTimer(TIMER_ID_DRAG_AUTO_SCROLL, 70, NULL);	//~14fps 연속 스크롤(커서가 멈춰 있어도 계속).
+	else
+		KillTimer(TIMER_ID_DRAG_AUTO_SCROLL);
 }
 
 void CSCListCtrl::apply_marquee_selection(bool ctrl)
@@ -6290,7 +6401,7 @@ bool CSCListCtrl::smooth_key_navigate(UINT vk)
 	if (total <= 0)
 		return false;
 
-	int rowH = (m_line_height > 0) ? m_line_height : 16;
+	int rowH = row_height();
 	CRect rc;
 	GetClientRect(&rc);
 	int header = get_header_height();
@@ -6352,7 +6463,7 @@ void CSCListCtrl::smooth_ensure_visible(int item)
 	if (!m_smooth_scroll || item < 0)
 		return;
 
-	int rowH = (m_line_height > 0) ? m_line_height : 16;
+	int rowH = row_height();
 	CRect rc;
 	GetClientRect(&rc);
 	int header = get_header_height();
@@ -6426,8 +6537,23 @@ void CSCListCtrl::OnHScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar)
 	//이 핸들러 미진입). 따라서 여기서 native 실제 가로 위치를 m_h_scroll_pos 로 미러링하면 native hwheel 이 썸에 반영되고
 	//우리 자체 스크롤 경로(드래그/휠/OnMouseHWheel)에는 영향이 없다.
 	m_h_scroll_pos = GetScrollPos(SB_HORZ);
-	logWrite(_T("[hscroll] nSBCode=%u native SB_HORZ=%d -> m_h_scroll_pos=%d"), nSBCode, GetScrollPos(SB_HORZ), m_h_scroll_pos);
-	sync_scrollbar();	//가로 오버레이 스크롤바(m_scrollbar_h) 연동.
+	//logWrite(_T("[hscroll] nSBCode=%u native SB_HORZ=%d -> m_h_scroll_pos=%d"), nSBCode, GetScrollPos(SB_HORZ), m_h_scroll_pos);	//[진단 §5-2] 폭주 노이즈 → 주석.
+
+	//20260706 by claude. [§5 폭주 완화] native 리스트뷰는 마우스 가로휠 1회를 smooth-scroll 로 풀어 WM_HSCROLL 을 수십~백여 회
+	//연속 발생시킨다. 매 스텝 full sync_scrollbar(오버레이 재배치 + 동기 RedrawWindow)는 성능 저하 요인 → ~30ms 로 스로틀하고,
+	//버스트가 멎은 뒤 trailing 타이머로 최종 위치를 한 번 더 정확히 반영한다(가로 썸·헤더 offset 정합). 스로틀은 sync 의 '빈도'만
+	//줄일 뿐 sync 가 하는 일은 그대로라 정확성은 불변.
+	DWORD now = GetTickCount();
+	if (now - m_last_hsync_tick >= 30)
+	{
+		m_last_hsync_tick = now;
+		KillTimer(TIMER_ID_HSYNC_TRAILING);
+		sync_scrollbar();	//가로 오버레이 스크롤바(m_scrollbar_h) 연동.
+	}
+	else
+	{
+		SetTimer(TIMER_ID_HSYNC_TRAILING, 40, NULL);	//버스트 종료 후 최종 sync 보장.
+	}
 }
 
 
@@ -7030,7 +7156,7 @@ void CSCListCtrl::sync_scrollbar()
 	//넘어 한 행도 안 그려져 리스트가 통째로 빈 것처럼 보인다. 여기서 항상 [0, content−area] 로 조인다(오버플로 없으면 0).
 	if (m_smooth_scroll)
 	{
-		int rowH = (m_line_height > 0) ? m_line_height : 16;
+		int rowH = row_height();
 		int area_h = max(0, rc.Height() - header);
 		int max_scroll = max(0, total * rowH - area_h);
 		m_scroll_y = max(0, min(m_scroll_y, max_scroll));
@@ -7048,7 +7174,7 @@ void CSCListCtrl::sync_scrollbar()
 	{
 		//20260706 by claude. [smooth] 세로 스크롤바를 픽셀 단위로 구동 — range=콘텐츠 전체 높이(total*rowH), page=항목영역 높이, pos=m_scroll_y.
 		//바닥까지 내리면 마지막 행이 항목영역 바닥에 flush(여백 0), 맨 위는 부분행. (m_scroll_y 클램프는 위에서 항상 수행.)
-		int rowH = (m_line_height > 0) ? m_line_height : 16;
+		int rowH = row_height();
 		int content_h = total * rowH;
 		int area_h = max(0, rc.Height() - header);
 		m_scrollbar.set_range(0, content_h - 1);
@@ -7242,7 +7368,7 @@ BOOL CSCListCtrl::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
 		if (m_smooth_scroll)
 		{
 			//20260706 by claude. [smooth] 세로 휠 = 픽셀 이동(한 노치 = 3행). m_scroll_y 갱신 → sync 클램프 → 재그리기.
-			int rowH = (m_line_height > 0) ? m_line_height : 16;
+			int rowH = row_height();
 			int dy = -zDelta / WHEEL_DELTA * 3 * rowH;
 			if (dy == 0)
 				dy = (zDelta > 0) ? -rowH : rowH;

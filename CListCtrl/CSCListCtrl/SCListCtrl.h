@@ -899,6 +899,8 @@ public:
 	bool		smooth_key_navigate(UINT vk);
 	//20260706 by claude. [smooth §3] item 이 항목 영역에 완전히 보이도록 m_scroll_y 최소 조정(native EnsureVisible 의 픽셀판).
 	void		smooth_ensure_visible(int item);
+	//20260706 by claude. subItem 컬럼이 가로 뷰포트에 완전히 들어오도록 가로 스크롤(편집 진입 전 셀 노출). smooth/native 공용.
+	void		ensure_column_visible(int subItem);
 	//20260706 by claude. 선택 원자연산 — 마우스(L/R)·키보드 핸들러가 공유(중복 방지). 정책(ctrl/shift 의미)은 각 핸들러가 결정하고 연산만 공용.
 	void		select_single(int item);			//item 만 선택, 나머지 해제, m_focus_anchor=item.
 	void		select_range(int anchor, int item);	//[anchor,item] 구간 선택, 나머지 해제(anchor 불변).

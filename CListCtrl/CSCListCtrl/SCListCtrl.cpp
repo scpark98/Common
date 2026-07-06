@@ -2113,6 +2113,9 @@ CSCStaticEdit* CSCListCtrl::edit_item(int item, int subItem)
 			return NULL;
 	}
 
+	//20260706 by claude. 편집 진입 전 편집할 셀(레이블)이 가로로 가려져 있으면 가로 스크롤로 완전히 노출시킨다.
+	ensure_column_visible(subItem);
+
 	m_last_clicked_time = 0;
 
 
@@ -6235,12 +6238,48 @@ void CSCListCtrl::smooth_ensure_visible(int item)
 	int item_top    = item * rowH;
 	int item_bottom = item_top + rowH;
 
+	int old_scroll = m_scroll_y;
 	if (item_top < m_scroll_y)
 		m_scroll_y = item_top;
 	else if (item_bottom > m_scroll_y + area_h)
 		m_scroll_y = item_bottom - area_h;
 
 	sync_scrollbar();	//[0, content-area] 최종 클램프 + 세로 썸 위치 반영.
+
+	//20260706 by claude. 스크롤이 바뀌면 내용도 새 위치로 다시 그려야 한다. sync_scrollbar 는 썸만 옮길 뿐이라,
+	//이걸 빠뜨리면 썸은 움직이는데 화면은 안 스크롤되고(편집 박스가 옛 행 위치에 어긋나게 뜸) 문제가 생긴다.
+	if (m_scroll_y != old_scroll)
+		Invalidate(FALSE);
+}
+
+
+//20260706 by claude. subItem 컬럼이 가로 뷰포트에 완전히 들어오도록 가로 스크롤. 편집 진입 전 셀을 노출하는 용도.
+//OnNcCalcSize 가 v-bar 폭을 우측 NC 로 예약하므로 GetClientRect().Width() = 가시 콘텐츠 폭(가로 뷰포트). 가로 스크롤 위치는
+//native SB_HORZ(= m_h_scroll_pos 와 미러). smooth/native 공용 — 둘 다 가로는 native Scroll 을 쓴다.
+void CSCListCtrl::ensure_column_visible(int subItem)
+{
+	if (subItem < 0 || subItem >= get_column_count())
+		return;
+
+	int cell_left = 0;
+	for (int i = 0; i < subItem; i++)
+		cell_left += GetColumnWidth(i);
+	int cell_right = cell_left + GetColumnWidth(subItem);
+
+	CRect rc;
+	GetClientRect(&rc);
+	int view_w = rc.Width();
+
+	int cur = GetScrollPos(SB_HORZ);
+	int new_pos = cur;
+	if (cell_left < cur)
+		new_pos = cell_left;						//왼쪽으로 가려짐 → 셀 왼쪽을 뷰포트 좌단에.
+	else if (cell_right > cur + view_w)
+		new_pos = max(cell_left, cell_right - view_w);	//오른쪽으로 가려짐 → 셀 오른쪽을 뷰포트 우단에(단 왼쪽이 넘어가지 않게).
+
+	int delta = new_pos - cur;
+	if (delta != 0)
+		Scroll(CSize(delta, 0));					//native 가로 스크롤 → OnHScroll 이 m_h_scroll_pos 미러 + sync.
 }
 
 

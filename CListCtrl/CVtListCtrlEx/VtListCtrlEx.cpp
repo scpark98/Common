@@ -11,6 +11,7 @@
 
 #include "../../colors.h"
 #include "../../MemoryDC.h"
+#include "../../log/SCLog/SCLog.h"	//20260706 by claude. [진단 임시] logWrite 사용 — 원인 확정 후 이 include 도 함께 제거.
 #include <afxvslistbox.h>
 
 #define IDC_EDIT_CELL	1001
@@ -176,6 +177,12 @@ void CVtListCtrlEx::OnLvnGetdispinfo(NMHDR *pNMHDR, LRESULT *pResult)
 	//Create a pointer to the item
 	LV_ITEM* pItem = &(pDispInfo)->item;
 
+	//20260706 by claude. [팬텀 행] sync_scrollbar 가 native 세로 스크롤 범위 확장을 위해 item count 를 실제보다 pad 만큼
+	//늘려두므로, native 가 pad 인덱스(>= m_list_db.size())를 조회할 수 있다. 데이터가 없으니 무시(아래 IMAGE/STATE 분기의
+	//무가드 m_list_db[iItem] 접근으로 인한 OOB 크래시 방지). 기존 LVIF_TEXT 분기 가드는 그대로 두되 여기서 전 분기 공통 차단.
+	if (pItem->iItem < 0 || pItem->iItem >= (int)m_list_db.size())
+		return;
+
 	//Which item number?
 
 	//Do the list need text information?
@@ -272,6 +279,11 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		return;
 
 	int			iItem		= (int)lpDIS->itemID;
+
+	//20260706 by claude. [팬텀 행] native 스크롤 범위 확장용 pad 인덱스는 데이터가 없으므로 그리지 않는다(아래 m_list_db[iItem] OOB 방지).
+	if (iItem < 0 || iItem >= (int)m_list_db.size())
+		return;
+
 	int			iSubItem;
 	CDC			*pDC		= CDC::FromHandle(lpDIS->hDC);
 	CRect		rowRect;
@@ -6388,7 +6400,7 @@ void CVtListCtrlEx::sync_scrollbar()
 	//영구 차단 — sync 마다 ShowScrollBar 토글은 무용하면서 OS 가 NCCALCSIZE/paint 사이클을 발화시켜
 	//컬럼 폭 드래그 중 변경 컬럼이 추가 repaint 되는 flicker 원인. 따라서 sync 진입부에선 호출 X.
 
-	int total = GetItemCount();
+	int total = size();	//20260706 by claude. [팬텀 행] 로직 total 은 실제 항목수(가상 리스트=m_list_db.size()). native item count 는 아래에서 pad 를 더해 늘리지만, need_v 판정·thumb range·max_pos 는 실제값 기준이어야 한다.
 
 	CRect rc;
 	GetClientRect(&rc);
@@ -6457,6 +6469,28 @@ void CVtListCtrlEx::sync_scrollbar()
 	int content_view_w = rc.Width();
 	int avail_rows = (m_line_height > 0) ? max(0, (rc.Height() - header) / m_line_height) : GetCountPerPage();
 	int visible = avail_rows;
+
+	//20260706 by claude. [팬텀 행 — 마지막 항목 도달 불가 근본 수정]
+	//native report-view 의 세로 스크롤 최대 top = itemcount - GetCountPerPage(). 그런데 커스텀 헤더(높이=행높이)를
+	//native 가 page 계수에서 제대로 빼지 않아 GetCountPerPage()가 실제 가시행수(visible)보다 크게(= 헤더 1행분) 나온다.
+	//→ native max top 이 우리가 필요한 (total-visible)보다 그만큼 작아, SB_BOTTOM·픽셀 Scroll 모두 그 지점에서 clamp 되어
+	//마지막 항목이 영영 화면에 안 올라온다(로그로 확정: afterTop 이 max_top-1 에서 멈춤).
+	//해결: native item count 만 pad(=GetCountPerPage()-visible) 만큼 늘려 native max top 을 정확히 (total-visible)로 맞춘다.
+	//로직상의 total 은 위에서 size()(실제값)로 고정했으므로 pad 는 오직 native 스크롤 범위 확장에만 작용한다.
+	//pad 행(가상 인덱스 total..)은 DrawItem 의 (iItem >= m_list_db.size()) 가드로 그려지지 않고, 바닥까지 스크롤 시
+	//하단 reserve 띠(NC 예약, client 밖)에 위치해 실제로 페인트되지 않는다.
+	//native 의 세로 스크롤 page 는 GetCountPerPage()(=완전 가시행수=visible)가 아니라 floor(clientH/rowH) 다 — 헤더 1행을
+	//page 에서 빼지 않는다(로그 확정: clientH=624,row=26 → native page=24 이나 GetCountPerPage=visible=23). 그래서 native max
+	//top = nativeCount - floor(clientH/rowH). 이걸 우리가 필요한 (total - visible) 로 맞추려면 pad = floor(clientH/rowH) - visible.
+	//reserve 로 clientH = (visible+1)*rowH 가 되어 pad 는 사실상 1 이지만, 헤더가 여러 행일 경우까지 일반화해 기하식으로 계산.
+	if (m_use_virtual_list && m_scrollbar_setup)
+	{
+		int real       = (int)m_list_db.size();
+		int native_page = (m_line_height > 0) ? (rc.Height() / m_line_height) : GetCountPerPage();
+		int pad         = need_v ? max(0, native_page - visible) : 0;
+		if (GetItemCount() != real + pad)
+			SetItemCountEx(real + pad, LVSICF_NOSCROLL);
+	}
 
 	//세로 scrollbar — 우측 NC 띠(parent child). [rc.right, rc.right+gw] × content 높이를 parent 좌표로 배치.
 	if (::IsWindow(m_scrollbar.m_hWnd))
@@ -6566,7 +6600,7 @@ LRESULT CVtListCtrlEx::on_message_CSCScrollbar(WPARAM wParam, LPARAM lParam)
 		//msg->pos 는 이미 scrollbar 가 max_pos(=total - sync 에서 계산한 visible) 로 클램프해 보낸다. 여기서
 		//GetCountPerPage 로 다시 클램프하면 가로바·헤더 차감을 반영 못해 new_top 이 강제로 작아져, 끝까지
 		//드래그해도 마지막 항목이 보이지 않는다. msg->pos 를 그대로 쓰고 total-1 안전 클램프만 둔다.
-		int total = GetItemCount();
+		int total = size();	//20260706 by claude. [팬텀 행] 실제 항목수 기준(native count 는 pad 로 커져 있으므로 GetItemCount 를 쓰면 안 됨).
 		int new_top = max(0, min(msg->pos, total - 1));
 		int cur_top = GetTopIndex();
 
@@ -6605,6 +6639,24 @@ LRESULT CVtListCtrlEx::on_message_CSCScrollbar(WPARAM wParam, LPARAM lParam)
 				if (dy != 0)
 					Scroll(CSize(0, dy));
 			}
+		}
+
+		//20260706 by claude. [진단2 · 임시] top-index 가 0 에 고정되는(=끝 항목 도달 불가) 원인 추적.
+		//이전 진단으로 행 높이(26=26)·부분 무효화는 무관 확정. 이제 스크롤 상태 전량을 찍어 어느 분기(SB_BOTTOM vs 픽셀
+		//Scroll)를 타는지, native GetTopIndex 가 왜 안 오르는지, 마지막 항목 rect 가 client 안에 드는지, WS_VSCROLL 유무를 본다.
+		//판별 후 제거 예정.
+		{
+			CRect rc2;
+			GetClientRect(&rc2);
+			int hdr2 = m_HeaderCtrlEx.GetSafeHwnd() ? get_header_height() : 0;
+			CRect r0, rL;
+			int i0top = GetItemRect(0, &r0, LVIR_BOUNDS) ? r0.top : -9999;
+			int iLbot = (total > 0 && GetItemRect(total - 1, &rL, LVIR_BOUNDS)) ? rL.bottom : -9999;
+			bool has_vsb = (GetStyle() & WS_VSCROLL) != 0;
+			logWrite(_T("[BLANKROW2] pos=%d new_top=%d cur_top=%d max_top=%d visible=%d total=%d gcp=%d nativeCount=%d branch=%s | afterTop=%d item0.top=%d last.bottom=%d clientH=%d hdr=%d reserve=%d WS_VSCROLL=%d"),
+				msg->pos, new_top, cur_top, max_top, visible, total, GetCountPerPage(), GetItemCount(),
+				(new_top >= max_top && total > 0) ? _T("SB_BOTTOM") : _T("pixel"),
+				GetTopIndex(), i0top, iLbot, rc2.Height(), hdr2, m_bottom_reserve, has_vsb ? 1 : 0);
 		}
 	}
 	else if (msg->pThis == &m_scrollbar_h)
@@ -6651,7 +6703,7 @@ BOOL CVtListCtrlEx::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
 			int item_h = rItem.Height();
 			if (item_h > 0)
 			{
-				int total = GetItemCount();
+				int total = size();	//20260706 by claude. [팬텀 행] 실제 항목수 기준(native count pad 무관).
 				CRect rc;
 				GetClientRect(&rc);
 				int header = m_HeaderCtrlEx.GetSafeHwnd() ? get_header_height() : 0;

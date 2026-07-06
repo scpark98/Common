@@ -142,6 +142,10 @@ public:
 	//단락 모드에서도 부모의 round / back fill / border / header-image 비주얼 기능이 그대로 작동한다.
 	CRect			set_tagged_text(CString text);
 
+	//특정 라인의 세로 정렬 지정(한 라인 안에 크기가 다른 run 이 있을 때 유용). line_idx < 0 = 모든 라인. align = DT_TOP/DT_VCENTER/DT_BOTTOM.
+	//set_tagged_text 로 텍스트를 세팅(레이아웃)한 *뒤* 에 호출한다(m_para 필요). 값은 para 에 저장돼 재레이아웃돼도 유지된다.
+	void			set_line_align(int line_idx, DWORD align);
+
 	//halign + valign 을 한 번에 설정. DT_LEFT|DT_CENTER|DT_RIGHT + DT_TOP|DT_VCENTER|DT_BOTTOM 조합.
 	//내부에서 m_halign / m_valign 으로 분리 저장된 뒤 (단락 모드면) layout 이 재빌드된다.
 	void			set_text_align(DWORD align);

@@ -2176,6 +2176,15 @@ CRect CSCStatic::set_tagged_text(CString text)
 	return m_text_rect;
 }
 
+//특정 라인(line_idx)의 세로 정렬을 지정한다. line_idx < 0 이면 모든 라인. align = DT_TOP/DT_VCENTER/DT_BOTTOM.
+//set_per_line_align 이 para 에 line_align 을 저장 + 즉시 재배치하므로, 이후 재레이아웃(calc_text_rect) 때도 자동 유지된다.
+//m_para 가 비어있으면(= set_tagged_text 전) 무동작 — 반드시 텍스트 세팅 뒤 호출.
+void CSCStatic::set_line_align(int line_idx, DWORD align)
+{
+	CSCParagraph::set_per_line_align(m_para, line_idx, align);
+	Invalidate();
+}
+
 void CSCStatic::update_text_property()
 {
 	_tcscpy_s(m_text_prop.name, _countof(m_text_prop.name), m_lf.lfFaceName);

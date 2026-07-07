@@ -12,6 +12,7 @@
 #include "../../colors.h"
 #include "../../MemoryDC.h"
 #include "../../log/SCLog/SCLog.h"	//20260706 by claude. [진단 임시] logWrite 사용 — 원인 확정 후 이 include 도 함께 제거.
+#include "Common/drag_scroll_message.h"	//20260707 by claude. SCTreeCtrl 드래그 자동스크롤 위임 메시지 수신용.
 #include <afxvslistbox.h>
 
 #define IDC_EDIT_CELL	1001
@@ -104,6 +105,7 @@ BEGIN_MESSAGE_MAP(CVtListCtrlEx, CListCtrl)
 	ON_WM_MOUSEWHEEL()
 	ON_WM_MOUSEHWHEEL()
 	ON_REGISTERED_MESSAGE(Message_CSCScrollbar, &CVtListCtrlEx::on_message_CSCScrollbar)
+	ON_REGISTERED_MESSAGE(Message_DragScrollBy, &CVtListCtrlEx::on_message_DragScrollBy)
 	ON_WM_TIMER()
 END_MESSAGE_MAP()
 
@@ -3525,6 +3527,35 @@ void CVtListCtrlEx::unselect_selected_item()
 	//	select_item(dqSelected[i], false);
 }
 
+int CVtListCtrlEx::select_items_by_names(const std::deque<CString>& names, int visible_mode)
+{
+	if (names.empty())
+		return -1;
+
+	select_item(-1, false);		//기존 선택 전체 해제 → names 에 해당하는 항목만 다시 선택.
+
+	int last_sel = -1;
+	int count = GetItemCount();
+	for (int i = 0; i < count; i++)
+	{
+		CString name = get_part(get_path(i), fn_name);
+		for (const auto& n : names)
+		{
+			if (name.CompareNoCase(n) == 0)
+			{
+				select_item(i, true, false, false);	//누적 선택, 스크롤은 아래에서 한 번만.
+				last_sel = i;
+				break;
+			}
+		}
+	}
+
+	if (last_sel >= 0)
+		ensure_visible(last_sel, visible_mode);
+
+	return last_sel;
+}
+
 //아이템의 상태값이 특정 상태값이 항목 또는 그 개수 구하기
 //LVIS_DROPHILITED or LVIS_SELECTED 항목을 구할 수 있다.
 //drag 도중에 마우스가 다른 앱 영역으로 나가서 WM_LBUTTONUP 될 경우 drophilited 상태로 아이템이 남는 문제를 제거하기 위해.
@@ -5205,7 +5236,9 @@ void CVtListCtrlEx::OnLvnBeginDrag(NMHDR* pNMHDR, LRESULT* pResult)
 	m_nDragIndex = pNMLV->iItem;
 
 	//보호 항목(시스템 폴더·드라이브 루트 등)이 드래그 대상(선택)에 하나라도 포함되면 드래그 시작 자체를 차단(위험 원천 차단).
-	if (m_pShellImageList)
+	//20260707 by claude. shell 리스트에서만 검사한다. m_pShellImageList 가 있어도 shell 리스트가 아닐 수 있고(예: 일반 리스트가
+	//아이콘용으로만 imagelist 를 붙인 경우) 그때는 get_win32_find_data 가 읽는 m_cur_folders/m_cur_files 가 비어 out-of-range.
+	if (m_is_shell_listctrl)
 	{
 		bool any_sel = false;
 		POSITION pos = GetFirstSelectedItemPosition();
@@ -5376,8 +5409,10 @@ void CVtListCtrlEx::OnMouseMove(UINT nFlags, CPoint point)
 
 			// Get the item that is below cursor
 			m_nDropIndex = ((CVtListCtrlEx*)pDropWnd)->HitTest(pt, &uFlags);
-			// Highlight it (폴더인 경우에만 hilite시킨다)
-			if (m_nDropIndex >= 0 && ((CVtListCtrlEx*)pDropWnd)->GetItemText(m_nDropIndex, col_filesize) == _T(""))
+			//20260707 by claude. shell 리스트면 폴더(파일크기 컬럼이 빈 항목)만 유효 드롭 대상, 일반 리스트는 폴더 개념이 없으므로
+			//커서 아래 항목을 그대로 하이라이트한다. (기존엔 대상이 일반 리스트여도 col_filesize 컬럼이 우연히 빈 행만 반응했다.)
+			if (m_nDropIndex >= 0 &&
+				(!pList->is_shell_listctrl() || pList->GetItemText(m_nDropIndex, col_filesize).IsEmpty()))
 				pList->SetItemState(m_nDropIndex, LVIS_DROPHILITED, LVIS_DROPHILITED);
 			// Redraw item
 			pList->RedrawItems(m_nDropIndex, m_nDropIndex);
@@ -5496,6 +5531,13 @@ void CVtListCtrlEx::drag_scroll_by(int dx_px, int dy_lines)
 
 	UpdateWindow();
 	sync_scrollbar();
+}
+
+//20260707 by claude. SCTreeCtrl 에서 드래그해 이 리스트로 자동스크롤 위임될 때 받는다. drag_scroll_by 로 위임 후 1 반환(=처리됨).
+LRESULT CVtListCtrlEx::on_message_DragScrollBy(WPARAM wParam, LPARAM lParam)
+{
+	drag_scroll_by((int)wParam, (int)lParam);
+	return 1;
 }
 
 void CVtListCtrlEx::OnTimer(UINT_PTR nIDEvent)

@@ -6,7 +6,7 @@
 #include "../../Functions.h"
 #include "../../MemoryDC.h"
 #include "../../SCGdiPlusBitmap.h"
-#include "../../CListCtrl/CVtListCtrlEx/VtListCtrlEx.h"		//20260704 by claude. 드래그 자동스크롤 시 리스트 대상은 drag_scroll_by() 로 위임(가로바 동기)
+#include "Common/drag_scroll_message.h"		//20260707 by claude. 드래그 자동스크롤을 대상 타입 무관 메시지로 위임 — CVtListCtrlEx 하드 의존 제거(점진 이행용).
 
 #include <fstream>
 // CSCTreeCtrl
@@ -93,6 +93,7 @@ BEGIN_MESSAGE_MAP(CSCTreeCtrl, CTreeCtrl)
 	ON_WM_GETMINMAXINFO()
 	ON_COMMAND_RANGE(menu_add_item, menu_favorite, &CSCTreeCtrl::OnPopupMenu)
 	ON_REGISTERED_MESSAGE(Message_CSCStaticEdit, &CSCTreeCtrl::on_message_CSCStaticEdit)
+	ON_REGISTERED_MESSAGE(Message_DragScrollBy, &CSCTreeCtrl::on_message_DragScrollBy)
 	ON_MESSAGE(WM_TREE_END_EDIT, &CSCTreeCtrl::on_end_edit_posted)
 	ON_WM_DESTROY()
 	ON_WM_NCPAINT()
@@ -4568,35 +4569,30 @@ void CSCTreeCtrl::OnTimer(UINT_PTR nIDEvent)
 		else
 		{
 			//m_pDropWnd 가 아니라 m_drag_scroll_target — 커서가 오버레이 스크롤바 위여도 실제 트리/리스트로 보낸다.
-			//20260704 by claude. CVtListCtrlEx 는 자체 오버레이 가로 스크롤바(m_h_scroll_pos) 모델이라 raw Scroll() 로 밀면
-			//바가 안 따라와 desync 된다(콘텐츠만 스크롤, 바는 그대로). 리스트가 노출한 정상 경로 drag_scroll_by() 로 위임하면
-			//m_h_scroll_pos+sync_scrollbar 까지 동기화된다(리스트가 드래그 소스일 때의 OnTimer 와 동일 경로).
-			//20260705 by claude. 트리 드래그 이미지도 레이어드 팝업(CSCShapeDlg)이라 화면 lock(DragShowNolock)이 불필요.
-			if (m_drag_scroll_target->IsKindOf(RUNTIME_CLASS(CVtListCtrlEx)))
+			//20260707 by claude. 대상의 구체 타입(CVtListCtrlEx/CSCListCtrl/CSCTreeCtrl)을 몰라도 Message_DragScrollBy 로 위임한다.
+			//이들은 자체 오버레이 가로바(m_h_scroll_pos) 모델이라 raw Scroll() 로 밀면 바가 desync 되므로, 각자 handler 에서
+			//drag_scroll_by(m_h_scroll_pos + sync_scrollbar 동기)를 수행하고 1 을 반환한다. 미처리(일반 CListCtrl/CTreeCtrl)면 폴백.
+			//(레이어드 드래그 이미지라 화면 lock(DragShowNolock) 불필요.)
+			LRESULT handled = m_drag_scroll_target->SendMessage(Message_DragScrollBy,
+				(WPARAM)(m_drag_scroll_vx * 30), (LPARAM)m_drag_scroll_vy);	//가로 px, 세로 라인 수
+
+			if (!handled)
 			{
-				CVtListCtrlEx* pl = (CVtListCtrlEx*)m_drag_scroll_target;
-				pl->drag_scroll_by(m_drag_scroll_vx * 30, m_drag_scroll_vy);	//가로 px, 세로 라인 수
-			}
-			else if (m_drag_scroll_target->IsKindOf(RUNTIME_CLASS(CListCtrl)))
-			{
-				//일반 CListCtrl(오버레이 바 없음)은 WM_*SCROLL SB_LINE 이 안 먹으므로 raw Scroll(픽셀).
-				CListCtrl* pl = (CListCtrl*)m_drag_scroll_target;
-				pl->Scroll(CSize(m_drag_scroll_vx * 30, m_drag_scroll_vy * 20));
-				pl->UpdateWindow();
-			}
-			else if (m_drag_scroll_target->IsKindOf(RUNTIME_CLASS(CSCTreeCtrl)))
-			{
-				//20260704 by claude. 트리 대상은 픽셀 단위 drag_scroll_by 로 — 가로를 vx*30px 로(기존 SB_LINELEFT 는 vx*60px 라 빨랐음)
-				//리스트와 동일한 속도감으로 낮춘다. 세로는 라인 수 그대로.
-				((CSCTreeCtrl*)m_drag_scroll_target)->drag_scroll_by(m_drag_scroll_vx * 30, m_drag_scroll_vy);
-			}
-			else
-			{
-				//일반 CTreeCtrl 등 — 기존 SB_LINE 경로.
-				for (int i = 0; i < abs(m_drag_scroll_vy); i++)
-					m_drag_scroll_target->SendMessage(WM_VSCROLL, (m_drag_scroll_vy < 0) ? SB_LINEUP   : SB_LINEDOWN);
-				for (int i = 0; i < abs(m_drag_scroll_vx); i++)
-					m_drag_scroll_target->SendMessage(WM_HSCROLL, (m_drag_scroll_vx < 0) ? SB_LINELEFT : SB_LINERIGHT);
+				if (m_drag_scroll_target->IsKindOf(RUNTIME_CLASS(CListCtrl)))
+				{
+					//일반 CListCtrl(오버레이 바 없음)은 WM_*SCROLL SB_LINE 이 안 먹으므로 raw Scroll(픽셀).
+					CListCtrl* pl = (CListCtrl*)m_drag_scroll_target;
+					pl->Scroll(CSize(m_drag_scroll_vx * 30, m_drag_scroll_vy * 20));
+					pl->UpdateWindow();
+				}
+				else
+				{
+					//일반 CTreeCtrl 등 — SB_LINE 경로.
+					for (int i = 0; i < abs(m_drag_scroll_vy); i++)
+						m_drag_scroll_target->SendMessage(WM_VSCROLL, (m_drag_scroll_vy < 0) ? SB_LINEUP   : SB_LINEDOWN);
+					for (int i = 0; i < abs(m_drag_scroll_vx); i++)
+						m_drag_scroll_target->SendMessage(WM_HSCROLL, (m_drag_scroll_vx < 0) ? SB_LINELEFT : SB_LINERIGHT);
+				}
 			}
 		}
 	}
@@ -4686,6 +4682,13 @@ void CSCTreeCtrl::drag_scroll_by(int dx_px, int dy_lines)
 
 	Invalidate(FALSE);
 	sync_scrollbar();
+}
+
+//20260707 by claude. 다른 SCTreeCtrl 에서 드래그해 이 트리로 자동스크롤 위임될 때 받는다. drag_scroll_by 로 위임 후 1 반환(=처리됨).
+LRESULT CSCTreeCtrl::on_message_DragScrollBy(WPARAM wParam, LPARAM lParam)
+{
+	drag_scroll_by((int)wParam, (int)lParam);
+	return 1;
 }
 
 

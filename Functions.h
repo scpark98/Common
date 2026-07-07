@@ -1404,6 +1404,10 @@ struct	NETWORK_INFO
 	bool		IsFileFolderPathIsEqual(CString file0, CString file1, bool bCaseSensitive = false);
 	CString		get_parent_dir(CString path, TCHAR path_sep = '\\');	//현재 폴더의 상위 폴더명을 리턴한다.
 
+	//드래그&드롭의 이동/복사 판정(탐색기 기본 규칙). 실시간 물리 키(GetAsyncKeyState)를 봐 SetCapture 드래그 중에도 일관 적용:
+	//Ctrl=강제 복사, Shift=강제 이동, 키 없으면 드라이브 기준(같은 드라이브=이동/다른 드라이브=복사). 반환 true=복사.
+	bool		is_drag_copy(const CString& from_path, const CString& to_path);
+
 	//compare_only_filename : fullpath로 정렬할지, 파일명만 추출해서 정렬할지. default = false;
 	void		sort_like_explorer(std::deque<CString> *dq, bool compare_only_filename = false);
 	void		sort_like_explorer(std::deque<CString>::iterator _first, std::deque<CString>::iterator _last, bool compare_only_filename = false);

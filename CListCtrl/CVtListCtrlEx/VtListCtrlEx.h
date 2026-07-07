@@ -449,6 +449,9 @@ public:
 	//index = -1 : 전체선택
 	void		select_item(int index, bool select = true, bool after_unselect = false, bool insure_visible = true);
 	void		unselect_selected_item();
+	//names(각 항목의 leaf 파일/폴더명)에 매칭되는 항목만 선택하고, 마지막 매칭 항목으로 스크롤한다(기존 선택은 모두 해제).
+	//리로드(refresh_list) 후 선택/스크롤 복원, 전송된 항목 재선택 등에 사용. 반환: 마지막으로 선택된 인덱스(없으면 -1).
+	int			select_items_by_names(const std::deque<CString>& names, int visible_mode = visible_last);
 
 	int			get_check(int index);
 	//CListCtrl::GetCheck() override.
@@ -736,6 +739,8 @@ public:
 	//(raw Scroll() 만 호출하면 LVN_ENDSCROLL→sync_scrollbar 가 stale m_h_scroll_pos 로 thumb 을 리셋해 가로바가 안 따라옴.)
 	//dx_px: +오른쪽/-왼쪽(px). dy_lines: +아래/-위(라인 수).
 	void			drag_scroll_by(int dx_px, int dy_lines);
+	//20260707 by claude. SCTreeCtrl 등에서 드래그 자동스크롤이 이 리스트로 위임될 때 받는 메시지 핸들러. drag_scroll_by 후 1 반환.
+	afx_msg LRESULT	on_message_DragScrollBy(WPARAM wParam, LPARAM lParam);
 
 	//text = "     some text"일 경우 앞의 공백을 들여쓰기 용도로 사용한다.
 	//"     " 만큼 들여써서 "some text"를 출력한다. 아이콘도 함께 적용된다.

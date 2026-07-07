@@ -10637,6 +10637,21 @@ CString	get_parent_dir(CString path, TCHAR path_sep)
 	return path;
 }
 
+bool	is_drag_copy(const CString& from_path, const CString& to_path)
+{
+	//실시간 물리 키(GetAsyncKeyState) — SetCapture 드래그 중에도 안정적으로 Ctrl/Shift 눌림을 본다.
+	bool ctrl  = (GetAsyncKeyState(VK_CONTROL) & 0x8000) != 0;
+	bool shift = (GetAsyncKeyState(VK_SHIFT)   & 0x8000) != 0;
+	if (ctrl)
+		return true;	//Ctrl = 강제 복사(탐색기 동일)
+	if (shift)
+		return false;	//Shift = 강제 이동
+	//키 없음 → 드라이브 기준: 같은 드라이브 = 이동, 다른 드라이브 = 복사.
+	if (from_path.GetLength() < 2 || to_path.GetLength() < 2)
+		return false;
+	return (from_path.Left(2).CompareNoCase(to_path.Left(2)) != 0);
+}
+
 //MAX_COMPUTERNAME_LENGTH(15) 길이까지만 리턴됨에 주의.
 //GetComputerName API 함수는 항상 대문자로 리턴한다.
 //그냥 확실하게 GetComputerNameString().MakeLower() 등과 같이

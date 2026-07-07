@@ -502,6 +502,8 @@ protected:
 	//20260704 by claude. 드래그 자동스크롤 실행: 가로는 m_h_scroll_pos 직접 px(+clamp+sync_scrollbar), 세로는 SB_LINE 라인 수.
 	//WM_HSCROLL SB_LINELEFT(=60px, 마우스휠/스크롤바와 공유) 대신 이 픽셀 경로로 더 세밀·느린 가로 자동스크롤을 낸다.
 	void			drag_scroll_by(int dx_px, int dy_lines);
+	//20260707 by claude. tree→tree 드래그 시 드롭 대상 트리가 받는 자동스크롤 위임 메시지. drag_scroll_by 로 위임 후 1 반환.
+	afx_msg LRESULT	on_message_DragScrollBy(WPARAM wParam, LPARAM lParam);
 	void			cancel_drag();								//드래그 중 ESC 등으로 드롭 없이 완전 취소.
 	bool			m_swallow_rbutton = false;					//드래그 취소용 우클릭의 RBUTTONUP 을 소비할지(팝업 메뉴 방지).
 

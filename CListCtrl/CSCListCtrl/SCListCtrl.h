@@ -4,11 +4,10 @@
 #include <list>
 #include <functional>
 #include <Afxwin.h>
-//20260706 by claude. HeaderCtrlEx/list_data 는 list 타입에 독립인 공유 헬퍼·데이터 세트 — CSCListCtrl 실험용으로 복사하지 않고
-//원본(CVtListCtrlEx 폴더)을 그대로 공유한다. (이 프로젝트는 tree 드래그 때문에 CVtListCtrlEx 도 함께 컴파일되므로 세트를
-//같은 이름으로 복사하면 CHeaderCtrlEx 중복 정의로 링크 충돌. CSCListCtrl 이 CVtListCtrlEx 를 완전 대체하면 그때 세트를 이동.)
-#include "../CVtListCtrlEx/list_data.h"
-#include "../CVtListCtrlEx/HeaderCtrlEx.h"
+//20260707 by claude. HeaderCtrlEx/list_data 세트를 CSCListCtrl 폴더로 복사(HeaderCtrlEx→SCHeaderCtrl, class CSCHeaderCtrl).
+//원본(CVtListCtrlEx 폴더)은 다른 프로젝트가 아직 사용하므로 이 프로젝트 빌드에서만 제외하고 이 복사본을 쓴다(전 프로젝트 이행 완료 후 원본 폴더 제거 예정).
+#include "list_data.h"
+#include "SCHeaderCtrl.h"
 //#include "../../GdiplusBitmap.h"
 #include "../../CButton/GdiButton/GdiButton.h"
 #include "../../Functions.h"
@@ -28,7 +27,7 @@
 */
 
 /*
-CListCtrl의 각 라인을 CListCtrlData라는 클래스의 인스턴스로 생성하여
+CListCtrl의 각 라인을 CSCListCtrlData라는 클래스의 인스턴스로 생성하여
 virtual list 기능을 이용하도록 작성된 클래스.
 resource editor에서
 virtual list 기능을 이용하기 위해 Owner Data를 true로,
@@ -66,7 +65,7 @@ m_list.set_header_height(24);
 <멀티레벨 구현 관련 방향>
 - 간혹 트리+리스트의 형태로 멀티레벨이 구현된 컨트롤도 있으나 이 컨트롤만으로 심플한 정도에서 멀티레벨을 구현하고자 함
   (확장, 축소 기능 지원안함)
-- CListCtrlData에 level 멤버를 추가하여 해당 라인의 레벨을 표시한다.
+- CSCListCtrlData에 level 멤버를 추가하여 해당 라인의 레벨을 표시한다.
   0레벨
 	1레벨
 		2레벨
@@ -228,6 +227,10 @@ public:
 	//local일 경우는 경로만 주면 자동으로 폴더목록 표시
 	//m_path를 변경한 후 set_path(m_path)와 같이 절대 호출하지 말것. set_path()내부에서 변경하려는 path와 m_path가 같으면 스킵되므로.
 	void		set_path(CString path, bool refresh = true);
+
+	//20260707 by claude. shell 리스트 뒤로가기 — 방문 폴더 히스토리(deque). 앞으로 이동 시 set_path 가 이전 폴더를 push,
+	//go_back() 이 마지막 폴더로 이동(그때는 push 안 함). 마우스 back 버튼(XBUTTON1)·Backspace 가 자체적으로 호출한다.
+	void		go_back();
 	//remote일 경우는 파일목록을 받아서 표시한다.
 	void		set_filelist(std::deque<CVtFileInfo>* pFolderList, std::deque<CVtFileInfo>* pFileList);
 
@@ -288,6 +291,9 @@ public:
 	};
 
 	CString		m_path;
+	//20260707 by claude. shell 리스트 뒤로가기 히스토리. set_path(앞으로 이동) 시 이전 m_path 를 push, go_back 시 pop.
+	std::deque<CString>	m_folder_history;
+	bool				m_navigating_back = false;	//go_back 실행 중이면 set_path 가 히스토리에 push 하지 않도록.
 	CShellImageList*	m_pShellImageList = NULL;
 	CShellImageList*	get_shell_imagelist() { return m_pShellImageList; }
 	void				set_shell_imagelist(CShellImageList* pShellImageList) { m_pShellImageList = pShellImageList; }
@@ -452,6 +458,9 @@ public:
 	//index = -1 : 전체선택
 	void		select_item(int index, bool select = true, bool after_unselect = false, bool insure_visible = true);
 	void		unselect_selected_item();
+	//names(각 항목의 leaf 파일/폴더명)에 매칭되는 항목만 선택하고, 마지막 매칭 항목으로 스크롤한다(기존 선택은 모두 해제).
+	//리로드(refresh_list) 후 선택/스크롤 복원, 전송된 항목 재선택 등에 사용. 반환: 마지막으로 선택된 인덱스(없으면 -1).
+	int			select_items_by_names(const std::deque<CString>& names, int visible_mode = visible_last);
 
 	int			get_check(int index);
 	//CListCtrl::GetCheck() override.
@@ -636,7 +645,7 @@ public:
 	//=> SetFont()를 통해서 header의 height를 변경한다.
 	void		set_header_height(int height, bool invalidate = false);
 
-	LRESULT		on_message_CHeaderCtrlEx(WPARAM wParam, LPARAM lParam);
+	LRESULT		on_message_CSCHeaderCtrl(WPARAM wParam, LPARAM lParam);
 
 	//line height를 변경하는 방법은 가상의 이미지리스트를 이용하는 방법과
 	//(실제 사용할 이미지리스트가 있는 경우는 위 방법을 사용할 수 없다)
@@ -743,17 +752,19 @@ public:
 	//(raw Scroll() 만 호출하면 LVN_ENDSCROLL→sync_scrollbar 가 stale m_h_scroll_pos 로 thumb 을 리셋해 가로바가 안 따라옴.)
 	//dx_px: +오른쪽/-왼쪽(px). dy_lines: +아래/-위(라인 수).
 	void			drag_scroll_by(int dx_px, int dy_lines);
+	//20260707 by claude. SCTreeCtrl 등에서 드래그 자동스크롤이 이 리스트로 위임될 때 받는 메시지 핸들러. drag_scroll_by 후 1 반환.
+	afx_msg LRESULT	on_message_DragScrollBy(WPARAM wParam, LPARAM lParam);
 
 	//text = "     some text"일 경우 앞의 공백을 들여쓰기 용도로 사용한다.
 	//"     " 만큼 들여써서 "some text"를 출력한다. 아이콘도 함께 적용된다.
 	void			use_indent_from_prefix_space(bool use_indent) { m_use_indent_from_prefix_space = use_indent; }
 
 	//HAS_STRING, OWNER_DRAW_FIXED 속성을 가지면 Get/SetItemData() 함수를 사용할 수 없다.
-	//이 두 함수를 사용할 수 있도록 CListCtrlData에 data 멤버를 추가하고 다음 함수들을 override하여 선언함.
+	//이 두 함수를 사용할 수 있도록 CSCListCtrlData에 data 멤버를 추가하고 다음 함수들을 override하여 선언함.
 	DWORD_PTR		GetItemData(int index);
 	BOOL			SetItemData(int index, DWORD_PTR dwData);
 
-	CHeaderCtrlEx*	get_header_ctrl() { return &m_HeaderCtrlEx; }
+	CSCHeaderCtrl*	get_header_ctrl() { return &m_HeaderCtrlEx; }
 
 //cell action
 	enum CELL_ACTION
@@ -770,14 +781,14 @@ protected:
 	bool			m_in_bulk_insert = false;
 
 //메인 데이터
-	std::deque<CListCtrlData> m_list_db;
+	std::deque<CSCListCtrlData> m_list_db;
 	
 	CString			m_text_on_empty;
 	int				m_text_on_empty_size = 9;
 	Gdiplus::Color	m_text_on_empty_color = Gdiplus::Color::DimGray;
 
 //컬럼 관련
-	CHeaderCtrlEx	m_HeaderCtrlEx;
+	CSCHeaderCtrl	m_HeaderCtrlEx;
 	std::deque<int> m_column_data_type;
 	std::deque<int> m_column_text_align;
 	int				m_fixed_width_column = -1;
@@ -855,6 +866,10 @@ protected:
 	CPoint			m_marquee_cur = CPoint(0, 0);		//현재 커서(client 좌표).
 	bool			m_marquee_ctrl = false;				//드래그 시작 시 Ctrl 눌림 여부(추가 모드) — 드래그 내내 고정.
 	std::deque<int>	m_marquee_base;						//드래그 시작 시점의 선택 스냅샷(Ctrl 드래그 = 기존 선택에 추가).
+	//20260707 by claude. 직전 apply 에서 마퀴에 세로로 걸친 연속 항목 구간(빈=hi<lo). 매 이동마다 전체 N 을 훑지 않고
+	//이 구간과 새 구간의 합집합만 재평가 → 대량 리스트에서 드래그 선택 성능 확보(항목 균일 높이라 겹치는 항목은 항상 연속 구간).
+	int				m_marquee_lo = 0;
+	int				m_marquee_hi = -1;
 	void			start_marquee(CPoint point, bool ctrl);	//빈 공간 눌림 → 마퀴 시작(capture, 스냅샷, plain 이면 선택 해제).
 	void			end_marquee();						//마퀴 종료(capture 해제, 타이머 정지, 사각형 지우기).
 	int				m_marquee_scroll_vx = 0;			//마퀴 자동 스크롤 속도(가로, tick당 level, 부호=방향). 거리비례 가속.
@@ -863,6 +878,13 @@ protected:
 	void			apply_marquee_selection(bool ctrl);	//현재 마퀴 사각형으로 선택 갱신.
 	void			row_screen_rect(int item, CRect& out);	//item 행의 화면 rect(smooth=m_scroll_y 기준, native=GetItemRect).
 	void			draw_marquee(CDC* pDC);				//OnPaint 에서 마퀴 사각형 렌더.
+
+	//20260707 by claude. [smooth] 드래그 제스처 감지 — native 모드는 리스트뷰가 LVN_BEGINDRAG 를 쏘지만 smooth 는
+	//OnLButtonDown 이 native 를 우회 소비하므로 직접 감지한다. 항목 위 LButton 누름 후 문턱 이상 이동하면 LVN_BEGINDRAG 를 합성.
+	bool			m_smooth_drag_pending = false;		//항목 위 LButton 눌림 — 드래그 제스처 대기 중.
+	CPoint			m_smooth_drag_pt = CPoint(0, 0);	//누른 지점(client).
+	int				m_smooth_drag_item = -1;			//누른 항목.
+	int				m_smooth_click_defer = -1;			//다중선택 상태에서 이미 선택된 항목을 plain 클릭 → 드래그가 아니면 LButtonUp 에서 single 로 축소.
 
 	//https://jiniya.net/tt/594/
 	//이 함수는 드래그 이미지를 직접 생성해주는 코드지만 취약점이 많은 코드이므로 참고만 할것.

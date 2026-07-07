@@ -12,6 +12,7 @@
 #include "../../colors.h"
 #include "../../MemoryDC.h"
 #include "../../log/SCLog/SCLog.h"	//20260706 by claude. [진단 임시] logWrite 사용 — 원인 확정 후 이 include 도 함께 제거.
+#include "Common/drag_scroll_message.h"	//20260707 by claude. SCTreeCtrl 드래그 자동스크롤 위임 메시지 수신용.
 #include <afxvslistbox.h>
 
 #define IDC_EDIT_CELL	1001
@@ -97,13 +98,14 @@ BEGIN_MESSAGE_MAP(CSCListCtrl, CListCtrl)
 	ON_WM_SIZE()
 	ON_WM_WINDOWPOSCHANGED()
 	ON_REGISTERED_MESSAGE(Message_CGdiButton, &CSCListCtrl::on_message_CGdiButton)
-	ON_REGISTERED_MESSAGE(Message_CHeaderCtrlEx, &CSCListCtrl::on_message_CHeaderCtrlEx)
+	ON_REGISTERED_MESSAGE(Message_CSCHeaderCtrl, &CSCListCtrl::on_message_CSCHeaderCtrl)
 	ON_WM_NCPAINT()
 	ON_WM_NCCALCSIZE()
 	ON_WM_STYLECHANGING()
 	ON_WM_MOUSEWHEEL()
 	ON_WM_MOUSEHWHEEL()
 	ON_REGISTERED_MESSAGE(Message_CSCScrollbar, &CSCListCtrl::on_message_CSCScrollbar)
+	ON_REGISTERED_MESSAGE(Message_DragScrollBy, &CSCListCtrl::on_message_DragScrollBy)
 	ON_WM_TIMER()
 END_MESSAGE_MAP()
 
@@ -253,8 +255,8 @@ void CSCListCtrl::OnLvnOdfinditem(NMHDR *pNMHDR, LRESULT *pResult)
 	CString searchText = pFindInfo->lvfi.psz;
 	int find_index = -1;
 
-	std::deque<CListCtrlData>::iterator it = std::find_if(m_list_db.begin(), m_list_db.end(),
-		[&](const CListCtrlData& item) ->
+	std::deque<CSCListCtrlData>::iterator it = std::find_if(m_list_db.begin(), m_list_db.end(),
+		[&](const CSCListCtrlData& item) ->
 		bool
 		{
 			return (searchText.CompareNoCase(item.text[0]) == 0);
@@ -978,7 +980,7 @@ void CSCListCtrl::set_header_height(int height, bool invalidate)
 	if (m_HeaderCtrlEx.m_hWnd != NULL)
 		m_HeaderCtrlEx.set_header_height(height);
 
-	//커스텀 헤더 높이는 listview 가 헤더에 HDM_LAYOUT 을 보낼 때(CHeaderCtrlEx::OnLayout, 보통 WM_SIZE)만
+	//커스텀 헤더 높이는 listview 가 헤더에 HDM_LAYOUT 을 보낼 때(CSCHeaderCtrl::OnLayout, 보통 WM_SIZE)만
 	//실제 적용된다. resize 가 없는 컨텍스트(예: 고정 크기로 임베드된 환경설정 리스트)에서도 즉시 반영되도록
 	//listview 크기를 1px 늘렸다 되돌려 *실제* WM_SIZE 두 번을 발생시켜 HDM_LAYOUT 을 강제 재전송한다.
 	//(동일 크기 WM_SIZE 는 listview 가 무시할 수 있어 헤더 relayout 이 안 일어난다 — 컬럼 너비 조정 같은
@@ -1390,7 +1392,7 @@ void CSCListCtrl::sort(int subItem, int ascending)
 		//이 때 m_list_db를 보면 특정 항목의 text가 empty로 변하여 std::sort에서 오류가 발생함.
 		//1번 또는 11번 항목이 empty.
 		std::sort(m_list_db.begin(), m_list_db.end(),
-			[sort_asc, iSub, data_type, include_null](CListCtrlData a, CListCtrlData b)
+			[sort_asc, iSub, data_type, include_null](CSCListCtrlData a, CSCListCtrlData b)
 			{
 				if (sort_asc)
 				{
@@ -1488,7 +1490,7 @@ void CSCListCtrl::sort_by_text_color(int subItem, int ascending, bool text_sort_
 	bool text_sort_on_same_color_item = text_sort_on_same_color;
 
 	std::sort(m_list_db.begin(), m_list_db.end(),
-		[sort_asc, iSub, text_sort_on_same_color_item](CListCtrlData a, CListCtrlData b)
+		[sort_asc, iSub, text_sort_on_same_color_item](CSCListCtrlData a, CSCListCtrlData b)
 	{
 		if (sort_asc)
 		{
@@ -1710,10 +1712,14 @@ BOOL CSCListCtrl::PreTranslateMessage(MSG* pMsg)
 		refresh_drag_hint();
 	}
 
-	//마우스 back button up
-	if (pMsg->message == WM_XBUTTONUP)
+	//20260707 by claude. 마우스 back 버튼(XBUTTON1) up → 뒤로가기 히스토리 이동(shell 리스트). 처리 시 소비.
+	if (pMsg->message == WM_XBUTTONUP && GET_XBUTTON_WPARAM(pMsg->wParam) == XBUTTON1)
 	{
-		move_parent_folder();
+		if (m_is_shell_listctrl)
+		{
+			go_back();
+			return TRUE;
+		}
 	}
 	else if (pMsg->message == WM_MOUSEWHEEL && m_in_editing)
 	{
@@ -1797,29 +1803,13 @@ BOOL CSCListCtrl::PreTranslateMessage(MSG* pMsg)
 				if (m_in_editing)
 					break;
 
-				//로컬일 경우 Back키에 대해 다음 동작을 수행시키는 것은 간편한 사용이 될 수도 있지만
-				//main에서 어떻게 사용하느냐에 따라 방해가 될 수도 있다.
+				//20260707 by claude. Backspace → 상위 폴더가 아니라 뒤로가기 히스토리로 이동(마우스 back 버튼과 동일 동작).
 				if (m_is_shell_listctrl)
 				{
-					if (m_path == m_pShellImageList->m_volume[!m_is_local].get_label(CSIDL_DRIVES))
-						return true;
-
-					CString new_path;
-
-					//드라이브면 내 PC로 가고
-					if (is_drive_root(m_path))
-						new_path = m_pShellImageList->m_volume[!m_is_local].get_label(CSIDL_DRIVES);
-					//그렇지 않으면 상위 디렉토리로 이동
-					else
-						new_path = get_parent_dir(m_path);
-
-					set_path(new_path);
-				
-					//CSCListCtrl 내부에서 어떤 이벤트에 의해 경로가 변경되는 경우라면 parent에게 이를 알려야한다.
-					//set_path에서 메시지 전송을 포함시키면 recursive call이 발생하므로 별도로 호출한다.
-					::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCListCtrl, (WPARAM) & (CSCListCtrlMessage(this, message_path_changed, NULL)), (LPARAM)&new_path);
+					go_back();
+					return TRUE;
 				}
-				
+
 				break;
 			}
 
@@ -2121,6 +2111,15 @@ CSCStaticEdit* CSCListCtrl::edit_item(int item, int subItem)
 
 	if (!m_allow_edit_column[subItem])
 		return NULL;
+
+	//20260707 by claude. 보호 항목(시스템 폴더·파일 등)은 이름 변경 금지 — 트리는 막는데 리스트는 안 막던 버그 수정.
+	//단 드라이브 루트는 '볼륨 레이블' 변경이므로 허용한다(드라이브 문자 변경은 아님). 이름 컬럼(col_filename) 편집에만 적용.
+	if (m_is_shell_listctrl && m_pShellImageList && subItem == col_filename)
+	{
+		CString real = m_pShellImageList->convert_special_folder_to_real_path(!m_is_local, get_path(item));
+		if (!is_drive_root(real) && m_pShellImageList->is_protected(!m_is_local, real))
+			return NULL;
+	}
 	// The returned pointer should not be saved
 
 	// Make sure that the item is visible
@@ -2567,8 +2566,8 @@ void CSCListCtrl::set_item_color(int item, int subItem, Gdiplus::Color crText, G
 }
 
 template <typename ValueT, typename DequeT>
-static void _apply_style_field(std::deque<CListCtrlData>& db, int item, int subItem, int col_count,
-	DequeT CListCtrlData::* member, ValueT value)
+static void _apply_style_field(std::deque<CSCListCtrlData>& db, int item, int subItem, int col_count,
+	DequeT CSCListCtrlData::* member, ValueT value)
 {
 	auto set = [&](int i, int j)
 	{
@@ -2600,28 +2599,28 @@ static void _apply_style_field(std::deque<CListCtrlData>& db, int item, int subI
 
 void CSCListCtrl::set_text_weight(int item, int subItem, int weight, bool invalidate)
 {
-	_apply_style_field<int>(m_list_db, item, subItem, get_column_count(), &CListCtrlData::weight, weight);
+	_apply_style_field<int>(m_list_db, item, subItem, get_column_count(), &CSCListCtrlData::weight, weight);
 	if (invalidate)
 		Invalidate();
 }
 
 void CSCListCtrl::set_text_italic(int item, int subItem, bool italic, bool invalidate)
 {
-	_apply_style_field<BYTE>(m_list_db, item, subItem, get_column_count(), &CListCtrlData::italic, italic ? 1 : 0);
+	_apply_style_field<BYTE>(m_list_db, item, subItem, get_column_count(), &CSCListCtrlData::italic, italic ? 1 : 0);
 	if (invalidate)
 		Invalidate();
 }
 
 void CSCListCtrl::set_text_underline(int item, int subItem, bool underline, bool invalidate)
 {
-	_apply_style_field<BYTE>(m_list_db, item, subItem, get_column_count(), &CListCtrlData::underline, underline ? 1 : 0);
+	_apply_style_field<BYTE>(m_list_db, item, subItem, get_column_count(), &CSCListCtrlData::underline, underline ? 1 : 0);
 	if (invalidate)
 		Invalidate();
 }
 
 void CSCListCtrl::set_text_strikeout(int item, int subItem, bool strikeout, bool invalidate)
 {
-	_apply_style_field<BYTE>(m_list_db, item, subItem, get_column_count(), &CListCtrlData::strikeout, strikeout ? 1 : 0);
+	_apply_style_field<BYTE>(m_list_db, item, subItem, get_column_count(), &CSCListCtrlData::strikeout, strikeout ? 1 : 0);
 	if (invalidate)
 		Invalidate();
 }
@@ -2629,10 +2628,10 @@ void CSCListCtrl::set_text_strikeout(int item, int subItem, bool strikeout, bool
 void CSCListCtrl::set_text_style(int item, int subItem, int weight, bool italic, bool underline, bool strikeout, bool invalidate)
 {
 	int col = get_column_count();
-	_apply_style_field<int> (m_list_db, item, subItem, col, &CListCtrlData::weight,    weight);
-	_apply_style_field<BYTE>(m_list_db, item, subItem, col, &CListCtrlData::italic,    italic    ? 1 : 0);
-	_apply_style_field<BYTE>(m_list_db, item, subItem, col, &CListCtrlData::underline, underline ? 1 : 0);
-	_apply_style_field<BYTE>(m_list_db, item, subItem, col, &CListCtrlData::strikeout, strikeout ? 1 : 0);
+	_apply_style_field<int> (m_list_db, item, subItem, col, &CSCListCtrlData::weight,    weight);
+	_apply_style_field<BYTE>(m_list_db, item, subItem, col, &CSCListCtrlData::italic,    italic    ? 1 : 0);
+	_apply_style_field<BYTE>(m_list_db, item, subItem, col, &CSCListCtrlData::underline, underline ? 1 : 0);
+	_apply_style_field<BYTE>(m_list_db, item, subItem, col, &CSCListCtrlData::strikeout, strikeout ? 1 : 0);
 	if (invalidate && !m_in_bulk_insert)
 		Invalidate();
 }
@@ -2760,7 +2759,7 @@ int CSCListCtrl::insert_item(int index, CString text, int image_index, bool ensu
 
 	if (m_use_virtual_list)
 	{
-		m_list_db.insert(m_list_db.begin() + index, CListCtrlData(text, image_index, m_HeaderCtrlEx.GetItemCount()));
+		m_list_db.insert(m_list_db.begin() + index, CSCListCtrlData(text, image_index, m_HeaderCtrlEx.GetItemCount()));
 
 		//LVSICF_NOSCROLL 옵션을 주지 않으면 특정 항목 선택 후 해당 항목이 보이지 않도록 스크롤하려 해도
 		//데이터가 계속 추가되는 상황에서는 선택된 항목이 보이지 않는 영역으로의 스크롤이 되지 않는 현상이 있다.
@@ -3148,9 +3147,9 @@ bool CSCListCtrl::delete_item(CString label)
 	{
 		CString filename = get_part(label, fn_name);
 
-		std::deque<CListCtrlData>::iterator it_data;
+		std::deque<CSCListCtrlData>::iterator it_data;
 		it_data = std::find_if(m_list_db.begin(), m_list_db.end(),
-			[filename](CListCtrlData data)
+			[filename](CSCListCtrlData data)
 			{
 				return (data.text[0].Compare(filename) == 0);
 			});
@@ -3372,9 +3371,9 @@ void CSCListCtrl::rename(CString old_text, CString new_text)
 		CString old_label = get_part(old_text, fn_name);
 		CString new_label = get_part(new_text, fn_name);
 
-		std::deque<CListCtrlData>::iterator it_data;
+		std::deque<CSCListCtrlData>::iterator it_data;
 		it_data = std::find_if(m_list_db.begin(), m_list_db.end(),
-			[old_label](CListCtrlData data)
+			[old_label](CSCListCtrlData data)
 			{
 				return (data.text[0].Compare(old_label) == 0);
 			});
@@ -3645,6 +3644,35 @@ void CSCListCtrl::unselect_selected_item()
 	//get_selected_items(&dqSelected);
 	//for (int i = 0; i < dqSelected.size(); i++)
 	//	select_item(dqSelected[i], false);
+}
+
+int CSCListCtrl::select_items_by_names(const std::deque<CString>& names, int visible_mode)
+{
+	if (names.empty())
+		return -1;
+
+	select_item(-1, false);		//기존 선택 전체 해제 → names 에 해당하는 항목만 다시 선택.
+
+	int last_sel = -1;
+	int count = GetItemCount();
+	for (int i = 0; i < count; i++)
+	{
+		CString name = get_part(get_path(i), fn_name);
+		for (const auto& n : names)
+		{
+			if (name.CompareNoCase(n) == 0)
+			{
+				select_item(i, true, false, false);	//누적 선택, 스크롤은 아래에서 한 번만.
+				last_sel = i;
+				break;
+			}
+		}
+	}
+
+	if (last_sel >= 0)
+		ensure_visible(last_sel, visible_mode);
+
+	return last_sel;
 }
 
 //아이템의 상태값이 특정 상태값이 항목 또는 그 개수 구하기
@@ -4586,7 +4614,7 @@ void CSCListCtrl::set_as_shell_listctrl(CShellImageList* pShellImageList, bool i
 	set_font_size(9);
 	//set_font_name(_T("맑은 고딕"));
 	//set_font_size(), set_font_name()을 호출하지 않고 set_header_height()을 호출하면
-	//CHeaderCtrlEx::OnLayout()에서 에러가 발생한다.
+	//CSCHeaderCtrl::OnLayout()에서 에러가 발생한다.
 	set_header_height(26);
 	set_line_height(26);
 
@@ -4697,6 +4725,11 @@ void CSCListCtrl::set_path(CString path, bool refresh)
 	if (path.IsEmpty())
 		path = m_pShellImageList->get_system_path(!m_is_local, CSIDL_DRIVES);
 
+	//20260707 by claude. 뒤로가기 히스토리 — 앞으로 이동(go_back 아님)이고 폴더가 실제로 바뀔 때 현재(이전) 폴더를 push.
+	//go_back() 이 부르는 set_path 는 m_navigating_back 로 push 를 건너뛴다(무한 누적 방지).
+	if (m_is_shell_listctrl && !m_navigating_back && !m_path.IsEmpty() && m_path != path)
+		m_folder_history.push_back(m_path);
+
 	m_path = path;
 
 	//C 드라이브는 "C:\\"로, "C:\\temp\\"는 "C:\\temp"로 변경한다.
@@ -4707,6 +4740,24 @@ void CSCListCtrl::set_path(CString path, bool refresh)
 	TRACE(_T("set_path(%s)\n"), m_path);
 
 	refresh_list(refresh);
+}
+
+//20260707 by claude. 뒤로가기 — 히스토리의 마지막 폴더로 이동한다(그 이동은 히스토리에 push 하지 않는다).
+//마우스 back 버튼(XBUTTON1)·Backspace 가 호출. 비어 있으면 아무 것도 안 한다.
+void CSCListCtrl::go_back()
+{
+	if (!m_is_shell_listctrl || m_folder_history.empty())
+		return;
+
+	CString prev = m_folder_history.back();
+	m_folder_history.pop_back();
+
+	m_navigating_back = true;
+	set_path(prev);
+	m_navigating_back = false;
+
+	//경로 변경을 parent 에 알린다. set_path 는 재귀 방지로 이 메시지를 안 보내므로 여기서 별도 전송(기존 VK_BACK 코드와 동일 패턴).
+	::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCListCtrl, (WPARAM) & (CSCListCtrlMessage(this, message_path_changed, NULL)), (LPARAM)&prev);
 }
 
 void CSCListCtrl::set_filelist(std::deque<CVtFileInfo>* pFolderList, std::deque<CVtFileInfo>* pFileList)
@@ -5324,7 +5375,9 @@ void CSCListCtrl::OnLvnBeginDrag(NMHDR* pNMHDR, LRESULT* pResult)
 	m_nDragIndex = pNMLV->iItem;
 
 	//보호 항목(시스템 폴더·드라이브 루트 등)이 드래그 대상(선택)에 하나라도 포함되면 드래그 시작 자체를 차단(위험 원천 차단).
-	if (m_pShellImageList)
+	//20260707 by claude. shell 리스트에서만 검사한다. m_pShellImageList 가 있어도 shell 리스트가 아닐 수 있고(예: 일반 리스트가
+	//아이콘용으로만 imagelist 를 붙인 경우) 그때는 get_win32_find_data 가 읽는 m_cur_folders/m_cur_files 가 비어 out-of-range.
+	if (m_is_shell_listctrl)
 	{
 		bool any_sel = false;
 		POSITION pos = GetFirstSelectedItemPosition();
@@ -5433,6 +5486,29 @@ void CSCListCtrl::OnMouseMove(UINT nFlags, CPoint point)
 	}
 
 
+	//20260707 by claude. [smooth] 드래그 제스처 감지 — 항목 위 LButton 누른 뒤 문턱 이상 이동하면 LVN_BEGINDRAG 를 합성한다.
+	//native 모드는 리스트뷰가 이 감지를 대신 해주지만, smooth 는 OnLButtonDown 이 native 를 우회 소비하므로 여기서 직접 감지한다.
+	//OnLvnBeginDrag 가 m_bDragging=TRUE + SetCapture 하고, 이번 이동이 아래 m_bDragging 블록으로 흘러 드래그 이미지를 곧바로 배치.
+	if (m_smooth_scroll && m_smooth_drag_pending && (nFlags & MK_LBUTTON) && !m_bDragging && !m_marquee_active)
+	{
+		if (abs(point.x - m_smooth_drag_pt.x) >= GetSystemMetrics(SM_CXDRAG) ||
+			abs(point.y - m_smooth_drag_pt.y) >= GetSystemMetrics(SM_CYDRAG))
+		{
+			m_smooth_drag_pending = false;
+			m_smooth_click_defer  = -1;		//드래그 확정 → 선택 축소 취소(다중선택 유지).
+
+			NMLISTVIEW nmlv = { 0 };
+			nmlv.hdr.hwndFrom = m_hWnd;
+			nmlv.hdr.idFrom   = (UINT_PTR)GetDlgCtrlID();
+			nmlv.hdr.code     = LVN_BEGINDRAG;
+			nmlv.iItem        = m_smooth_drag_item;
+			nmlv.iSubItem     = 0;
+			nmlv.ptAction     = m_smooth_drag_pt;
+			LRESULT res = 0;
+			OnLvnBeginDrag((NMHDR*)&nmlv, &res);
+		}
+	}
+
 	//20260706 by claude. 마퀴 드래그 중이면 사각형 갱신 + 겹치는 항목 선택(시작 시 고정한 ctrl 모드) + 가장자리 자동 스크롤.
 	if (m_marquee_active)
 	{
@@ -5509,8 +5585,10 @@ void CSCListCtrl::OnMouseMove(UINT nFlags, CPoint point)
 			int drop_item = -1, drop_sub = -1;
 			((CSCListCtrl*)pDropWnd)->hit_test(pt, drop_item, drop_sub, true);
 			m_nDropIndex = drop_item;
-			// Highlight it (폴더인 경우에만 hilite시킨다)
-			if (m_nDropIndex >= 0 && ((CSCListCtrl*)pDropWnd)->GetItemText(m_nDropIndex, col_filesize) == _T(""))
+			//20260707 by claude. shell 리스트면 폴더(파일크기 컬럼이 빈 항목)만 유효 드롭 대상, 일반 리스트는 폴더 개념이 없으므로
+			//커서 아래 항목을 그대로 하이라이트한다. (기존엔 대상이 일반 리스트여도 col_filesize 컬럼이 우연히 빈 행만 반응했다.)
+			if (m_nDropIndex >= 0 &&
+				(!pList->is_shell_listctrl() || pList->GetItemText(m_nDropIndex, col_filesize).IsEmpty()))
 				pList->SetItemState(m_nDropIndex, LVIS_DROPHILITED, LVIS_DROPHILITED);
 			// Redraw item
 			pList->RedrawItems(m_nDropIndex, m_nDropIndex);
@@ -5618,8 +5696,21 @@ void CSCListCtrl::drag_scroll_by(int dx_px, int dy_lines)
 	if (!::IsWindow(m_hWnd))
 		return;
 
-	for (int i = 0; i < abs(dy_lines); i++)
-		SendMessage(WM_VSCROLL, (dy_lines < 0) ? SB_LINEUP : SB_LINEDOWN);
+	//20260707 by claude. 세로: smooth 모드는 native 세로 스크롤(WM_VSCROLL)을 안 쓰고 m_scroll_y 로 그린다. 라인 수만큼 m_scroll_y 를
+	//직접 이동시켜야 실제로 스크롤되고 세로 썸도 따라온다(sync_scrollbar 가 [0,content-area] clamp + 썸 위치 반영). native 모드는 종전 SB_LINE.
+	if (m_smooth_scroll)
+	{
+		if (dy_lines != 0)
+		{
+			m_scroll_y += dy_lines * row_height();
+			Invalidate(FALSE);
+		}
+	}
+	else
+	{
+		for (int i = 0; i < abs(dy_lines); i++)
+			SendMessage(WM_VSCROLL, (dy_lines < 0) ? SB_LINEUP : SB_LINEDOWN);
+	}
 
 	if (dx_px != 0)
 	{
@@ -5629,6 +5720,13 @@ void CSCListCtrl::drag_scroll_by(int dx_px, int dy_lines)
 
 	UpdateWindow();
 	sync_scrollbar();
+}
+
+//20260707 by claude. SCTreeCtrl 에서 드래그해 이 리스트로 자동스크롤 위임될 때 받는다. drag_scroll_by 로 위임 후 1 반환(=처리됨).
+LRESULT CSCListCtrl::on_message_DragScrollBy(WPARAM wParam, LPARAM lParam)
+{
+	drag_scroll_by((int)wParam, (int)lParam);
+	return 1;
 }
 
 void CSCListCtrl::OnTimer(UINT_PTR nIDEvent)
@@ -5763,6 +5861,23 @@ void CSCListCtrl::OnLButtonUp(UINT nFlags, CPoint point)
 		// Get the CWnd pointer of the window that is under the mouse cursor
 		CWnd* pDropWnd = WindowFromPoint(pt);
 		ASSERT(pDropWnd); //make sure we have a window pointer
+
+		//20260707 by claude. [드롭 확인용] 마우스를 뗀 지점의 창/항목을 from→to 한 줄로 TRACE — 대상이 리스트/트리/그 밖 무엇이든.
+		//to 항목은 드래그 중 hit_test 로 갱신해 둔 m_nDropIndex 사용(대상이 CSCListCtrl 일 때). 대상 창은 MFC 런타임 클래스명으로 표기.
+		{
+			std::deque<int> sel;
+			get_selected_items(&sel);
+			CString from_item = sel.empty() ? _T("(none)") : GetItemText(sel[0], col_filename);
+			CString to_item;
+			if (pDropWnd && pDropWnd->IsKindOf(RUNTIME_CLASS(CSCListCtrl)) && m_nDropIndex >= 0)
+				to_item = ((CSCListCtrl*)pDropWnd)->GetItemText(m_nDropIndex, col_filename);
+			TRACE(_T("[DROP] from: path=%s item=%s (sel=%d)  ->  to: hwnd=%p class=%hs item=%s\n"),
+				(LPCTSTR)get_path(), (LPCTSTR)from_item, (int)sel.size(),
+				pDropWnd ? pDropWnd->GetSafeHwnd() : NULL,
+				pDropWnd ? pDropWnd->GetRuntimeClass()->m_lpszClassName : "null",
+				(LPCTSTR)to_item);
+		}
+
 		// If window is CListCtrl, we perform the drop
 		if (pDropWnd->IsKindOf(RUNTIME_CLASS(CSCListCtrl)) ||
 			pDropWnd->IsKindOf(RUNTIME_CLASS(CTreeCtrl)))
@@ -5775,6 +5890,19 @@ void CSCListCtrl::OnLButtonUp(UINT nFlags, CPoint point)
 		//마우스를 떼도 drophilited된 항목 표시가 여전히 남는다.
 		//메인에 메시지를 보내서 해당 컨트롤들의 아이템에서 drophilited를 제거시켜줘야 한다.
 		::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCListCtrl, (WPARAM) & (CSCListCtrlMessage(this, message_drag_and_drop, NULL)), (LPARAM)0);
+	}
+
+	//20260707 by claude. [smooth] 드래그로 이어지지 않은 클릭 마무리 — 제스처 대기 해제 + 지연해둔 다중선택 축소(single) 반영.
+	//드래그가 시작됐다면 m_smooth_click_defer 는 이미 -1(OnMouseMove 에서 취소)이라 여기서 축소가 일어나지 않는다.
+	if (m_smooth_scroll)
+	{
+		m_smooth_drag_pending = false;
+		if (m_smooth_click_defer >= 0)
+		{
+			select_single(m_smooth_click_defer);
+			m_smooth_click_defer = -1;
+			Invalidate(FALSE);
+		}
 	}
 
 	CListCtrl::OnLButtonUp(nFlags, point);
@@ -6083,7 +6211,7 @@ void CSCListCtrl::OnMouseLeave()
 }
 
 //HAS_STRING, OWNER_DRAW_FIXED 속성을 가지면 CListCtrl의 Get/SetItemData() 함수를 사용할 수 없다.
-//이 두 함수를 사용할 수 있도록 CListCtrlData에 data 멤버를 추가하고 다음 함수들을 override하여 선언함.
+//이 두 함수를 사용할 수 있도록 CSCListCtrlData에 data 멤버를 추가하고 다음 함수들을 override하여 선언함.
 DWORD_PTR CSCListCtrl::GetItemData(int index)
 {
 	if (index < 0 || index >= m_list_db.size())
@@ -6164,21 +6292,21 @@ void CSCListCtrl::get_remote_file_info(CString fullpath, WIN32_FIND_DATA* data)
 //실제 SetItemState 조작은 여기로 모은다(중복 방지).
 void CSCListCtrl::select_single(int item)
 {
-	int total = size();
-	for (int i = 0; i < total; i++)
-		if (i != item)
-			SetItemState(i, 0, LVIS_SELECTED);
+	//20260707 by claude. 전체 해제는 SetItemState(-1,...) 1회 API 로 — 항목 수만큼 루프 돌던 것을 제거(대량 리스트 키보드 네비 성능).
+	SetItemState(-1, 0, LVIS_SELECTED);
 	SetItemState(item, LVIS_SELECTED, LVIS_SELECTED);
 	m_focus_anchor = item;
 }
 
 void CSCListCtrl::select_range(int anchor, int item)
 {
+	//20260707 by claude. 전체 해제 1회(-1) 후 [a,b] 구간만 설정 — O(전체) → O(선택 구간). 구간 밖 항목을 매번 훑지 않는다.
 	int total = size();
-	int a = min(anchor, item);
-	int b = max(anchor, item);
-	for (int i = 0; i < total; i++)
-		SetItemState(i, (i >= a && i <= b) ? LVIS_SELECTED : 0, LVIS_SELECTED);
+	int a = max(0, min(anchor, item));
+	int b = min(total - 1, max(anchor, item));
+	SetItemState(-1, 0, LVIS_SELECTED);
+	for (int i = a; i <= b; i++)
+		SetItemState(i, LVIS_SELECTED, LVIS_SELECTED);
 }
 
 void CSCListCtrl::select_range_add(int anchor, int item)
@@ -6234,6 +6362,8 @@ void CSCListCtrl::start_marquee(CPoint point, bool ctrl)
 	m_marquee_start  = point;
 	m_marquee_cur    = point;
 	m_marquee_ctrl   = ctrl;
+	m_marquee_lo     = 0;	//직전 구간 리셋(빈).
+	m_marquee_hi     = -1;
 	SetCapture();
 
 	m_marquee_base.clear();
@@ -6305,7 +6435,68 @@ void CSCListCtrl::apply_marquee_selection(bool ctrl)
 	bool h_overlap = (m.left < col_right) && (m.right > rc.left);
 
 	int total = size();
-	for (int i = 0; i < total; i++)
+
+	//20260707 by claude. 마퀴에 세로로 걸치는 항목은 균일 높이라 항상 연속 인덱스 구간 [lo,hi] 다. 이를 산술로 구해
+	//(±1 여유 후 아래 루프의 정확한 per-item 테스트로 최종 판정), 직전 구간과의 합집합만 재평가한다 → 매 이동 O(N) 회피.
+	//행 화면 top = base_top + i*row_h (smooth: header-m_scroll_y, native: GetItemRect(0).top — owner-draw-fixed 라 균일).
+	int lo, hi;
+	if (!h_overlap || total == 0)
+	{
+		lo = 0;
+		hi = -1;	//빈 구간.
+	}
+	else
+	{
+		int row_h = row_height();
+		int base_top;
+		if (m_smooth_scroll)
+		{
+			base_top = get_header_height() - m_scroll_y;
+		}
+		else
+		{
+			CRect r0;
+			base_top = GetItemRect(0, &r0, LVIR_BOUNDS) ? r0.top : get_header_height();
+		}
+		lo = (m.top    - base_top) / row_h - 1;
+		hi = (m.bottom - base_top) / row_h + 1;
+		if (lo < 0)			lo = 0;
+		if (hi > total - 1)	hi = total - 1;
+		if (lo > hi)
+		{
+			lo = 0;
+			hi = -1;
+		}
+	}
+
+	//새 구간과 직전 구간의 합집합만 순회(둘 다 빈이면 순회 없음). 합집합 밖 항목은 in 여부가 두 시점 동일 → 변경 없음.
+	bool new_empty  = (hi < lo);
+	bool prev_empty = (m_marquee_hi < m_marquee_lo);
+	int scan_lo, scan_hi;
+	if (new_empty && prev_empty)
+	{
+		scan_lo = 0;
+		scan_hi = -1;
+	}
+	else if (new_empty)
+	{
+		scan_lo = m_marquee_lo;
+		scan_hi = m_marquee_hi;
+	}
+	else if (prev_empty)
+	{
+		scan_lo = lo;
+		scan_hi = hi;
+	}
+	else
+	{
+		scan_lo = min(lo, m_marquee_lo);
+		scan_hi = max(hi, m_marquee_hi);
+	}
+	if (scan_lo < 0)			scan_lo = 0;
+	if (scan_hi > total - 1)	scan_hi = total - 1;
+
+	for (int i = scan_lo; i <= scan_hi; i++)
 	{
 		CRect r;
 		row_screen_rect(i, r);
@@ -6319,6 +6510,9 @@ void CSCListCtrl::apply_marquee_selection(bool ctrl)
 		if (want != cur)
 			SetItemState(i, want ? LVIS_SELECTED : 0, LVIS_SELECTED);
 	}
+
+	m_marquee_lo = lo;	//다음 이동에서 합집합 계산용.
+	m_marquee_hi = hi;
 }
 
 void CSCListCtrl::draw_marquee(CDC* pDC)
@@ -6364,7 +6558,14 @@ void CSCListCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 		SetFocus();
 		//마우스 클릭 정책: ctrl+shift=기존 선택에 anchor~item 범위 추가, ctrl=토글, shift=anchor~item 범위(나머지 해제), plain=단일.
 		bool anchor_valid = (m_focus_anchor >= 0 && m_focus_anchor < total);
-		if (multi && ctrl && shift && anchor_valid)
+		bool already_sel  = (GetItemState(item, LVIS_SELECTED) & LVIS_SELECTED) != 0;
+
+		//20260707 by claude. 다중선택 상태에서 이미 선택된 항목을 plain(ctrl/shift 없이) 클릭하면, 이 눌림이 드래그의 시작일 수
+		//있으므로 선택을 지금 축소하지 않는다(탐색기 동작). 드래그로 이어지면 다중선택 유지, 단순 클릭이면 LButtonUp 에서 single 로 축소.
+		bool defer_collapse = (multi && already_sel && !ctrl && !shift);
+		if (defer_collapse)
+			m_smooth_click_defer = item;
+		else if (multi && ctrl && shift && anchor_valid)
 			select_range_add(m_focus_anchor, item);
 		else if (multi && ctrl)
 			toggle_item_select(item);
@@ -6373,6 +6574,15 @@ void CSCListCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 		else
 			select_single(item);
 		SetItemState(item, LVIS_FOCUSED, LVIS_FOCUSED);
+
+		//20260707 by claude. 드래그 제스처 대기 시작(드래그 허용 리스트일 때만). OnMouseMove 가 문턱 이상 이동을 감지하면
+		//LVN_BEGINDRAG 를 합성해 OnLvnBeginDrag 로 실제 드래그를 시작한다. m_focus_anchor 는 select_* 가 이미 갱신.
+		if (m_use_drag_and_drop)
+		{
+			m_smooth_drag_pending = true;
+			m_smooth_drag_pt      = point;
+			m_smooth_drag_item    = item;
+		}
 
 		//[smooth §4] 클릭 후처리(체크박스 토글·재클릭 편집진입)의 단일 출처는 OnNMClick. smooth 는 NM_CLICK 이 안 뜨므로
 		//합성 NMITEMACTIVATE(ptAction=클릭좌표)로 직접 호출(내부 hit_test 가 smooth-aware).
@@ -6638,13 +6848,25 @@ BOOL CSCListCtrl::OnNotify(WPARAM wParam, LPARAM lParam, LRESULT* pResult)
 				NMHEADER* nmh = (NMHEADER*)nm;
 				int col = nmh->iItem;
 				int w = get_column_max_text_width(col);
+				//20260707 by claude. 자동맞춤도 최소 컬럼 너비(60px) 보장.
 				if (w > 0)
-					set_column_width(col, w, true);
+					set_column_width(col, max(w, 60), true);
 
 				if (m_scrollbar_setup)
 					sync_scrollbar();
 				if (pResult) *pResult = 1;
 				return TRUE;   //base OnNotify 호출 차단 — Default 가 LVSCW_AUTOSIZE 로 덮어쓰는 것 방지.
+			}
+
+			//20260707 by claude. 컬럼 너비 최소 60px — 사용자가 분리자를 드래그해 그 이하로 줄이려 하면 그 변경을 거부(컬럼이 사라질 만큼 좁아지지 않게).
+			if (nm->code == HDN_ITEMCHANGINGW || nm->code == HDN_ITEMCHANGINGA)
+			{
+				NMHEADER* nmh = (NMHEADER*)nm;
+				if (nmh->pitem && (nmh->pitem->mask & HDI_WIDTH) && nmh->pitem->cxy < 60)
+				{
+					if (pResult) *pResult = TRUE;
+					return TRUE;
+				}
 			}
 
 			//나머지 트랙/체인지 분기는 sync_scrollbar 호출이라 m_scrollbar_setup 가드 안에서.
@@ -6782,9 +7004,9 @@ void CSCListCtrl::init_auto_scroll_button()
 	m_button_scroll_to_end->add_image(&img);
 }
 
-LRESULT	CSCListCtrl::on_message_CHeaderCtrlEx(WPARAM wParam, LPARAM lParam)
+LRESULT	CSCListCtrl::on_message_CSCHeaderCtrl(WPARAM wParam, LPARAM lParam)
 {
-	//CHeaderCtrlEx::OnLButtonDblClk 가 분리자 더블클릭 시 SendMessage(Message_CHeaderCtrlEx, column, header_text_width).
+	//CSCHeaderCtrl::OnLButtonDblClk 가 분리자 더블클릭 시 SendMessage(Message_CSCHeaderCtrl, column, header_text_width).
 	//기존 로직은 GetStringWidth(row text) 만으로 max 산출 + 컬럼0 의 *small image 아이콘 폭 미반영* —
 	//사용자 보고 "아이콘 너비가 반영 안 된 듯한 너비, 항목이 일부 안 보이고 말줄임표" 의 직접 원인.
 	//get_column_max_text_width 는 헤더+row text+icon+padding 모두 포함하므로 그것을 사용 (단일 진입점).
@@ -7012,7 +7234,7 @@ void CSCListCtrl::sync_scrollbar()
 	GetClientRect(&rc);
 
 	//visible(세로 가시 항목 수): 커스텀 헤더 height(get_header_height) 와 실제 행 높이로 직접 계산한다.
-	//GetCountPerPage 는 커스텀 헤더(CHeaderCtrlEx, set_header_height) 높이를 반영하지 못해 세로 스크롤바
+	//GetCountPerPage 는 커스텀 헤더(CSCHeaderCtrl, set_header_height) 높이를 반영하지 못해 세로 스크롤바
 	//출현 시점이 헤더 높이만큼 어긋난다.
 	int total_col_width = 0;
 	int col_count = get_column_count();

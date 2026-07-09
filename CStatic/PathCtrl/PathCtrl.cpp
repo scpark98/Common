@@ -144,7 +144,7 @@ void CPathCtrl::PreSubclassWindow()
 
 	CRect rc;
 	GetClientRect(rc);
-	TRACE(_T("rc = %s\n"), get_rect_info_str(rc, 2));
+	//TRACE(_T("rc = %s\n"), get_rect_info_str(rc, 2));
 
 	rc.DeflateRect(1, 1);
 	rc.left = (m_icon_left - 2) + ROOT_WIDTH;
@@ -906,7 +906,9 @@ void CPathCtrl::recalc_path_width()
 		if (i > 0)
 			rt.left = m_path[i - 1].r.right + 2;
 
-		dc.DrawText(m_path[i].label, &rt, DT_CALCRECT | DT_LEFT | DT_SINGLELINE | DT_VCENTER);
+		//20260709 by claude. DT_NOPREFIX — 폭 측정도 '&' 를 리터럴로 계산해야 한다. 없으면 "R&D" 가 mnemonic 으로 "RD" 폭으로 측정돼
+		//세그먼트가 좁게 잡히고 실제 표시(NOPREFIX)와 폭이 어긋난다.
+		dc.DrawText(m_path[i].label, &rt, DT_CALCRECT | DT_LEFT | DT_SINGLELINE | DT_VCENTER | DT_NOPREFIX);
 
 		//맨 끝 항목은 rc.right전까지 영역을 허용한다.
 		if ((i == m_path.size() - 1) && (rt.right + (m_has_subfolder ? m_arrow_area_width : 0) > rc.right - 10))
@@ -963,8 +965,8 @@ void CPathCtrl::recalc_path_position()
 	//각 항목의 표시 너비를 계산하고
 	for (i = m_path.size() - 1; i >= 0; i--)
 	{
-		//label이 출력될 width를 구하고
-		dc.DrawText(m_path[i].label, &rt, DT_CALCRECT | DT_LEFT | DT_SINGLELINE | DT_VCENTER);
+		//label이 출력될 width를 구하고 (DT_NOPREFIX — '&' 를 리터럴로 계산. 20260709 by claude.)
+		dc.DrawText(m_path[i].label, &rt, DT_CALCRECT | DT_LEFT | DT_SINGLELINE | DT_VCENTER | DT_NOPREFIX);
 
 		if (i == 0)
 			rt.right = rt.left + ROOT_WIDTH;

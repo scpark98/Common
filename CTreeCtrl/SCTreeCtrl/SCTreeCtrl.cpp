@@ -229,10 +229,10 @@ BOOL CSCTreeCtrl::PreTranslateMessage(MSG* pMsg)
 		{
 			case VK_F2:
 			{
-				//편집을 컨트롤 내부에서 처리하는게 편할수도 있지만 때로는 편집을 메인에서 관여해야 하는 경우도 존재한다.
-				//실제 label data와 UI상에 표시하는 label이 다를 경우, CSManager에서 그룹명 옆에 에이전트 개수를 표시하는 기능 등...
-				//아래와 같이 SendMessage()를 통해서 이벤트를 전달해도 되고 메인에서 직접 F2키에 대한 처리를 추가해도 된다.
-				::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCTreeCtrl, (WPARAM)&(CSCTreeCtrlMessage(this, message_edit_item, NULL)), (LPARAM)0);
+				//20260708 by claude. 편집을 컨트롤 자체에서 시작(리스트와 동일). 보호폴더 차단·드라이브 접미 제거는 edit_item 내부 가드가 담당하고,
+				//커밋·통지(MoveFile/SetVolumeLabel/message_path_changed/message_drive_volume_changed/TVN_ENDLABELEDIT)는 edit_end 가 자체 수행한다.
+				//표시≠편집 레이블(예: "이름 (개수)")이 필요한 앱은 TVN_ENDLABELEDIT 통지로 후처리하면 된다(예전 message_edit_item 왕복 불필요).
+				edit_item();
 				return FALSE;
 			}
 
@@ -1409,7 +1409,7 @@ BOOL CSCTreeCtrl::OnTvnItemexpanding(NMHDR* pNMHDR, LRESULT* pResult)
 			else
 			{
 				//remote라면 요청해서 넣어야 한다.
-				TRACE(_T("send message_request_folder_list, cur_path = %s\n"), get_path(m_expanding_item));
+				//TRACE(_T("send message_request_folder_list, cur_path = %s\n"), get_path(m_expanding_item));
 				::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCTreeCtrl, (WPARAM) & (CSCTreeCtrlMessage(this, message_request_folder_list, NULL)), (LPARAM)&get_path(m_expanding_item));
 			}
 		}
@@ -1459,10 +1459,8 @@ BOOL CSCTreeCtrl::OnNMClick(NMHDR* pNMHDR, LRESULT* pResult)
 		{
 			if (hCurItem == m_last_clicked_item)
 			{
-				//편집을 컨트롤 내부에서 처리하는게 편하지만 때로는 편집을 메인에서 관여해야 하는 경우도 존재한다.
-				//(실제 label data와 UI상에 표시하는 label이 다를 경우, CSManager에서 그룹명 옆에 에이전트 개수를 표시하는 기능)
-				//edit_item();
-				::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCTreeCtrl, (WPARAM) & (CSCTreeCtrlMessage(this, message_edit_item, NULL)), (LPARAM)0);
+				//20260708 by claude. 시간차 클릭 편집도 컨트롤 자체에서 시작(F2 와 동일). 표시≠편집 레이블 후처리가 필요한 앱은 TVN_ENDLABELEDIT 통지로.
+				edit_item();
 			}
 			else
 			{
@@ -1574,7 +1572,7 @@ void CSCTreeCtrl::set_path(CString fullpath, bool expand)
 	//fullpath가 "작업 디스크 (D:)\\temp"라고 넘어오면 이를 토큰분리한 후 "작업 디스크 (D:)" -> "temp" 순서로 폴더를 찾아간다.
 	for (int i = 1; i < dq.size(); i++)
 	{
-		TRACE(_T("CSCTreeCtrl::set_path(). finding '%s' from '%s' node...\n"), dq[i], (item ? GetItemText(item) : _T("root")));
+		//TRACE(_T("CSCTreeCtrl::set_path(). finding '%s' from '%s' node...\n"), dq[i], (item ? GetItemText(item) : _T("root")));
 
 		//만약 현재 노드에 아직 child가 추가된 상태가 아니라면 우선 children을 넣어준 후 검색해야 한다.
 		if (item && (GetChildItem(item) == NULL))
@@ -1604,7 +1602,7 @@ void CSCTreeCtrl::set_path(CString fullpath, bool expand)
 			Expand(item, TVE_EXPAND);
 	}
 
-	TRACE(_T("text = %s\n"), GetItemText(item));
+	//TRACE(_T("text = %s\n"), GetItemText(item));
 	if (item)
 		SelectItem(item);
 }
@@ -3678,6 +3676,15 @@ void CSCTreeCtrl::edit_item(HTREEITEM hItem)
 			return;
 	}
 
+	//20260708 by claude. 보호 항목(시스템 폴더 등)은 이름 변경 금지 — 단 드라이브 루트는 볼륨 레이블 변경이므로 허용(드라이브 문자 변경 아님).
+	//리스트(CSCListCtrl::edit_item)와 동일 정책. 커밋(edit_end)은 드라이브면 SetVolumeLabel, 그 외 폴더면 rename 으로 분기.
+	if (m_is_shell_treectrl && m_pShellImageList)
+	{
+		CString real = m_pShellImageList->convert_special_folder_to_real_path(!m_is_local, get_path(hItem));
+		if (!is_drive_root(real) && m_pShellImageList->is_protected(!m_is_local, real))
+			return;
+	}
+
 	//20260704 by claude. EnsureVisible 는 부분적으로 가려진 항목을 native H-scroll 로 reveal 하는데(스마트 동작 — 유지),
 	//트리의 가로 스크롤은 native 가 아니라 m_h_scroll_pos + paint-shift 모델이라 이 native reveal 이 오버레이 바/m_h_scroll_pos
 	//와 어긋난다(콘텐츠는 스크롤됐는데 바는 0). → native reveal 델타를 custom m_h_scroll_pos 로 접고 native 는 원위치로
@@ -3711,6 +3718,27 @@ void CSCTreeCtrl::edit_item(HTREEITEM hItem)
 
 	m_edit_item = hItem;
 	m_edit_old_text = GetItemText(hItem);
+
+	//20260708 by claude. 드라이브 루트면 편집 박스에 볼륨명만 보여준다 — 드라이브 문자 " (X:)" 는 편집 불가라 제거하고 커밋 때 다시 붙인다(리스트와 동일).
+	//드라이브 root 를 멤버에 저장해 edit_end 가 접미 제거된 m_edit_old_text 에 의존하지 않게 한다.
+	m_edit_is_drive = false;
+	if (m_is_shell_treectrl && m_pShellImageList)
+	{
+		CString root = m_pShellImageList->convert_special_folder_to_real_path(!m_is_local, get_path(hItem));
+		if (is_drive_root(root))
+		{
+			if (root.Right(1) != _T('\\'))
+				root += _T('\\');
+			m_edit_is_drive = true;
+			m_edit_drive_root = root;
+
+			CString suffix;
+			suffix.Format(_T(" (%c:)"), root[0]);
+			if (m_edit_old_text.Right(suffix.GetLength()) == suffix)
+				m_edit_old_text = m_edit_old_text.Left(m_edit_old_text.GetLength() - suffix.GetLength());
+		}
+	}
+
 	m_last_clicked_item = NULL;
 	m_last_clicked_time = 0;
 
@@ -3817,7 +3845,21 @@ void CSCTreeCtrl::edit_end(bool valid)
 		CString old_path = concat_path(parent_path, m_edit_old_text);
 		CString new_path = concat_path(parent_path, m_edit_new_text);
 
-		if (m_is_local)
+		//20260708 by claude. 드라이브 루트는 파일 rename 이 아니라 '볼륨 레이블' 변경. 드라이브 여부·root 는 edit_item 이 멤버에 저장했고
+		//편집 박스엔 볼륨명만 보였으므로 m_edit_new_text 가 곧 새 볼륨명이다. SetVolumeLabel 로 반영하고 표시엔 " (X:)" 를 다시 붙인다(아래).
+		bool is_drive = (m_is_local && m_edit_is_drive);
+
+		if (is_drive)
+		{
+			res = SetVolumeLabel(m_edit_drive_root, m_edit_new_text);
+
+			//성공 시 parent 에 드라이브 볼륨 변경 통지 → 형제 컨트롤(리스트) 드라이브 표시 동기화. param0=root("C:\\"), param1=새 볼륨명.
+			if (res)
+				::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCTreeCtrl,
+					(WPARAM) & (CSCTreeCtrlMessage(this, message_drive_volume_changed, NULL, m_edit_drive_root, m_edit_new_text)),
+					(LPARAM)0);
+		}
+		else if (m_is_local)
 		{
 			//이미 동일한 폴더명이 존재하면 parent에게 알려 메시지를 표시하도록 한다.
 			if (new_path != old_path && PathFileExists(new_path))
@@ -3852,12 +3894,23 @@ void CSCTreeCtrl::edit_end(bool valid)
 	
 		if (res)
 		{
-			SetItemText(m_edit_item, m_edit_new_text);
-			//path가 변경된 것을 parent에게 알려야 listctrl, pathctrl을 갱신한다.
-			::SendMessage(GetParent()->GetSafeHwnd(),
-				Message_CSCTreeCtrl,
-				(WPARAM) & (CSCTreeCtrlMessage(this, message_path_changed, NULL, new_path)),
-				(LPARAM)&res);
+			if (is_drive)
+			{
+				//20260708 by claude. 드라이브면 표시에 " (X:)" 재부착. 경로는 안 바뀌었으므로 message_path_changed 는 보내지 않는다
+				//(볼륨 변경 통지는 위 message_drive_volume_changed 로 이미 전송). new_path 는 "내 PC\볼륨명" 이라 실제 경로가 아니다.
+				CString disp;
+				disp.Format(_T("%s (%c:)"), (LPCTSTR)m_edit_new_text, m_edit_drive_root[0]);
+				SetItemText(m_edit_item, disp);
+			}
+			else
+			{
+				SetItemText(m_edit_item, m_edit_new_text);
+				//path가 변경된 것을 parent에게 알려야 listctrl, pathctrl을 갱신한다.
+				::SendMessage(GetParent()->GetSafeHwnd(),
+					Message_CSCTreeCtrl,
+					(WPARAM) & (CSCTreeCtrlMessage(this, message_path_changed, NULL, new_path)),
+					(LPARAM)&res);
+			}
 		}
 		else
 		{
@@ -3998,6 +4051,16 @@ void CSCTreeCtrl::set_font_size(int font_size)
 	//you can use the following formula to specify 
 	//a height for a font with a specified point size:
 	m_lf.lfHeight = get_pixel_size_from_font_size(m_hWnd, m_font_size);
+	reconstruct_font();
+}
+
+//20260709 by claude. 선언(SCTreeCtrl.h)만 있고 정의가 없어 링크 실패하던 것을 CSCListCtrl::set_font_name 패턴으로 구현.
+void CSCTreeCtrl::set_font_name(LPCTSTR font_name, BYTE char_set)
+{
+	if (font_name == NULL || font_name[0] == _T('\0'))
+		return;
+	m_lf.lfCharSet = char_set;
+	_tcscpy_s(m_lf.lfFaceName, _countof(m_lf.lfFaceName), font_name);
 	reconstruct_font();
 }
 

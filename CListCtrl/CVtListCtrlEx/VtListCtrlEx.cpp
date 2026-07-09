@@ -4616,7 +4616,7 @@ void CVtListCtrlEx::set_path(CString path, bool refresh)
 	if (m_path.Right(1) == '\\' && m_path.GetLength() > 3)
 		m_path = m_path.Left(m_path.GetLength() - 1);
 
-	TRACE(_T("set_path(%s)\n"), m_path);
+	//TRACE(_T("set_path(%s)\n"), m_path);
 
 	refresh_list(refresh);
 }
@@ -4737,8 +4737,8 @@ void CVtListCtrlEx::refresh_list(bool reload, bool force)
 						(int)(m_cur_folders.size() + m_cur_files.size()) >= m_folder_cache_min_items;
 				}
 			}
-			TRACE(_T("cur folders[0] = %s\n"), m_cur_folders.size() > 0 ? m_cur_folders[0].data.cFileName : _T(""));
-			TRACE(_T("cur files[0] = %s\n"), m_cur_files.size() > 0 ? m_cur_files[0].data.cFileName : _T(""));
+			//TRACE(_T("cur folders[0] = %s\n"), m_cur_folders.size() > 0 ? m_cur_folders[0].data.cFileName : _T(""));
+			//TRACE(_T("cur files[0] = %s\n"), m_cur_files.size() > 0 ? m_cur_files[0].data.cFileName : _T(""));
 
 			//display_filelist 가 각 항목의 img_idx 를 1회 계산해 m_cur_folders/files 에 채운다(캐시 저장 전에 호출돼야
 			//아이콘까지 캐시된다).

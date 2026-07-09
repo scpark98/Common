@@ -17,14 +17,7 @@ static char THIS_FILE[] = __FILE__;
 
 CSCHeaderCtrl::CSCHeaderCtrl()
 {
-	//m_cr_back.SetFromCOLORREF(::GetSysColor(COLOR_3DFACE));
-	//m_cr_text.SetFromCOLORREF(::GetSysColor(COLOR_BTNTEXT));
-
-	if (get_gray_value(m_cr_back) < 128)
-		m_cr_separator = get_color(m_cr_back, 32);
-	else
-		m_cr_separator = get_color(m_cr_back, -32);
-
+	m_cr_separator = get_weak_color(m_cr_back, 32);
 	m_header_is_clicked = false;
 	m_header_clicked_index = -1;
 	m_header_height = 16;
@@ -98,12 +91,7 @@ void CSCHeaderCtrl::OnPaint()
 	Gdiplus::Graphics g(dc);
 
 	dc.SelectObject(GetFont());
-
-	//if (m_flat_style)
-	//	dc.FillSolidRect(rc, GetParent()->IsWindowEnabled() ? ::GetSysColor(COLOR_WINDOW) : GRAY(164));
-	//else
-		dc.FillSolidRect(rc, GetParent()->IsWindowEnabled() ? m_cr_back.ToCOLORREF() : GRAY(164));
-
+	dc.FillSolidRect(rc, GetParent()->IsWindowEnabled() ? m_cr_back.ToCOLORREF() : GRAY(164));
 	dc.SetBkMode(TRANSPARENT);
 	dc.SetTextColor(GetParent()->IsWindowEnabled() ? m_cr_text.ToCOLORREF() : ::GetSysColor(COLOR_GRAYTEXT));
 
@@ -132,8 +120,12 @@ void CSCHeaderCtrl::OnPaint()
 		{
 			if (m_flat_style)
 			{
+				//separator를 그릴 때 가로좌표를 rItem.right로 그려주면 그 위치는 맨 우측으로 스크롤했을때 화면에 그려지지 않는다.
+				//-2를 해줘야 딱 맞게 표시된다. 물론 이 보정을 해줌으로써 커서변경, 실제 항목들의 우측 잘림 위치 등 약간의 오차는 있지만 거의 구분되지 않는다.
+				//오히려 맨 우측으로 스크롤 했는데도 분리기호가 화면에 표시되지 않는 불편함이 더 크다.
+				//그리고 더블클릭 시 자동 너비 조정기능이 간혹 반응이 없을때가 있는데 이 조정 후 덜한듯한 느낌이다. 이는 좀 더 테스트해봐야 한다.
 				if (m_use_header_separator)
-					draw_line(g, rItem.right, rItem.top + 2, rItem.right, rItem.bottom - 2, crSunkenDark);
+					draw_line(g, rItem.right - 2, rItem.top + 2, rItem.right - 2, rItem.bottom - 2, crSunkenDark);
 			}
 			else
 			{
@@ -181,129 +173,6 @@ void CSCHeaderCtrl::OnPaint()
 	}
 
 	dc.SelectObject(pOldFont);
-	/*
-	CPaintDC dc(this); // device context for painting
-	
-	CRect rect, rectItem, clientRect;
-	GetClientRect(&rect);
-	GetClientRect(&clientRect);
-	CMemDC memDC(&dc, rect);
-	CDC bitmapDC;
-	bitmapDC.CreateCompatibleDC(&dc);
-	
-	memDC.FillSolidRect(&rect, RGB(76,85,118));
-
-	CBitmap bitmapSpan;
-	bitmapSpan.LoadBitmap(IDB_COLUMNHEADER_SPAN);
-	CBitmap* pOldBitmapSpan = bitmapDC.SelectObject(&bitmapSpan);
-
-	memDC.StretchBlt(rect.left+2, 0, rect.Width(), 12, &bitmapDC, 0, 0, 1, 12, SRCCOPY);
-
-	bitmapDC.SelectObject(pOldBitmapSpan);
-	bitmapSpan.DeleteObject();
-	
-	int nItems = GetItemCount();
-
-	CBitmap bitmap;
-	CBitmap bitmap2;
-	CBitmap bitmap3;
-	
-	bitmap.LoadBitmap(IDB_COLUMNHEADER_START);
-	bitmap2.LoadBitmap(IDB_COLUMNHEADER_SPAN);
-	bitmap3.LoadBitmap(IDB_COLUMNHEADER_END);
-
-	for(int i = 0; i <nItems; i++)
-	{
-		
-		TCHAR buf1[256];
-		HD_ITEM hditem1;
-		
-		hditem1.mask = HDI_TEXT | HDI_FORMAT | HDI_ORDER;
-		hditem1.pszText = buf1;
-		hditem1.cchTextMax = 255;
-		GetItem(i, &hditem1);
-		
-		GetItemRect(i, &rect);
-		
-		CBitmap* pOldBitmap = NULL;
-		
-		//make sure we draw the start piece
-		//on the first item so it has a left border
-
-		//For the following items we will just use the
-		//right border of the previous items as the left
-		//border
-		if(hditem1.iOrder==0)
-		{
-			pOldBitmap = bitmapDC.SelectObject(&bitmap);
-			memDC.BitBlt(rect.left,rect.top,2,12,&bitmapDC,0,0,SRCCOPY);
-		}
-		else
-		{
-			memDC.BitBlt(rect.left-1,rect.top,2,12,&bitmapDC,0,0,SRCCOPY);
-			pOldBitmap = bitmapDC.SelectObject(&bitmap2);
-			memDC.BitBlt(rect.left+1,rect.top,1,12,&bitmapDC,0,0,SRCCOPY);
-		}
-
-		bitmapDC.SelectObject(pOldBitmap);
-		
-		//span the bitmap for the width of the column header item
-		int nWidth = rect.Width() - 4;
-		
-		CBitmap* pOldBitmap2 = bitmapDC.SelectObject(&bitmap2);
-		
-		memDC.StretchBlt(rect.left+2, 0, nWidth, 1, &bitmapDC, 0,0, 1, 12, SRCCOPY);
-
-		bitmapDC.SelectObject(pOldBitmap2);
-		
-		
-		//draw the end piece of the column header
-		CBitmap* pOldBitmap3 = bitmapDC.SelectObject(&bitmap3);
-		memDC.BitBlt((rect.right-2), 0, 2, 12, &bitmapDC,0,0,SRCCOPY);
-		bitmapDC.SelectObject(pOldBitmap3);
-		
-		//Get all the info for the current
-		//item so we can draw the text to it
-		//in the desired font and style
-		DRAWITEMSTRUCT	DrawItemStruct;
-		GetItemRect(i, &rectItem);
-		
-		
-		DrawItemStruct.CtlType		= 100;
-		DrawItemStruct.hDC			= dc.GetSafeHdc();
-		DrawItemStruct.itemAction	= ODA_DRAWENTIRE; 
-		DrawItemStruct.hwndItem 	= GetSafeHwnd(); 
-		DrawItemStruct.rcItem	= rectItem;
-		DrawItemStruct.itemID	= i;
-		DrawItem(&DrawItemStruct);
-		
-		UINT uFormat = DT_SINGLELINE | DT_NOPREFIX | DT_TOP |DT_CENTER | DT_END_ELLIPSIS ;
-		
-		
-		CFont font;
-		LOGFONT lf;
-		memset(&lf, 0, sizeof(LOGFONT));
-		lf.lfHeight = 8;
-		strcpy(lf.lfFaceName, "Sevenet 7");
-		font.CreateFontIndirect(&lf);
-		CFont* def_font = memDC.SelectObject(&font);
-		
-		memDC.SetBkMode(TRANSPARENT);
-		rectItem.DeflateRect(2,2,2,2);
-		
-		TCHAR buf[256];
-		HD_ITEM hditem;
-		
-		hditem.mask = HDI_TEXT | HDI_FORMAT | HDI_ORDER;
-		hditem.pszText = buf;
-		hditem.cchTextMax = 255;
-		GetItem(DrawItemStruct.itemID, &hditem);
-
-		memDC.DrawText(buf, &rectItem, uFormat);
-		memDC.SelectObject(def_font);
-		font.DeleteObject();
-	}
-	*/
 }
 
 BOOL CSCHeaderCtrl::OnEraseBkgnd(CDC* pDC) 
@@ -344,25 +213,6 @@ void CSCHeaderCtrl::set_header_text(int column, CString sText)
 int	CSCHeaderCtrl::get_header_text_align(int column)
 {
 	return m_header_text_align[column];
-	/*
-	if (GetItemCount() <= 0)
-		return HDF_LEFT;
-
-	HDITEM	hdItem;
-
-	//scpark 2010-3-25 10:01:15
-	//아래 memset을 안해주면 heap error난다.
-	memset(&hdItem, 0, sizeof(hdItem));
-
-	hdItem.mask	= HDI_FORMAT;
-	GetItem(column, &hdItem);
-
-	if (hdItem.fmt & HDF_CENTER)
-		return HDF_CENTER;
-	if (hdItem.fmt & HDF_RIGHT)
-		return HDF_RIGHT;
-	return HDF_LEFT;
-	*/
 }
 
 void CSCHeaderCtrl::set_header_text_align(int column, int format)
@@ -573,6 +423,9 @@ void CSCHeaderCtrl::reconstruct_font()
 	m_font.DeleteObject();
 	BOOL bCreated = m_font.CreateFontIndirect(&m_lf);
 	SetFont(&m_font, false);
+	//20260709 by claude. owner-draw 헤더는 m_lf 로 직접 그리므로 폰트 변경 후 재그리기가 필요하다(SetFont bRedraw=FALSE 로는 갱신 안 됨 → 헤더가 옛 폰트 유지).
+	if (::IsWindow(m_hWnd))
+		Invalidate();
 }
 
 void CSCHeaderCtrl::set_font_name(LPCTSTR sFontname, BYTE byCharSet)

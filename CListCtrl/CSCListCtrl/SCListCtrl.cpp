@@ -282,7 +282,7 @@ void CSCListCtrl::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 	if (!m_use_virtual_list)
 		return;
 
-	int			iItem		= (int)lpDIS->itemID;
+	int	iItem = (int)lpDIS->itemID;
 
 	//20260706 by claude. [팬텀 행] native 스크롤 범위 확장용 pad 인덱스는 데이터가 없으므로 그리지 않는다(아래 m_list_db[iItem] OOB 방지).
 	if (iItem < 0 || iItem >= (int)m_list_db.size())
@@ -563,34 +563,30 @@ void CSCListCtrl::draw_row(CDC* pDC, int iItem, const CRect& row_bounds)
 					else
 						//pDC->SetTextColor(m_theme.cr_progress_text.ToCOLORREF());
 						pDC->SetTextColor(crText.ToCOLORREF());
-#if 0
-					pDC->DrawText(text, itemRect, DT_VCENTER | DT_CENTER | DT_SINGLELINE);
-#else
-					//progress 경과 위치에 따라 왼쪽과 오른쪽을 각각 다른 색으로 표현하기 위해 클리핑 영역을 나눠서 텍스트를 두 번 그려준다.
+					//20260708 by claude. progress 텍스트를 채워진(바 위) 영역은 cr_back, 나머지는 cr_progress 로 두 번 그려 경계에서 색이 바뀌게 한다.
+					//예전엔 SelectClipRgn+LPtoDP 를 썼으나 smooth OnPaint 의 MemoryDC 좌표계에서 LPtoDP 가 어긋나 텍스트가 잘리고("50%"→"5C"),
+					//마지막 SelectClipRgn(NULL) 이 smooth 의 항목영역 클립(rc)까지 지워 다음 행이 클립 없이 그려지는 번짐/붉은칸 아티팩트가 났다.
+					//SaveDC+IntersectClipRect+RestoreDC 는 논리좌표로 동작(LPtoDP 불필요)하고 현재 클립 상태를 보존·복원해 native/smooth 둘 다 안전.
 					CRect rcLeft, rcRight;
 					rcLeft = rcRight = itemRect;
 					rcRight.left = rcLeft.right = r.right;
 
-					//OnPaint()에서 header ctrl 유무에 따라 MemoryDC의 높이를 보정해주므로
-					//SelectClipRgn()을 사용하려면 LPtoDP()로 좌표 보정이 필요하다.
-					pDC->LPtoDP(&rcLeft);
-					pDC->LPtoDP(&rcRight);
-
-					CRgn rgnLeft, rgnRight;
-					rgnLeft.CreateRectRgnIndirect(&rcLeft);
-					rgnRight.CreateRectRgnIndirect(&rcRight);
-
+					//20260709 by claude. BkMode=TRANSPARENT 필수 — draw_row 는 BkMode 를 설정하지 않아 기본 OPAQUE 다.
+					//OPAQUE 면 왼쪽 패스의 흰색(cr_back) 글자가 '흰 불투명 박스' 를 깔고 그 위에 그려져 자기 자신을 가려(막대 위 흰 구멍처럼)
+					//왼쪽 글자가 사라지고 오른쪽만 남아 "50%"→"5C" 로 보였다. 본문 텍스트는 어두운 색이라 OPAQUE 여도 티가 안 났을 뿐.
+					int saved = pDC->SaveDC();
+					pDC->IntersectClipRect(&rcLeft);
+					pDC->SetBkMode(TRANSPARENT);
 					pDC->SetTextColor(m_theme.cr_back.ToCOLORREF());
-					pDC->SelectClipRgn(&rgnLeft);
 					pDC->DrawText(text, itemRect, DT_VCENTER | DT_CENTER | DT_SINGLELINE | DT_NOCLIP | DT_NOPREFIX);
+					pDC->RestoreDC(saved);
 
+					saved = pDC->SaveDC();
+					pDC->IntersectClipRect(&rcRight);
+					pDC->SetBkMode(TRANSPARENT);
 					pDC->SetTextColor(m_theme.cr_progress.ToCOLORREF());
-					pDC->SelectClipRgn(&rgnRight);
 					pDC->DrawText(text, itemRect, DT_VCENTER | DT_CENTER | DT_SINGLELINE | DT_NOCLIP | DT_NOPREFIX);
-					rgnLeft.DeleteObject();
-					rgnRight.DeleteObject();
-					pDC->SelectClipRgn(NULL);
-#endif
+					pDC->RestoreDC(saved);
 				}
 			}			
 		}
@@ -603,6 +599,11 @@ void CSCListCtrl::draw_row(CDC* pDC, int iItem, const CRect& row_bounds)
 			//약간 줄여서 출력해야 보기 쉽다.
 			textRect = itemRect;
 			CString text = get_text(iItem, iSubItem);
+
+			//20260709 by claude. shell 리스트의 파일명 표시는 탐색기와 동일하게 .lnk(바로가기) 확장자를 숨긴다.
+			//표시(draw)에서만 떼고, 저장값(get_text)·경로 이동·이름변경 등 운영은 실제 이름(.lnk 포함)을 그대로 유지한다.
+			if (m_is_shell_listctrl && iSubItem == col_filename && text.Right(4).CompareNoCase(_T(".lnk")) == 0)
+				text = text.Left(text.GetLength() - 4);
 
 			//0번 컬럼의 text 앞에 공백이 있을 경우 이를 들여쓰기로 처리하는 경우
 			if (iSubItem == 0 && m_use_indent_from_prefix_space)
@@ -886,13 +887,19 @@ int CSCListCtrl::get_column_max_text_width(int column)
 
 	//padding — 좌측 + (아이콘 + gap) + 텍스트 + 우측 + safety.
 	//safety: GDI GetTextExtentPoint32 측정 vs 실제 그리는 폭 차이 흡수 (한글 trailing).
+	//20260708 scpark question 실제 헤더 너비보다 더 넉넉하게 계산되는 이유는?
+	//20260709 by claude. [답] 이 패딩 합(left6 + right + safety, col0 은 +아이콘16+gap4)이 헤더/내용 텍스트폭 위에 더해져서다.
 	const int left_padding  = 6;
 	const int icon_gap      = 4;
-	const int right_padding = 10;
-	const int safety        = 8;
+	const int right_padding = 6;
+	const int safety        = 2;
 
-	int row_full    = left_padding + (icon_w > 0 ? icon_w + icon_gap : 0) + max_row_w + right_padding + safety;
-	int header_full = left_padding + header_w + right_padding + safety;
+	//20260709 by claude. col 0 체크박스(LVS_EX_CHECKBOXES) 폭 — draw_row 는 좌측 4 + 박스 14 + gap 2 = 20px 를 소비한 뒤 아이콘/텍스트를 그린다.
+	//이걸 누락하면 자동맞춤 폭이 체크박스만큼 좁게 나와 텍스트가 잘린다(사용자 지적). 체크박스가 있을 때만 col 0 에 더한다.
+	int checkbox_w = (column == 0 && (GetExtendedStyle() & LVS_EX_CHECKBOXES)) ? 20 : 0;
+
+	int row_full    = left_padding + checkbox_w + (icon_w > 0 ? icon_w + icon_gap : 0) + max_row_w + right_padding + safety;
+	int header_full = left_padding + header_w + right_padding + safety;		//헤더 텍스트는 체크박스/아이콘 없이 그려지므로 그 폭만.
 
 	return max(header_full, row_full);
 }
@@ -1712,14 +1719,25 @@ BOOL CSCListCtrl::PreTranslateMessage(MSG* pMsg)
 		refresh_drag_hint();
 	}
 
-	//20260707 by claude. 마우스 back 버튼(XBUTTON1) up → 뒤로가기 히스토리 이동(shell 리스트). 처리 시 소비.
-	if (pMsg->message == WM_XBUTTONUP && GET_XBUTTON_WPARAM(pMsg->wParam) == XBUTTON1)
+	//20260707 by claude. 마우스 back(XBUTTON1) up → 뒤로가기. 20260709 by claude. forward(XBUTTON2) → 앞으로가기(shell 리스트). 처리 시 소비.
+	if (pMsg->message == WM_XBUTTONUP && m_is_shell_listctrl &&
+		(GET_XBUTTON_WPARAM(pMsg->wParam) == XBUTTON1 || GET_XBUTTON_WPARAM(pMsg->wParam) == XBUTTON2))
 	{
-		if (m_is_shell_listctrl)
-		{
+		if (GET_XBUTTON_WPARAM(pMsg->wParam) == XBUTTON1)
 			go_back();
-			return TRUE;
-		}
+		else
+			go_forward();
+		return TRUE;
+	}
+	//20260709 by claude. Alt+Left = 뒤로, Alt+Right = 앞으로(탐색기 동일). Alt 조합은 WM_SYSKEYDOWN 으로 온다.
+	else if (pMsg->message == WM_SYSKEYDOWN && m_is_shell_listctrl && !m_in_editing &&
+			 (pMsg->wParam == VK_LEFT || pMsg->wParam == VK_RIGHT))
+	{
+		if (pMsg->wParam == VK_LEFT)
+			go_back();
+		else
+			go_forward();
+		return TRUE;
 	}
 	else if (pMsg->message == WM_MOUSEWHEEL && m_in_editing)
 	{
@@ -1839,9 +1857,9 @@ BOOL CSCListCtrl::PreTranslateMessage(MSG* pMsg)
 								}
 								else
 								{
-									//현재 경로가 "내 PC"인 경우는 우선 편집을 보류한다.
-									if (!m_is_shell_listctrl || get_path() != m_pShellImageList->get_system_label(!m_is_local, CSIDL_DRIVES))
-										edit_item(get_selected_index(), m_edit_subItem);
+									//20260708 by claude. 드라이브뷰(내 PC)에서도 드라이브 볼륨 레이블 편집을 지원하므로 예전의 "내 PC 보류" 가드를 제거.
+									//보호/드라이브 정책은 edit_item 내부 가드가 담당(보호 항목 차단, 드라이브 루트는 허용). F2 는 이름 컬럼(col_filename) 편집.
+									edit_item(get_selected_index(), col_filename);
 									return true;
 								}
 								break;
@@ -1969,8 +1987,11 @@ void CSCListCtrl::OnPaint()
 			//기본(시스템) 폰트가 아닌 컨트롤 폰트로 텍스트가 그려진다. (셀별 styled font 는 draw_row 내부에서 별도 SelectObject.)
 			CFont* pCtrlFont = GetFont();
 			CFont* pOldFont  = pCtrlFont ? pDC->SelectObject(pCtrlFont) : nullptr;
-			int first = m_scroll_y / rowH;
-			int y = rc.top - (m_scroll_y % rowH);
+			//20260707 by claude. m_scroll_y 는 정상적으로 [0, content-area] 이지만, 드래그 자동스크롤 등에서 클램프 직전 음수가 될 수 있다.
+			//음수면 first 가 음수 → draw_row(음수) → m_list_db[음수] deque OOB 크래시. 여기서 0 하한으로 방어(정상 경로엔 영향 없음).
+			int scroll_y = max(0, m_scroll_y);
+			int first = scroll_y / rowH;
+			int y = rc.top - (scroll_y % rowH);
 			for (int i = first; i < total && y < area_bottom; i++, y += rowH)
 			{
 				CRect row_bounds(rc.left, y, rc.right, y + rowH);
@@ -2178,6 +2199,26 @@ CSCStaticEdit* CSCListCtrl::edit_item(int item, int subItem)
 
 	m_edit_old_text = GetItemText(item, subItem);
 
+	//20260708 by claude. 드라이브 루트면 편집 박스에 볼륨명만 보여준다 — 드라이브 문자 " (X:)" 는 편집 불가라 제거하고 커밋 때 다시 붙인다.
+	//드라이브 root 를 멤버에 저장해 edit_end 가 접미 제거된 m_edit_old_text 에 의존하지 않고 안전하게 SetVolumeLabel 하도록 한다.
+	m_edit_is_drive = false;
+	if (m_is_shell_listctrl && m_pShellImageList && subItem == col_filename)
+	{
+		CString root = m_pShellImageList->convert_special_folder_to_real_path(!m_is_local, get_path(item));
+		if (is_drive_root(root))
+		{
+			if (root.Right(1) != _T('\\'))
+				root += _T('\\');
+			m_edit_is_drive = true;
+			m_edit_drive_root = root;
+
+			CString suffix;
+			suffix.Format(_T(" (%c:)"), root[0]);
+			if (m_edit_old_text.Right(suffix.GetLength()) == suffix)
+				m_edit_old_text = m_edit_old_text.Left(m_edit_old_text.GetLength() - suffix.GetLength());
+		}
+	}
+
 	//20260214 scpark.
 	//edit_end()에서 DestroyWindow() 및 delete을 했었으나 타이밍이 맞지 않으면 double delete이 발생하므로
 	//edit_end()에서는 우선 hide 시키고 edit_item()에서 DestroyWindow() 및 delete을 하도록 수정한다.
@@ -2206,8 +2247,11 @@ CSCStaticEdit* CSCListCtrl::edit_item(int item, int subItem)
 	m_pEdit->SetFocus();
 
 	//파일명 편집이면 확장자 앞까지만 선택, 그 외엔 전체 선택.
+	//20260709 by claude. 확장자 제외 선택은 '파일' 에만. 폴더는 확장자 개념이 없어(예: "R&D.prog.ref" 폴더) 전체 선택해야 한다(탐색기 동일).
+	//shell 리스트에서 폴더는 크기 컬럼이 비어 있으므로 그것으로 파일/폴더를 구분한다. (비-shell 리스트는 폴더 개념이 없어 종전 확장자 판정 유지.)
+	bool is_folder = m_is_shell_listctrl && get_text(item, col_filesize).IsEmpty();
 	CString ext = get_part(m_edit_old_text, fn_ext);
-	if ((ext.GetLength() == 3 || ext.GetLength() == 4) && IsAlphaNumeric(ext))
+	if (!is_folder && (ext.GetLength() == 3 || ext.GetLength() == 4) && IsAlphaNumeric(ext))
 		m_pEdit->set_sel(0, m_edit_old_text.GetLength() - ext.GetLength() - 1);
 	else
 		m_pEdit->set_sel(0, -1);
@@ -3908,12 +3952,27 @@ BOOL CSCListCtrl::OnNMDblclk(NMHDR *pNMHDR, LRESULT *pResult)
 		}
 		else
 		{
-			//파일일 경우는 현재로는 아무처리하지 않는다.
-			//if (!(get_win32_find_data(item).dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
-			if (!get_text(item, col_filesize).IsEmpty())
-				return TRUE;
+			CString candidate = concat_path(m_path, get_text(item, col_filename));
 
-			new_path = concat_path(m_path, get_text(item, col_filename));
+			//20260709 by claude. 파일(크기 있음)이라도 .lnk(바로가기)면 IShellLink 로 대상을 풀어 폴더면 진입한다(탐색기 동작).
+			//resolve_lnk_path(Common) 는 '경로 컴포넌트가 .lnk' 인 경우를 실경로로 푼다 → .lnk 확장자를 떼고 넘긴다.
+			//대상이 폴더가 아니거나 링크가 아닌 일반 파일이면 현재는 처리하지 않는다.
+			if (!get_text(item, col_filesize).IsEmpty())
+			{
+				CString base = candidate;
+				if (base.Right(4).CompareNoCase(_T(".lnk")) == 0)
+					base = base.Left(base.GetLength() - 4);
+
+				CString resolved = resolve_lnk_path(base);
+				if (resolved != base && IsFolder(resolved))
+					new_path = resolved;
+				else
+					return TRUE;
+			}
+			else
+			{
+				new_path = candidate;
+			}
 		}
 
 		set_path(new_path);
@@ -4347,10 +4406,8 @@ BOOL CSCListCtrl::OnNMClick(NMHDR *pNMHDR, LRESULT *pResult)
 			(clock() - m_last_clicked_time > 500) &&	//이 값이 작으면 더블클릭에도 편집되고
 			(clock() - m_last_clicked_time < 2000))
 		{
-			//트리에서 "내 PC"를 선택하여 리스트에 드라이브 리스트가 표시된 상태에서는 시간차 클릭에 의한 편집은 지원하지 않는다.
-			if (m_is_shell_listctrl && (get_path() == m_pShellImageList->get_system_label(!m_is_local, CSIDL_DRIVES)))
-				return TRUE;
-
+			//20260708 by claude. (예전엔 드라이브 리스트(내 PC) 뷰에서 편집 진입을 막았으나) 드라이브 루트는 볼륨 레이블 변경을 지원하므로
+			//편집을 허용한다. 실제 커밋은 edit_end 가 드라이브면 SetVolumeLabel, 그 외 파일/폴더면 rename 으로 분기.
 			edit_item(m_edit_item, m_edit_subItem);
 		}
 		else
@@ -4407,7 +4464,22 @@ void CSCListCtrl::edit_end(bool valid)
 		CString old_path = concat_path(path, m_edit_old_text);
 		CString new_path = concat_path(path, m_edit_new_text);
 
-		if (m_is_local)
+		//20260708 by claude. 드라이브 루트는 파일 rename 이 아니라 '볼륨 레이블' 변경이다. 드라이브 여부·root 는 edit_item 이 멤버에 저장했고
+		//편집 박스엔 볼륨명만 보였으므로 m_edit_new_text 가 곧 새 볼륨명이다. SetVolumeLabel 로 반영하고 표시엔 " (X:)" 를 다시 붙인다(아래).
+		//드라이브 문자는 안 바뀌고 실제 탐색기에도 반영된다.
+		bool is_drive = (m_is_local && m_edit_is_drive);
+
+		if (is_drive)
+		{
+			res = !!SetVolumeLabel(m_edit_drive_root, m_edit_new_text);
+
+			//성공 시 parent 에 드라이브 볼륨 변경 통지 → 형제 컨트롤(트리) 드라이브 표시 동기화. param0=root("C:\\"), param1=새 볼륨명.
+			if (res)
+				::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCListCtrl,
+					(WPARAM) & (CSCListCtrlMessage(this, message_drive_volume_changed, NULL, m_edit_drive_root, m_edit_new_text)),
+					(LPARAM)0);
+		}
+		else if (m_is_local)
 		{
 			//이미 동일한 항목이 존재하면 parent에게 알려 메시지를 표시하도록 한다.
 			if (new_path != old_path && PathFileExists(new_path))
@@ -4434,7 +4506,15 @@ void CSCListCtrl::edit_end(bool valid)
 		{
 			m_modified = true;
 
-			set_text(m_edit_item, m_edit_subItem, m_edit_new_text);
+			//20260708 by claude. 드라이브면 표시에 " (X:)" 재부착(편집 박스엔 볼륨명만 보였으므로). 그 외는 입력 텍스트 그대로.
+			if (is_drive)
+			{
+				CString disp;
+				disp.Format(_T("%s (%c:)"), (LPCTSTR)m_edit_new_text, m_edit_drive_root[0]);
+				set_text(m_edit_item, m_edit_subItem, disp);
+			}
+			else
+				set_text(m_edit_item, m_edit_subItem, m_edit_new_text);
 		}
 		else
 		{
@@ -4725,10 +4805,14 @@ void CSCListCtrl::set_path(CString path, bool refresh)
 	if (path.IsEmpty())
 		path = m_pShellImageList->get_system_path(!m_is_local, CSIDL_DRIVES);
 
-	//20260707 by claude. 뒤로가기 히스토리 — 앞으로 이동(go_back 아님)이고 폴더가 실제로 바뀔 때 현재(이전) 폴더를 push.
-	//go_back() 이 부르는 set_path 는 m_navigating_back 로 push 를 건너뛴다(무한 누적 방지).
-	if (m_is_shell_listctrl && !m_navigating_back && !m_path.IsEmpty() && m_path != path)
+	//20260707 by claude. 뒤로가기 히스토리 — 앞으로 이동(go_back/go_forward 아님)이고 폴더가 실제로 바뀔 때 현재(이전) 폴더를 push.
+	//go_back()/go_forward() 가 부르는 set_path 는 m_navigating_back/forward 로 이 처리를 건너뛰고 스택을 직접 관리한다(무한 누적 방지).
+	//20260709 by claude. 새 폴더로 정상 이동하면 앞으로 스택은 무효화(브라우저와 동일 — 뒤로 갔다가 다른 곳으로 가면 앞으로 기록 소멸).
+	if (m_is_shell_listctrl && !m_navigating_back && !m_navigating_forward && !m_path.IsEmpty() && m_path != path)
+	{
 		m_folder_history.push_back(m_path);
+		m_folder_forward.clear();
+	}
 
 	m_path = path;
 
@@ -4752,12 +4836,36 @@ void CSCListCtrl::go_back()
 	CString prev = m_folder_history.back();
 	m_folder_history.pop_back();
 
+	//20260709 by claude. 떠나는 현재 폴더를 앞으로 스택에 push → 이후 go_forward 로 되돌아올 수 있다.
+	if (!m_path.IsEmpty())
+		m_folder_forward.push_back(m_path);
+
 	m_navigating_back = true;
 	set_path(prev);
 	m_navigating_back = false;
 
 	//경로 변경을 parent 에 알린다. set_path 는 재귀 방지로 이 메시지를 안 보내므로 여기서 별도 전송(기존 VK_BACK 코드와 동일 패턴).
 	::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCListCtrl, (WPARAM) & (CSCListCtrlMessage(this, message_path_changed, NULL)), (LPARAM)&prev);
+}
+
+//20260709 by claude. 앞으로가기 — go_back 으로 물러난 폴더로 다시 진행. 마우스 forward 버튼(XBUTTON2)·Alt+Right 가 호출. 비어 있으면 아무 것도 안 한다.
+void CSCListCtrl::go_forward()
+{
+	if (!m_is_shell_listctrl || m_folder_forward.empty())
+		return;
+
+	CString next = m_folder_forward.back();
+	m_folder_forward.pop_back();
+
+	//떠나는 현재 폴더를 뒤로 스택에 push → 다시 go_back 으로 돌아올 수 있다.
+	if (!m_path.IsEmpty())
+		m_folder_history.push_back(m_path);
+
+	m_navigating_forward = true;
+	set_path(next);
+	m_navigating_forward = false;
+
+	::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCListCtrl, (WPARAM) & (CSCListCtrlMessage(this, message_path_changed, NULL)), (LPARAM)&next);
 }
 
 void CSCListCtrl::set_filelist(std::deque<CVtFileInfo>* pFolderList, std::deque<CVtFileInfo>* pFileList)
@@ -5644,23 +5752,24 @@ void CSCListCtrl::update_drag_auto_scroll(CPoint screen_pt)
 
 	if (m_drag_scroll_target)
 	{
-		CRect rw;
-		m_drag_scroll_target->GetWindowRect(rw);
+		//20260707 by claude. 가장자리 거리는 '콘텐츠(클라이언트) 영역' 기준으로 잰다. GetWindowRect(창 전체)로 재면 v-스크롤바 예약
+		//띠(OnNcCalcSize 가 우측/하단 NC 로 예약, 스크롤바 있을 때만) 만큼 오른쪽/아래 유효 가장자리가 달라져, 스크롤바 유무에 따라
+		//"가장자리를 지나가야 트리거 / 근처만 가도 트리거"로 들쭉날쭉했다(#9). 클라이언트 영역은 예약 띠를 제외한 실제 내용 폭이라
+		//스크롤바 유무와 무관하게 항상 내용 가장자리에서 일관 트리거된다. (커서가 예약 띠 위=내용 밖이면 d 음수 → 최대속도로 그 방향 스크롤.)
+		//경계 게이트는 두지 않는다: 안쪽 가운데면 d>=MARGIN 이라 자연히 0, 가장자리에 가깝거나 벗어날수록 빨라져 MAX_LEVEL 로 clamp.
+		CRect rc;
+		m_drag_scroll_target->GetClientRect(rc);
+		m_drag_scroll_target->ClientToScreen(rc);
 
-		//[의도적] 예전엔 rw 를 120 inflate 한 bound 밖이면 스크롤을 멈췄으나(→ rc 를 조금만 벗어나도 정지), 요구사항은
-		//"SetCapture 처럼 rc 를 벗어나도 드래그·스크롤이 계속"이므로 경계 게이트를 제거한다. 아래 거리 공식은 rc 안쪽
-		//가운데면 d>=MARGIN 이라 자연히 0(스크롤 안 함), 가장자리에 가까워지면 시작, rc 를 벗어나(d 음수) 멀어질수록
-		//빨라져 MAX_LEVEL 로 clamp 되므로 별도 상한 없이도 안전하다. 커서가 오버레이 스크롤바(=부모 dlg 의 자식) 위여서
-		//WindowFromPoint 가 리스트를 못 짚어도, 위쪽에서 m_drag_scroll_target 을 직전 유효 리스트/트리로 유지하므로 계속 동작.
-		//세로 상단 기준: 리스트는 헤더 아래. (헤더 위로 올라가면 up 이 멈추는 게 아니라 계속 위로 — top_ref 를 넘는 음수 거리 → 최대속도)
-		int top_ref = rw.top;
+		//세로 상단 기준: 리스트는 헤더 아래. (헤더 위로 올라가면 계속 위로 — top_ref 를 넘는 음수 거리 → 최대속도)
+		int top_ref = rc.top;
 		if (m_drag_scroll_target->IsKindOf(RUNTIME_CLASS(CSCListCtrl)))
 		{
 			CHeaderCtrl* ph = ((CListCtrl*)m_drag_scroll_target)->GetHeaderCtrl();
 			if (ph && ph->GetSafeHwnd() && ph->IsWindowVisible())
 			{
 				CRect rh; ph->GetWindowRect(rh);
-				if (rh.bottom > rw.top && rh.bottom < rw.bottom)
+				if (rh.bottom > rc.top && rh.bottom < rc.bottom)
 					top_ref = rh.bottom;
 			}
 		}
@@ -5669,16 +5778,20 @@ void CSCListCtrl::update_drag_auto_scroll(CPoint screen_pt)
 		const int MAX_LEVEL = 3;	//tick 당 최대 스크롤 단위(level)
 
 		//가장자리로부터의 거리 d(안쪽 양수 / 넘어가면 음수). d<MARGIN 이면 스크롤: 가장자리에 가깝거나 넘을수록 빠르게(최대 MAX).
-		int dl = screen_pt.x - rw.left;			//왼쪽 가장자리까지
-		int dr = rw.right - screen_pt.x;		//오른쪽
+		int dl = screen_pt.x - rc.left;			//왼쪽 가장자리까지
+		int dr = rc.right - screen_pt.x;		//오른쪽
 		int dt = screen_pt.y - top_ref;			//위(헤더 아래 기준)
-		int db = rw.bottom - screen_pt.y;		//아래
+		int db = rc.bottom - screen_pt.y;		//아래
 
 		if (dl < MARGIN)      m_drag_scroll_vx = -min(MAX_LEVEL, 1 + (MARGIN - dl) * (MAX_LEVEL - 1) / MARGIN);
 		else if (dr < MARGIN) m_drag_scroll_vx =  min(MAX_LEVEL, 1 + (MARGIN - dr) * (MAX_LEVEL - 1) / MARGIN);
 
 		if (dt < MARGIN)      m_drag_scroll_vy = -min(MAX_LEVEL, 1 + (MARGIN - dt) * (MAX_LEVEL - 1) / MARGIN);
 		else if (db < MARGIN) m_drag_scroll_vy =  min(MAX_LEVEL, 1 + (MARGIN - db) * (MAX_LEVEL - 1) / MARGIN);
+
+		//[진단 HS] 가로 가장자리 근처일 때 dl/dr/vx 를 기록(D&D 드래그 자동스크롤). 근본원인 추적용.
+		if (dl < 120 || dr < 120)
+			logWrite(_T("[HS-drag] rc.left=%d rc.right=%d pt.x=%d dl=%d dr=%d MARGIN=%d vx=%d"), rc.left, rc.right, screen_pt.x, dl, dr, MARGIN, m_drag_scroll_vx);
 	}
 
 	if (m_drag_scroll_vx != 0 || m_drag_scroll_vy != 0)
@@ -5701,10 +5814,7 @@ void CSCListCtrl::drag_scroll_by(int dx_px, int dy_lines)
 	if (m_smooth_scroll)
 	{
 		if (dy_lines != 0)
-		{
-			m_scroll_y += dy_lines * row_height();
-			Invalidate(FALSE);
-		}
+			m_scroll_y += dy_lines * row_height();	//[0,content-area] clamp 는 아래 sync_scrollbar 가 수행(음수/과대 방지).
 	}
 	else
 	{
@@ -5718,8 +5828,12 @@ void CSCListCtrl::drag_scroll_by(int dx_px, int dy_lines)
 		Scroll(CSize(dx_px, 0));
 	}
 
-	UpdateWindow();
+	//20260707 by claude. sync_scrollbar 를 먼저 호출해 m_scroll_y 를 clamp(+썸 반영)한 뒤 paint 한다. UpdateWindow 를 clamp 이전에
+	//부르면 위로 드래그 시 음수가 된 m_scroll_y 로 그려져 draw_row(음수) OOB 크래시가 났다(#9b).
 	sync_scrollbar();
+	if (m_smooth_scroll)
+		Invalidate(FALSE);
+	UpdateWindow();
 }
 
 //20260707 by claude. SCTreeCtrl 에서 드래그해 이 리스트로 자동스크롤 위임될 때 받는다. drag_scroll_by 로 위임 후 1 반환(=처리됨).
@@ -6413,6 +6527,10 @@ void CSCListCtrl::update_marquee_auto_scroll(CPoint client_pt)
 	if (dt < MARGIN)      m_marquee_scroll_vy = -min(MAX_LEVEL, 1 + (MARGIN - dt) * (MAX_LEVEL - 1) / MARGIN);
 	else if (db < MARGIN) m_marquee_scroll_vy =  min(MAX_LEVEL, 1 + (MARGIN - db) * (MAX_LEVEL - 1) / MARGIN);
 
+	//[진단 HS] 가로 가장자리 근처일 때 dl/dr/vx 기록(마퀴 선택 자동스크롤). client 좌표 기준.
+	if (dl < 120 || dr < 120)
+		logWrite(_T("[HS-marquee] rc.right=%d cli.x=%d dl=%d dr=%d MARGIN=%d vx=%d"), rc.right, client_pt.x, dl, dr, MARGIN, m_marquee_scroll_vx);
+
 	if (m_marquee_scroll_vx != 0 || m_marquee_scroll_vy != 0)
 		SetTimer(TIMER_ID_DRAG_AUTO_SCROLL, 70, NULL);	//~14fps 연속 스크롤(커서가 멈춰 있어도 계속).
 	else
@@ -6530,6 +6648,16 @@ void CSCListCtrl::draw_marquee(CDC* pDC)
 
 void CSCListCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 {
+	//20260708 by claude. 편집 중 다른 위치를 클릭하면 먼저 편집을 종료(commit)한 뒤 아래 선택 로직을 수행한다.
+	if (m_in_editing)
+		edit_end(true);
+
+	//20260708 by claude. per-click 임시 상태(다중선택 지연 축소 defer, 드래그 대기)를 새 클릭마다 먼저 리셋한다.
+	//이미 선택된 항목 클릭으로 defer 를 설정하고 그 클릭이 편집을 진입시키면, LButtonUp 이 편집 박스로 가 defer 가 정리되지 않는다.
+	//그러면 다음 클릭의 LButtonUp 이 스테일 defer 로 엉뚱한(이전 편집) 항목을 select_single 해 선택이 되돌아간다 — 그 버그의 실제 원인.
+	m_smooth_click_defer  = -1;
+	m_smooth_drag_pending = false;
+
 	int item = -1, subItem = -1;
 	hit_test(point, item, subItem, true);
 	int total = size();
@@ -7010,12 +7138,13 @@ LRESULT	CSCListCtrl::on_message_CSCHeaderCtrl(WPARAM wParam, LPARAM lParam)
 	//기존 로직은 GetStringWidth(row text) 만으로 max 산출 + 컬럼0 의 *small image 아이콘 폭 미반영* —
 	//사용자 보고 "아이콘 너비가 반영 안 된 듯한 너비, 항목이 일부 안 보이고 말줄임표" 의 직접 원인.
 	//get_column_max_text_width 는 헤더+row text+icon+padding 모두 포함하므로 그것을 사용 (단일 진입점).
+	//20260709 by claude. get_column_max_text_width 가 이미 '헤더 텍스트 폭 + row 최대폭 + 아이콘 + 패딩' 을 모두 포함한다.
+	//예전엔 max(passed_header_w, computed) 였는데 passed_header_w(헤더가 넘긴 폭)가 computed 보다 크면 축소가 막혀
+	//빈 리스트에서 더블클릭해도 좁아지지 않았다. computed 만으로 맞추고 최소 60 보장 + 헤더 동기(true).
 	int column = (int)wParam;
-	int passed_header_w = (int)lParam;
 	int computed = get_column_max_text_width(column);
-	int new_w = max(passed_header_w, computed);
-
-	set_column_width(column, new_w);
+	if (computed > 0)
+		set_column_width(column, max(computed, 60), true);
 
 	return 0;
 }

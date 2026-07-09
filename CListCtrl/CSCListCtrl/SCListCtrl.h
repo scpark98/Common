@@ -189,6 +189,9 @@ public:
 
 		message_drag_and_drop,
 		message_path_changed,
+		//20260708 by claude. 드라이브 볼륨 레이블 변경 통지 — param0=드라이브 root("C:\\"), param1=새 볼륨 레이블. watcher·일반 rename 통지로는
+		//커버 안 되는 드라이브 전용 이벤트(파일/폴더 rename 은 LVN_ENDLABELEDIT 로 별도 처리). parent 가 받아 형제 컨트롤(트리 등) 드라이브 표시 동기화.
+		message_drive_volume_changed,
 		message_rename_duplicated,
 		message_request_rename,
 		message_request_new_folder,
@@ -231,6 +234,8 @@ public:
 	//20260707 by claude. shell 리스트 뒤로가기 — 방문 폴더 히스토리(deque). 앞으로 이동 시 set_path 가 이전 폴더를 push,
 	//go_back() 이 마지막 폴더로 이동(그때는 push 안 함). 마우스 back 버튼(XBUTTON1)·Backspace 가 자체적으로 호출한다.
 	void		go_back();
+	//20260709 by claude. 앞으로가기 — go_back 으로 물러난 폴더로 다시 진행. 마우스 forward 버튼(XBUTTON2)·Alt+Right 가 호출.
+	void		go_forward();
 	//remote일 경우는 파일목록을 받아서 표시한다.
 	void		set_filelist(std::deque<CVtFileInfo>* pFolderList, std::deque<CVtFileInfo>* pFileList);
 
@@ -294,6 +299,9 @@ public:
 	//20260707 by claude. shell 리스트 뒤로가기 히스토리. set_path(앞으로 이동) 시 이전 m_path 를 push, go_back 시 pop.
 	std::deque<CString>	m_folder_history;
 	bool				m_navigating_back = false;	//go_back 실행 중이면 set_path 가 히스토리에 push 하지 않도록.
+	//20260709 by claude. 앞으로가기 스택. go_back 시 떠난 폴더를 push, go_forward 시 pop. 새 폴더로 정상 이동하면 clear(분기 무효화).
+	std::deque<CString>	m_folder_forward;
+	bool				m_navigating_forward = false;	//go_forward 실행 중이면 set_path 가 히스토리 조작을 건너뛰도록.
 	CShellImageList*	m_pShellImageList = NULL;
 	CShellImageList*	get_shell_imagelist() { return m_pShellImageList; }
 	void				set_shell_imagelist(CShellImageList* pShellImageList) { m_pShellImageList = pShellImageList; }
@@ -813,6 +821,9 @@ protected:
 	bool			m_edit_readonly = false;		//편집모드로는 들어가지만 편집해서는 안되는 데이터인 경우 set_edit_readonly(true);를 호출한다.
 	CString			m_edit_old_text;				//편집 전 텍스트
 	CString			m_edit_new_text;				//편집 후 텍스트
+	//20260708 by claude. 드라이브 루트 편집 상태 — 편집 박스엔 볼륨명만 보이고(드라이브 문자 " (X:)" 제거), 커밋 때 SetVolumeLabel + 표시에 재부착.
+	bool			m_edit_is_drive = false;		//현재 편집 대상이 드라이브 루트인가.
+	CString			m_edit_drive_root;				//그 드라이브 root("C:\\") — edit_end 가 m_edit_old_text(접미 제거본)에 의존하지 않게 저장.
 	CSCStaticEdit*	m_pEdit = NULL;
 	long			m_last_clicked_time = 0;		//one_click으로 편집모드 진입 시 마지막 클릭 시각
 	int				m_last_clicked_index = -1;		//one_click으로 편집모드 진입 시 마지막 클릭 인덱스
@@ -1005,9 +1016,11 @@ public:
 	int				m_bottom_reserve = 0;		//세로바 시 하단 partial row 예약 px — OnNcCalcSize 가 설정, sync(바 위치)·OnNcPaint(빈영역 fill)가 읽음
 	bool			m_syncing = false;			//framechange 재진입 가드 (SWP_FRAMECHANGED → OnSize → sync 재진입 차단)
 	bool			m_snapping = false;			//top 항목 헤더 스냅 재진입 가드 (Scroll → LVN_ENDSCROLL 재귀 차단)
-	//20260706 by claude. [smooth scroll — 픽셀 페인트 모드] true 면 native 위임 대신 항목을 직접 픽셀 위치에 그려 부분행/여백0 을 구현.
-	//off(기본) 면 기존 native 위임 경로 100% 그대로(회귀 0). m_scroll_y = 픽셀 세로 오프셋(항목 영역 기준, 헤더 아래).
-	bool			m_smooth_scroll = false;
+	//20260706 by claude. [smooth scroll — 픽셀 페인트 모드] 항목을 직접 픽셀 위치에 그려 부분행/하단여백0 을 구현.
+	//20260708 by claude. 기본값을 true 로 — CSCListCtrl 은 native 위임의 근본적 하단여백 한계를 없애려 만든 픽셀 페인트 리스트라, smooth 가 기본이다.
+	//(CVtListCtrlEx 를 이걸로 대체 중. 다른 소비자는 아직 CVtListCtrlEx 를 쓰므로 기본 변경은 안전.) set_smooth_scroll(false) 로 native 위임 복귀 가능.
+	//m_scroll_y = 픽셀 세로 오프셋(항목 영역 기준, 헤더 아래).
+	bool			m_smooth_scroll = true;
 	int				m_scroll_y = 0;
 	int				m_focus_anchor = -1;		//smooth 모드 shift-range 선택 기준 항목.
 	//WS_BORDER/WS_EX_CLIENTEDGE 가 켜져 있으면 PreSubclassWindow 에서 native border 제거하고 이 플래그를 켠 뒤

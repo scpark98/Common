@@ -13,6 +13,7 @@ IMPLEMENT_DYNAMIC(CSCScrollbar, CWnd)
 CSCScrollbar::CSCScrollbar()
 {
 	m_theme.set_color_theme(CSCColorTheme::color_theme_dark_gray);
+	update_thumb_color();
 }
 
 CSCScrollbar::~CSCScrollbar()
@@ -162,6 +163,7 @@ void CSCScrollbar::set_show_arrows(bool show)
 void CSCScrollbar::set_color_theme(int theme, bool invalidate /*=true*/)
 {
 	m_theme.set_color_theme(theme);
+	update_thumb_color();
 	if (invalidate && ::IsWindow(m_hWnd))
 		Invalidate();
 }
@@ -169,8 +171,15 @@ void CSCScrollbar::set_color_theme(int theme, bool invalidate /*=true*/)
 void CSCScrollbar::set_color_theme(const CSCColorTheme& theme, bool invalidate /*=false*/)
 {
 	m_theme = theme;
+	update_thumb_color();
 	if (invalidate && ::IsWindow(m_hWnd))
 		Invalidate();
+}
+
+//20260709 by claude. 테마 변경 시 thumb·arrow 공통 색을 thumb 계산식으로 한 번 구해 저장. draw_thumb/draw_arrow 가 이 값을 공유한다.
+void CSCScrollbar::update_thumb_color()
+{
+	m_cr_thumb = get_color(m_theme.cr_back, m_theme.cr_text, 0.45);
 }
 
 //---- 기하 ------------------------------------------------------------------
@@ -228,8 +237,13 @@ CRect CSCScrollbar::calc_thumb_rect() const
 
 	int track_extent = (m_orient == vertical) ? rTrack.Height() : rTrack.Width();
 	int thumb_extent = (int)((double)track_extent * m_page / range + 0.5);
-	if (thumb_extent < thumb_min_extent())
-		thumb_extent = thumb_min_extent();
+	//20260709 by claude. 항목이 많고 트랙(스크롤바 길이)이 짧을 때 min thumb 가 트랙을 꽉 채워 드래그 여지가 0 이 되는 문제 방지.
+	//min thumb 를 '트랙의 절반'까지로 제한 → 트랙이 아무리 짧아도 최소 절반의 이동 공간을 남겨 썸으로 스크롤 가능. (비례 썸이 절반보다 크면 그대로.)
+	int min_ext = thumb_min_extent();
+	if (min_ext > track_extent / 2)
+		min_ext = track_extent / 2;
+	if (thumb_extent < min_ext)
+		thumb_extent = min_ext;
 	if (thumb_extent > track_extent)
 		thumb_extent = track_extent;
 
@@ -248,6 +262,7 @@ CRect CSCScrollbar::calc_thumb_rect() const
 		int cx = rTrack.left + (rTrack.Width() - m_thickness) / 2;
 		return CRect(cx, rTrack.top + thumb_offset, cx + m_thickness, rTrack.top + thumb_offset + thumb_extent);
 	}
+
 	int cy = rTrack.top + (rTrack.Height() - m_thickness) / 2;
 	return CRect(rTrack.left + thumb_offset, cy, rTrack.left + thumb_offset + thumb_extent, cy + m_thickness);
 }
@@ -485,8 +500,9 @@ void CSCScrollbar::draw_track(Gdiplus::Graphics& g, const CRect& rTrack)
 		return;
 
 	//직사각형 — cr_back 보다 약간 weak 한 톤. "여기 scrollbar 가 있다" 정도 인지.
-	//get_weak_color: 밝은 배경(흰색 등)은 어둡게(→연회색), 어두운 배경은 밝게. get_color(+24)는 흰 배경에서 clamp 돼 흰색 유지되는 문제 회피.
-	Gdiplus::Color cr_track = get_weak_color(m_theme.cr_back, 24);
+	//get_weak_color: 밝은 배경(흰색 등)은 어둡게(→연회색), 어두운 배경은 밝게. get_color(+16)는 흰 배경에서 clamp 돼 흰색 유지되는 문제 회피.
+	//deep_black, vibrant_ink는 배경이 워낙 블랙에 가까워서 16의 차이가 잘 안느껴진다.
+	Gdiplus::Color cr_track = get_weak_color(m_theme.cr_back, 16);
 	Gdiplus::SolidBrush br(cr_track);
 	g.FillRectangle(&br, rTrack.left, rTrack.top, rTrack.Width(), rTrack.Height());
 }
@@ -496,10 +512,8 @@ void CSCScrollbar::draw_thumb(Gdiplus::Graphics& g, const CRect& rThumb)
 	if (rThumb.IsRectEmpty())
 		return;
 
-	//thumb color = cr_text 와 cr_back 의 blend. hover/pressed 여부와 무관하게 항상 동일한 색(두께만 hover 시 굵어짐).
-	//(이전엔 hover 0.65 / pressed 0.85 로 진해졌으나 사용자 요청으로 unhover 색으로 고정.)
-	double ratio = 0.45;
-	Gdiplus::Color cr_thumb = get_color(m_theme.cr_back, m_theme.cr_text, ratio);
+	//20260709 by claude. thumb·arrow 공통 색(update_thumb_color 가 테마별 1회 계산해 저장). hover/pressed 무관 동일색(두께만 hover 시 굵어짐).
+	Gdiplus::Color cr_thumb = m_cr_thumb;
 
 	//cross 두께는 m_thickness 가 직접 결정 — DeflateRect 로 더 깎으면 얇은 thumb 가 사라짐.
 	int radius = max(1, m_thickness / 2);
@@ -518,14 +532,15 @@ void CSCScrollbar::draw_arrow(Gdiplus::Graphics& g, const CRect& rArrow, bool to
 		return;
 
 	//배경은 track 과 동일 — 클릭/hover 시에도 변경하지 않음. (밝은 배경에서 흰색 clamp 회피 위해 get_weak_color.)
-	Gdiplus::Color cr_track = get_weak_color(m_theme.cr_back, 24);
+	Gdiplus::Color cr_track = get_weak_color(m_theme.cr_back, 16);
 	Gdiplus::SolidBrush br_bg(cr_track);
 	g.FillRectangle(&br_bg, rArrow.left, rArrow.top, rArrow.Width(), rArrow.Height());
 
 	//삼각형 — 탐색기 reference. sharp triangle (FillPolygon) + 각 vertex 의 1×1 픽셀을 배경색으로 덮어 round triangle 효과.
 	//세로 scrollbar 기준: 가로 8 (hw=4), 세로 6 (hh=3). 가로 scrollbar 는 90° 회전 → 가로 6, 세로 8 (코드상 hw/hh swap 적용).
 	//PointF sub-pixel center 사용 — visual mass center 가 client 정중앙 (width 16 → sub-pixel 8.0) 에 정확 align.
-	Gdiplus::Color cr_glyph = get_color(m_theme.cr_back, m_theme.cr_text, 0.75);
+	//20260709 by claude. arrow glyph 도 thumb 과 동일한 공통 색(m_cr_thumb)으로 그린다(예전 0.75 별도 계산 제거 — 사용자 요청).
+	Gdiplus::Color cr_glyph = m_cr_thumb;
 	Gdiplus::SolidBrush br_glyph(cr_glyph);
 
 	Gdiplus::REAL cx = (rArrow.left + rArrow.right) * 0.5f;
@@ -573,7 +588,11 @@ void CSCScrollbar::OnPaint()
 	GetClientRect(&rc);
 
 	CMemoryDC dc(&dc1, &rc);
-	dc.FillSolidRect(rc, m_theme.cr_back.ToCOLORREF());
+
+	//20260708 scpark question 아래 draw_track()에서 바탕까지 전체를 그리는데 여기서 FillSolidRect()를 호출하는 이유는?
+	//dc.FillSolidRect(rc, m_theme.cr_back.ToCOLORREF());
+	//if (m_theme.cr_back.GetValue() != 4294967295)
+	//	TRACE(_T("cr_back = %d\n"), m_theme.cr_back.GetValue());
 
 	Gdiplus::Graphics g(dc);
 
@@ -582,6 +601,8 @@ void CSCScrollbar::OnPaint()
 	//따라서 track 은 AA 를 끄고 crisp 하게 채워 가장자리도 track 색 그대로 나오게 한다.
 	g.SetSmoothingMode(Gdiplus::SmoothingModeNone);
 
+	//20260708 scpark question draw_track은 단순히 직사각 스크롤바 영역을 배경색으로 그리는 함수이고 거의 한두문장인데 굳이 함수로 분리한 이유는?
+	//20260708 scpark question get_visible_rect() 또한 위에서 구한 rc와 동일한 사각형을 구하는데 이 또한 함수로 뺀 이유는?
 	//track 배경은 window 전체 (arrow 영역 포함) — 평소에도 그 영역까지 시각적으로 같은 톤.
 	//thumb 의 스크롤 범위는 calc_track_rect (arrow 제외) — calc_thumb_rect 가 그 위에서 계산.
 	draw_track(g, get_visible_rect());

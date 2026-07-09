@@ -93,6 +93,10 @@ public:
 	void	set_color_theme(const CSCColorTheme& theme, bool invalidate = true);
 
 	CSCColorTheme	m_theme = CSCColorTheme(this);
+	//20260709 by claude. thumb·arrow 공통 색 — 테마 변경 시 thumb 색 계산식(cr_back↔cr_text 0.45 blend)으로 한 번 구해 저장하고,
+	//thumb 과 arrow 를 그릴 때 모두 이 색을 쓴다(예전엔 thumb 0.45 / arrow 0.75 로 각자 계산해 미세하게 달랐음).
+	Gdiplus::Color	m_cr_thumb = Gdiplus::Color(128, 128, 128);
+	void			update_thumb_color();
 
 //Message_CSCScrollbar 발신 대상 — 미지정 시 GetParent() 로 fallback.
 //overlay 가 host 의 형제로 (다른 window 의 child 로) 부착될 때 host 가 자기 자신을 target 으로 지정 가능.
@@ -112,7 +116,8 @@ protected:
 
 	//폭(breadth) — 스크롤바 cross-axis 크기. 폭 개념의 단일 출처(get_width/set_width). create() 가 실제 생성 폭으로 갱신.
 	//화살표 버튼은 정사각형(폭×폭)이라 arrow 길이도 이 값으로 통일(별도 arrow_size 상수 제거).
-	int				m_width = 16;
+	//must be even number
+	int				m_width = 14;
 
 	//시각 — m_thickness 는 *thumb 의 cross 두께만* (컬럼 폭 m_width 와 별개인 가는 막대 굵기).
 	int				m_thickness = 1;			//현재 적용된 thumb cross 두께.
@@ -149,7 +154,8 @@ protected:
 	//hover-expand: 윈도우는 항상 hover thickness 만큼 잡고, 안에서 track/thumb 만 m_thickness 만큼 가운데 정렬해 그림.
 	//resting → hover 시 좌우 모두 (hover-normal)/2 만큼 늘어나는 시각 효과.
 	void			apply_visible_thickness(int new_thickness);
-	CRect			get_visible_rect() const;	//window client 안에서 m_thickness 만큼 가운데 정렬한 영역.
+	//20260708 scpark question window client 안에서 m_thickness 만큼 가운데 정렬한 영역. <= 이 주석이 맞게 설명된 주석인가?
+	CRect			get_visible_rect() const;
 
 	//알림
 	void			emit(int msg);

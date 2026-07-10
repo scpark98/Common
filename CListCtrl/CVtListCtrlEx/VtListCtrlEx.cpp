@@ -567,7 +567,7 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 					rgnLeft.CreateRectRgnIndirect(&rcLeft);
 					rgnRight.CreateRectRgnIndirect(&rcRight);
 
-					pDC->SetTextColor(m_theme.cr_back.ToCOLORREF());
+					pDC->SetTextColor(m_theme.cr_text.ToCOLORREF());
 					pDC->SelectClipRgn(&rgnLeft);
 					pDC->DrawText(text, itemRect, DT_VCENTER | DT_CENTER | DT_SINGLELINE | DT_NOCLIP | DT_NOPREFIX);
 
@@ -6125,6 +6125,17 @@ BOOL CVtListCtrlEx::OnNotify(WPARAM wParam, LPARAM lParam, LRESULT* pResult)
 			}
 
 			//나머지 트랙/체인지 분기는 sync_scrollbar 호출이라 m_scrollbar_setup 가드 안에서.
+			//20260710 by claude. 컬럼 너비 최소 60px — 분리자를 드래그해 그 이하로 줄이려 하면 그 변경을 거부(컬럼이 사라질 만큼 좁아지지 않게). CSCListCtrl 과 동일 정책.
+			if (nm->code == HDN_ITEMCHANGINGW || nm->code == HDN_ITEMCHANGINGA)
+			{
+				NMHEADER* nmh = (NMHEADER*)nm;
+				if (nmh->pitem && (nmh->pitem->mask & HDI_WIDTH) && nmh->pitem->cxy < 60)
+				{
+					if (pResult) *pResult = TRUE;
+					return TRUE;
+				}
+			}
+
 			if (m_scrollbar_setup)
 			{
 				switch (nm->code)

@@ -73,6 +73,7 @@ BEGIN_MESSAGE_MAP(CSCTreeCtrl, CTreeCtrl)
 	ON_NOTIFY_REFLECT_EX(NM_DBLCLK, &CSCTreeCtrl::OnNMDblclk)
 	ON_WM_MOUSEMOVE()
 	ON_WM_LBUTTONDOWN()
+	ON_WM_LBUTTONDBLCLK()
 	ON_WM_LBUTTONUP()
 	ON_WM_RBUTTONDOWN()
 	ON_WM_RBUTTONUP()
@@ -1119,6 +1120,13 @@ HTREEITEM CSCTreeCtrl::insert_folder(HTREEITEM hParent, WIN32_FIND_DATA* data, b
 	tvItem.cChildren = true;
 	SetItem(&tvItem);
 
+	//20260710 by claude. 단건 삽입도 새 노드 핸들을 만들므로 가시항목·콘텐츠폭 캐시를 무효화한다.
+	//누락 시: refresh(원격/정렬삽입/d&d 가 쓰는 이 오버로드)로 자식을 삭제 후 같은 개수 재삽입하면 GetCount 가 그대로라
+	//가시항목 캐시가 삭제된 옛 핸들을 유지 → 휠 스크롤이 무효 핸들에 TVM_SELECTITEM 하여 스크롤이 막혔다.
+	//(일괄 오버로드 insert_folder(hParent, CString) 는 이미 동일 무효화를 한다.)
+	m_visible_cache_dirty = true;
+	m_content_width_dirty = true;
+
 	return hItem;
 }
 
@@ -1430,58 +1438,10 @@ BOOL CSCTreeCtrl::OnTvnItemexpanding(NMHDR* pNMHDR, LRESULT* pResult)
 //결국 OnPaint()에서 직접 그려주는 방법이 아닌 OnCustomDraw()로 전환함.
 BOOL CSCTreeCtrl::OnNMClick(NMHDR* pNMHDR, LRESULT* pResult)
 {
-	//TRACE(_T("OnNMClick\n"));
-
+	//20260710 by claude. 시간차 클릭 → 편집 진입은 이제 OnLButtonDown 의 지연 이름변경 타이머(timer_edit_label)가 담당한다.
+	//여기서는 편집 중 다른 위치 클릭 시 현재 편집을 커밋하는 것만 처리(OnLButtonDown 이 놓치는 경로 대비 방어).
 	if (m_in_editing)
-	{
 		edit_end(true);
-	}
-
-	LPNMTVDISPINFO pTVDispInfo = reinterpret_cast<LPNMTVDISPINFO>(pNMHDR);
-
-	long t0 = clock();
-
-	CPoint pt;
-	GetCursorPos(&pt);
-	ScreenToClient(&pt);
-	HTREEITEM hCurItem = HitTest(pt);
-	HTREEITEM hDispItem = pTVDispInfo->item.hItem;
-
-	CRect r;
-	GetItemRect(hCurItem, r, TRUE);
-
-	//TRACE(_T("cur = %ld, last = %ld, m_last_clicked_item = %p, hCurItem = %p, hDispItem = %p\n"),
-	//	t0, m_last_clicked_time, m_last_clicked_item, hCurItem, hDispItem);
-
-	if (r.PtInRect(pt))
-	{
-		if ((t0 - m_last_clicked_time > 500) && (t0 - m_last_clicked_time < 2000))
-		{
-			if (hCurItem == m_last_clicked_item)
-			{
-				//20260708 by claude. 시간차 클릭 편집도 컨트롤 자체에서 시작(F2 와 동일). 표시≠편집 레이블 후처리가 필요한 앱은 TVN_ENDLABELEDIT 통지로.
-				edit_item();
-			}
-			else
-			{
-				//TRACE(_T("diff item\n"));
-				m_last_clicked_time = t0;
-				m_last_clicked_item = hCurItem;
-			}
-		}
-		else
-		{
-			//TRACE(_T("time over\n"));
-			m_last_clicked_time = t0;
-			m_last_clicked_item = hCurItem;
-		}
-	}
-	else
-	{
-		m_last_clicked_time = 0;
-		m_last_clicked_item = NULL;
-		//TRACE(_T("m_last_clicked_time = %ld\n"), m_last_clicked_time);
-	}
 
 	*pResult = 0;
 
@@ -1978,6 +1938,13 @@ BOOL CSCTreeCtrl::OnTvnBegindrag(NMHDR* pNMHDR, LRESULT* pResult)
 {
 	LPNMTREEVIEW pNMTreeView = reinterpret_cast<LPNMTREEVIEW>(pNMHDR);
 	// TODO: 여기에 컨트롤 알림 처리기 코드를 추가합니다.
+
+	//20260710 by claude. 선택 항목을 드래그하기 시작하면 대기 중이던 지연 이름변경은 취소(드래그 의도이지 rename 이 아님).
+	if (m_pending_edit_item)
+	{
+		KillTimer(timer_edit_label);
+		m_pending_edit_item = NULL;
+	}
 
 	if (!m_use_drag_and_drop)// || !m_is_shell_treectrl)
 		return FALSE;
@@ -2699,6 +2666,22 @@ void CSCTreeCtrl::OnMouseLeave()
 
 void CSCTreeCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 {
+	//20260710 by claude. 편집 중 다른 곳 클릭 → 현재 편집을 먼저 커밋.
+	if (m_in_editing)
+		edit_end(true);
+
+	//20260710 by claude. 새 mouse-down 이 들어오면 대기 중이던 지연 이름변경은 취소(다른 항목·영역 클릭이거나 더블클릭 첫 down).
+	if (m_pending_edit_item)
+	{
+		KillTimer(timer_edit_label);
+		m_pending_edit_item = NULL;
+	}
+
+	//20260710 by claude. 지연 이름변경(탐색기식) 판정용 — 이번 클릭 *이전* 의 선택 항목과 포커스 보유 여부.
+	HTREEITEM prev_sel = GetSelectedItem();
+	CWnd* pFocus = GetFocus();
+	bool had_focus = (pFocus && pFocus->GetSafeHwnd() == m_hWnd);
+
 	//탐색기 동작: full-row selection 표시 + row 어디 클릭이든 그 항목 선택.
 	//base CTreeCtrl::OnLButtonDown 는 Default() → DefWindowProc 로 *원래 message 의 lParam* (= 사용자 클릭 좌표) 그대로 보내므로
 	//point 인자를 label 좌표로 바꿔 호출해도 redirect 가 무효 → SelectItem 직접 호출로 명시적 선택.
@@ -2762,9 +2745,37 @@ void CSCTreeCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 	{
 		SelectItem(hItem);
 		SetFocus();
+
+		//20260710 by claude. 탐색기식 지연 이름변경(정석): *이미 선택돼 있던* 항목의 레이블을 (포커스 보유 상태에서) 다시 클릭하면
+		//시스템 더블클릭 시간만큼 기다렸다가 편집 진입한다. 그 사이 WM_LBUTTONDBLCLK 가 오면(=빠른 더블클릭) OnLButtonDblClk 이
+		//타이머를 취소하고 base 가 폴더를 확장한다. → 느린 재클릭=이름변경, 빠른 더블클릭=확장 으로 정확히 갈린다.
+		//첫 클릭(미선택 항목 선택)은 prev_sel 이 달라 무장하지 않으므로, 단순 선택만으로 편집이 뜨지 않는다.
+		if (hItem == prev_sel && had_focus)
+		{
+			CRect r;
+			GetItemRect(hItem, r, TRUE);
+			r.OffsetRect(-get_over_shift(), 0);
+			if (r.PtInRect(point))
+			{
+				m_pending_edit_item = hItem;
+				SetTimer(timer_edit_label, GetDoubleClickTime(), NULL);
+			}
+		}
 	}
 
 	CTreeCtrl::OnLButtonDown(nFlags, point);
+}
+
+//20260710 by claude. 빠른 더블클릭 — 직전 down 이 무장한 지연 이름변경 타이머를 취소하고 base 기본동작(폴더 확장 등)이 우선하게 한다.
+void CSCTreeCtrl::OnLButtonDblClk(UINT nFlags, CPoint point)
+{
+	if (m_pending_edit_item)
+	{
+		KillTimer(timer_edit_label);
+		m_pending_edit_item = NULL;
+	}
+
+	CTreeCtrl::OnLButtonDblClk(nFlags, point);
 }
 
 void CSCTreeCtrl::OnLButtonUp(UINT nFlags, CPoint point)
@@ -3748,6 +3759,16 @@ void CSCTreeCtrl::edit_item(HTREEITEM hItem)
 
 	GetItemRect(hItem, r, TRUE);
 
+	//20260710 by claude. 편집 항목의 시작(left)이 가로 스크롤로 화면 왼쪽 밖에 있으면 m_h_scroll_pos 를 줄여
+	//edit.left 가 보이도록 최소한으로 되돌린다(native H scroll 불가 → paint-shift 모델이라 EnsureVisible 이 가로 노출을 못 함).
+	//CSCListCtrl edit 진입과 동일 정책: 편집 시작이 항상 보여야 한다. r.left(native) 로 맞추면 표시 좌측이 0 이 된다.
+	if (r.left - get_over_shift() < 0)
+	{
+		m_h_scroll_pos = max(0, (int)r.left);
+		sync_scrollbar();
+		Invalidate();
+	}
+
 	//20260704 by claude. 가로 over-scroll 은 paint-only 시프트(get_over_shift)라 GetItemRect(native 좌표)엔 반영 안 됨.
 	//그리기와 동일하게 -over_shift 를 적용해 edit 을 실제 보이는 노드 위치에 배치(체크박스/확장 hit-test 와 동일 처리).
 	r.OffsetRect(-get_over_shift(), 0);
@@ -4622,6 +4643,16 @@ void CSCTreeCtrl::OnTimer(UINT_PTR nIDEvent)
 		HTREEITEM h = GetDropHilightItem();
 		if (h != NULL)
 			Expand(h, TVE_EXPAND);
+	}
+	//20260710 by claude. 탐색기식 지연 이름변경 발화 — 더블클릭 시간 안에 더블클릭이 안 왔으므로(왔으면 OnLButtonDblClk 이 취소) 편집 진입.
+	else if (nIDEvent == timer_edit_label)
+	{
+		KillTimer(timer_edit_label);
+		HTREEITEM h = m_pending_edit_item;
+		m_pending_edit_item = NULL;
+		if (h != NULL && h == GetSelectedItem() && !m_in_editing)
+			edit_item(h);
+		return;
 	}
 	else if (nIDEvent == timer_drag_auto_scroll)
 	{

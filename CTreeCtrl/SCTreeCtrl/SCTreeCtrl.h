@@ -495,6 +495,7 @@ protected:
 		timer_expand_for_drag_hover = 0,	//drag하여 트리 항목위에 머물경우 해당 트리를 expand시켜준다.
 		timer_vscroll_apply,				//세로 스크롤바 드래그 coalesce — 연속 pos 는 목표값만 갱신, 타이머가 마지막만 적용.
 		timer_drag_auto_scroll,				//트리에서 드래그 중 대상 컨트롤 가장자리 호버 시 연속 자동 스크롤.
+		timer_edit_label,					//20260710 by claude. 탐색기식 지연 이름변경 — 선택 항목 재클릭 후 더블클릭 시간만큼 대기(더블클릭 오면 취소).
 	};
 
 	int				m_drag_scroll_vx = 0;		//드래그 자동 스크롤 속도(가로, tick당 level, 부호=방향). 0=안 함.
@@ -641,6 +642,7 @@ protected:
 
 	long			m_last_clicked_time = 0;
 	HTREEITEM		m_last_clicked_item;
+	HTREEITEM		m_pending_edit_item = NULL;	//20260710 by claude. timer_edit_label 발화 시 편집할 항목(대기 중이 아니면 NULL).
 
 	enum ROW_ITEM_RECT
 	{
@@ -684,6 +686,7 @@ public:
 	afx_msg BOOL OnNMDblclk(NMHDR* pNMHDR, LRESULT* pResult);
 	afx_msg void OnMouseMove(UINT nFlags, CPoint point);
 	afx_msg void OnLButtonDown(UINT nFlags, CPoint point);
+	afx_msg void OnLButtonDblClk(UINT nFlags, CPoint point);
 	afx_msg void OnLButtonUp(UINT nFlags, CPoint point);
 	afx_msg void OnRButtonDown(UINT nFlags, CPoint point);	//드래그 중 우클릭 = 취소.
 	afx_msg void OnRButtonUp(UINT nFlags, CPoint point);	//취소용 우클릭의 UP 소비(팝업 메뉴 방지).

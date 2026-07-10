@@ -840,6 +840,11 @@ protected:
 	int				m_drag_scroll_vy = 0;		//드래그 자동 스크롤 속도(세로).
 	CWnd*			m_drag_scroll_target = NULL;	//자동 스크롤을 실제로 보낼 리스트/트리(오버레이 스크롤바 위여도 이 컨트롤로 전송).
 	void			update_drag_auto_scroll(CPoint screen_pt);	//드래그 중 대상 가장자리 거리로 속도 산출 + 타이머 관리.
+	//20260710 by claude. CSCListCtrl 에서 고친 원래 버그 미러링 — 자동스크롤 타이머는 zone 진입 시 1회만 SetTimer 해야 한다.
+	//매 mousemove 마다 SetTimer 하면 같은 ID 라 70ms 카운트다운이 계속 리셋돼 타이머가 영영 발화 못 해 '이동 중엔 스크롤 안 되고 멈춰야만 스크롤' 됐다.
+	bool			m_auto_scroll_timer_on = false;
+	void			start_auto_scroll_timer();
+	void			stop_auto_scroll_timer();
 	void			cancel_drag();								//드래그 중 ESC 등으로 드롭 없이 완전 취소.
 	bool			m_swallow_rbutton = false;					//드래그 취소용 우클릭의 RBUTTONUP 을 소비할지(팝업 메뉴 방지).
 	int				m_nDragIndex = -1;			//drag되는 컨트롤이 CListCtrl일 때 그 인덱스(drag를 시작한 컨트롤의 멤버값에 저장됨, 드롭된 클래스에는 저장되지 않음)

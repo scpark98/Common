@@ -11,7 +11,6 @@
 
 #include "../../colors.h"
 #include "../../MemoryDC.h"
-#include "../../log/SCLog/SCLog.h"	//20260706 by claude. [진단 임시] logWrite 사용 — 원인 확정 후 이 include 도 함께 제거.
 #include "Common/drag_scroll_message.h"	//20260707 by claude. SCTreeCtrl 드래그 자동스크롤 위임 메시지 수신용.
 #include <afxvslistbox.h>
 
@@ -856,14 +855,18 @@ int CVtListCtrlEx::get_column_max_text_width(int column)
 	}
 
 	//padding — 좌측 + (아이콘 + gap) + 텍스트 + 우측 + safety.
-	//safety: GDI GetTextExtentPoint32 측정 vs 실제 그리는 폭 차이 흡수 (한글 trailing).
+	//20260710 by claude. CSCListCtrl 에서 고친 원래 버그 미러링 — safety 8/우측 10 은 과대해 자동맞춤이 넉넉하게 잡혔다(우측6·safety2 로 축소).
 	const int left_padding  = 6;
 	const int icon_gap      = 4;
-	const int right_padding = 10;
-	const int safety        = 8;
+	const int right_padding = 6;
+	const int safety        = 2;
 
-	int row_full    = left_padding + (icon_w > 0 ? icon_w + icon_gap : 0) + max_row_w + right_padding + safety;
-	int header_full = left_padding + header_w + right_padding + safety;
+	//20260710 by claude. col 0 체크박스(LVS_EX_CHECKBOXES) 폭 — draw 는 좌4 + 박스14 + gap2 = 20px 를 소비한 뒤 아이콘/텍스트를 그리는데
+	//이걸 누락해 체크박스 리스트에서 자동맞춤 폭이 20px 좁게 나와 텍스트가 잘렸다(원래 CVt 버그).
+	int checkbox_w = (column == 0 && (GetExtendedStyle() & LVS_EX_CHECKBOXES)) ? 20 : 0;
+
+	int row_full    = left_padding + checkbox_w + (icon_w > 0 ? icon_w + icon_gap : 0) + max_row_w + right_padding + safety;
+	int header_full = left_padding + header_w + right_padding + safety;		//헤더 텍스트는 체크박스/아이콘 없이 그려지므로 그 폭만.
 
 	return max(header_full, row_full);
 }
@@ -1067,16 +1070,18 @@ CRect CVtListCtrlEx::get_item_rect(int item, int subItem)
 	// Now scroll if we need to expose the column
 	GetClientRect(&rc);
 
-	if (Offset + Rect.left < 0 || Offset + Rect.left > rc.right)
+	//20260710 by claude. 셀 좌측(client 좌표)이 화면 밖(좌<0 또는 우>rc.right)이면 셀 좌측을 뷰포트 좌단(0)으로 스크롤해 노출한다(편집 시작점이 반드시 보이게).
+	//예전 식은 부호가 어긋나, 긴 항목을 가로로 끝까지 본 상태(셀 좌측<0)에서 F2 시 반대로 스크롤해 화면이 far-right 로 튀었다.
+	//cell_left 만큼 Scroll 하면 셀 좌측이 정확히 x=0 으로 온다(양수=콘텐츠 좌로, 음수=우로). Scroll 후 오버레이 가로바도 동기화.
+	int cell_left = Offset + Rect.left;
+	if (cell_left < 0 || cell_left > rc.right)
 	{
-		CSize Size;
-		if (Offset + Rect.left > 0)
-			Size.cx = -(Offset - Rect.left);
-		else
-			Size.cx = Offset - Rect.left;
-		Size.cy = 0;
-		Scroll(Size);
-		Rect.left -= Size.cx;
+		//20260710 by claude. 가로 스크롤바는 sync_scrollbar 가 m_h_scroll_pos(미러) 로 thumb 을 그린다. Scroll 만 하고 이 값을 안 갱신하면
+		//stale 값으로 그려 스크롤바 위치가 어긋나고 편집 반복 시 누적된다. drag_scroll_by 패턴대로 Scroll 과 같은 양(cell_left)만큼 먼저 갱신.
+		m_h_scroll_pos += cell_left;
+		Scroll(CSize(cell_left, 0));
+		Rect.left -= cell_left;
+		sync_scrollbar();
 	}
 
 	Rect.left += Offset;
@@ -1091,7 +1096,11 @@ CRect CVtListCtrlEx::get_item_rect(int item, int subItem)
 		if (GetExtendedStyle() & LVS_EX_CHECKBOXES)
 			Rect.left += 18;
 
-		if (m_is_shell_listctrl)
+		//20260710 by claude. CSCListCtrl 에서 고친 원래 버그 미러링 — 아이콘 폭 보정을 shell 리스트뿐 아니라 own imagelist(수동 그리기) 아이콘에도 적용.
+		//예전엔 m_is_shell_listctrl 일 때만 밀어, own imagelist 리스트는 편집 박스가 아이콘 좌측부터 시작하는 불일치가 있었다(draw 는 아이콘 우측부터).
+		bool has_icon = m_is_shell_listctrl ||
+			(m_use_own_imagelist && m_pShellImageList && m_pShellImageList->get_imagelist() && m_pShellImageList->get_imagelist()->GetImageCount());
+		if (has_icon)
 		{
 			Rect.left += 19;	//editbox자체의 left-margin이 있으므로 22가 아닌 19만 더해준다.
 			Rect.OffsetRect(0, -1);
@@ -2050,12 +2059,10 @@ CSCStaticEdit* CVtListCtrlEx::edit_item(int item, int subItem)
 	else if (align == HDF_RIGHT)
 		halign = DT_RIGHT;
 
-	//세로 오버레이가 보이면 edit 의 우측이 그 영역을 침범하지 않도록 m_scrollbar.get_width() 만큼 줄임.
-	int right_limit = rc.right;
-	if (::IsWindow(m_scrollbar.GetSafeHwnd()) && m_scrollbar.IsWindowVisible())
-		right_limit -= m_scrollbar.get_width();
-	if (r.right > right_limit)
-		r.right = right_limit;
+	//20260710 by claude. edit 끝 = min(rc.right, cell_right). GetClientRect().right 는 이미 세로 스크롤바 폭을 제외한 콘텐츠 우단(= 스크롤바의 left)이다.
+	//여기서 스크롤바폭을 또 빼면 edit 끝이 (vscroll.left - vscroll.width) 가 돼 한 폭만큼 더 잘린다(사용자 지적). 추가 차감 없이 rc.right 로 clamp.
+	if (r.right > rc.right)
+		r.right = rc.right;
 
 	m_edit_old_text = GetItemText(item, subItem);
 
@@ -2087,8 +2094,11 @@ CSCStaticEdit* CVtListCtrlEx::edit_item(int item, int subItem)
 	m_pEdit->SetFocus();
 
 	//파일명 편집이면 확장자 앞까지만 선택, 그 외엔 전체 선택.
+	//20260710 by claude. CSCListCtrl 에서 고친 원래 버그 미러링 — 확장자 제외 선택은 '파일' 에만. 폴더는 확장자 개념이 없어(예: "R&D.prog.ref" 폴더)
+	//전체 선택해야 한다(탐색기 동일). shell 리스트에서 폴더는 크기 컬럼이 비어 있어 그것으로 구분한다.
+	bool is_folder = m_is_shell_listctrl && get_text(item, col_filesize).IsEmpty();
 	CString ext = get_part(m_edit_old_text, fn_ext);
-	if ((ext.GetLength() == 3 || ext.GetLength() == 4) && IsAlphaNumeric(ext))
+	if (!is_folder && (ext.GetLength() == 3 || ext.GetLength() == 4) && IsAlphaNumeric(ext))
 		m_pEdit->set_sel(0, m_edit_old_text.GetLength() - ext.GetLength() - 1);
 	else
 		m_pEdit->set_sel(0, -1);
@@ -5506,15 +5516,35 @@ void CVtListCtrlEx::update_drag_auto_scroll(CPoint screen_pt)
 	}
 
 	if (m_drag_scroll_vx != 0 || m_drag_scroll_vy != 0)
-		SetTimer(TIMER_ID_DRAG_AUTO_SCROLL, 70, NULL);	//~14fps 연속 스크롤(마우스가 멈춰 있어도 계속)
+		start_auto_scroll_timer();	//~14fps 연속 스크롤(마우스가 멈춰 있어도 계속)
 	else
-		KillTimer(TIMER_ID_DRAG_AUTO_SCROLL);
+		stop_auto_scroll_timer();
 }
 
 //드래그 자동 스크롤 등 외부(드래그 소스)가 이 리스트를 스크롤할 때의 정상 경로.
 //가로: shift+휠/가로휠(OnMouseHWheel)과 동일 — m_h_scroll_pos 를 먼저 갱신해야 Scroll() 이 유발하는
 //LVN_ENDSCROLL→sync_scrollbar 에서 thumb 이 stale 로 리셋되지 않는다. Scroll 후 sync_scrollbar 로 가로바 위치·헤더 offset 반영.
 //세로: report list 는 WM_VSCROLL SB_LINE 이 native bottom-align 규칙을 지키므로 라인 단위로 보낸다.
+//20260710 by claude. CSCListCtrl 에서 고친 원래 버그 미러링 — 자동 스크롤 타이머 시작/종료. 플래그로 중복 SetTimer(카운트다운 리셋) 방지.
+//update_drag_auto_scroll 가 매 mousemove 호출해도 실제 SetTimer 는 zone 진입 시 1회만 → 마우스가 움직이는 중에도 70ms 마다 꾸준히 발화.
+void CVtListCtrlEx::start_auto_scroll_timer()
+{
+	if (!m_auto_scroll_timer_on)
+	{
+		SetTimer(TIMER_ID_DRAG_AUTO_SCROLL, 70, NULL);
+		m_auto_scroll_timer_on = true;
+	}
+}
+
+void CVtListCtrlEx::stop_auto_scroll_timer()
+{
+	if (m_auto_scroll_timer_on)
+	{
+		KillTimer(TIMER_ID_DRAG_AUTO_SCROLL);
+		m_auto_scroll_timer_on = false;
+	}
+}
+
 void CVtListCtrlEx::drag_scroll_by(int dx_px, int dy_lines)
 {
 	if (!::IsWindow(m_hWnd))
@@ -5546,7 +5576,7 @@ void CVtListCtrlEx::OnTimer(UINT_PTR nIDEvent)
 	{
 		if (!m_bDragging || m_drag_scroll_target == NULL || (m_drag_scroll_vx == 0 && m_drag_scroll_vy == 0))
 		{
-			KillTimer(TIMER_ID_DRAG_AUTO_SCROLL);
+			stop_auto_scroll_timer();
 			return;
 		}
 
@@ -5595,7 +5625,7 @@ void CVtListCtrlEx::OnLButtonUp(UINT nFlags, CPoint point)
 		m_bDragging = FALSE;
 
 		//드래그 자동 스크롤 타이머 정지.
-		KillTimer(TIMER_ID_DRAG_AUTO_SCROLL);
+		stop_auto_scroll_timer();
 		m_drag_scroll_vx = 0;
 		m_drag_scroll_vy = 0;
 
@@ -5633,7 +5663,7 @@ void CVtListCtrlEx::cancel_drag()
 	ReleaseCapture();
 	m_bDragging = FALSE;
 
-	KillTimer(TIMER_ID_DRAG_AUTO_SCROLL);
+	stop_auto_scroll_timer();
 	m_drag_scroll_vx = 0;
 	m_drag_scroll_vy = 0;
 
@@ -6235,12 +6265,12 @@ LRESULT	CVtListCtrlEx::on_message_CHeaderCtrlEx(WPARAM wParam, LPARAM lParam)
 	//기존 로직은 GetStringWidth(row text) 만으로 max 산출 + 컬럼0 의 *small image 아이콘 폭 미반영* —
 	//사용자 보고 "아이콘 너비가 반영 안 된 듯한 너비, 항목이 일부 안 보이고 말줄임표" 의 직접 원인.
 	//get_column_max_text_width 는 헤더+row text+icon+padding 모두 포함하므로 그것을 사용 (단일 진입점).
+	//20260710 by claude. CSCListCtrl 에서 고친 원래 버그 미러링 — get_column_max_text_width 가 이미 헤더/내용/아이콘/패딩을 다 포함하므로
+	//passed_header_w 가 그보다 크면 max() 때문에 축소가 막혔다(빈/짧은 리스트에서 더블클릭해도 안 좁아짐). computed 만으로 맞추고 최소 60 보장.
 	int column = (int)wParam;
-	int passed_header_w = (int)lParam;
 	int computed = get_column_max_text_width(column);
-	int new_w = max(passed_header_w, computed);
-
-	set_column_width(column, new_w);
+	if (computed > 0)
+		set_column_width(column, max(computed, 60), true);
 
 	return 0;
 }
@@ -6683,23 +6713,6 @@ LRESULT CVtListCtrlEx::on_message_CSCScrollbar(WPARAM wParam, LPARAM lParam)
 			}
 		}
 
-		//20260706 by claude. [진단2 · 임시] top-index 가 0 에 고정되는(=끝 항목 도달 불가) 원인 추적.
-		//이전 진단으로 행 높이(26=26)·부분 무효화는 무관 확정. 이제 스크롤 상태 전량을 찍어 어느 분기(SB_BOTTOM vs 픽셀
-		//Scroll)를 타는지, native GetTopIndex 가 왜 안 오르는지, 마지막 항목 rect 가 client 안에 드는지, WS_VSCROLL 유무를 본다.
-		//판별 후 제거 예정.
-		{
-			CRect rc2;
-			GetClientRect(&rc2);
-			int hdr2 = m_HeaderCtrlEx.GetSafeHwnd() ? get_header_height() : 0;
-			CRect r0, rL;
-			int i0top = GetItemRect(0, &r0, LVIR_BOUNDS) ? r0.top : -9999;
-			int iLbot = (total > 0 && GetItemRect(total - 1, &rL, LVIR_BOUNDS)) ? rL.bottom : -9999;
-			bool has_vsb = (GetStyle() & WS_VSCROLL) != 0;
-			logWrite(_T("[BLANKROW2] pos=%d new_top=%d cur_top=%d max_top=%d visible=%d total=%d gcp=%d nativeCount=%d branch=%s | afterTop=%d item0.top=%d last.bottom=%d clientH=%d hdr=%d reserve=%d WS_VSCROLL=%d"),
-				msg->pos, new_top, cur_top, max_top, visible, total, GetCountPerPage(), GetItemCount(),
-				(new_top >= max_top && total > 0) ? _T("SB_BOTTOM") : _T("pixel"),
-				GetTopIndex(), i0top, iLbot, rc2.Height(), hdr2, m_bottom_reserve, has_vsb ? 1 : 0);
-		}
 	}
 	else if (msg->pThis == &m_scrollbar_h)
 	{

@@ -1127,7 +1127,11 @@ CRect CSCListCtrl::get_item_rect(int item, int subItem)
 		if (GetExtendedStyle() & LVS_EX_CHECKBOXES)
 			Rect.left += 18;
 
-		if (m_is_shell_listctrl)
+		//20260709 by claude. 아이콘 폭 보정을 shell 리스트뿐 아니라 own imagelist(수동 그리기, 예: m_list2)로 아이콘이 그려질 때도 적용한다.
+		//예전엔 m_is_shell_listctrl 일 때만 밀어, own imagelist 리스트는 편집 박스가 아이콘 좌측부터 시작하는 불일치가 있었다(draw_row 는 아이콘 우측부터 그림).
+		bool has_icon = m_is_shell_listctrl ||
+			(m_use_own_imagelist && m_pShellImageList && m_pShellImageList->get_imagelist() && m_pShellImageList->get_imagelist()->GetImageCount());
+		if (has_icon)
 		{
 			Rect.left += 19;	//editbox자체의 left-margin이 있으므로 22가 아닌 19만 더해준다.
 			Rect.OffsetRect(0, -1);
@@ -1858,8 +1862,10 @@ BOOL CSCListCtrl::PreTranslateMessage(MSG* pMsg)
 								else
 								{
 									//20260708 by claude. 드라이브뷰(내 PC)에서도 드라이브 볼륨 레이블 편집을 지원하므로 예전의 "내 PC 보류" 가드를 제거.
-									//보호/드라이브 정책은 edit_item 내부 가드가 담당(보호 항목 차단, 드라이브 루트는 허용). F2 는 이름 컬럼(col_filename) 편집.
-									edit_item(get_selected_index(), col_filename);
+									//보호/드라이브 정책은 edit_item 내부 가드가 담당(보호 항목 차단, 드라이브 루트는 허용).
+									//20260710 by claude. F2 편집 컬럼 — shell 리스트는 탐색기처럼 이름 컬럼(col_filename) 고정, 그 외 일반 리스트는 마지막 클릭/편집 컬럼(m_edit_subItem).
+									//(원본 CVtListCtrlEx 는 항상 m_edit_subItem 이라 자막편집기 등 비-shell 에서 정상이었는데, col_filename 고정으로 바꿔 일반 리스트 F2 가 깨졌다.)
+									edit_item(get_selected_index(), m_is_shell_listctrl ? col_filename : m_edit_subItem);
 									return true;
 								}
 								break;
@@ -2190,12 +2196,26 @@ CSCStaticEdit* CSCListCtrl::edit_item(int item, int subItem)
 	else if (align == HDF_RIGHT)
 		halign = DT_RIGHT;
 
-	//세로 오버레이가 보이면 edit 의 우측이 그 영역을 침범하지 않도록 m_scrollbar.get_width() 만큼 줄임.
-	int right_limit = rc.right;
-	if (::IsWindow(m_scrollbar.GetSafeHwnd()) && m_scrollbar.IsWindowVisible())
-		right_limit -= m_scrollbar.get_width();
-	if (r.right > right_limit)
-		r.right = right_limit;
+	//20260710 by claude. edit 끝 = min(rc.right, cell_right). GetClientRect().right 는 이미 세로 스크롤바 폭을 제외한 콘텐츠 우단(= 스크롤바의 left)이다.
+	//여기서 스크롤바폭을 또 빼면 edit 끝이 (vscroll.left - vscroll.width) 가 돼 한 폭만큼 더 잘리고, 그 틈으로 리스트가 그린 셀 텍스트 꼬리가 비친다(사용자 지적).
+	//추가 차감 없이 rc.right 로만 clamp. 좌측(시작)은 ensure_column_visible 로 노출한다.
+	if (r.right > rc.right)
+		r.right = rc.right;
+
+	//20260710 by claude. 레이블이 현재 폭(아이콘/체크박스 우측~셀 우측)에 '모두 표시'되면 그대로 두고, 폭이 좁아 다 표시 못 하는(잘리는) 경우에만
+	//셀(컬럼) 좌측부터 편집해 폭을 확보한다. (예전엔 폭<최소값 이면 무조건 좌측부터라, 짧은 레이블도 폭이 좁으면 좌측부터 시작하는 문제가 있었음.)
+	CString label = GetItemText(item, subItem);
+	CClientDC dc_measure(this);
+	CFont* pOldFont = dc_measure.SelectObject(GetFont());
+	CSize sz_label;
+	GetTextExtentPoint32(dc_measure.GetSafeHdc(), label, label.GetLength(), &sz_label);
+	dc_measure.SelectObject(pOldFont);
+	if (r.Width() < sz_label.cx + 8)		//텍스트 폭 + 캐럿/여백. 다 안 들어가면 셀 좌측부터.
+	{
+		CRect cell;
+		GetSubItemRect(item, subItem, LVIR_BOUNDS, cell);		//col 0 은 행 전체 rect 라 left 가 곧 컬럼 좌측(= list 좌측). X 는 native 라 정확.
+		r.left = max((LONG)rc.left, cell.left);
+	}
 
 	m_edit_old_text = GetItemText(item, subItem);
 
@@ -3930,6 +3950,19 @@ BOOL CSCListCtrl::OnNMDblclk(NMHDR *pNMHDR, LRESULT *pResult)
 	int item;// = pNMItemActivate->iItem;
 	int subItem;// = pNMItemActivate->iSubItem;
 
+	//20260710 by claude. smooth 모드에서 NM_DBLCLK 의 iItem/iSubItem 은 native hit-test(스크롤 미반영)라 틀린 항목(대개 최상단=0)을 가리킨다.
+	//ptAction 을 smooth hit_test 로 재판별해 알림 값을 보정 → 아래 shell 처리도, 부모(비-shell, 예: 자막편집기)가 읽는 iItem 도 올바르게 한다.
+	if (m_smooth_scroll)
+	{
+		int hi = -1, hs = -1;
+		hit_test(pNMItemActivate->ptAction, hi, hs, true);
+		if (hi >= 0)
+		{
+			pNMItemActivate->iItem    = hi;
+			pNMItemActivate->iSubItem = hs;
+		}
+	}
+
 	//TRACE(_T("%d, %d\n"), item, subItem);
 
 	if (m_is_shell_listctrl)// && m_is_local)
@@ -4545,6 +4578,30 @@ void CSCListCtrl::edit_end(bool valid)
 //mode가 visible_last이고 offset이 3이면 아래에서 -3-1인 위치에 해당 아이템이 표시되도록 스크롤시킨다.
 void CSCListCtrl::ensure_visible(int index, int mode, int offset)
 {
+	//20260710 by claude. smooth 모드는 native Scroll 로 못 움직이므로 m_scroll_y 를 직접 계산해 모드/offset 을 그대로 반영한다.
+	//(자막 추적처럼 visible_first+offset 으로 항목을 특정 위치에 고정하는 호출을 보존 — 최소 가시화로 근사하면 위치가 달라진다.)
+	if (m_smooth_scroll)
+	{
+		int rowH = row_height();
+		CRect rc;
+		GetClientRect(&rc);
+		int area_h = max(0, rc.Height() - get_header_height());
+		int page   = (rowH > 0) ? max(1, area_h / rowH) : 1;
+
+		int target;		//m_scroll_y 목표(항목 영역 픽셀 오프셋)
+		if (mode == visible_first)
+			target = (index - offset) * rowH;
+		else if (mode == visible_last)
+			target = (index + offset - page + 1) * rowH;
+		else			//visible_center(기본)
+			target = (index - page / 2) * rowH;
+
+		m_scroll_y = target;
+		sync_scrollbar();		//[0, content-area] clamp + 세로 썸 위치 반영.
+		Invalidate(FALSE);
+		return;
+	}
+
 	//EnsureVisible(index, FALSE);
 
 	int items_per_page = GetCountPerPage();
@@ -4567,24 +4624,77 @@ void CSCListCtrl::ensure_visible(int index, int mode, int offset)
 	}
 }
 
+//20260710 by claude. 표준 CListCtrl geometry/scroll API 의 smooth-aware shadow. smooth 면 픽셀 뷰포트(m_scroll_y·row_height) 기준, native 면 기반 구현 위임.
+//소비자·내부 모두 표준 이름으로 호출해도 두 모드에서 정상 동작 → 자막 선택 미추적·EnsureVisible 무한루프 freeze 같은 부작용 제거.
+BOOL CSCListCtrl::EnsureVisible(int nItem, BOOL bPartialOK)
+{
+	if (m_smooth_scroll)
+	{
+		smooth_ensure_visible(nItem);		//m_scroll_y 를 최소 조정해 항목을 항목 영역에 들인다.
+		return TRUE;
+	}
+	return CListCtrl::EnsureVisible(nItem, bPartialOK);
+}
+
+int CSCListCtrl::GetTopIndex()
+{
+	if (m_smooth_scroll)
+	{
+		int rowH = row_height();
+		return (rowH > 0) ? (m_scroll_y / rowH) : 0;		//항목 영역 상단에 걸린 항목.
+	}
+	return CListCtrl::GetTopIndex();
+}
+
+int CSCListCtrl::GetCountPerPage()
+{
+	if (m_smooth_scroll)
+	{
+		int rowH = row_height();
+		if (rowH > 0)
+		{
+			CRect rc;
+			GetClientRect(&rc);
+			int area_h = max(0, rc.Height() - get_header_height());
+			return max(1, area_h / rowH);
+		}
+	}
+	return CListCtrl::GetCountPerPage();
+}
+
+BOOL CSCListCtrl::IsItemVisible(int nItem, BOOL bPartial)
+{
+	if (nItem < 0 || nItem >= size())
+		return FALSE;
+
+	CRect rc;
+	GetClientRect(&rc);
+	int area_top = get_header_height();		//항목 영역 상단(클라이언트 기준).
+
+	int item_top, item_bottom;
+	if (m_smooth_scroll)
+	{
+		int rowH    = row_height();
+		item_top    = area_top + nItem * rowH - m_scroll_y;
+		item_bottom = item_top + rowH;
+	}
+	else
+	{
+		CRect itemRect;
+		GetItemRect(nItem, itemRect, LVIR_BOUNDS);		//native 는 스크롤 반영된 실제 Y.
+		item_top    = itemRect.top;
+		item_bottom = itemRect.bottom;
+	}
+
+	if (!bPartial)
+		return (item_top >= area_top && item_bottom <= rc.bottom) ? TRUE : FALSE;
+	return (item_bottom > area_top && item_top < rc.bottom) ? TRUE : FALSE;
+}
+
+//20260710 by claude. 커스텀 이름은 표준 IsItemVisible 로 위임(backward-compat). 신규 코드는 IsItemVisible 사용 권장.
 bool CSCListCtrl::is_item_visible(int index, bool bPartial)
 {
-	CRect rc;
-	CRect itemRect;
-	
-	GetClientRect(rc);
-	GetItemRect(index, itemRect, LVIR_BOUNDS);
-
-	rc.top += m_HeaderCtrlEx.get_header_height();
-
-	if (!bPartial && (itemRect.top >= rc.top) && (itemRect.bottom <= rc.bottom))
-		return true;
-	else if (bPartial &&
-			(((itemRect.top > rc.top) && (itemRect.top < rc.bottom)) ||
-			 ((itemRect.bottom > rc.top) && (itemRect.bottom < rc.bottom))))
-		return true;
-
-	return false;
+	return IsItemVisible(index, bPartial ? TRUE : FALSE) != FALSE;
 }
 
 void CSCListCtrl::shuffle()
@@ -5774,36 +5884,72 @@ void CSCListCtrl::update_drag_auto_scroll(CPoint screen_pt)
 			}
 		}
 
-		const int MARGIN    = 48;	//가장자리 감지 폭(px)
-		const int MAX_LEVEL = 3;	//tick 당 최대 스크롤 단위(level)
-
-		//가장자리로부터의 거리 d(안쪽 양수 / 넘어가면 음수). d<MARGIN 이면 스크롤: 가장자리에 가깝거나 넘을수록 빠르게(최대 MAX).
+		//가장자리로부터의 거리 d(안쪽 양수 / 넘어가면 음수). 더 가까운 쪽으로, 거리에 비례해 가속(auto_scroll_level). 둘 다 멀면 0.
 		int dl = screen_pt.x - rc.left;			//왼쪽 가장자리까지
 		int dr = rc.right - screen_pt.x;		//오른쪽
 		int dt = screen_pt.y - top_ref;			//위(헤더 아래 기준)
 		int db = rc.bottom - screen_pt.y;		//아래
 
-		if (dl < MARGIN)      m_drag_scroll_vx = -min(MAX_LEVEL, 1 + (MARGIN - dl) * (MAX_LEVEL - 1) / MARGIN);
-		else if (dr < MARGIN) m_drag_scroll_vx =  min(MAX_LEVEL, 1 + (MARGIN - dr) * (MAX_LEVEL - 1) / MARGIN);
-
-		if (dt < MARGIN)      m_drag_scroll_vy = -min(MAX_LEVEL, 1 + (MARGIN - dt) * (MAX_LEVEL - 1) / MARGIN);
-		else if (db < MARGIN) m_drag_scroll_vy =  min(MAX_LEVEL, 1 + (MARGIN - db) * (MAX_LEVEL - 1) / MARGIN);
-
-		//[진단 HS] 가로 가장자리 근처일 때 dl/dr/vx 를 기록(D&D 드래그 자동스크롤). 근본원인 추적용.
-		if (dl < 120 || dr < 120)
-			logWrite(_T("[HS-drag] rc.left=%d rc.right=%d pt.x=%d dl=%d dr=%d MARGIN=%d vx=%d"), rc.left, rc.right, screen_pt.x, dl, dr, MARGIN, m_drag_scroll_vx);
+		m_drag_scroll_vx = (dl < dr) ? -auto_scroll_level(dl) : auto_scroll_level(dr);
+		m_drag_scroll_vy = (dt < db) ? -auto_scroll_level(dt) : auto_scroll_level(db);
 	}
 
 	if (m_drag_scroll_vx != 0 || m_drag_scroll_vy != 0)
-		SetTimer(TIMER_ID_DRAG_AUTO_SCROLL, 70, NULL);	//~14fps 연속 스크롤(마우스가 멈춰 있어도 계속)
+		start_auto_scroll_timer();	//~14fps 연속 스크롤(마우스가 멈춰 있어도 계속)
 	else
-		KillTimer(TIMER_ID_DRAG_AUTO_SCROLL);
+		stop_auto_scroll_timer();
 }
 
 //드래그 자동 스크롤 등 외부(드래그 소스)가 이 리스트를 스크롤할 때의 정상 경로.
 //가로: shift+휠/가로휠(OnMouseHWheel)과 동일 — m_h_scroll_pos 를 먼저 갱신해야 Scroll() 이 유발하는
 //LVN_ENDSCROLL→sync_scrollbar 에서 thumb 이 stale 로 리셋되지 않는다. Scroll 후 sync_scrollbar 로 가로바 위치·헤더 offset 반영.
 //세로: report list 는 WM_VSCROLL SB_LINE 이 native bottom-align 규칙을 지키므로 라인 단위로 보낸다.
+//20260709 by claude. 자동 스크롤 타이머 시작/종료 — 플래그로 중복 SetTimer(카운트다운 리셋) 방지. update_drag_auto_scroll/update_marquee_auto_scroll 가
+//매 mousemove 마다 호출해도 실제 SetTimer 는 zone 진입 시 1회만 일어나, 마우스가 움직이는 중에도 70ms 마다 꾸준히 발화한다.
+void CSCListCtrl::start_auto_scroll_timer()
+{
+	if (!m_auto_scroll_timer_on)
+	{
+		SetTimer(TIMER_ID_DRAG_AUTO_SCROLL, 70, NULL);
+		m_auto_scroll_timer_on = true;
+	}
+}
+
+void CSCListCtrl::stop_auto_scroll_timer()
+{
+	if (m_auto_scroll_timer_on)
+	{
+		KillTimer(TIMER_ID_DRAG_AUTO_SCROLL);
+		m_auto_scroll_timer_on = false;
+	}
+}
+
+//20260709 by claude. 자동스크롤 속도 레벨 — 가장자리 거리 dist(안쪽 양수, 넘으면 음수)에 '비례'해 가속. dist>=MARGIN 이면 0.
+//2단계: (1) MARGIN 안(dist 0..MARGIN) 은 1..LEVEL_EDGE, (2) 가장자리를 넘어선 뒤(dist 0..-FAR, 즉 모니터 끝쪽) 은 LEVEL_EDGE..LEVEL_MAX 로 '계속' 가속.
+//예전엔 정수식+MAX_LEVEL 3 이라 실질 1~2 로 거의 등속이었고, 가장자리에서 바로 max 라 더 넘어가도 안 빨라졌다(사용자 지적).
+int CSCListCtrl::auto_scroll_level(int dist)
+{
+	const int MARGIN     = 48;	//가장자리 감지 폭(px). 이 안쪽부터 스크롤 시작.
+	const int LEVEL_EDGE = 8;	//가장자리(dist=0) 에서의 level.
+	const int LEVEL_MAX  = 20;	//가장자리를 FAR_PX 이상 넘어섰을 때(모니터 끝쪽) 의 최대 level.
+	const int FAR_PX     = 250;	//가장자리 너머 이 거리(px)에서 LEVEL_MAX 도달. (FAR 는 Windows 매크로라 사용 불가.)
+
+	if (dist >= MARGIN)
+		return 0;
+
+	if (dist >= 0)
+	{
+		double t = (double)(MARGIN - dist) / MARGIN;		//0(경계)~1(가장자리)
+		return 1 + (int)((LEVEL_EDGE - 1) * t + 0.5);
+	}
+
+	//가장자리를 넘어선 영역 — 넘어간 거리에 비례해 LEVEL_EDGE 위로 계속 가속.
+	double t = (double)(-dist) / FAR_PX;					//0(가장자리)~1(FAR_PX 너머)
+	if (t > 1.0)
+		t = 1.0;
+	return LEVEL_EDGE + (int)((LEVEL_MAX - LEVEL_EDGE) * t + 0.5);
+}
+
 void CSCListCtrl::drag_scroll_by(int dx_px, int dy_lines)
 {
 	if (!::IsWindow(m_hWnd))
@@ -5862,7 +6008,7 @@ void CSCListCtrl::OnTimer(UINT_PTR nIDEvent)
 		{
 			if (m_marquee_scroll_vx == 0 && m_marquee_scroll_vy == 0)
 			{
-				KillTimer(TIMER_ID_DRAG_AUTO_SCROLL);
+				stop_auto_scroll_timer();
 				return;
 			}
 
@@ -5906,7 +6052,7 @@ void CSCListCtrl::OnTimer(UINT_PTR nIDEvent)
 
 		if (!m_bDragging || m_drag_scroll_target == NULL || (m_drag_scroll_vx == 0 && m_drag_scroll_vy == 0))
 		{
-			KillTimer(TIMER_ID_DRAG_AUTO_SCROLL);
+			stop_auto_scroll_timer();
 			return;
 		}
 
@@ -5963,7 +6109,7 @@ void CSCListCtrl::OnLButtonUp(UINT nFlags, CPoint point)
 		m_bDragging = FALSE;
 
 		//드래그 자동 스크롤 타이머 정지.
-		KillTimer(TIMER_ID_DRAG_AUTO_SCROLL);
+		stop_auto_scroll_timer();
 		m_drag_scroll_vx = 0;
 		m_drag_scroll_vy = 0;
 
@@ -6031,7 +6177,7 @@ void CSCListCtrl::cancel_drag()
 	ReleaseCapture();
 	m_bDragging = FALSE;
 
-	KillTimer(TIMER_ID_DRAG_AUTO_SCROLL);
+	stop_auto_scroll_timer();
 	m_drag_scroll_vx = 0;
 	m_drag_scroll_vy = 0;
 
@@ -6493,7 +6639,7 @@ void CSCListCtrl::end_marquee()
 	if (!m_marquee_active)
 		return;
 	m_marquee_active = false;
-	KillTimer(TIMER_ID_DRAG_AUTO_SCROLL);
+	stop_auto_scroll_timer();
 	m_marquee_scroll_vx = 0;
 	m_marquee_scroll_vy = 0;
 	if (::GetCapture() == m_hWnd)
@@ -6513,28 +6659,19 @@ void CSCListCtrl::update_marquee_auto_scroll(CPoint client_pt)
 	GetClientRect(&rc);
 	int top_ref = rc.top + get_header_height();		//세로 상단 기준 = 헤더 아래.
 
-	const int MARGIN    = 48;	//가장자리 감지 폭(px).
-	const int MAX_LEVEL = 3;	//tick 당 최대 스크롤 level.
-
 	int dl = client_pt.x - rc.left;		//왼쪽 가장자리까지 거리(안쪽 양수).
 	int dr = rc.right - client_pt.x;	//오른쪽.
 	int dt = client_pt.y - top_ref;		//위(헤더 아래 기준).
 	int db = rc.bottom - client_pt.y;	//아래.
 
-	if (dl < MARGIN)      m_marquee_scroll_vx = -min(MAX_LEVEL, 1 + (MARGIN - dl) * (MAX_LEVEL - 1) / MARGIN);
-	else if (dr < MARGIN) m_marquee_scroll_vx =  min(MAX_LEVEL, 1 + (MARGIN - dr) * (MAX_LEVEL - 1) / MARGIN);
-
-	if (dt < MARGIN)      m_marquee_scroll_vy = -min(MAX_LEVEL, 1 + (MARGIN - dt) * (MAX_LEVEL - 1) / MARGIN);
-	else if (db < MARGIN) m_marquee_scroll_vy =  min(MAX_LEVEL, 1 + (MARGIN - db) * (MAX_LEVEL - 1) / MARGIN);
-
-	//[진단 HS] 가로 가장자리 근처일 때 dl/dr/vx 기록(마퀴 선택 자동스크롤). client 좌표 기준.
-	if (dl < 120 || dr < 120)
-		logWrite(_T("[HS-marquee] rc.right=%d cli.x=%d dl=%d dr=%d MARGIN=%d vx=%d"), rc.right, client_pt.x, dl, dr, MARGIN, m_marquee_scroll_vx);
+	//더 가까운 가장자리로, 거리에 비례해 가속(auto_scroll_level). 둘 다 멀면 0.
+	m_marquee_scroll_vx = (dl < dr) ? -auto_scroll_level(dl) : auto_scroll_level(dr);
+	m_marquee_scroll_vy = (dt < db) ? -auto_scroll_level(dt) : auto_scroll_level(db);
 
 	if (m_marquee_scroll_vx != 0 || m_marquee_scroll_vy != 0)
-		SetTimer(TIMER_ID_DRAG_AUTO_SCROLL, 70, NULL);	//~14fps 연속 스크롤(커서가 멈춰 있어도 계속).
+		start_auto_scroll_timer();	//~14fps 연속 스크롤(커서가 멈춰 있어도 계속).
 	else
-		KillTimer(TIMER_ID_DRAG_AUTO_SCROLL);
+		stop_auto_scroll_timer();
 }
 
 void CSCListCtrl::apply_marquee_selection(bool ctrl)
@@ -6842,16 +6979,26 @@ void CSCListCtrl::ensure_column_visible(int subItem)
 	GetClientRect(&rc);
 	int view_w = rc.Width();
 
+	int cell_w = cell_right - cell_left;
 	int cur = GetScrollPos(SB_HORZ);
 	int new_pos = cur;
+	//20260710 by claude. 편집은 셀 '좌측'(텍스트/편집 시작점)만 보이면 충분하다. 셀이 뷰포트보다 넓으면(예: 아주 긴 자막이 섞인 자막 컬럼)
+	//오른쪽 끝까지 스크롤하면 짧은 자막인데도 화면이 far-right 로 튀어 편집 박스가 안 보였다. 그래서 넓은 셀은 '좌측 노출'만 한다.
 	if (cell_left < cur)
-		new_pos = cell_left;						//왼쪽으로 가려짐 → 셀 왼쪽을 뷰포트 좌단에.
-	else if (cell_right > cur + view_w)
-		new_pos = max(cell_left, cell_right - view_w);	//오른쪽으로 가려짐 → 셀 오른쪽을 뷰포트 우단에(단 왼쪽이 넘어가지 않게).
+		new_pos = cell_left;							//셀 왼쪽이 좌측으로 가려짐 → 왼쪽을 뷰포트 좌단에.
+	else if (cell_left > cur + view_w)
+		new_pos = cell_left;							//셀이 우측 밖으로 완전히 벗어남 → 왼쪽을 뷰포트 좌단에.
+	else if (cell_w <= view_w && cell_right > cur + view_w)
+		new_pos = cell_right - view_w;					//뷰포트에 들어갈 폭인데 우측만 살짝 가려짐 → 우측을 우단에.
+	//셀 폭이 뷰포트보다 넓고 좌측이 이미 보이면 스크롤하지 않는다(far-right 튐 방지).
 
 	int delta = new_pos - cur;
 	if (delta != 0)
-		Scroll(CSize(delta, 0));					//native 가로 스크롤 → OnHScroll 이 m_h_scroll_pos 미러 + sync.
+	{
+		m_h_scroll_pos = new_pos;						//오버레이 가로바 동기화를 위해 먼저 갱신(drag_scroll_by 패턴).
+		Scroll(CSize(delta, 0));
+		sync_scrollbar();								//Scroll 만으로는 WM_HSCROLL 미발생 → 오버레이 가로바가 stale. 여기서 위치 반영.
+	}
 }
 
 

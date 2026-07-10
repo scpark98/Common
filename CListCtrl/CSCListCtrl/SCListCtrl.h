@@ -717,6 +717,15 @@ public:
 	//original IsItemVisible method does not check partial. only check vertical axis.
 	bool			is_item_visible(int index, bool bPartial = false);
 
+	//20260710 by claude. 표준 CListCtrl geometry/scroll API 를 '같은 이름'으로 smooth-aware shadow(override).
+	//소비자가 표준 이름만 써도 smooth(픽셀 뷰포트 m_scroll_y)/native 무관 정상 동작한다. 예전엔 커스텀 이름(is_item_visible/ensure_visible)만 있어
+	//표준 API 호출이 native=smooth에서 깨진 값을 받았고(자막 선택 미추적·EnsureVisible 루프 freeze 원인), 소비자가 어느 이름을 써야 하는지도 혼란스러웠다.
+	//CListCtrl 은 non-virtual 이라 CSCListCtrl* 로 호출할 때만 이 shadow 가 적용된다(기반 포인터론 native — 필요시 CListCtrl::… 명시).
+	BOOL			EnsureVisible(int nItem, BOOL bPartialOK);
+	int				GetTopIndex();
+	int				GetCountPerPage();
+	BOOL			IsItemVisible(int nItem, BOOL bPartial = FALSE);
+
 	//항목이 추가되면 auto scroll되지만 특정 항목을 선택하면 false로 된다.
 	//scroll_end_button은 m_auto_scroll = false 일때만 화면에 표시된다.
 	bool			m_auto_scroll = true;
@@ -864,6 +873,13 @@ protected:
 	int				m_drag_scroll_vy = 0;		//드래그 자동 스크롤 속도(세로).
 	CWnd*			m_drag_scroll_target = NULL;	//자동 스크롤을 실제로 보낼 리스트/트리(오버레이 스크롤바 위여도 이 컨트롤로 전송).
 	void			update_drag_auto_scroll(CPoint screen_pt);	//드래그 중 대상 가장자리 거리로 속도 산출 + 타이머 관리.
+	//20260709 by claude. 자동 스크롤 타이머는 zone 진입 시 1회만 SetTimer 해야 한다. 매 mousemove 마다 SetTimer 하면 같은 ID 라 카운트다운이
+	//리셋돼(마우스가 계속 움직이면) 70ms 타이머가 영영 발화하지 못해 '이동 중엔 스크롤 안 되고 멈춰야만 스크롤' 되던 버그. 플래그로 중복 SetTimer 차단.
+	bool			m_auto_scroll_timer_on = false;
+	void			start_auto_scroll_timer();
+	void			stop_auto_scroll_timer();
+	//20260709 by claude. 자동스크롤 속도 레벨 — 가장자리 거리(안쪽 양수/넘으면 음수)에 비례해 1..MAX_LEVEL 가속(멀면 0). 드래그·마퀴 공통.
+	int				auto_scroll_level(int dist);
 	void			cancel_drag();								//드래그 중 ESC 등으로 드롭 없이 완전 취소.
 	bool			m_swallow_rbutton = false;					//드래그 취소용 우클릭의 RBUTTONUP 을 소비할지(팝업 메뉴 방지).
 	int				m_nDragIndex = -1;			//drag되는 컨트롤이 CListCtrl일 때 그 인덱스(drag를 시작한 컨트롤의 멤버값에 저장됨, 드롭된 클래스에는 저장되지 않음)

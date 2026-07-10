@@ -262,17 +262,12 @@ CString	get_datetime_str(__timeb32 tb, int type, bool sep, CString mid, bool h24
 
 CString	get_datetime_str(SYSTEMTIME st, int type, bool sep, CString mid, bool h24, bool sec, bool msec)
 {
-	CString sDate;// = (sep ? get_date_str(st) : get_date_str(st, _T("")));
-	CString sTime;// = (sep ? get_time_str(st, _T(":"), h24, sec, msec) : get_time_str(st, _T(""), h24, sec, msec));
-
-	CString str_sep = (sep ? _T("/") : _T(""));
-	sDate.Format(_T("%04d%s%02d%s%02d"), st.wYear, str_sep, st.wMonth, str_sep, st.wDay);
-
-	str_sep = (sep ? _T(":") : _T(""));
-	sTime.Format(_T("%02d%s%02d%s%02d"), st.wHour, str_sep, st.wMinute, str_sep, st.wSecond);
-
-	if (msec)
-		sTime = sTime + _T(".") + i2S(st.wMilliseconds, false, true, 3);
+	//20260709 by claude. locale·h24/sec 파라미터를 존중하는 원래 구현으로 복원. 커밋 65fb9947(2025-12-14 22:28:43)이 문자열→SYSTEMTIME 역파서
+	//(get_SYSTEMTIME_from_datetime_str) round-trip 을 위해 이 SYSTEMTIME 오버로드를 파싱용 고정 "yyyy/mm/dd 24h" 로 하드코딩하면서,
+	//언어별 표기("2023-07-03 오후 6:01:47" / 영문 "…PM")로 그리던 파일목록 날짜가 "2023/07/03 18:01:47" 로 깨졌다.
+	//COleDateTime 오버로드(get_date_str/get_time_str 호출)는 원래대로였고 이 오버로드만 어긋났음 → 동일 방식으로 되돌린다.
+	CString sDate = (sep ? get_date_str(st) : get_date_str(st, _T("")));
+	CString sTime = (sep ? get_time_str(st, _T(":"), h24, sec, msec) : get_time_str(st, _T(""), h24, sec, msec));
 
 	if (type == 0)
 		return sDate;
@@ -8970,7 +8965,8 @@ CString get_file_time_str(FILETIME filetime)
 	FileTimeToLocalFileTime(&(filetime), &ftLocal);
 	FileTimeToSystemTime(&ftLocal, &st);
 
-	return get_datetime_str(st, 2, true, _T(" "), false, false, false);
+	//20260709 by claude. h24=false(언어별 오전/오후·AM/PM), sec=true(초 표시 — 파일목록 원래 표기 "2023-07-03 오후 6:01:47"). msec=false.
+	return get_datetime_str(st, 2, true, _T(" "), false, true, false);
 }
 
 size_t read_raw(CString sfile, uint8_t *dst, size_t size)

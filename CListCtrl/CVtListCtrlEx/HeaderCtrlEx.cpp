@@ -20,11 +20,7 @@ CHeaderCtrlEx::CHeaderCtrlEx()
 	//m_cr_back.SetFromCOLORREF(::GetSysColor(COLOR_3DFACE));
 	//m_cr_text.SetFromCOLORREF(::GetSysColor(COLOR_BTNTEXT));
 
-	if (get_gray_value(m_cr_back) < 128)
-		m_cr_separator = get_color(m_cr_back, 32);
-	else
-		m_cr_separator = get_color(m_cr_back, -32);
-
+	m_cr_separator = get_weak_color(m_cr_back, 32);
 	m_header_is_clicked = false;
 	m_header_clicked_index = -1;
 	m_header_height = 16;
@@ -133,7 +129,7 @@ void CHeaderCtrlEx::OnPaint()
 			if (m_flat_style)
 			{
 				if (m_use_header_separator)
-					draw_line(g, rItem.right, rItem.top + 2, rItem.right, rItem.bottom - 2, crSunkenDark);
+					draw_line(g, rItem.right - 2, rItem.top + 2, rItem.right - 2, rItem.bottom - 2, crSunkenDark);
 			}
 			else
 			{

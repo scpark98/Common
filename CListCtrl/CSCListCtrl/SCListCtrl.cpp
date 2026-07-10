@@ -6849,15 +6849,20 @@ void CSCListCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 			m_smooth_drag_item    = item;
 		}
 
-		//[smooth §4] 클릭 후처리(체크박스 토글·재클릭 편집진입)의 단일 출처는 OnNMClick. smooth 는 NM_CLICK 이 안 뜨므로
-		//합성 NMITEMACTIVATE(ptAction=클릭좌표)로 직접 호출(내부 hit_test 가 smooth-aware).
+		//20260710 by claude. [smooth §4] smooth 는 native 클릭 경로를 우회하므로 native 가 부모로 보내던 NM_CLICK 도
+		//사라진다(부모의 ON_NOTIFY(NM_CLICK) 가 영영 안 뜸 — 선택 통지 유실). native 와 동일 계약을 위해 합성 NM_CLICK 을
+		//부모로 보낸다. 부모 WM_NOTIFY 처리가 자식(OnNMClick)에 먼저 반사(체크박스 토글·재클릭 편집진입 후처리)한 뒤
+		//부모 ON_NOTIFY(NM_CLICK) 핸들러를 호출한다 — 이는 native 리스트뷰가 하던 그대로다.
+		//iItem/iSubItem 은 부모 핸들러용(smooth-aware hit_test 결과), ptAction 은 반사된 OnNMClick 의 재-hit_test 용.
 		NMITEMACTIVATE nmia = { 0 };
 		nmia.hdr.hwndFrom = m_hWnd;
 		nmia.hdr.idFrom   = (UINT_PTR)GetDlgCtrlID();
 		nmia.hdr.code     = NM_CLICK;
+		nmia.iItem        = item;
+		nmia.iSubItem     = subItem;
 		nmia.ptAction     = point;
-		LRESULT nmres = 0;
-		OnNMClick((NMHDR*)&nmia, &nmres);
+		if (GetParent())
+			GetParent()->SendMessage(WM_NOTIFY, GetDlgCtrlID(), (LPARAM)&nmia);
 
 		Invalidate(FALSE);
 		return;

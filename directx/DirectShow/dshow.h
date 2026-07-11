@@ -214,7 +214,9 @@ public:
 	void			step_frame(bool forward);
 	bool			capture_frame(CString sfile);
 	//현재 video frame 을 in-memory CSCGdiplusBitmap 으로 캡처. 북마크 thumbnail 등에 사용.
-	bool			capture_frame(CSCGdiplusBitmap& out);
+	//step_when_paused=true(기본): paused 상태에서 캡처 후 한 프레임 전진(프레임 스텝 UI 용). false: 전진 없이 현재 프레임만 캡처
+	//  — 같은 위치를 반복 캡처(스냅샷 seek 착지 폴링 등)할 때 위치가 밀리지 않아야 하는 호출부에서 사용.
+	bool			capture_frame(CSCGdiplusBitmap& out, bool step_when_paused = true);
 
 	//트랙 hover 프리뷰용 — 메인 재생과 무관하게 독립 디코더로 time_ms 의 키프레임 1장을 target_width 폭 비트맵으로.
 	//재생 상태를 바꾸지 않음. 성공 시 true. (정확 위치가 아닌 직전 키프레임 — 프리뷰엔 충분.)

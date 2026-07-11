@@ -4215,7 +4215,7 @@ bool CDShow::capture_frame(CString sfile)
 	return saved;
 }
 
-bool CDShow::capture_frame(CSCGdiplusBitmap& out)
+bool CDShow::capture_frame(CSCGdiplusBitmap& out, bool step_when_paused)
 {
 	if (!is_media_opened() || !m_VMR || (!m_pVMRWC && !m_pVDC && !m_use_mpcvr))
 		return false;
@@ -4235,7 +4235,7 @@ bool CDShow::capture_frame(CSCGdiplusBitmap& out)
 	if (ok)
 		normalize_captured_to_native(out, m_video_size.cx, m_video_size.cy);
 
-	if (get_play_state() == State_Paused)
+	if (step_when_paused && get_play_state() == State_Paused)
 		step_frame(true);
 
 	CoTaskMemFree(lpDib);

@@ -263,6 +263,9 @@ public:
 	void			popup_menu(int x, int y);
 	CSCMenuItem*	get_menu_item(int menu_id);
 	int				get_menu_count() { return (int)m_items.size(); }
+	//20260711 by claude. 이미 load 된 items 를 외부에서 순회할 수 있도록 노출. CSCKeyBindings::seed_from_scmenu 가
+	//이 리스트를 재귀 순회해 hot_key 를 파싱, HACCEL 을 시드 — .rc 를 CMenu 로 이중 로드하지 않는다.
+	const std::deque<CSCMenuItem*>& items() const { return m_items; }
 	//모든 항목 destroy. 동적 메뉴 (북마크 / 최근 파일 등) 를 popup 마다 rebuild 할 때 사용.
 	void			clear();
 	//특정 menu_id 항목 1개 제거. 첫 매칭만 제거. resource load 후 일부 항목 위치를 옮기고 싶을 때 사용

@@ -3,6 +3,8 @@
 #include <afxwin.h>
 #include <vector>
 
+class CSCMenu;		//20260711 by claude. seed_from_scmenu 전방 선언 — 상세 include 는 SCKeyBindings.cpp.
+
 //앱 단위 단축키(accelerator) 바인딩 매니저.
 //- .rc ACCELERATORS 를 기본값으로 seed → 사용자 override(레지스트리) 적용 → 런타임 HACCEL 생성.
 //- 액션은 커맨드 ID 로 식별. 메뉴/accel 과 동일한 WM_COMMAND 경로로 dispatch 되므로 포커스 무관.
@@ -34,6 +36,11 @@ public:
 	//owner-draw 메뉴는 캡션 문자열이 비어있을 수 있으므로, LoadMenu 직후의 표준 HMENU 를 넘길 것.
 	void			seed_from_menu(HMENU hMenu);
 
+	//20260711 by claude. CSCMenu 를 이미 load 한 프로젝트용 — 리소스를 CMenu 로 재로드하지 않고
+	//m_items 의 (m_id, m_hot_key) 를 직접 시드. m_sub_menu 재귀. hot_key 파싱·dedup·등록 규칙은
+	//seed_from_menu 와 동일 (내부 add_or_update_binding 공유).
+	void			seed_from_scmenu(const CSCMenu* menu);
+
 	//"Ctrl+Alt+E", "F2", "Left", "Space" 등 단축키 문자열 → (fVirt, key). 성공 시 true.
 	//fVirt 는 항상 FVIRTKEY 포함. 인식 못 하는 키 이름이면 false.
 	static bool		string_to_key(LPCTSTR text, BYTE& fVirt, WORD& key);
@@ -63,6 +70,8 @@ public:
 
 private:
 	Binding*		find_named(UINT cmd);
+	//20260711 by claude. seed_from_menu / seed_from_scmenu 공용 — (cmd, fVirt, key) 를 dedup 후 추가/갱신.
+	void			add_or_update_binding(UINT cmd, BYTE fVirt, WORD key);
 
 	std::vector<Binding>	m_bindings;
 	CString			m_section;

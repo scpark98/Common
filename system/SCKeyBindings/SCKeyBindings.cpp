@@ -3,6 +3,8 @@
 
 //#include "stdafx.h"
 #include "SCKeyBindings.h"
+//20260711 by claude. seed_from_scmenu 가 CSCMenu::items() 를 순회 — 상세 include 는 여기서만.
+#include "../../CMenu/CSCMenuBar/SCMenu.h"
 
 CSCKeyBindings::CSCKeyBindings()
 	: m_section(_T("keybindings"))
@@ -371,42 +373,73 @@ void CSCKeyBindings::seed_from_menu(HMENU hMenu)
 		if (!string_to_key(accel_text, fVirt, key))
 			continue;
 
-		//메뉴 캡션이 이 chord(fVirt+key)를 명시했으면, 같은 chord 를 갖던 다른 cmd 의 (resource seed 단계의)
-		//바인딩은 무효다. 제거하지 않으면 build_haccel 의 table 에 동일 chord 가 둘 생겨 TranslateAccelerator
-		//가 먼저 등록된 cmd(대개 핸들러 없는 .rc 잔재)를 골라 정작 메뉴 명령이 호출되지 않는다.
-		for (size_t k = 0; k < m_bindings.size(); )
+		add_or_update_binding(id, fVirt, key);
+	}
+}
+
+//20260711 by claude. CSCMenu 를 이미 load 한 프로젝트용 — m_items 를 재귀 순회.
+//m_id 가 유효한 MENUITEM 만 처리(음수/0 은 separator·placeholder).
+void CSCKeyBindings::seed_from_scmenu(const CSCMenu* menu)
+{
+	if (!menu)
+		return;
+
+	for (const CSCMenuItem* item : menu->items())
+	{
+		if (item == NULL)
+			continue;
+
+		if (item->m_sub_menu)
 		{
-			if (m_bindings[k].cmd != id && m_bindings[k].fVirt == fVirt && m_bindings[k].key == key)
-				m_bindings.erase(m_bindings.begin() + k);
-			else
-				k++;
+			seed_from_scmenu(item->m_sub_menu);
+			continue;
 		}
 
-		//같은 cmd 가 이미 있으면 키만 갱신(name 보존 → register_action 으로 named 화된 항목도 유지), 없으면 추가.
-		bool found = false;
-		for (size_t k = 0; k < m_bindings.size(); k++)
+		if (item->m_id <= 0 || item->m_hot_key.IsEmpty())
+			continue;
+
+		BYTE fVirt = 0;
+		WORD key = 0;
+		if (!string_to_key(item->m_hot_key, fVirt, key))
+			continue;
+
+		add_or_update_binding((UINT)item->m_id, fVirt, key);
+	}
+}
+
+//20260711 by claude. seed_from_menu / seed_from_scmenu 공용 dedup + upsert.
+//같은 chord 를 쓰던 다른 cmd 의 이전 바인딩 제거 (build_haccel 이 동일 chord 를 둘 등록하면
+//TranslateAccelerator 가 먼저 등록된 cmd — 대개 핸들러 없는 .rc 잔재 — 를 골라 정작 메뉴 명령이 안 호출됨).
+//같은 cmd 가 이미 있으면 키만 갱신 (register_action 으로 named 화된 항목은 name 보존).
+void CSCKeyBindings::add_or_update_binding(UINT cmd, BYTE fVirt, WORD key)
+{
+	for (size_t k = 0; k < m_bindings.size(); )
+	{
+		if (m_bindings[k].cmd != cmd && m_bindings[k].fVirt == fVirt && m_bindings[k].key == key)
+			m_bindings.erase(m_bindings.begin() + k);
+		else
+			k++;
+	}
+
+	for (size_t k = 0; k < m_bindings.size(); k++)
+	{
+		if (m_bindings[k].cmd == cmd)
 		{
-			if (m_bindings[k].cmd == id)
-			{
-				m_bindings[k].fVirt = fVirt;
-				m_bindings[k].key = key;
-				m_bindings[k].def_fVirt = fVirt;
-				m_bindings[k].def_key = key;
-				found = true;
-				break;
-			}
-		}
-		if (!found)
-		{
-			Binding b;
-			b.cmd = id;
-			b.fVirt = fVirt;
-			b.key = key;
-			b.def_fVirt = fVirt;
-			b.def_key = key;
-			m_bindings.push_back(b);
+			m_bindings[k].fVirt = fVirt;
+			m_bindings[k].key = key;
+			m_bindings[k].def_fVirt = fVirt;
+			m_bindings[k].def_key = key;
+			return;
 		}
 	}
+
+	Binding b;
+	b.cmd = cmd;
+	b.fVirt = fVirt;
+	b.key = key;
+	b.def_fVirt = fVirt;
+	b.def_key = key;
+	m_bindings.push_back(b);
 }
 
 CSCKeyBindings::Binding* CSCKeyBindings::find_named(UINT cmd)

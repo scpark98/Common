@@ -200,6 +200,10 @@ public:
 	//show_time <= 0 이면 깜빡임 중지(현재 보임 상태 유지). 호출 전 set_text/set_image 로 내용이 설정돼 있어야 한다.
 	void			set_blink(int show_time, int hide_time = -1);
 
+	//20260711 by claude. 은은한 펄스 — alpha 를 alpha_max~alpha_min 사이로 부드럽게 왕복(show/hide 깜빡임보다 자연스럽다).
+	//period_ms = 한 왕복(밝→어→밝) 주기. period_ms <= 0 이면 정지하고 alpha 를 alpha_max 로 복원. 호출 전 내용이 설정돼 있어야 한다.
+	void			set_pulse(int period_ms, int alpha_min = 64, int alpha_max = 255);
+
 	//
 	CSCShapeDlgTextSetting	m_text_setting;
 	//get_text_setting()으로 리턴받은 세팅값을 직접 수정하여 set_text(setting);를 호출한다.
@@ -257,6 +261,13 @@ protected:
 	int				m_blink_show = 0;
 	int				m_blink_hide = 0;
 	bool			m_blink_visible = true;
+
+	//20260711 by claude. 은은한 펄스 — timer_pulse 로 m_alpha 를 min~max 사이 왕복.
+	enum { timer_pulse = 0x5C0C };
+	int				m_pulse_min = 64;
+	int				m_pulse_max = 255;
+	int				m_pulse_step = 8;
+	int				m_pulse_dir = -1;		//-1: 어두워지는 중, +1: 밝아지는 중
 
 	bool			m_fadeinout_ing = false;
 	//fade_in(), fade_out() 함수에서 호출하며

@@ -59,6 +59,49 @@ void CSCShapeDlg::set_blink(int show_time, int hide_time /*= -1*/)
 	}
 }
 
+void CSCShapeDlg::set_pulse(int period_ms, int alpha_min /*= 64*/, int alpha_max /*= 255*/)
+{
+	if (GetSafeHwnd())
+		KillTimer(timer_pulse);
+
+	if (period_ms <= 0)
+	{
+		//정지 — alpha_max(불투명)로 복원(호출자가 별도로 hide 가능).
+		set_alpha(alpha_max);
+		return;
+	}
+
+	if (alpha_min < 0)   alpha_min = 0;
+	if (alpha_min > 255) alpha_min = 255;
+	if (alpha_max < 0)   alpha_max = 0;
+	if (alpha_max > 255) alpha_max = 255;
+	if (alpha_min > alpha_max)
+	{
+		int t = alpha_min;
+		alpha_min = alpha_max;
+		alpha_max = t;
+	}
+	m_pulse_min = alpha_min;
+	m_pulse_max = alpha_max;
+
+	const int tick_ms = 40;		//~25fps 로 부드럽게.
+	int half_steps = (period_ms / 2) / tick_ms;
+	if (half_steps < 1)
+		half_steps = 1;
+	m_pulse_step = (m_pulse_max - m_pulse_min) / half_steps;
+	if (m_pulse_step < 1)
+		m_pulse_step = 1;
+	m_pulse_dir = -1;		//밝은 상태에서 시작해 어두워지는 방향.
+
+	set_alpha(m_pulse_max);
+	if (GetSafeHwnd())
+	{
+		if (!IsWindowVisible())
+			ShowWindow(SW_SHOWNA);
+		SetTimer(timer_pulse, tick_ms, NULL);
+	}
+}
+
 void CSCShapeDlg::OnTimer(UINT_PTR nIDEvent)
 {
 	if (nIDEvent == timer_blink)
@@ -68,6 +111,23 @@ void CSCShapeDlg::OnTimer(UINT_PTR nIDEvent)
 
 		KillTimer(timer_blink);
 		SetTimer(timer_blink, m_blink_visible ? m_blink_show : m_blink_hide, NULL);
+		return;
+	}
+
+	if (nIDEvent == timer_pulse)
+	{
+		int a = m_alpha + m_pulse_dir * m_pulse_step;
+		if (a <= m_pulse_min)
+		{
+			a = m_pulse_min;
+			m_pulse_dir = +1;
+		}
+		else if (a >= m_pulse_max)
+		{
+			a = m_pulse_max;
+			m_pulse_dir = -1;
+		}
+		set_alpha(a);		//m_alpha 갱신 + render(UpdateLayeredWindow 블렌드).
 		return;
 	}
 

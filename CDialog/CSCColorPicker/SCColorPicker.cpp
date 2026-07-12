@@ -537,6 +537,10 @@ void CSCColorPicker::apply_edit_to_color()
 
 	m_sel_color = Gdiplus::Color(a, r, g, b);
 
+	//20260712 by claude. 편집으로 색이 바뀌면 선택 대상도 갱신 — 스와치에 없으면 External 로 둬 preview 의 m_sel.is_valid() 게이트를 통과시킨다.
+	const HitTarget found = find_color(m_sel_color);
+	m_sel = found.is_valid() ? found : HitTarget{ HitArea::External, -1, -1, -1 };
+
 	// 편집 → HSL 추출 후 슬라이더 동기화
 	gcolor_to_hsl(m_sel_color, m_hue, m_sat, m_light);
 	update_slider_alpha();
@@ -583,6 +587,10 @@ void CSCColorPicker::OnEnChangeHexa()
 
 	m_sel_color = Gdiplus::Color(a, r, g, b);
 
+	//20260712 by claude. 편집으로 색이 바뀌면 선택 대상도 갱신 — 스와치에 없으면 External 로 둬 preview 의 m_sel.is_valid() 게이트를 통과시킨다.
+	const HitTarget found = find_color(m_sel_color);
+	m_sel = found.is_valid() ? found : HitTarget{ HitArea::External, -1, -1, -1 };
+
 	gcolor_to_hsl(m_sel_color, m_hue, m_sat, m_light);
 	update_slider_alpha();
 	update_slider_hue();
@@ -624,6 +632,10 @@ void CSCColorPicker::OnEnChangeHsl()
 	const BYTE           a = m_sel_color.GetA();
 	const Gdiplus::Color rgb = hsl_to_gcolor(m_hue, m_sat, m_light);
 	m_sel_color = Gdiplus::Color(a, rgb.GetR(), rgb.GetG(), rgb.GetB());
+
+	//20260712 by claude. 편집으로 색이 바뀌면 선택 대상도 갱신 — 스와치에 없으면 External 로 둬 preview 의 m_sel.is_valid() 게이트를 통과시킨다.
+	const HitTarget found = find_color(m_sel_color);
+	m_sel = found.is_valid() ? found : HitTarget{ HitArea::External, -1, -1, -1 };
 
 	update_slider_alpha();
 	update_slider_hue();

@@ -48,7 +48,7 @@ namespace ReadDirectoryChangesPrivate
 
         bool OpenDirectory();
 
-        void BeginRead();
+        bool BeginRead();
 
         // The dwSize is the actual number of bytes sent to the APC.
         void BackupBuffer(DWORD dwSize)
@@ -168,6 +168,24 @@ namespace ReadDirectoryChangesPrivate
             }
         }
 
+        //20260712 by claude. read 가 더는 발행되지 않는(폴더 삭제로 죽은) 블록을 목록·카운트에서 즉시 제거·파괴한다.
+        //pending I/O 가 없어 ABORTED 완료가 오지 않으므로, 이 정리를 생략하면 m_nOutstandingRequests 가 0 이 되지 못해
+        //Terminate() 의 Run 루프가 영구 대기(=UI freeze)한다. worker thread context 에서만 호출되어 m_pBlocks 접근이 안전하다.
+        void RemoveDeadBlock(CReadChangesRequest* pBlock)
+        {
+            for (DWORD i = 0; i < m_pBlocks.size(); ++i)
+            {
+                if (m_pBlocks[i] == pBlock)
+                {
+                    m_pBlocks.erase(m_pBlocks.begin() + i);
+                    break;
+                }
+            }
+            ::InterlockedDecrement(&m_nOutstandingRequests);
+            pBlock->RequestTermination();	// 열린 핸들 정리(pending I/O 없음 → CancelIo no-op)
+            delete pBlock;
+        }
+
         CReadDirectoryChanges* const m_pBase;
 
         volatile DWORD m_nOutstandingRequests{};
@@ -180,7 +198,10 @@ namespace ReadDirectoryChangesPrivate
             {
                 ::InterlockedIncrement(&pBlock->m_pServer->m_nOutstandingRequests);
                 m_pBlocks.push_back(pBlock);
-                pBlock->BeginRead();
+                //20260712 by claude. 최초 read 발행 실패(연 직후 폴더 소멸 등)면 counted-but-not-pending 상태가 되어
+                //Terminate 의 Run 루프가 카운트>0 로 영구 대기(freeze)하므로 즉시 정리한다.
+                if (!pBlock->BeginRead())
+                    RemoveDeadBlock(pBlock);
             }
             else
                 delete pBlock;

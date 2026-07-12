@@ -88,11 +88,12 @@ namespace ReadDirectoryChangesPrivate
         return true;
     }
 
-    void CReadChangesRequest::BeginRead()
+    bool CReadChangesRequest::BeginRead()
     {
         DWORD dwBytes = 0;
 
         // This call needs to be reissued after every APC.
+        //20260712 by claude. 감시 폴더가 삭제/이동되면 ReadDirectoryChangesW 가 FALSE 를 반환한다 — 호출측이 이를 보고 이 watch 를 정리한다.
         bool success = ::ReadDirectoryChangesW(
             m_hDirectory,						// handle to directory
             &m_Buffer[0],                       // read results buffer
@@ -102,6 +103,8 @@ namespace ReadDirectoryChangesPrivate
             &dwBytes,                           // bytes returned
             &m_Overlapped,                      // overlapped buffer
             &NotificationCompletion);           // completion routine
+
+        return success;
     }
 
     //static
@@ -124,18 +127,27 @@ namespace ReadDirectoryChangesPrivate
 		// scpark edit: 원래 이 문장이 있었으나 watching중인 폴더를 목록에서 삭제할 경우 ASSERT가 발생하여 주석처리 함.
        // _ASSERTE(dwNumberOfBytesTransfered >= offsetof(FILE_NOTIFY_INFORMATION, FileName) + sizeof(WCHAR));
 
-        // This might mean overflow? Not sure.
+        //20260712 by claude. 0바이트 = 버퍼 오버플로 또는 감시 폴더 삭제/이동. 재-read 로 감시를 지속하되, 재-read 가 실패하면
+        //(폴더가 사라짐) 이 watch 는 죽은 것이므로 즉시 정리한다 — 안 그러면 pending I/O 없이 카운트만 남아 Terminate 가 영구 대기(freeze).
         if (!dwNumberOfBytesTransfered)
+        {
+            if (!pBlock->BeginRead())
+                pBlock->m_pServer->RemoveDeadBlock(pBlock);
             return;
+        }
 
         pBlock->BackupBuffer(dwNumberOfBytesTransfered);
 
         // Get the new read issued as fast as possible. The documentation
         // says that the original OVERLAPPED structure will not be used
         // again once the completion routine is called.
-        pBlock->BeginRead();
+        //20260712 by claude. 재-read 결과 확인 — 이 완료 처리 직후 폴더가 삭제됐으면 read 가 실패하므로 아래에서 watch 를 정리한다.
+        bool bReadOk = pBlock->BeginRead();
 
         pBlock->ProcessNotification();
+
+        if (!bReadOk)
+            pBlock->m_pServer->RemoveDeadBlock(pBlock);
     }
 
     void CReadChangesRequest::ProcessNotification()

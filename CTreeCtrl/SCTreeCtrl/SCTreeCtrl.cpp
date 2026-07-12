@@ -2,6 +2,7 @@
 //
 
 #include "SCTreeCtrl.h"
+#include "../../log/SCLog/SCLog.h"	//20260712 by claude. [diag temp] 확장 지연로드 조사 — 테스트 후 제거.
 #include <thread>
 #include "../../Functions.h"
 #include "../../MemoryDC.h"
@@ -1401,6 +1402,7 @@ BOOL CSCTreeCtrl::OnTvnItemexpanding(NMHDR* pNMHDR, LRESULT* pResult)
 	m_content_width_dirty = true;
 	m_visible_cache_dirty = true;
 
+	logWrite(_T("[expand] path='%s' childLoaded=%d hasChildren=%d local=%d"), (LPCTSTR)get_path(m_expanding_item), (int)(GetChildItem(m_expanding_item) != NULL), (int)ItemHasChildren(m_expanding_item), (int)m_is_local);	//20260712 by claude. [diag temp]
 	if (m_is_shell_treectrl)
 	{
 		//만약 child가 없다면 아직 로딩되지 않은 노드이므로 검색해서 추가한다.
@@ -1413,6 +1415,7 @@ BOOL CSCTreeCtrl::OnTvnItemexpanding(NMHDR* pNMHDR, LRESULT* pResult)
 				::SetCursor(AfxGetApp()->LoadStandardCursor(IDC_WAIT));
 				insert_folder(m_expanding_item, get_path(m_expanding_item));
 				::SetCursor(AfxGetApp()->LoadStandardCursor(IDC_ARROW));
+				logWrite(_T("[expand] after insert_folder childLoaded=%d"), (int)(GetChildItem(m_expanding_item) != NULL));	//20260712 by claude. [diag temp]
 			}
 			else
 			{
@@ -2726,8 +2729,16 @@ void CSCTreeCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 		rcButton.OffsetRect(-get_over_shift(), 0);   //over-scroll 시 그리기와 동일하게 좌측 shift (안 하면 H 스크롤 후 클릭 영역이 어긋남)
 		if (!rcButton.IsRectEmpty() && rcButton.PtInRect(point))
 		{
+			logWrite(_T("[click] chevron hit path='%s' before expanded=%d childLoaded=%d hasChildren=%d"), (LPCTSTR)get_path(hItem), (int)((GetItemState(hItem, TVIS_EXPANDED) & TVIS_EXPANDED) ? 1 : 0), (int)(GetChildItem(hItem) != NULL), (int)ItemHasChildren(hItem));	//20260712 by claude. [diag temp]
 			SetRedraw(FALSE);
-			Expand(hItem, TVE_TOGGLE);
+			//20260712 by claude. expanded-empty(펼쳐진 노드에서 watcher 가 마지막 자식을 DeleteItem 해 TVIS_EXPANDED 만 남은 상태)면
+			//TVE_TOGGLE 이 '이미 expanded' 로 보고 접기만 시도해 lazy-load 가 안 걸린다(첫 확장만 되고 이후 먹통 — 로그로 확인).
+			//이 stale 상태에선 대상 노드를 refresh(자식 재열거)한다 — 노드가 이미 expanded 라 재삽입된 자식이 바로 표시된다.
+			if ((GetItemState(hItem, TVIS_EXPANDED) & TVIS_EXPANDED) && GetChildItem(hItem) == NULL)
+				refresh(hItem);
+			else
+				Expand(hItem, TVE_TOGGLE);
+			logWrite(_T("[click] after Expand expanded=%d childLoaded=%d"), (int)((GetItemState(hItem, TVIS_EXPANDED) & TVIS_EXPANDED) ? 1 : 0), (int)(GetChildItem(hItem) != NULL));	//20260712 by claude. [diag temp]
 			//collapse 시엔 OnTvnItemexpanded 가 호출되지 않아(Win32 가 collapse 에 ITEMEXPANDED 미발송) 캐시 무효화·
 			//range 갱신이 누락된다 → 접어도 세로 스크롤바 range 가 펼친 상태로 남던 버그. toggle(펼침/접힘) 완료 후
 			//여기서 직접 무효화 + sync 한다.

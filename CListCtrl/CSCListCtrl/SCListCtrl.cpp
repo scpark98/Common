@@ -7307,6 +7307,24 @@ void CSCListCtrl::OnNcPaint()
 	//아래 CListCtrl::OnNcPaint();를 호출하지 않으면 스크롤바 등의 일부 영역이 제대로 그려지지 않게 되므로 반드시 기본 핸들러 호출 필요.
 	CListCtrl::OnNcPaint();
 
+	//20260712 by claude. [진단] 리사이즈 중 세로바 찢김 원인 측정 — NC paint 발화 시점·세로/가로바 가시 상태.
+	//원인 확정·수정 완료로 주석 처리(§2J). 재조사 시 해제.
+	//logWrite(_T("[vbar-ncpaint] tick=%u setup=%d v_visible=%d h_visible=%d"),
+	//	::GetTickCount(), (int)m_scrollbar_setup, (int)m_v_visible_state, (int)m_h_visible_state);
+
+	//20260712 by claude. [바 찢김 수정] base CListCtrl::OnNcPaint 는 window DC 로 우측/하단 NC 띠를 그린다. 이 띠엔
+	//WS_VSCROLL 유지(bottom-align 목적)로 남아있는 native 세로 스크롤바 시각화가 포함돼, 그 자리에 놓인 오버레이 바를
+	//덮어써 리사이즈 중 바가 찢겨 보인다(WS_CLIPSIBLINGS 는 client DC 만 clip → NC(window) DC 미적용이라 못 막음).
+	//바는 NC 띠의 시각적 소유자이므로 base NC paint 직후 위로 다시 그려 복원한다. 바는 CMemoryDC 더블버퍼라 flicker 없음.
+	//보일 때만. (이전 시도들과 달리 리스트/버튼이 아니라 바 하나만 건드린다.)
+	if (m_scrollbar_setup)
+	{
+		if (m_v_visible_state && ::IsWindow(m_scrollbar.m_hWnd))
+			m_scrollbar.RedrawWindow(NULL, NULL, RDW_INVALIDATE | RDW_UPDATENOW);
+		if (m_h_visible_state && ::IsWindow(m_scrollbar_h.m_hWnd))
+			m_scrollbar_h.RedrawWindow(NULL, NULL, RDW_INVALIDATE | RDW_UPDATENOW);
+	}
+
 	//[self-heal] 임베드(child 로 심어 생성 타이밍이 다른 경우) 등으로 PreSubclassWindow 의 frame change 가
 	//WM_NCCALCSIZE 를 못 띄워 1px NC 가 미확보된 채 paint 되는 경우 — 표시 시점(여기, 실제 window 상태)에서 frame
 	//change 를 1회 강제한다. 그러면 이번엔 OnNcCalcSize 가 불려 1px 를 확보(m_border_nc_reserved=true)하고, 곧바로

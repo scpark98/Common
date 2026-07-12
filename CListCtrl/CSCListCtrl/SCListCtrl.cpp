@@ -7520,7 +7520,7 @@ void CSCListCtrl::sync_scrollbar()
 	//비쌈)을 전부 건너뛴다. 단 NC 예약(우측/하단 gw 띠)을 유지하면 그 띠에 native scrollbar 잔상이 리사이즈마다 찢겨
 	//보이므로, 예약을 *1회* 해제(framechange)해 content 를 풀폭으로 쓰고 바를 숨긴다. release 시 app 이 sync 로 정확히 복원.
 	//(framechange 는 상태가 true→false 로 바뀌는 첫 sync 에서만 — 이후엔 state 가 false 라 재발사 안 됨.)
-	if (s_in_live_resize && m_hide_when_resize)
+	if (s_in_live_resize && m_hide_scroll_when_resize)
 	{
 		bool was_reserved = (m_v_visible_state || m_h_visible_state);
 		m_v_visible_state = false;

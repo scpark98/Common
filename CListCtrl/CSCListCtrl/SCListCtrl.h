@@ -1062,10 +1062,10 @@ public:
 	static void		set_live_resize(bool b) { s_in_live_resize = b; }
 	static bool		s_in_live_resize;
 	//20260712 by claude. 리사이즈 중 '바 숨김' 최적화를 이 컨트롤에 적용할지. 기본 false(바가 계속 보임 — 자연스러움). 컨트롤이
-	//많아 리사이즈가 정말 느린 앱에서만 set_hide_when_resize(true) 로 켜면 리사이즈 드래그 중 바를 숨겨 리스트당 5~10ms 를 절감.
+	//많아 리사이즈가 정말 느린 앱에서만 set_hide_scroll_when_resize(true) 로 켜면 리사이즈 드래그 중 바를 숨겨 리스트당 5~10ms 를 절감.
 	//(true 면 드래그 중 바가 잠깐 사라졌다 놓으면 복원. false 면 바는 유지되나 리사이즈가 느림.) 컨트롤별 선택 가능.
-	void			set_hide_when_resize(bool b) { m_hide_when_resize = b; }
-	bool			m_hide_when_resize = false;
+	void			set_hide_scroll_when_resize(bool b) { m_hide_scroll_when_resize = b; }
+	bool			m_hide_scroll_when_resize = false;
 
 public:
 	DWORD			get_last_user_scroll_at() const { return m_last_user_scroll_at; }

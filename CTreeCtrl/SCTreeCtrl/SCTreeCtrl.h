@@ -483,9 +483,9 @@ public:
 	//app 이 ENTER 시 set_live_resize(true), EXIT 시 false + sync_scrollbar 로 복원. 모든 인스턴스 공유.
 	static void		set_live_resize(bool b) { s_in_live_resize = b; }
 	static bool		s_in_live_resize;
-	//20260712 by claude. 리사이즈 중 '바 숨김' 최적화 적용 여부. 기본 false(바 유지). 정말 느린 앱만 set_hide_when_resize(true).
-	void			set_hide_when_resize(bool b) { m_hide_when_resize = b; }
-	bool			m_hide_when_resize = false;
+	//20260712 by claude. 리사이즈 중 '바 숨김' 최적화 적용 여부. 기본 false(바 유지). 정말 느린 앱만 set_hide_scroll_when_resize(true).
+	void			set_hide_scroll_when_resize(bool b) { m_hide_scroll_when_resize = b; }
+	bool			m_hide_scroll_when_resize = false;
 
 protected:
 	//root 항목은 실제 또는 가상의 root일 수 있다.

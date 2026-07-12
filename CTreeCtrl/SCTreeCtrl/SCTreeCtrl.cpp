@@ -5426,7 +5426,7 @@ void CSCTreeCtrl::sync_scrollbar()
 
 	//20260712 by claude. 리사이즈 드래그 중: 오버레이 바 window 조작을 전부 건너뛴다(리스트와 동일). NC 예약을 1회 해제해
 	//native scrollbar 잔상이 찢기는 것을 막고 바를 숨긴다. release 시 app 이 sync 로 정확히 복원.
-	if (s_in_live_resize && m_hide_when_resize)
+	if (s_in_live_resize && m_hide_scroll_when_resize)
 	{
 		bool was_reserved = (m_v_visible_state || m_h_visible_state);
 		m_v_visible_state = false;

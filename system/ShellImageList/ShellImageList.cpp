@@ -677,7 +677,8 @@ bool CShellImageList::is_protected(int index, CString folder, bool as_destinatio
 		return (rest.GetLength() > len && rest.Left(len) == root && rest[len] == _T('\\'));
 	};
 
-	//시스템 폴더 + 하위 전체(어느 드라이브든 이름 기반). 소스·목적지 공통 금지.
+	//시스템 폴더 + 하위 전체(어느 드라이브든 이름 기반). 소스·목적지 공통 금지 — 어떤 액션(전송/이동/복사/삭제/이름변경)으로도
+	//시스템 손상 불가하게 하위까지 예외 없이 금지(사용자 방침 2026-07-12: 시스템 손상 가능 액션은 절대 허용 안 함).
 	if (is_under(_T("\\windows")) ||
 		is_under(_T("\\program files")) ||
 		is_under(_T("\\program files (x86)")) ||

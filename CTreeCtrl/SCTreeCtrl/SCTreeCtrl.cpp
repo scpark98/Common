@@ -3791,10 +3791,19 @@ void CSCTreeCtrl::edit_item(HTREEITEM hItem)
 
 	r.DeflateRect(0, 0);
 
+	//20260712 by claude. 편집 텍스트 열을 항목 텍스트 열과 일치시킨다. 항목 텍스트=label.left+2(customdraw 의 rcDraw.left+=2),
+	//편집 텍스트=edit.left + border_width(1) + padding(2). padding(2)=항목 offset(2)이라, edit.left 를 border_width(1) 만큼
+	//왼쪽 시프트하면 편집 텍스트=(label.left-1)+1+2=label.left+2=항목 텍스트 → 편집 진입 시 글자 1px 우측 튐 제거.
+	//(CSCStaticEdit 기본 m_border_width=1. 트리는 border width 를 변경하지 않는다.)
+	r.left -= 1;
+
 	if (m_pEdit == NULL)
 	{
 		m_pEdit = new CSCStaticEdit;
-		m_pEdit->Create(WS_BORDER, r, this, 1004);
+		//20260712 by claude. WS_BORDER 주지 않는다(리스트 CSCListCtrl::edit_item 과 동일 Create(0)). CSCStaticEdit 는 자체
+		//테마 테두리를 draw_border 로 그리고 PreSubclassWindow 에서 WS_BORDER 를 strip 하는데, strip 이 frame change 없이
+		//이뤄져 native WS_BORDER 1px NC 잔재가 남아 테마 테두리와 좌측에 두 겹으로 어긋나 보였다(사용자 지적).
+		m_pEdit->Create(0, r, this, 1004);
 	}
 
 	m_pEdit->MoveWindow(r);
@@ -4301,6 +4310,21 @@ void CSCTreeCtrl::OnNMCustomDraw(NMHDR* pNMHDR, LRESULT* pResult)
 				dc.FillSolidRect(&rcFill, m_theme.cr_back.ToCOLORREF());
 				CRect rcLabel(rcText.left - 2, rcRow.top, rcText.right + 2, rcRow.bottom);
 				dc.FillSolidRect(&rcLabel, crBack.ToCOLORREF());
+			}
+
+			//20260712 by claude. 리스트(CSCListCtrl set_draw_selected_border)처럼 선택 항목에 테두리를 그린다.
+			//활성 선택(focus 보유·컨텍스트메뉴 중)일 때만 — inactive 선택은 채움만(리스트 동작과 동일).
+			//편집 중(m_in_editing)엔 그리지 않는다 — 편집 박스(CSCStaticEdit)가 자체 border 를 그리는데, 선택 border 와
+			//좌표 계산이 달라(rcText.left-2 vs 편집 박스 배치) 좌측에 파란선 두 개가 어긋나 겹친다. 리스트도 !m_in_editing.
+			//테두리 rect 는 채운 강조 영역과 동일: FULLROWSELECT=풀행 rcFill, off=라벨 영역. 테마 선택 테두리색·1px·inset.
+			if ((pNMCustomDraw->uItemState & CDIS_SELECTED) && !m_in_editing &&
+				(GetFocus() == this || m_in_context_menu))
+			{
+				CRect rcSelBorder = ((GetStyle() & TVS_FULLROWSELECT) || !state_highlight)
+					? rcFill
+					: CRect(rcText.left - 2, rcRow.top, rcText.right + 2, rcRow.bottom);
+				draw_rect(&dc, rcSelBorder, m_theme.cr_selected_border, Gdiplus::Color::Transparent,
+					1, Gdiplus::PenAlignmentInset, Gdiplus::DashStyleSolid);
 			}
 
 			//2. expand/collapse glyph — rcText.left 기준 역산 (H scroll 따라 같이 움직이도록).
@@ -5393,10 +5417,32 @@ void CSCTreeCtrl::setup_scrollbar()
 	sync_scrollbar();
 }
 
+bool CSCTreeCtrl::s_in_live_resize = false;	//20260712 by claude. 리사이즈 드래그 중 바 조작 스킵 플래그(모든 인스턴스 공유).
+
 void CSCTreeCtrl::sync_scrollbar()
 {
 	if (!m_scrollbar_setup || !::IsWindow(m_scrollbar.m_hWnd))
 		return;
+
+	//20260712 by claude. 리사이즈 드래그 중: 오버레이 바 window 조작을 전부 건너뛴다(리스트와 동일). NC 예약을 1회 해제해
+	//native scrollbar 잔상이 찢기는 것을 막고 바를 숨긴다. release 시 app 이 sync 로 정확히 복원.
+	if (s_in_live_resize && m_hide_when_resize)
+	{
+		bool was_reserved = (m_v_visible_state || m_h_visible_state);
+		m_v_visible_state = false;
+		m_h_visible_state = false;
+		m_scrollbar.ShowWindow(SW_HIDE);
+		if (::IsWindow(m_scrollbar_h.m_hWnd))
+			m_scrollbar_h.ShowWindow(SW_HIDE);
+		if (was_reserved && !m_syncing)
+		{
+			m_syncing = true;
+			SetWindowPos(NULL, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
+			m_syncing = false;
+			Invalidate(FALSE);
+		}
+		return;
+	}
 
 	//tree 가 collapse/expand / SetScrollInfo 등으로 WS_VSCROLL/HSCROLL 자체 재추가하는 케이스 강제 strip.
 	if (GetStyle() & (WS_VSCROLL | WS_HSCROLL))
@@ -5424,7 +5470,9 @@ void CSCTreeCtrl::sync_scrollbar()
 	bool need_h = ::IsWindow(m_scrollbar_h.m_hWnd) && (right_limit_h > 0) && (content_w > right_limit_h);
 
 	//customdraw 가 timing 무관하게 정확한 값 사용 — IsWindowVisible 의 paint cycle stale 회피.
+	bool old_v = m_v_visible_state;
 	m_v_visible_state = need_v;
+	bool old_h = m_h_visible_state;
 	bool nc_changed = (need_h != m_h_visible_state);
 	m_h_visible_state = need_h;
 
@@ -5441,32 +5489,22 @@ void CSCTreeCtrl::sync_scrollbar()
 
 	//---- 2단계: ShowWindow ----
 	//visible 변화 시 tree client 도 invalidate — right_limit (m_v_visible_state 기반) 가 바뀐 새 폭으로 row fill 재계산.
-	bool vis_changed = false;
-	if (need_v && !m_scrollbar.IsWindowVisible())
-	{
-		m_scrollbar.ShowWindow(SW_SHOW);
-		vis_changed = true;
-	}
-	else if (!need_v && m_scrollbar.IsWindowVisible())
-	{
-		m_scrollbar.ShowWindow(SW_HIDE);
-		vis_changed = true;
-	}
+	//20260712 by claude. ShowWindow 를 IsWindowVisible() 로 가드하지 않는다 — OnInitDialog 안(부모 dialog SW_SHOW 전)에서는
+	//IsWindowVisible() 이 부모 chain 때문에 false 라, need_v 가 true→false 로 바뀔 때 hide 분기(!need_v && IsWindowVisible())가
+	//스킵돼 자식 바의 WS_VISIBLE 비트가 켜진 채 남는다 → dialog 가 보이는 순간 스크롤바가 그대로 표시되는 버그(로컬 트리는 init
+	//중에만 sync 되고 이후 sync 가 없어 stuck, 원격은 connect 후 sync 라 정상). ShowWindow 는 같은 상태면 no-op 이라 무조건 호출이
+	//정석(리스트 CSCListCtrl::sync_scrollbar 와 동일 방식). Invalidate 는 old 상태와 비교해 실제 변화 시에만.
+	m_scrollbar.ShowWindow(need_v ? SW_SHOW : SW_HIDE);
+	bool vis_changed = (need_v != old_v);
 
 	if (::IsWindow(m_scrollbar_h.m_hWnd))
 	{
-		if (need_h && !m_scrollbar_h.IsWindowVisible())
-		{
-			m_scrollbar_h.ShowWindow(SW_SHOW);
-			//dialog child 이므로 형제(tree) 위로 올려야 NC 띠에서 보인다.
+		m_scrollbar_h.ShowWindow(need_h ? SW_SHOW : SW_HIDE);
+		//dialog child 이므로 형제(tree) 위로 올려야 NC 띠에서 보인다.
+		if (need_h)
 			m_scrollbar_h.SetWindowPos(&CWnd::wndTop, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+		if (need_h != old_h)
 			vis_changed = true;
-		}
-		else if (!need_h && m_scrollbar_h.IsWindowVisible())
-		{
-			m_scrollbar_h.ShowWindow(SW_HIDE);
-			vis_changed = true;
-		}
 	}
 
 	if (vis_changed)

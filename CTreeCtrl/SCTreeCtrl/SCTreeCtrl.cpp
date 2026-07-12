@@ -743,7 +743,13 @@ void CSCTreeCtrl::OnPaint()
 BOOL CSCTreeCtrl::OnTvnSelchanging(NMHDR* pNMHDR, LRESULT* pResult)
 {
 	LPNMTREEVIEW pNMTreeView = reinterpret_cast<LPNMTREEVIEW>(pNMHDR);
-	// TODO: 여기에 컨트롤 알림 처리기 코드를 추가합니다.
+	//20260712 by claude. select-on-up 모드의 down 동안(m_defer_select)엔 base OnLButtonDown 의 자동 선택을 취소한다
+	//(*pResult=TRUE = 선택 변경 거부). 실제 선택은 OnLButtonUp 이 SelectItem 으로 수행한다.
+	if (m_defer_select)
+	{
+		*pResult = TRUE;
+		return TRUE;
+	}
 	*pResult = 0;
 	return FALSE;
 }
@@ -751,7 +757,8 @@ BOOL CSCTreeCtrl::OnTvnSelchanging(NMHDR* pNMHDR, LRESULT* pResult)
 BOOL CSCTreeCtrl::OnTvnSelchanged(NMHDR* pNMHDR, LRESULT* pResult)
 {
 	LPNMTREEVIEW pNMTreeView = reinterpret_cast<LPNMTREEVIEW>(pNMHDR);
-	// TODO: 여기에 컨트롤 알림 처리기 코드를 추가합니다.
+	//20260712 by claude. 선택이 실제로 바뀐 시각 기록 — 재클릭 이름변경(select-on-up)의 시간창 판정에 사용.
+	m_select_tick = ::GetTickCount();
 	*pResult = 0;
 	return FALSE;
 }
@@ -1975,7 +1982,11 @@ BOOL CSCTreeCtrl::OnTvnBegindrag(NMHDR* pNMHDR, LRESULT* pResult)
 	//drag 이미지만 표시되므로 focus를 주고 drag하고 있는 아이템을 선택상태로 표시해줘야 한다.
 	//"선택 영역 항상 표시" 속성 또한 true여야 한다.
 	::SetFocus(m_hWnd);
-	SetItemState(m_DragItem, TVIS_SELECTED, TVIF_STATE);
+	//20260712 by claude. select-on-up 모드에선 드래그 시작 시 드래그 항목을 선택하지 않는다 — 기존 선택(트리 하이라이트 + 리스트)이
+	//그대로 유지되어야 하기 때문(사용자 요구). 드래그 표시는 드래그 이미지(m_drag_shape)로만. 또 up 의 지연 선택 후보도 취소.
+	m_click_pending_select = NULL;
+	if (!m_select_on_button_up)
+		SetItemState(m_DragItem, TVIS_SELECTED, TVIF_STATE);
 
 	bool sub_folder_exist = (m_is_shell_treectrl ? has_sub_folders(path) : false);
 	CSCGdiplusBitmap drag_img(64, 64, Gdiplus::Color(128, 255, 0, 0), PixelFormat32bppARGB);
@@ -2754,27 +2765,72 @@ void CSCTreeCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 
 	if (hItem)
 	{
-		SelectItem(hItem);
-		SetFocus();
-
-		//20260710 by claude. 탐색기식 지연 이름변경(정석): *이미 선택돼 있던* 항목의 레이블을 (포커스 보유 상태에서) 다시 클릭하면
-		//시스템 더블클릭 시간만큼 기다렸다가 편집 진입한다. 그 사이 WM_LBUTTONDBLCLK 가 오면(=빠른 더블클릭) OnLButtonDblClk 이
-		//타이머를 취소하고 base 가 폴더를 확장한다. → 느린 재클릭=이름변경, 빠른 더블클릭=확장 으로 정확히 갈린다.
-		//첫 클릭(미선택 항목 선택)은 prev_sel 이 달라 무장하지 않으므로, 단순 선택만으로 편집이 뜨지 않는다.
-		if (hItem == prev_sel && had_focus)
+		if (m_select_on_button_up)
 		{
-			CRect r;
-			GetItemRect(hItem, r, TRUE);
-			r.OffsetRect(-get_over_shift(), 0);
-			if (r.PtInRect(point))
+			//20260712 by claude. 탐색기식: DOWN 에선 선택/브라우징하지 않는다(드래그하려고 클릭한 폴더가 브라우징되지 않고 기존
+			//선택 유지). base OnLButtonDown 의 자동 선택은 m_defer_select 로 OnTvnSelchanging 이 거부. 실제 선택·이름변경 판정은
+			//OnLButtonUp(드래그가 아닐 때)에서. 드래그 소스는 OnTvnBegindrag 이 클릭 지점 항목으로 독립적으로 잡으므로 안전.
+			m_click_pending_select = hItem;
+			m_down_prev_sel = prev_sel;
+			m_down_had_focus = had_focus;
+			m_down_point = point;
+			SetFocus();
+			m_defer_select = true;
+			logWrite(_T("[sou] DOWN pending=%p prev_sel=%p"), (void*)hItem, (void*)prev_sel);	//20260712 by claude. [diag temp]
+		}
+		else
+		{
+			SelectItem(hItem);
+			SetFocus();
+
+			//20260710 by claude. 탐색기식 지연 이름변경(정석): *이미 선택돼 있던* 항목의 레이블을 (포커스 보유 상태에서) 다시 클릭하면
+			//시스템 더블클릭 시간만큼 기다렸다가 편집 진입한다. 그 사이 WM_LBUTTONDBLCLK 가 오면(=빠른 더블클릭) OnLButtonDblClk 이
+			//타이머를 취소하고 base 가 폴더를 확장한다. → 느린 재클릭=이름변경, 빠른 더블클릭=확장 으로 정확히 갈린다.
+			//첫 클릭(미선택 항목 선택)은 prev_sel 이 달라 무장하지 않으므로, 단순 선택만으로 편집이 뜨지 않는다.
+			if (hItem == prev_sel && had_focus)
 			{
-				m_pending_edit_item = hItem;
-				SetTimer(timer_edit_label, GetDoubleClickTime(), NULL);
+				CRect r;
+				GetItemRect(hItem, r, TRUE);
+				r.OffsetRect(-get_over_shift(), 0);
+				if (r.PtInRect(point))
+				{
+					m_pending_edit_item = hItem;
+					SetTimer(timer_edit_label, GetDoubleClickTime(), NULL);
+				}
 			}
 		}
 	}
 
 	CTreeCtrl::OnLButtonDown(nFlags, point);
+
+	//20260712 by claude. base OnLButtonDown 은 클릭/드래그 판정을 위해 내부 모달 루프를 돌며 이 down 의 button-up 을 소비한다
+	//(로그로 확인: OnLButtonUp 이 클릭 시 호출되지 않음). 따라서 select-on-up 선택은 base 가 리턴한 이 시점(=클릭이 끝난 시점)에
+	//수행한다. 드래그였다면 그 사이 OnTvnBegindrag 이 m_click_pending_select 를 NULL 로 비워 여기서 선택하지 않는다.
+	m_defer_select = false;
+	if (m_select_on_button_up && m_click_pending_select)
+	{
+		HTREEITEM cand = m_click_pending_select;
+		m_click_pending_select = NULL;
+
+		//20260712 by claude. 선택 변경 후 2초 이내의 재클릭만 이름변경으로 본다(그 이후엔 오래된 선택이므로 이름변경 안 함 — 사용자 요구).
+		if (cand == m_down_prev_sel && m_down_had_focus && (::GetTickCount() - m_select_tick <= 2000))
+		{
+			//이미 선택돼 있던 항목의 레이블 재클릭 → 지연 이름변경(브라우징 없음). down 좌표로 레이블 판정.
+			CRect r;
+			GetItemRect(cand, r, TRUE);
+			r.OffsetRect(-get_over_shift(), 0);
+			if (r.PtInRect(m_down_point))
+			{
+				m_pending_edit_item = cand;
+				SetTimer(timer_edit_label, GetDoubleClickTime(), NULL);
+			}
+		}
+		else
+		{
+			SelectItem(cand);	//선택 + 브라우징(TVN_SELCHANGED)
+			SetFocus();
+		}
+	}
 }
 
 //20260710 by claude. 빠른 더블클릭 — 직전 down 이 무장한 지연 이름변경 타이머를 취소하고 base 기본동작(폴더 확장 등)이 우선하게 한다.
@@ -2791,6 +2847,7 @@ void CSCTreeCtrl::OnLButtonDblClk(UINT nFlags, CPoint point)
 
 void CSCTreeCtrl::OnLButtonUp(UINT nFlags, CPoint point)
 {
+	logWrite(_T("[sou] UP entry dragging=%d sou=%d pending=%p"), (int)m_bDragging, (int)m_select_on_button_up, (void*)m_click_pending_select);	//20260712 by claude. [diag temp]
 	if (m_bDragging)
 	{
 		TRACE(_T("OnLButtonUp\n"));
@@ -2831,6 +2888,8 @@ void CSCTreeCtrl::OnLButtonUp(UINT nFlags, CPoint point)
 	}
 	else
 	{
+		//select-on-up 의 실제 선택은 OnLButtonDown 의 base 리턴 직후에 수행한다(base 가 클릭의 up 을 모달 루프에서 소비해
+		//이 핸들러가 클릭 시엔 호출되지 않기 때문). 여기 else 는 드래그가 아닌 up — 할 일 없음.
 		return;
 	}
 

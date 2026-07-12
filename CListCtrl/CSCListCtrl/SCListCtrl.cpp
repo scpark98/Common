@@ -7307,8 +7307,7 @@ void CSCListCtrl::OnNcPaint()
 	//아래 CListCtrl::OnNcPaint();를 호출하지 않으면 스크롤바 등의 일부 영역이 제대로 그려지지 않게 되므로 반드시 기본 핸들러 호출 필요.
 	CListCtrl::OnNcPaint();
 
-	//20260712 by claude. [진단] 리사이즈 중 세로바 찢김 원인 측정 — NC paint 발화 시점·세로/가로바 가시 상태.
-	//원인 확정·수정 완료로 주석 처리(§2J). 재조사 시 해제.
+	//20260712 by claude. [진단] 리사이즈 중 세로바 찢김 원인 측정 — NC paint 발화 시점·세로/가로바 가시 상태. 재조사 시 해제(§2J).
 	//logWrite(_T("[vbar-ncpaint] tick=%u setup=%d v_visible=%d h_visible=%d"),
 	//	::GetTickCount(), (int)m_scrollbar_setup, (int)m_v_visible_state, (int)m_h_visible_state);
 
@@ -7510,10 +7509,35 @@ void CSCListCtrl::end_bulk_insert()
 	Invalidate();
 }
 
+bool CSCListCtrl::s_in_live_resize = false;	//20260712 by claude. 리사이즈 드래그 중 바 조작 스킵 플래그(모든 인스턴스 공유).
+
 void CSCListCtrl::sync_scrollbar()
 {
 	if (!m_scrollbar_setup || !::IsWindow(m_scrollbar.m_hWnd))
 		return;
+
+	//20260712 by claude. 리사이즈 드래그 중: 오버레이 바 window 조작(MoveWindow/SetWindowPos — 형제 clip 재계산으로 매우
+	//비쌈)을 전부 건너뛴다. 단 NC 예약(우측/하단 gw 띠)을 유지하면 그 띠에 native scrollbar 잔상이 리사이즈마다 찢겨
+	//보이므로, 예약을 *1회* 해제(framechange)해 content 를 풀폭으로 쓰고 바를 숨긴다. release 시 app 이 sync 로 정확히 복원.
+	//(framechange 는 상태가 true→false 로 바뀌는 첫 sync 에서만 — 이후엔 state 가 false 라 재발사 안 됨.)
+	if (s_in_live_resize && m_hide_when_resize)
+	{
+		bool was_reserved = (m_v_visible_state || m_h_visible_state);
+		m_v_visible_state = false;
+		m_h_visible_state = false;
+		m_scrollbar.ShowWindow(SW_HIDE);
+		if (::IsWindow(m_scrollbar_h.m_hWnd))
+			m_scrollbar_h.ShowWindow(SW_HIDE);
+		if (was_reserved && !m_syncing)
+		{
+			m_syncing = true;
+			SetWindowPos(NULL, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
+			m_syncing = false;
+			Invalidate(FALSE);
+		}
+		return;
+	}
+
 
 	//20260706 by claude. [진단 폭주 §5-2] sync_scrollbar 가 어떤 메시지 처리 중 호출되는지 특정 완료(WM_HSCROLL 0x0114
 	//148회 / WM_NOTIFY 0x004E 144회 = native hwheel→WM_HSCROLL smooth-scroll 스텝). 폭주라 상시 노이즈 → 주석 처리.
@@ -7566,6 +7590,7 @@ void CSCListCtrl::sync_scrollbar()
 		need_h = nh;
 	}
 
+
 	//need_v / need_h 상태가 바뀌면 framechange 로 우측/하단 NC 재적용. 두 플래그는 OnNcCalcSize 가 읽으므로
 	//framechange *전* 에 갱신. 창 크기 불변 → 리사이즈 헬퍼 충돌·렌더 깨짐 없음.
 	bool old_v = m_v_visible_state;
@@ -7590,6 +7615,7 @@ void CSCListCtrl::sync_scrollbar()
 			pParent->InvalidateRect(&rWin, TRUE);
 		}
 	}
+
 
 	//최종 content 영역 기준 — NC 가 이미 우측/하단 gw 를 뺐으므로 rc 가 곧 가시 영역.
 	//가로 폭 단일 출처(회귀 방지): content_view_w = rc.Width(). need_h 판정·가로바 길이·max scroll·page·range 가 모두 사용.
@@ -7635,6 +7661,7 @@ void CSCListCtrl::sync_scrollbar()
 			SetItemCountEx(real + pad, LVSICF_NOSCROLL);
 	}
 
+
 	//세로 scrollbar — 우측 NC 띠(parent child). [rc.right, rc.right+gw] × content 높이를 parent 좌표로 배치.
 	if (::IsWindow(m_scrollbar.m_hWnd))
 	{
@@ -7671,6 +7698,7 @@ void CSCListCtrl::sync_scrollbar()
 			m_scrollbar_h.MoveWindow(rTargetH);
 	}
 
+
 	//20260706 by claude. [smooth §5-1] m_scroll_y 는 오버플로 유무와 무관하게 항상 클램프한다.
 	//항목 많은 폴더에서 스크롤(m_scroll_y 큰 값) 후 항목 적은(오버플로 없는) 폴더로 이동하면 need_v=false 라
 	//아래 else-if(smooth) 클램프가 스킵된다. 잔류한 큰 m_scroll_y 로 OnPaint 의 first=m_scroll_y/rowH 가 total 을
@@ -7702,7 +7730,9 @@ void CSCListCtrl::sync_scrollbar()
 		m_scrollbar.set_page(area_h);
 		m_scrollbar.set_pos(m_scroll_y);
 		m_scrollbar.ShowWindow(SW_SHOW);
-		m_scrollbar.SetWindowPos(&CWnd::wndTop, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+		//20260712 by claude. [perf] z-order 는 show 전환(old_v false)에만 1회 — 매 sync SetWindowPos(wndTop)는 dialog WS_CLIPCHILDREN 형제 clip 재계산이라 resize 병목.
+		if (!old_v)
+			m_scrollbar.SetWindowPos(&CWnd::wndTop, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
 	}
 	else
 	{
@@ -7720,8 +7750,9 @@ void CSCListCtrl::sync_scrollbar()
 		m_scrollbar.set_page(page);
 		m_scrollbar.set_pos(thumb_pos);
 		m_scrollbar.ShowWindow(SW_SHOW);
-		//parent dialog 의 child 라 형제인 listctrl 위로 z-order 올려야 보인다.
-		m_scrollbar.SetWindowPos(&CWnd::wndTop, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+		//parent dialog 의 child 라 형제인 listctrl 위로 z-order 올려야 보인다. [perf] show 전환에만 1회(위 smooth 분기와 동일 이유).
+		if (!old_v)
+			m_scrollbar.SetWindowPos(&CWnd::wndTop, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
 	}
 
 	//20260706 by claude. [진단 hsync §5-2] 가로 sync 진입값 측정 — sync 마다 폭주라 주석 처리(필요시 해제).
@@ -7748,13 +7779,13 @@ void CSCListCtrl::sync_scrollbar()
 		//logWrite(_T("[hsync] set thumb: max_h=%d range=[0,%d] page=%d pos=%d"),
 		//	max_h, total_h_range - 1, content_view_w, m_h_scroll_pos);
 		m_scrollbar_h.ShowWindow(SW_SHOW);
-		//parent dialog 의 child 라 형제인 listctrl 위로 z-order 올려야 보인다.
-		m_scrollbar_h.SetWindowPos(&CWnd::wndTop, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+		//parent dialog 의 child 라 형제인 listctrl 위로 z-order 올려야 보인다. [perf] show 전환에만 1회.
+		if (!old_h)
+			m_scrollbar_h.SetWindowPos(&CWnd::wndTop, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
 		//drag-during 에는 listview 의 paint cycle 이 멈춰 있어 자식 ShowWindow(SW_SHOW) 가 invalidate
 		//만 마크하고 즉시 그려지지 않는다 (release 후에야 보이는 현상). 즉시 paint 강제.
 		m_scrollbar_h.RedrawWindow(NULL, NULL, RDW_INVALIDATE | RDW_UPDATENOW);
 	}
-
 }
 
 LRESULT CSCListCtrl::on_message_CSCScrollbar(WPARAM wParam, LPARAM lParam)

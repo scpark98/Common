@@ -567,7 +567,7 @@ public:
 		cr_header_text				= src.cr_header_text;
 		cr_header_back				= src.cr_header_back;
 		cr_percentage_bar			= src.cr_percentage_bar;
-		cr_progress					= src.cr_progress;
+		cr_progress_active					= src.cr_progress_active;
 
 		cr_success					= src.cr_success;
 		cr_info						= src.cr_info;
@@ -639,7 +639,7 @@ public:
 	Gdiplus::Color	cr_header_text;
 	Gdiplus::Color	cr_header_back;
 	std::deque<Gdiplus::Color> cr_percentage_bar;	//percentage bar graph color
-	Gdiplus::Color	cr_progress;					//progress bar
+	Gdiplus::Color	cr_progress_active;					//progress bar
 	//Gdiplus::Color	cr_progress_text;				//progress text
 
 	//로그, 상태등의 텍스트	표시용 컬러. 컬러 테마마다 약간씩 다를 수 있으므로

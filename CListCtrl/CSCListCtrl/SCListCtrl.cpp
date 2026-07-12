@@ -540,7 +540,7 @@ void CSCListCtrl::draw_row(CDC* pDC, int iItem, const CRect& row_bounds)
 			Clamp(d, 0.0, 1.0);
 
 			r.right = r.left + (double)(r.Width()) * d;
-			pDC->FillSolidRect(r, m_theme.cr_progress.ToCOLORREF());
+			pDC->FillSolidRect(r, m_theme.cr_progress_active.ToCOLORREF());
 
 			//20231102 CSCSliderCtrl에서와 동일하게 progress 경과 위치에 따라 왼쪽과 오른쪽을 각각 다른 색으로 표현하고자
 			//아래 코드를 사용했으나 텍스트가 전혀 출력되지 않는다.
@@ -563,7 +563,8 @@ void CSCListCtrl::draw_row(CDC* pDC, int iItem, const CRect& row_bounds)
 					else
 						//pDC->SetTextColor(m_theme.cr_progress_text.ToCOLORREF());
 						pDC->SetTextColor(crText.ToCOLORREF());
-					//20260708 by claude. progress 텍스트를 채워진(바 위) 영역은 cr_back, 나머지는 cr_progress 로 두 번 그려 경계에서 색이 바뀌게 한다.
+
+					//20260708 by claude. progress 텍스트를 채워진(바 위) 영역은 cr_back, 나머지는 cr_progress_active 로 두 번 그려 경계에서 색이 바뀌게 한다.
 					//예전엔 SelectClipRgn+LPtoDP 를 썼으나 smooth OnPaint 의 MemoryDC 좌표계에서 LPtoDP 가 어긋나 텍스트가 잘리고("50%"→"5C"),
 					//마지막 SelectClipRgn(NULL) 이 smooth 의 항목영역 클립(rc)까지 지워 다음 행이 클립 없이 그려지는 번짐/붉은칸 아티팩트가 났다.
 					//SaveDC+IntersectClipRect+RestoreDC 는 논리좌표로 동작(LPtoDP 불필요)하고 현재 클립 상태를 보존·복원해 native/smooth 둘 다 안전.
@@ -584,7 +585,7 @@ void CSCListCtrl::draw_row(CDC* pDC, int iItem, const CRect& row_bounds)
 					saved = pDC->SaveDC();
 					pDC->IntersectClipRect(&rcRight);
 					pDC->SetBkMode(TRANSPARENT);
-					pDC->SetTextColor(m_theme.cr_progress.ToCOLORREF());
+					pDC->SetTextColor(m_theme.cr_progress_active.ToCOLORREF());
 					pDC->DrawText(text, itemRect, DT_VCENTER | DT_CENTER | DT_SINGLELINE | DT_NOCLIP | DT_NOPREFIX);
 					pDC->RestoreDC(saved);
 				}
@@ -2764,7 +2765,7 @@ CFont* CSCListCtrl::get_styled_font(int weight, bool italic, bool underline, boo
 
 void CSCListCtrl::set_progress_color(Gdiplus::Color crProgress)
 {
-	m_theme.cr_progress = crProgress;
+	m_theme.cr_progress_active = crProgress;
 	Invalidate();
 }
 

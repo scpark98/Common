@@ -527,7 +527,7 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 			Clamp(d, 0.0, 1.0);
 
 			r.right = r.left + (double)(r.Width()) * d;
-			pDC->FillSolidRect(r, m_theme.cr_progress.ToCOLORREF());
+			pDC->FillSolidRect(r, m_theme.cr_progress_active.ToCOLORREF());
 
 			//20231102 CSCSliderCtrl에서와 동일하게 progress 경과 위치에 따라 왼쪽과 오른쪽을 각각 다른 색으로 표현하고자
 			//아래 코드를 사용했으나 텍스트가 전혀 출력되지 않는다.
@@ -571,7 +571,7 @@ void CVtListCtrlEx::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 					pDC->SelectClipRgn(&rgnLeft);
 					pDC->DrawText(text, itemRect, DT_VCENTER | DT_CENTER | DT_SINGLELINE | DT_NOCLIP | DT_NOPREFIX);
 
-					pDC->SetTextColor(m_theme.cr_progress.ToCOLORREF());
+					pDC->SetTextColor(m_theme.cr_progress_active.ToCOLORREF());
 					pDC->SelectClipRgn(&rgnRight);
 					pDC->DrawText(text, itemRect, DT_VCENTER | DT_CENTER | DT_SINGLELINE | DT_NOCLIP | DT_NOPREFIX);
 					rgnLeft.DeleteObject();
@@ -2591,7 +2591,7 @@ CFont* CVtListCtrlEx::get_styled_font(int weight, bool italic, bool underline, b
 
 void CVtListCtrlEx::set_progress_color(Gdiplus::Color crProgress)
 {
-	m_theme.cr_progress = crProgress;
+	m_theme.cr_progress_active = crProgress;
 	Invalidate();
 }
 

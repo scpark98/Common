@@ -1346,7 +1346,7 @@ void CSCColorTheme::set_theme_from_editor_palette(Gdiplus::Color bg, Gdiplus::Co
 
 	cr_percentage_bar.clear();
 	cr_percentage_bar.push_back(get_weak_color(bg, 32));
-	cr_progress		= sel_bg;
+	cr_progress_active		= sel_bg;
 }
 
 void CSCColorTheme::set_theme_level(float level)
@@ -1396,7 +1396,7 @@ void CSCColorTheme::apply_theme_level(float level)
 
 	cr_header_back				= get_leveled_color(cr_header_back, level);
 
-	cr_progress					= get_leveled_color(cr_progress, level);
+	cr_progress_active					= get_leveled_color(cr_progress_active, level);
 	for (auto& c : cr_percentage_bar)
 		c = get_leveled_color(c, level);
 }
@@ -1460,10 +1460,10 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_header_back = gRGB(247, 247, 247);             //#f7f7f7
 			cr_percentage_bar.clear();
 			cr_percentage_bar.push_back(get_color(cr_back, 32));
-			cr_progress = gRGB(253, 126, 20);                 //#FD7E14 — BI logo orange (accent)
+			cr_progress_active = gRGB(253, 126, 20);                 //#FD7E14 — BI logo orange (accent)
 
 			//focus border 는 다른 brand theme 과 동일하게 primary chrome 색 사용. orange accent 를 border 에 쓰면
-			//navy chrome + orange border 가 시각적으로 충돌. orange 는 cr_progress 등 강조 액션에만 한정.
+			//navy chrome + orange border 가 시각적으로 충돌. orange 는 cr_progress_active 등 강조 액션에만 한정.
 			cr_border_active = cr_title_back_active;          //#222E3D — primary navy
 			cr_border_inactive = gRGB(210, 210, 210);         //#d2d2d2 — admin 보더
 			cr_button_back = cr_title_back_inactive;
@@ -1524,7 +1524,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 
 			cr_percentage_bar.clear();
 			cr_percentage_bar.push_back(get_color(cr_back, 32));
-			cr_progress = cr_back_selected;                   //#5BA2D9 — 시그니처 블루
+			cr_progress_active = cr_back_selected;                   //#5BA2D9 — 시그니처 블루
 
 			cr_border_active = cr_back_selected;              //focus border 도 동일 블루
 			cr_border_inactive = get_weak_color(cr_back, 64);
@@ -1576,7 +1576,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 
 			cr_percentage_bar.clear();
 			cr_percentage_bar.push_back(get_color(cr_back, -16));
-			cr_progress = cr_back_selected;                   //#B45309 — rust orange
+			cr_progress_active = cr_back_selected;                   //#B45309 — rust orange
 
 			cr_border_active = cr_back_selected;              //focus border = rust orange
 			cr_border_inactive = gRGB(232, 226, 214);         //#E8E2D6 — 일반 보더 (deep cream)
@@ -1625,7 +1625,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 
 			cr_percentage_bar.clear();
 			cr_percentage_bar.push_back(get_color(cr_back, -16));
-			cr_progress = cr_back_selected;
+			cr_progress_active = cr_back_selected;
 
 			cr_border_active = cr_back_selected;
 			cr_border_inactive = gRGB(229, 231, 235);
@@ -1667,7 +1667,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 
 			cr_percentage_bar.clear();
 			cr_percentage_bar.push_back(get_color(cr_back, 32));
-			cr_progress = cr_back_selected;
+			cr_progress_active = cr_back_selected;
 
 			cr_border_active = cr_back_selected;
 			cr_border_inactive = get_weak_color(cr_back, 64);
@@ -1709,7 +1709,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 
 			cr_percentage_bar.clear();
 			cr_percentage_bar.push_back(get_color(cr_back, 32));
-			cr_progress = cr_back_selected;
+			cr_progress_active = cr_back_selected;
 
 			cr_border_active = cr_back_selected;
 			cr_border_inactive = get_weak_color(cr_back, 64);
@@ -1750,7 +1750,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 
 			cr_percentage_bar.clear();
 			cr_percentage_bar.push_back(get_color(cr_back, -16));
-			cr_progress = cr_back_selected;
+			cr_progress_active = cr_back_selected;
 
 			cr_border_active = cr_back_selected;
 			cr_border_inactive = gRGB(229, 231, 235);
@@ -1791,7 +1791,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 
 			cr_percentage_bar.clear();
 			cr_percentage_bar.push_back(get_color(cr_back, 32));
-			cr_progress = cr_back_selected;
+			cr_progress_active = cr_back_selected;
 
 			cr_border_active = cr_back_selected;
 			cr_border_inactive = get_weak_color(cr_back, 64);
@@ -1833,7 +1833,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 
 			cr_percentage_bar.clear();
 			cr_percentage_bar.push_back(get_color(cr_back, -16));
-			cr_progress = cr_back_selected;
+			cr_progress_active = cr_back_selected;
 
 			cr_border_active = cr_back_selected;
 			cr_border_inactive = gRGB(232, 226, 214);
@@ -1874,7 +1874,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 
 			cr_percentage_bar.clear();
 			cr_percentage_bar.push_back(get_color(cr_back, 32));
-			cr_progress = cr_back_selected;
+			cr_progress_active = cr_back_selected;
 
 			cr_border_active = cr_back_selected;
 			cr_border_inactive = get_weak_color(cr_back, 64);
@@ -1915,7 +1915,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 
 			cr_percentage_bar.clear();
 			cr_percentage_bar.push_back(get_color(cr_back, -16));
-			cr_progress = cr_back_selected;
+			cr_progress_active = cr_back_selected;
 
 			cr_border_active = cr_back_selected;
 			cr_border_inactive = gRGB(229, 231, 235);
@@ -1956,7 +1956,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 
 			cr_percentage_bar.clear();
 			cr_percentage_bar.push_back(get_color(cr_back, 32));
-			cr_progress = cr_back_selected;
+			cr_progress_active = cr_back_selected;
 
 			cr_border_active = cr_back_selected;
 			cr_border_inactive = get_weak_color(cr_back, 64);
@@ -1997,7 +1997,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 
 			cr_percentage_bar.clear();
 			cr_percentage_bar.push_back(get_color(cr_back, -16));
-			cr_progress = cr_back_selected;
+			cr_progress_active = cr_back_selected;
 
 			cr_border_active = cr_back_selected;
 			cr_border_inactive = gRGB(229, 231, 235);
@@ -2041,7 +2041,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_header_back = get_color(cr_back, -16);
 			cr_percentage_bar.clear();
 			cr_percentage_bar.push_back(get_color(cr_back, 32));
-			cr_progress = gRGB(0, 69, 255);                   //#0045FF — BI 홈페이지 strong blue (accent)
+			cr_progress_active = gRGB(0, 69, 255);                   //#0045FF — BI 홈페이지 strong blue (accent)
 
 			cr_border_active = cr_title_back_active;          //logo orange (CornflowerBlue 폐기)
 			cr_border_inactive = Gdiplus::Color::LightGray;
@@ -2088,7 +2088,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 
 			cr_percentage_bar.clear();
 			cr_percentage_bar.push_back(get_color(cr_back, 32));
-			cr_progress = gRGB(20, 90, 255);                  //#145AFF — BI 홈페이지 strong blue
+			cr_progress_active = gRGB(20, 90, 255);                  //#145AFF — BI 홈페이지 strong blue
 
 			cr_border_active = cr_title_back_active;          //logo blue (CornflowerBlue 폐기)
 			cr_border_inactive = Gdiplus::Color::LightGray;
@@ -2136,7 +2136,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 
 			cr_percentage_bar.clear();
 			cr_percentage_bar.push_back(get_color(cr_back, 32));
-			cr_progress = cr_title_back_active;              //logo teal (RoyalBlue 폐기)
+			cr_progress_active = cr_title_back_active;              //logo teal (RoyalBlue 폐기)
 
 			cr_border_active = cr_title_back_active;         //logo teal (CornflowerBlue 폐기)
 			cr_border_inactive = gRGB(159, 159, 159);        //#9F9F9F — BI gray
@@ -2181,7 +2181,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 
 			cr_percentage_bar.clear();
 			cr_percentage_bar.push_back(get_color(cr_back, 32));
-			cr_progress = cr_title_back_active;               //logo orange (RoyalBlue 폐기)
+			cr_progress_active = cr_title_back_active;               //logo orange (RoyalBlue 폐기)
 
 			cr_border_active = cr_title_back_active;          //logo orange (CornflowerBlue 폐기)
 			cr_border_inactive = Gdiplus::Color::LightGray;
@@ -2221,7 +2221,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 
 			cr_percentage_bar.clear();
 			cr_percentage_bar.push_back(get_color(cr_back, 32));
-			cr_progress = get_color(cr_back, 96);
+			cr_progress_active = get_color(cr_back, 96);
 
 			cr_border_active		= get_weak_color(cr_back, 128);
 			cr_border_inactive		= get_weak_color(cr_back, 64);
@@ -2260,7 +2260,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 
 			cr_percentage_bar.clear();
 			cr_percentage_bar.push_back(get_color(cr_back, 32));
-			cr_progress = get_color(cr_back, 96);
+			cr_progress_active = get_color(cr_back, 96);
 
 			//dark 배경 위에 LightGray 는 거의 흰 띠로 보여 버튼 테두리가 부자연스러웠음.
 		//dark_gray 와 동일하게 cr_back 기준으로 가산해 어두운 톤 안에서 적절히 보이게 한다.
@@ -2328,7 +2328,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 
 			cr_percentage_bar.clear();
 			cr_percentage_bar.push_back(Gdiplus::Color::RoyalBlue);// gGRAY(192));
-			cr_progress = Gdiplus::Color::RoyalBlue;// Gdiplus::Color(255, 49, 108, 244);
+			cr_progress_active = Gdiplus::Color::RoyalBlue;// Gdiplus::Color(255, 49, 108, 244);
 
 			cr_selected_border = gRGB(153, 209, 255);
 			cr_selected_border_inactive = cr_back_selected_inactive;
@@ -2370,7 +2370,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 
 			cr_percentage_bar.clear();
 			cr_percentage_bar.push_back(gGRAY(192));
-			cr_progress = gGRAY(128);
+			cr_progress_active = gGRAY(128);
 
 			cr_selected_border = gRGB(153, 209, 255);
 			cr_selected_border_inactive = cr_back_selected_inactive;
@@ -2411,7 +2411,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 
 			cr_percentage_bar.clear();
 			cr_percentage_bar.push_back(gRGB(150, 110, 70));
-			cr_progress = gRGB(150, 110, 70);
+			cr_progress_active = gRGB(150, 110, 70);
 
 			cr_selected_border = gRGB(190, 160, 110);
 			cr_selected_border_inactive = cr_back_selected_inactive;
@@ -2537,7 +2537,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 
 			cr_percentage_bar.clear();
 			cr_percentage_bar.push_back(get_sys_color(COLOR_HIGHLIGHT));
-			cr_progress				= get_sys_color(COLOR_HIGHLIGHT);
+			cr_progress_active				= get_sys_color(COLOR_HIGHLIGHT);
 
 			cr_selected_border		= get_sys_color(COLOR_HIGHLIGHT);
 			cr_selected_border_inactive = get_sys_color(COLOR_BTNSHADOW);
@@ -2603,7 +2603,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 
 			cr_percentage_bar.clear();
 			cr_percentage_bar.push_back(Gdiplus::Color::RoyalBlue);// gGRAY(192));
-			cr_progress				= Gdiplus::Color::RoyalBlue;// Gdiplus::Color(255, 49, 108, 244);
+			cr_progress_active				= Gdiplus::Color::RoyalBlue;// Gdiplus::Color(255, 49, 108, 244);
 
 			cr_selected_border		= gRGB(153, 209, 255);
 			cr_selected_border_inactive	= cr_back_selected_inactive;

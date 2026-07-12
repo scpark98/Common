@@ -562,7 +562,7 @@ void CSCSliderCtrl::OnPaint()
 		CRgn rgn;
 		rgn.CreateRectRgnIndirect(rcLeft);
 		dc.SelectClipRgn(&rgn);
-		dc.SetTextColor(cr_text.ToCOLORREF());
+		dc.SetTextColor(cr_inactive.ToCOLORREF());
 
 		if ((m_text_style == text_style_dual_text))
 		{
@@ -2185,7 +2185,7 @@ int32_t CSCSliderCtrl::step(int step)
 	return GetPos();
 }
 
-//theme 의 accent(cr_progress)·배경에서 트랙/썸/틱 색을 파생. cr_progress 는 모든 테마에서 progress/선택 강조색
+//theme 의 accent(cr_progress_active)·배경에서 트랙/썸/틱 색을 파생. cr_progress_active 는 모든 테마에서 progress/선택 강조색
 //(default=RoyalBlue, windows=COLOR_HIGHLIGHT, 커스텀 테마=cr_back_selected)으로 설정돼 슬라이더 active 트랙·썸에
 //의미상 그대로 맞는다. 개별 setter(set_thumb_color 등) 로 일일이 지정하지 않아도 테마 교체만으로 채색되도록.
 void CSCSliderCtrl::apply_theme_colors()
@@ -2193,11 +2193,11 @@ void CSCSliderCtrl::apply_theme_colors()
 	Gdiplus::Color bg = m_theme.cr_back;
 	int lum_bg = (int)get_luminance(bg);
 
-	//active/thumb = 테마 accent(cr_progress). 단 에디터 import 테마는 cr_progress = 에디터 selection 색이라
+	//active/thumb = 테마 accent(cr_progress_active). 단 에디터 import 테마는 cr_progress_active = 에디터 selection 색이라
 	//배경과 명도 대비가 약한 경우가 많아(choco/navajo/ruby_blue 등) 트랙이 거의 안 보인다. 배경과 명도차가
 	//70 미만이면 배경 반대쪽(어두운 배경=흰, 밝은 배경=검)으로 부족분에 비례(0.25~0.6)해 섞어 가시성을 확보.
 	//이미 충분히 대비되는 curated 테마(windows~claude09 등)는 이 분기를 안 타므로 그대로 유지된다.
-	Gdiplus::Color accent = m_theme.cr_progress;
+	Gdiplus::Color accent = m_theme.cr_progress_active;
 	int diff = abs((int)get_luminance(accent) - lum_bg);
 	if (diff < 70)
 	{

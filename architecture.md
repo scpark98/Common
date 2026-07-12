@@ -70,7 +70,7 @@ Direct2D 아닌 GDI+ 기반 이미지. 독립 모듈.
 - 경계: `cr_border_active`, `cr_border_inactive`, `cr_selected_border(_inactive)`.
 - 편집: `cr_edit_text`, `cr_edit_back`.
 - 타이틀/시스템버튼: `cr_title_text`, `cr_title_back_active`, `cr_sys_buttons_hover_back`, `cr_sys_buttons_down_back`.
-- 헤더/프로그레스: `cr_header_text/back`, `cr_progress`, `cr_percentage_bar[]`.
+- 헤더/프로그레스: `cr_header_text/back`, `cr_progress_active`, `cr_percentage_bar[]`.
 - 상태: `cr_success`, `cr_info`, `cr_warning`, `cr_error`.
 
 **테마 enum `SC_COLOR_THEMES`**:

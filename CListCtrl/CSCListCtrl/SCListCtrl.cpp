@@ -3267,7 +3267,7 @@ void CSCListCtrl::delete_empty_lines()
 	}
 }
 
-void CSCListCtrl::delete_all_items(bool delete_file_list)
+void CSCListCtrl::delete_all_items(bool delete_file_list, bool sync)
 {
 	SetRedraw(FALSE);
 
@@ -3282,7 +3282,10 @@ void CSCListCtrl::delete_all_items(bool delete_file_list)
 	}
 
 	SetRedraw(TRUE);
-	sync_scrollbar();
+	//20260712 by claude. refill 이 뒤따르는 경로(sync=false)에선 여기서 sync 안 함 — total=0 sync 가 need_v 를 false 로 만들어
+	//바를 잠깐 숨겼다(+framechange 연쇄) 되살려 폴더 전환 시 세로바 잔상·가로바 썸 flicker 를 유발. 최종 표시(display_filelist)가 sync.
+	if (sync)
+		sync_scrollbar();
 }
 
 CString CSCListCtrl::get_text(int item, int subItem)
@@ -5013,7 +5016,8 @@ void CSCListCtrl::refresh_list(bool reload, bool force)
 	//UI의 list의 내용은 모두 clear하지만
 	//remote의 경우는 reload가 false이고 폴더/파일 목록이 채워진채로 이 함수안으로 들어오므로
 	//폴더/파일 목록까지 clear해선 안된다.
-	delete_all_items(reload);
+	//20260712 by claude. sync=false — clear 시점의 total=0 sync 생략(flicker 방지). 아래 display_filelist 가 채운 뒤 최종 sync.
+	delete_all_items(reload, false);
 
 	//local일 경우는 파일목록을 다시 읽어서 표시한다.
 	//sort할 경우 또는 remote일 경우는 변경된 m_cur_folders, m_cur_files를 새로 표시하면 된다.
@@ -7664,7 +7668,10 @@ void CSCListCtrl::sync_scrollbar()
 
 
 	//세로 scrollbar — 우측 NC 띠(parent child). [rc.right, rc.right+gw] × content 높이를 parent 좌표로 배치.
-	if (::IsWindow(m_scrollbar.m_hWnd))
+	//20260712 by claude. need_v 일 때만(=바가 보일 때만) 재배치한다. 폴더 전환 중 리스트가 비었다 채워지며 total 이 잠깐 0 이 되면
+	//need_v 가 순간 false→true 로 진동하는데, 무조건 재배치하면 false 구간에서 바를 "예약 없는 위치"(우측 gw 만큼 오른쪽)로 옮겼다가
+	//바로 숨겨 원위치 바 옆에 두 번째 바처럼 잔상이 번쩍인다. 숨길 바는 옮기지 않으면(위치 유지) 잔상이 사라진다.
+	if (need_v && ::IsWindow(m_scrollbar.m_hWnd))
 	{
 		CPoint strip_tl(rc.right, rc.top);
 		ClientToScreen(&strip_tl);
@@ -7678,11 +7685,19 @@ void CSCListCtrl::sync_scrollbar()
 			pParent->ScreenToClient(&rCurV);
 		}
 		if (rCurV != rTargetV)
+		{
 			m_scrollbar.MoveWindow(rTargetV);
+			//20260712 by claude. 바 이동 후 비운 옛 위치(rCurV) 잔상 제거 — parent 가 WS_CLIPCHILDREN + OnEraseBkgnd=FALSE 라 자동으로
+			//안 지워진다. 폴더 전환으로 세로바가 재배치될 때 옛 위치에 "두 번째 스크롤바" 잔상이 보이던 원인. 옛 rect 를 형제(리스트) 포함
+			//무효화해 다시 그려 지운다. 리사이즈 중엔 s_in_live_resize 로 sync 가 조기 반환해 이 코드에 도달 안 함 → 리사이즈 성능 무관.
+			if (CWnd* pParent = GetParent())
+				pParent->RedrawWindow(rCurV, NULL, RDW_INVALIDATE | RDW_ERASE | RDW_ALLCHILDREN);
+		}
 	}
 
 	//가로 scrollbar — 하단 NC 띠(parent child). [rc.left, rc.bottom] × (content 폭 × gw)를 parent 좌표로 배치.
-	if (::IsWindow(m_scrollbar_h.m_hWnd))
+	//20260712 by claude. need_h 일 때만 재배치 — 세로바와 동일 이유(숨길 바를 옮겨 생기는 잔상 방지, 위 세로바 주석 참조).
+	if (need_h && ::IsWindow(m_scrollbar_h.m_hWnd))
 	{
 		//rc.bottom 위에 remainder gap 이 있으므로 가로바는 그만큼 더 내려 window 바닥(gap 아래)에 놓는다.
 		CPoint band_tl(rc.left, rc.bottom + m_bottom_reserve);
@@ -7696,7 +7711,12 @@ void CSCListCtrl::sync_scrollbar()
 			pParent->ScreenToClient(&rCurH);
 		}
 		if (rCurH != rTargetH)
+		{
 			m_scrollbar_h.MoveWindow(rTargetH);
+			//20260712 by claude. 가로바 이동 후 옛 위치(rCurH) 잔상 제거 — 세로바와 동일 이유(위 참조).
+			if (CWnd* pParent = GetParent())
+				pParent->RedrawWindow(rCurH, NULL, RDW_INVALIDATE | RDW_ERASE | RDW_ALLCHILDREN);
+		}
 	}
 
 

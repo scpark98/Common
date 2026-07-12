@@ -421,7 +421,9 @@ public:
 
 	//라인 전체가 공백이면 해당 라인을 삭제한다.
 	void		delete_empty_lines();
-	void		delete_all_items(bool delete_file_list = true);
+	//sync=false 면 clear 후 sync_scrollbar 를 건너뛴다(폴더 전환처럼 곧바로 refill+최종 sync 가 뒤따르는 경로용 — clear 시점의
+	//total=0 sync 가 세로/가로바를 잠깐 숨겼다 되살려 flicker 를 유발하므로). standalone clear(=refill 없음)는 기본 sync=true 로 둔다.
+	void		delete_all_items(bool delete_file_list = true, bool sync = true);
 	void		DeleteAllItems() { delete_all_items(); }
 
 //텍스트 관련

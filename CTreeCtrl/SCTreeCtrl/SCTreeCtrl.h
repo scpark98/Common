@@ -510,8 +510,16 @@ protected:
 		timer_edit_label,					//20260710 by claude. 탐색기식 지연 이름변경 — 선택 항목 재클릭 후 더블클릭 시간만큼 대기(더블클릭 오면 취소).
 	};
 
-	int				m_drag_scroll_vx = 0;		//드래그 자동 스크롤 속도(가로, tick당 level, 부호=방향). 0=안 함.
-	int				m_drag_scroll_vy = 0;		//드래그 자동 스크롤 속도(세로).
+	//20260713 by claude. 거리 비례 가속을 소수 level 로 계산(가장자리 존 바깥쪽=아주 느림 ~0.15, 안쪽=최대).
+	//tick 당 정수 라인만 스크롤 가능하므로, 매 tick 소수 속도를 누적기(accum)에 더해 1.0 을 넘을 때만 그 정수만큼 스크롤한다
+	//→ level<1 이면 여러 tick 에 한 번씩 스크롤되어 '천천히' 표현(예전 정수 level 은 최소 1라인/tick 이라 시작부터 빨랐다).
+	float			m_drag_scroll_fx = 0.f;		//목표 속도(가로 level, 부호=방향)
+	float			m_drag_scroll_fy = 0.f;		//목표 속도(세로 level)
+	float			m_drag_scroll_ax = 0.f;		//가로 누적기
+	float			m_drag_scroll_ay = 0.f;		//세로 누적기
+	//20260713 by claude. 시간 램프 — 스크롤 에피소드 시작(존 진입) 시각. 시작 직후엔 아주 느리게, 유지할수록 최대속도로 가속(탐색기식).
+	//거리 레벨(가까울수록 빠름)에 시간 램프(막 시작=느림)를 곱해, "시작 속도가 너무 빠르다"를 해소. 존을 벗어나면 0 으로 리셋.
+	DWORD			m_drag_scroll_start_tick = 0;
 	CWnd*			m_drag_scroll_target = NULL;	//자동 스크롤을 실제로 보낼 트리/리스트(오버레이 스크롤바 위여도 이 컨트롤로 전송).
 	void			update_drag_auto_scroll(CPoint screen_pt);	//드래그 중 대상(m_pDropWnd) 가장자리 거리로 속도 산출 + 타이머 관리.
 	//20260704 by claude. 드래그 자동스크롤 실행: 가로는 m_h_scroll_pos 직접 px(+clamp+sync_scrollbar), 세로는 SB_LINE 라인 수.

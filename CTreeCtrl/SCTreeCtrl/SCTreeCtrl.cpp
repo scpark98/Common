@@ -8,6 +8,7 @@
 #include "../../MemoryDC.h"
 #include "../../SCGdiPlusBitmap.h"
 #include "Common/drag_scroll_message.h"		//20260707 by claude. 드래그 자동스크롤을 대상 타입 무관 메시지로 위임 — CVtListCtrlEx 하드 의존 제거(점진 이행용).
+#include "Common/CListCtrl/CSCListCtrl/SCListCtrl.h"	//20260713 by claude. 트리→리스트 드롭 시 대상 리스트의 smooth-aware hit_test 사용(native HitTest 는 스크롤 무시).
 
 #include <fstream>
 // CSCTreeCtrl
@@ -2501,7 +2502,16 @@ void CSCTreeCtrl::OnMouseMove(UINT nFlags, CPoint point)
 			}
 
 			// Get the item that is below cursor
-			m_nDropIndex = ((CListCtrl*)pDropWnd)->HitTest(point, &uFlags);
+			//20260713 by claude. native HitTest 는 smooth 스크롤(m_scroll_y)을 무시하고 클라이언트 Y 를 top(0번 행) 기준으로 매핑해,
+			//리스트가 스크롤돼 있으면 커서 밑과 다른 행을 짚어 드롭 하이라이트·드롭 대상이 어긋났다 → CSCListCtrl 은 smooth-aware hit_test 사용.
+			if (pDropWnd->IsKindOf(RUNTIME_CLASS(CSCListCtrl)))
+			{
+				int di = -1, ds = -1;
+				((CSCListCtrl*)pDropWnd)->hit_test(point, di, ds, true);
+				m_nDropIndex = di;
+			}
+			else
+				m_nDropIndex = ((CListCtrl*)pDropWnd)->HitTest(point, &uFlags);
 			TRACE(_T("nDropIndex in ListCtrl = %d\n"), m_nDropIndex);
 			// Highlight it (폴더인 경우에만 hilite시킨다. 폴더는 크기 컬럼이 empty임)
 			if (m_nDropIndex >= 0 && ((CListCtrl*)pDropWnd)->GetItemText(m_nDropIndex, 1) == _T(""))
@@ -2857,8 +2867,8 @@ void CSCTreeCtrl::OnLButtonUp(UINT nFlags, CPoint point)
 
 		//드래그 자동 스크롤 타이머 정지.
 		KillTimer(timer_drag_auto_scroll);
-		m_drag_scroll_vx = 0;
-		m_drag_scroll_vy = 0;
+		m_drag_scroll_fx = m_drag_scroll_fy = 0.f;
+		m_drag_scroll_ax = m_drag_scroll_ay = 0.f;
 
 		//20260705 by claude. 레이어드 드래그이미지 숨김(파괴 대신 재사용 — 다음 드래그의 set_image 가 갱신). CImageList 릭 경로 소멸.
 		m_drag_shape.ShowWindow(SW_HIDE);
@@ -2907,8 +2917,8 @@ void CSCTreeCtrl::cancel_drag()
 
 	KillTimer(timer_drag_auto_scroll);
 	KillTimer(timer_expand_for_drag_hover);
-	m_drag_scroll_vx = 0;
-	m_drag_scroll_vy = 0;
+	m_drag_scroll_fx = m_drag_scroll_fy = 0.f;
+	m_drag_scroll_ax = m_drag_scroll_ay = 0.f;
 
 	//20260705 by claude. 레이어드 드래그이미지 숨김(파괴 대신 재사용).
 	m_drag_shape.ShowWindow(SW_HIDE);
@@ -4750,36 +4760,54 @@ void CSCTreeCtrl::OnTimer(UINT_PTR nIDEvent)
 	}
 	else if (nIDEvent == timer_drag_auto_scroll)
 	{
-		if (!m_bDragging || m_drag_scroll_target == NULL || (m_drag_scroll_vx == 0 && m_drag_scroll_vy == 0))
+		if (!m_bDragging || m_drag_scroll_target == NULL || (m_drag_scroll_fx == 0.f && m_drag_scroll_fy == 0.f))
 		{
 			KillTimer(timer_drag_auto_scroll);
 		}
 		else
 		{
-			//m_pDropWnd 가 아니라 m_drag_scroll_target — 커서가 오버레이 스크롤바 위여도 실제 트리/리스트로 보낸다.
-			//20260707 by claude. 대상의 구체 타입(CVtListCtrlEx/CSCListCtrl/CSCTreeCtrl)을 몰라도 Message_DragScrollBy 로 위임한다.
-			//이들은 자체 오버레이 가로바(m_h_scroll_pos) 모델이라 raw Scroll() 로 밀면 바가 desync 되므로, 각자 handler 에서
-			//drag_scroll_by(m_h_scroll_pos + sync_scrollbar 동기)를 수행하고 1 을 반환한다. 미처리(일반 CListCtrl/CTreeCtrl)면 폴백.
-			//(레이어드 드래그 이미지라 화면 lock(DragShowNolock) 불필요.)
-			LRESULT handled = m_drag_scroll_target->SendMessage(Message_DragScrollBy,
-				(WPARAM)(m_drag_scroll_vx * 30), (LPARAM)m_drag_scroll_vy);	//가로 px, 세로 라인 수
+			//20260713 by claude. 소수 목표속도(level)에 '시간 램프'를 곱해 누적. 램프는 에피소드 시작 후 RAMP_MS 동안 RAMP_FLOOR→1.0 로
+			//선형 증가 → 스크롤이 막 시작될 땐 아주 느리고, 가장자리에 계속 머물수록 최대속도로 가속(탐색기식). "시작 속도가 너무 빠르다" 해소.
+			//누적기(<1 이면 여러 tick 에 한 번 스크롤)와 결합해, 시작 순간 실제 스크롤은 매우 드물게 일어난다.
+			const float RAMP_FLOOR = 0.12f;		//시작 순간 속도 비율(작을수록 시작이 느림)
+			const float RAMP_MS    = 700.0f;	//이 시간(ms) 유지하면 최대속도 도달
+			float ramp = (float)(GetTickCount() - m_drag_scroll_start_tick) / RAMP_MS;
+			if (ramp < RAMP_FLOOR) ramp = RAMP_FLOOR;
+			if (ramp > 1.0f)       ramp = 1.0f;
+			m_drag_scroll_ax += m_drag_scroll_fx * ramp;
+			m_drag_scroll_ay += m_drag_scroll_fy * ramp;
+			int step_x = (int)m_drag_scroll_ax;	//0 방향으로 절삭
+			int step_y = (int)m_drag_scroll_ay;
+			m_drag_scroll_ax -= step_x;
+			m_drag_scroll_ay -= step_y;
 
-			if (!handled)
+			if (step_x != 0 || step_y != 0)		//이번 tick 에 스크롤할 정수분이 없으면(아직 누적중) 건너뜀 — 타이머는 유지.
 			{
-				if (m_drag_scroll_target->IsKindOf(RUNTIME_CLASS(CListCtrl)))
+				//m_pDropWnd 가 아니라 m_drag_scroll_target — 커서가 오버레이 스크롤바 위여도 실제 트리/리스트로 보낸다.
+				//20260707 by claude. 대상의 구체 타입(CVtListCtrlEx/CSCListCtrl/CSCTreeCtrl)을 몰라도 Message_DragScrollBy 로 위임한다.
+				//이들은 자체 오버레이 가로바(m_h_scroll_pos) 모델이라 raw Scroll() 로 밀면 바가 desync 되므로, 각자 handler 에서
+				//drag_scroll_by(m_h_scroll_pos + sync_scrollbar 동기)를 수행하고 1 을 반환한다. 미처리(일반 CListCtrl/CTreeCtrl)면 폴백.
+				//(레이어드 드래그 이미지라 화면 lock(DragShowNolock) 불필요.)
+				LRESULT handled = m_drag_scroll_target->SendMessage(Message_DragScrollBy,
+					(WPARAM)(step_x * 30), (LPARAM)step_y);	//가로 px, 세로 라인 수
+
+				if (!handled)
 				{
-					//일반 CListCtrl(오버레이 바 없음)은 WM_*SCROLL SB_LINE 이 안 먹으므로 raw Scroll(픽셀).
-					CListCtrl* pl = (CListCtrl*)m_drag_scroll_target;
-					pl->Scroll(CSize(m_drag_scroll_vx * 30, m_drag_scroll_vy * 20));
-					pl->UpdateWindow();
-				}
-				else
-				{
-					//일반 CTreeCtrl 등 — SB_LINE 경로.
-					for (int i = 0; i < abs(m_drag_scroll_vy); i++)
-						m_drag_scroll_target->SendMessage(WM_VSCROLL, (m_drag_scroll_vy < 0) ? SB_LINEUP   : SB_LINEDOWN);
-					for (int i = 0; i < abs(m_drag_scroll_vx); i++)
-						m_drag_scroll_target->SendMessage(WM_HSCROLL, (m_drag_scroll_vx < 0) ? SB_LINELEFT : SB_LINERIGHT);
+					if (m_drag_scroll_target->IsKindOf(RUNTIME_CLASS(CListCtrl)))
+					{
+						//일반 CListCtrl(오버레이 바 없음)은 WM_*SCROLL SB_LINE 이 안 먹으므로 raw Scroll(픽셀).
+						CListCtrl* pl = (CListCtrl*)m_drag_scroll_target;
+						pl->Scroll(CSize(step_x * 30, step_y * 20));
+						pl->UpdateWindow();
+					}
+					else
+					{
+						//일반 CTreeCtrl 등 — SB_LINE 경로.
+						for (int i = 0; i < abs(step_y); i++)
+							m_drag_scroll_target->SendMessage(WM_VSCROLL, (step_y < 0) ? SB_LINEUP   : SB_LINEDOWN);
+						for (int i = 0; i < abs(step_x); i++)
+							m_drag_scroll_target->SendMessage(WM_HSCROLL, (step_x < 0) ? SB_LINELEFT : SB_LINERIGHT);
+					}
 				}
 			}
 		}
@@ -4788,16 +4816,38 @@ void CSCTreeCtrl::OnTimer(UINT_PTR nIDEvent)
 	CTreeCtrl::OnTimer(nIDEvent);
 }
 
+//20260713 by claude. 가장자리로부터의 거리 d(px)를 [min_level..max_level] 속도로 선형 매핑.
+//d = 가장자리로부터 거리(안쪽 양수, 넘어가면 음수). trigger 안쪽부터 스크롤 시작하고, accel_range 에 걸쳐 min→max 로 '완만하게' 가속.
+//20260713 by claude. 핵심: accel_range 를 trigger 보다 훨씬 크게(가장자리 너머까지) 주면, 존 안(0..trigger)에선 t 가 작아 아주 완만하고,
+//가장자리를 넘어(d 음수) 계속 다가갈수록 t 가 서서히 1 로 커져 최대속도에 이른다. 예전엔 accel_range=trigger 라 48px 안에서 min→max 를
+//다 소화하고 가장자리에서 바로 max 클램프 → "조금만 다가가도 확 빨라짐"(급격). 이제 가장자리 넘어까지 부드럽게 이어진다.
+static float drag_scroll_level(int d, int trigger, int accel_range, float min_level, float max_level)
+{
+	if (d >= trigger)
+		return 0.f;
+	//20260713 by claude. 오버슛 상한 — 가장자리를 MAX_OVERSHOOT 이상 벗어나면(=옆 컨트롤 몸통까지 확실히 이동) 0 을 반환해 이 타깃 스크롤을
+	//해제한다. 이러면 fx/fy=0 → 에피소드 종료 → 커서 밑 컨트롤로 타깃 전환. (그 전까지, 옆 컨트롤에 살짝~어느정도 걸쳐도 원래 걸 계속 스크롤.)
+	const int MAX_OVERSHOOT = 200;
+	if (d < -MAX_OVERSHOOT)
+		return 0.f;
+	float t = (float)(trigger - d) / (float)accel_range;	//d=trigger→0, 가장자리(d=0)→trigger/accel, 너머로 갈수록 →1
+	if (t < 0.f) t = 0.f;
+	if (t > 1.f) t = 1.f;
+	return min_level + (max_level - min_level) * t;
+}
+
 //드래그 중, 대상 컨트롤(m_pDropWnd) 가장자리 근처면 자동 스크롤 방향/속도(level)를 정하고 타이머로 연속 스크롤한다.
 //속도는 가장자리와의 '거리에 비례'(가까울수록 빠름). 상/하/좌/우 4방향. screen_pt = 스크린 좌표. (CVtListCtrlEx 와 동일 규칙)
 void CSCTreeCtrl::update_drag_auto_scroll(CPoint screen_pt)
 {
-	m_drag_scroll_vx = 0;
-	m_drag_scroll_vy = 0;
+	m_drag_scroll_fx = 0.f;
+	m_drag_scroll_fy = 0.f;
 
-	//오버레이 스크롤바/헤더는 부모 다이얼로그의 자식이라 커서가 그 위면 WindowFromPoint(→m_pDropWnd)가 트리/리스트가
-	//아니게 된다. → 직전까지 유효했던 트리/리스트를 스크롤 대상으로 유지하고, 커서가 그 컨트롤 window rect 밖이면 해제.
-	if (m_pDropWnd && (m_pDropWnd->IsKindOf(RUNTIME_CLASS(CTreeCtrl)) || m_pDropWnd->IsKindOf(RUNTIME_CLASS(CListCtrl))))
+	//20260713 by claude. 타깃 선택: 스크롤 중이면(start_tick!=0) 현재 타깃을 유지, 아니면 커서 밑 트리/리스트로 설정.
+	//"언제 유지가 풀리나"는 레벨함수의 오버슛 상한(MAX_OVERSHOOT)이 담당한다 — 커서가 타깃 가장자리를 상한 이상 벗어나면 fx/fy=0 이 되어
+	//에피소드가 끝나고(아래 else 에서 start_tick=0) 다음 이동에 커서 밑 컨트롤로 전환된다. 그 전까지는 옆 컨트롤에 걸쳐도 원래 걸 계속 스크롤.
+	bool keep_target = (m_drag_scroll_start_tick != 0 && m_drag_scroll_target && ::IsWindow(m_drag_scroll_target->GetSafeHwnd()));
+	if (!keep_target && m_pDropWnd && (m_pDropWnd->IsKindOf(RUNTIME_CLASS(CTreeCtrl)) || m_pDropWnd->IsKindOf(RUNTIME_CLASS(CListCtrl))))
 		m_drag_scroll_target = m_pDropWnd;
 
 	if (m_drag_scroll_target)
@@ -4823,26 +4873,40 @@ void CSCTreeCtrl::update_drag_auto_scroll(CPoint screen_pt)
 			}
 		}
 
-		const int MARGIN    = 48;	//가장자리 감지 폭(px)
-		const int MAX_LEVEL = 3;	//tick 당 최대 스크롤 단위(level)
+		const int   TRIGGER     = 40;		//가장자리 안쪽 이 거리(px)부터 스크롤 시작.
+		const int   ACCEL_RANGE = 280;		//min→max 가속을 이 거리(px)에 걸쳐 완만하게(가장자리 너머까지). TRIGGER 보다 훨씬 크게.
+		const float MIN_LEVEL   = 0.15f;	//시작 순간 최소 속도(아주 느림)
+		const float MAX_LEVEL   = 3.0f;		//가장자리를 ~240px 넘어섰을 때의 최대 속도
 
-		//가장자리로부터의 거리 d(안쪽 양수 / 넘어가면 음수). d<MARGIN 이면 스크롤: 가장자리에 가깝거나 넘을수록 빠르게(최대 MAX).
+		//가장자리로부터의 거리 d(안쪽 양수 / 넘어가면 음수). d<TRIGGER 이면 스크롤. 가장자리에 가깝거나 넘을수록 '완만하게' 가속(ACCEL_RANGE).
 		int dl = screen_pt.x - rw.left;			//왼쪽 가장자리까지
 		int dr = rw.right - screen_pt.x;		//오른쪽
 		int dt = screen_pt.y - top_ref;			//위(리스트면 헤더 아래 기준)
 		int db = rw.bottom - screen_pt.y;		//아래
 
-		if (dl < MARGIN)      m_drag_scroll_vx = -min(MAX_LEVEL, 1 + (MARGIN - dl) * (MAX_LEVEL - 1) / MARGIN);
-		else if (dr < MARGIN) m_drag_scroll_vx =  min(MAX_LEVEL, 1 + (MARGIN - dr) * (MAX_LEVEL - 1) / MARGIN);
+		//가로·세로 모두 가장자리를 넘어서도(d 음수) 계속 가속 — 타깃은 start_tick 로 고정돼 있으므로, 커서가 가장자리 밖(옆/위/아래
+		//다른 컨트롤 위)으로 나가도 그 방향으로 계속 스크롤된다. (예전에 가로만 오버슛을 막았다가, 오른쪽으로 스크롤 중 옆 리스트로
+		//가면 fx=0→fy=0→에피소드 종료→멈추는 버그가 났다. 로그로 확인 후 게이트 제거.)
+		if (dl < TRIGGER)      m_drag_scroll_fx = -drag_scroll_level(dl, TRIGGER, ACCEL_RANGE, MIN_LEVEL, MAX_LEVEL);
+		else if (dr < TRIGGER) m_drag_scroll_fx =  drag_scroll_level(dr, TRIGGER, ACCEL_RANGE, MIN_LEVEL, MAX_LEVEL);
 
-		if (dt < MARGIN)      m_drag_scroll_vy = -min(MAX_LEVEL, 1 + (MARGIN - dt) * (MAX_LEVEL - 1) / MARGIN);
-		else if (db < MARGIN) m_drag_scroll_vy =  min(MAX_LEVEL, 1 + (MARGIN - db) * (MAX_LEVEL - 1) / MARGIN);
+		if (dt < TRIGGER)      m_drag_scroll_fy = -drag_scroll_level(dt, TRIGGER, ACCEL_RANGE, MIN_LEVEL, MAX_LEVEL);
+		else if (db < TRIGGER) m_drag_scroll_fy =  drag_scroll_level(db, TRIGGER, ACCEL_RANGE, MIN_LEVEL, MAX_LEVEL);
 	}
 
-	if (m_drag_scroll_vx != 0 || m_drag_scroll_vy != 0)
-		SetTimer(timer_drag_auto_scroll, 70, NULL);	//~14fps 연속 스크롤(마우스가 멈춰 있어도 계속)
+	if (m_drag_scroll_fx != 0.f || m_drag_scroll_fy != 0.f)
+	{
+		if (m_drag_scroll_start_tick == 0)	//에피소드 시작(존 진입) 시각 기록 — 시간 램프 기준.
+			m_drag_scroll_start_tick = GetTickCount();
+		SetTimer(timer_drag_auto_scroll, 30, NULL);	//~33fps — 소수 속도 누적 + 시간 램프로 시작은 느리게, 유지하면 가속.
+	}
 	else
+	{
 		KillTimer(timer_drag_auto_scroll);
+		m_drag_scroll_ax = 0.f;		//멈추면 누적기·램프 리셋(다음 진입 시 다시 느리게 시작).
+		m_drag_scroll_ay = 0.f;
+		m_drag_scroll_start_tick = 0;
+	}
 }
 
 //20260704 by claude. 드래그 자동스크롤 실행 경로. 가로는 m_h_scroll_pos 를 px 단위로 직접 옮기고(OnHScroll 과 동일 clamp)

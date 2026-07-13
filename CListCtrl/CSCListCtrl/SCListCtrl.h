@@ -867,12 +867,19 @@ protected:
 	CPoint			m_drag_shape_offset = CPoint(-10, -14);		//커서 → 이미지 좌상단 오프셋
 	CSCGdiplusBitmap m_drag_base_img;			//20260705 by claude. 밴드(문구) 없는 원본 드래그 이미지 — 문구 갱신 때 base+band 재합성용
 	CString			m_drag_hint_text;			//20260705 by claude. 현재 표시 중인 문구(캐시) — 값이 바뀔 때만 재합성
+	DWORD			m_last_drag_hint_tick = 0;	//20260713 by claude. 마지막 재합성 시각(GetTickCount) — 재합성 스로틀용.
 	std::function<CString(CWnd* pDropWnd, CPoint pt_screen)> m_fn_drag_hint;		//드래그 문구 provider(app 설정)
 	//20260705 by claude. base 이미지 하단에 문구 밴드를 붙인 새 비트맵을 out 에 합성. XP 호환 위해 리스트 자체 폰트(m_lf) 사용.
 	void			compose_drag_image_with_hint(CSCGdiplusBitmap& base, const CString& text, CSCGdiplusBitmap& out);
 	bool			m_bDragging = false;		//T during a drag operation
-	int				m_drag_scroll_vx = 0;		//드래그 자동 스크롤 속도(가로, tick당 level, 부호=방향). 0=스크롤 안 함.
-	int				m_drag_scroll_vy = 0;		//드래그 자동 스크롤 속도(세로).
+	//20260713 by claude. 소수 level 속도 + 누적기. tick 당 정수 라인만 스크롤 가능하므로 소수 속도를 누적해 1.0 을 넘을 때만
+	//그 정수만큼 스크롤 → level<1(가장자리 존 바깥쪽)이면 여러 tick 에 한 번씩 스크롤되어 '시작이 천천히'가 표현된다.
+	float			m_drag_scroll_fx = 0.f;		//드래그 자동 스크롤 목표속도(가로 level, 부호=방향). 0=안 함.
+	float			m_drag_scroll_fy = 0.f;		//세로 목표속도.
+	float			m_drag_scroll_ax = 0.f;		//가로 누적기.
+	float			m_drag_scroll_ay = 0.f;		//세로 누적기.
+	//20260713 by claude. 시간 램프 — 스크롤 에피소드 시작 시각. 시작 직후 아주 느리게 → 유지하면 최대속도로 가속(탐색기식). 존 벗어나면 0.
+	DWORD			m_drag_scroll_start_tick = 0;
 	CWnd*			m_drag_scroll_target = NULL;	//자동 스크롤을 실제로 보낼 리스트/트리(오버레이 스크롤바 위여도 이 컨트롤로 전송).
 	void			update_drag_auto_scroll(CPoint screen_pt);	//드래그 중 대상 가장자리 거리로 속도 산출 + 타이머 관리.
 	//20260709 by claude. 자동 스크롤 타이머는 zone 진입 시 1회만 SetTimer 해야 한다. 매 mousemove 마다 SetTimer 하면 같은 ID 라 카운트다운이
@@ -881,7 +888,7 @@ protected:
 	void			start_auto_scroll_timer();
 	void			stop_auto_scroll_timer();
 	//20260709 by claude. 자동스크롤 속도 레벨 — 가장자리 거리(안쪽 양수/넘으면 음수)에 비례해 1..MAX_LEVEL 가속(멀면 0). 드래그·마퀴 공통.
-	int				auto_scroll_level(int dist);
+	float			auto_scroll_level(int dist);
 	void			cancel_drag();								//드래그 중 ESC 등으로 드롭 없이 완전 취소.
 	bool			m_swallow_rbutton = false;					//드래그 취소용 우클릭의 RBUTTONUP 을 소비할지(팝업 메뉴 방지).
 	int				m_nDragIndex = -1;			//drag되는 컨트롤이 CListCtrl일 때 그 인덱스(drag를 시작한 컨트롤의 멤버값에 저장됨, 드롭된 클래스에는 저장되지 않음)

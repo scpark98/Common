@@ -316,6 +316,11 @@ void CSCListCtrl::draw_row(CDC* pDC, int iItem, const CRect& row_bounds)
 
 	GetItemRect(iItem, &rowRect, LVIR_BOUNDS);
 
+	//20260713 by claude. 셀 텍스트는 항상 투명 배경으로 그린다. FillSolidRect(MFC)는 내부적으로 SetBkColor 를 남기고 복원하지 않으므로,
+	//배경을 직접 칠하지 않는 셀(예: 비-fullrow 선택 시 '크기' 컬럼)의 DrawText 가 기본 OPAQUE 모드에서 직전 셀(선택된 이름 셀)의
+	//채움색을 글자 배경에 깔아, 선택 시 크기 텍스트 뒤에 파란 박스가 생기던 문제를 방지.
+	pDC->SetBkMode(TRANSPARENT);
+
 	for (iSubItem = 0; iSubItem < get_column_count(); iSubItem++)
 	{
 		//TRACE(_T("%d, %d\n"), iItem, iSubItem);
@@ -557,35 +562,33 @@ void CSCListCtrl::draw_row(CDC* pDC, int iItem, const CRect& row_bounds)
 					if (IsNumericString(text) && (text.GetLength() > 0) && (text.Right(1) != '%'))
 						text += _T("%");
 
-					//text color를 별도로 준 경우는 그 컬러를 쓰고 그렇지 않으면 m_theme에 정의된 컬러를 쓴다.
+					//progress 텍스트는 채워진(바 위) 영역과 나머지 영역을 각각 다른 색으로 두 번 그려 경계에서 색이 바뀌게 한다.
+					//20260713 by claude. 단, 셀에 명시 텍스트색(예: fail=Red)이 지정되면 그 색을 '양쪽 영역 모두'에 적용한다.
+					//예전엔 아래 두 패스가 색을 무조건 cr_back / cr_progress_active 로 덮어써, set_text_color 로 준 Red 가 무시됐다.
+					//특히 "fail" 같은 비-숫자는 d=0(_ttof) → r.right=r.left 라 전체가 오른쪽 영역이 되어 cr_progress_active(파랑)로만 그려졌다.
+					Gdiplus::Color cr_left  = m_theme.cr_back;			//채움 바 위 영역(기본: 배경색으로 대비)
+					Gdiplus::Color cr_right = m_theme.cr_progress_active;	//바 바깥 영역(기본: 진행 강조색)
 					if (m_list_db[iItem].crText[iSubItem].GetValue() != listctrlex_unused_color.GetValue())
-						pDC->SetTextColor(m_list_db[iItem].crText[iSubItem].ToCOLORREF());
-					else
-						//pDC->SetTextColor(m_theme.cr_progress_text.ToCOLORREF());
-						pDC->SetTextColor(crText.ToCOLORREF());
+						cr_left = cr_right = m_list_db[iItem].crText[iSubItem];
 
-					//20260708 by claude. progress 텍스트를 채워진(바 위) 영역은 cr_back, 나머지는 cr_progress_active 로 두 번 그려 경계에서 색이 바뀌게 한다.
-					//예전엔 SelectClipRgn+LPtoDP 를 썼으나 smooth OnPaint 의 MemoryDC 좌표계에서 LPtoDP 가 어긋나 텍스트가 잘리고("50%"→"5C"),
+					//20260708 by claude. 예전엔 SelectClipRgn+LPtoDP 를 썼으나 smooth OnPaint 의 MemoryDC 좌표계에서 LPtoDP 가 어긋나 텍스트가 잘리고("50%"→"5C"),
 					//마지막 SelectClipRgn(NULL) 이 smooth 의 항목영역 클립(rc)까지 지워 다음 행이 클립 없이 그려지는 번짐/붉은칸 아티팩트가 났다.
 					//SaveDC+IntersectClipRect+RestoreDC 는 논리좌표로 동작(LPtoDP 불필요)하고 현재 클립 상태를 보존·복원해 native/smooth 둘 다 안전.
 					CRect rcLeft, rcRight;
 					rcLeft = rcRight = itemRect;
 					rcRight.left = rcLeft.right = r.right;
 
-					//20260709 by claude. BkMode=TRANSPARENT 필수 — draw_row 는 BkMode 를 설정하지 않아 기본 OPAQUE 다.
-					//OPAQUE 면 왼쪽 패스의 흰색(cr_back) 글자가 '흰 불투명 박스' 를 깔고 그 위에 그려져 자기 자신을 가려(막대 위 흰 구멍처럼)
-					//왼쪽 글자가 사라지고 오른쪽만 남아 "50%"→"5C" 로 보였다. 본문 텍스트는 어두운 색이라 OPAQUE 여도 티가 안 났을 뿐.
+					//20260709 by claude. BkMode=TRANSPARENT 필수 — OPAQUE 면 왼쪽 패스의 글자가 불투명 박스를 깔고 그 위에 그려져
+					//자기 자신을 가려(막대 위 구멍처럼) 왼쪽 글자가 사라지고 "50%"→"5C" 로 보였다. (draw_row 상단에서 이미 TRANSPARENT 지정.)
 					int saved = pDC->SaveDC();
 					pDC->IntersectClipRect(&rcLeft);
-					pDC->SetBkMode(TRANSPARENT);
-					pDC->SetTextColor(m_theme.cr_back.ToCOLORREF());
+					pDC->SetTextColor(cr_left.ToCOLORREF());
 					pDC->DrawText(text, itemRect, DT_VCENTER | DT_CENTER | DT_SINGLELINE | DT_NOCLIP | DT_NOPREFIX);
 					pDC->RestoreDC(saved);
 
 					saved = pDC->SaveDC();
 					pDC->IntersectClipRect(&rcRight);
-					pDC->SetBkMode(TRANSPARENT);
-					pDC->SetTextColor(m_theme.cr_progress_active.ToCOLORREF());
+					pDC->SetTextColor(cr_right.ToCOLORREF());
 					pDC->DrawText(text, itemRect, DT_VCENTER | DT_CENTER | DT_SINGLELINE | DT_NOCLIP | DT_NOPREFIX);
 					pDC->RestoreDC(saved);
 				}
@@ -1100,6 +1103,16 @@ CRect CSCListCtrl::get_item_rect(int item, int subItem)
 	CRect Rect;
 
 	GetItemRect(item, &Rect, LVIR_BOUNDS);
+
+	//20260713 by claude. smooth_scroll 시 행의 Y 는 native 스크롤이 아니라 m_scroll_y(픽셀) 기준으로 그려진다(draw_row/hit_test 와 동일 규칙).
+	//native GetItemRect 의 Y 를 그대로 쓰면 set_text 등의 InvalidateRect(get_item_rect()) 가 실제 그려진 위치와 m_scroll_y 만큼 어긋난
+	//밴드를 무효화해, 리스트가 아래로 스크롤된 상태에서 마지막 항목의 progress 셀이 전송 완료 후에도 갱신되지 않던(창 resize 해야 보이던) 문제가 났다.
+	if (m_smooth_scroll)
+	{
+		int rowH = row_height();
+		Rect.top    = get_header_height() + item * rowH - m_scroll_y;
+		Rect.bottom = Rect.top + rowH;
+	}
 
 	// Now scroll if we need to expose the column
 	GetClientRect(&rc);
@@ -4804,7 +4817,7 @@ void CSCListCtrl::set_as_shell_listctrl(CShellImageList* pShellImageList, bool i
 	if (GetUserDefaultUILanguage() == 1042)
 		set_headings(_T("이름,200;크기,100;수정한 날짜,150"));
 	else
-		set_headings(_T("Name,200;Size,100;Date mofified,150"));
+		set_headings(_T("Name,200;Size,100;Date modified,150"));
 	set_font_size(9);
 	//set_font_name(_T("맑은 고딕"));
 	//set_font_size(), set_font_name()을 호출하지 않고 set_header_height()을 호출하면

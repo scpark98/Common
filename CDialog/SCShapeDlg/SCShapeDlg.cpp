@@ -59,10 +59,14 @@ void CSCShapeDlg::set_blink(int show_time, int hide_time /*= -1*/)
 	}
 }
 
-void CSCShapeDlg::set_pulse(int period_ms, int alpha_min /*= 64*/, int alpha_max /*= 255*/)
+void CSCShapeDlg::set_pulse(int period_ms, int alpha_min /*= 64*/, int alpha_max /*= 255*/, int duration_ms /*= 0*/)
 {
 	if (GetSafeHwnd())
 		KillTimer(timer_pulse);
+
+	m_pulse_duration_ms = duration_ms;
+	m_pulse_elapsed_ms = 0;
+	m_pulse_fading_out = false;
 
 	if (period_ms <= 0)
 	{
@@ -84,7 +88,7 @@ void CSCShapeDlg::set_pulse(int period_ms, int alpha_min /*= 64*/, int alpha_max
 	m_pulse_min = alpha_min;
 	m_pulse_max = alpha_max;
 
-	const int tick_ms = 40;		//~25fps 로 부드럽게.
+	const int tick_ms = pulse_tick_ms;		//~25fps 로 부드럽게.
 	int half_steps = (period_ms / 2) / tick_ms;
 	if (half_steps < 1)
 		half_steps = 1;
@@ -116,6 +120,25 @@ void CSCShapeDlg::OnTimer(UINT_PTR nIDEvent)
 
 	if (nIDEvent == timer_pulse)
 	{
+		//20260713 by claude. duration_ms 만료 후: 왕복을 멈추고 alpha 0 까지 내려간 뒤 hide.
+		if (m_pulse_fading_out)
+		{
+			int a = m_alpha - m_pulse_step;
+			if (a <= 0)
+			{
+				set_alpha(0);
+				m_pulse_fading_out = false;
+				if (GetSafeHwnd())
+				{
+					KillTimer(timer_pulse);
+					ShowWindow(SW_HIDE);
+				}
+				return;
+			}
+			set_alpha(a);
+			return;
+		}
+
 		int a = m_alpha + m_pulse_dir * m_pulse_step;
 		if (a <= m_pulse_min)
 		{
@@ -128,6 +151,14 @@ void CSCShapeDlg::OnTimer(UINT_PTR nIDEvent)
 			m_pulse_dir = -1;
 		}
 		set_alpha(a);		//m_alpha 갱신 + render(UpdateLayeredWindow 블렌드).
+
+		//20260713 by claude. duration_ms(>0) 경과 시 fade-out 단계로 전환.
+		if (m_pulse_duration_ms > 0)
+		{
+			m_pulse_elapsed_ms += pulse_tick_ms;
+			if (m_pulse_elapsed_ms >= m_pulse_duration_ms)
+				m_pulse_fading_out = true;
+		}
 		return;
 	}
 

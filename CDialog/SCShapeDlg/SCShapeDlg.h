@@ -202,7 +202,8 @@ public:
 
 	//20260711 by claude. 은은한 펄스 — alpha 를 alpha_max~alpha_min 사이로 부드럽게 왕복(show/hide 깜빡임보다 자연스럽다).
 	//period_ms = 한 왕복(밝→어→밝) 주기. period_ms <= 0 이면 정지하고 alpha 를 alpha_max 로 복원. 호출 전 내용이 설정돼 있어야 한다.
-	void			set_pulse(int period_ms, int alpha_min = 64, int alpha_max = 255);
+	//20260713 by claude. duration_ms = 0 이면 무한 반복. > 0 이면 그 시간(ms) 동안 펄스한 뒤 alpha 0 까지 fade-out 하고 창을 hide.
+	void			set_pulse(int period_ms, int alpha_min = 64, int alpha_max = 255, int duration_ms = 0);
 
 	//
 	CSCShapeDlgTextSetting	m_text_setting;
@@ -264,10 +265,15 @@ protected:
 
 	//20260711 by claude. 은은한 펄스 — timer_pulse 로 m_alpha 를 min~max 사이 왕복.
 	enum { timer_pulse = 0x5C0C };
+	enum { pulse_tick_ms = 40 };			//펄스 타이머 tick(ms). ~25fps.
 	int				m_pulse_min = 64;
 	int				m_pulse_max = 255;
 	int				m_pulse_step = 8;
 	int				m_pulse_dir = -1;		//-1: 어두워지는 중, +1: 밝아지는 중
+	//20260713 by claude. duration_ms > 0 일 때만 사용 — 지정 시간 뒤 fade-out.
+	int				m_pulse_duration_ms = 0;	//0: 무한.
+	int				m_pulse_elapsed_ms = 0;
+	bool			m_pulse_fading_out = false;
 
 	bool			m_fadeinout_ing = false;
 	//fade_in(), fade_out() 함수에서 호출하며

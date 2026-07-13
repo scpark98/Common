@@ -2242,9 +2242,14 @@ void CSCListBox::sync_scrollbar()
 	}
 
 	//세로 모델
+	//20260713 by claude. show/hide 판정은 IsWindowVisible() 이 아니라 자식 자신의 WS_VISIBLE 스타일 비트로 한다.
+	//부모 listbox 가 숨겨진 동안(예: PathCtrl 이 풀다운 재구성 전에 SW_HIDE) sync 가 돌면, 자식 오버레이 바의
+	//IsWindowVisible() 은 부모가 숨겨졌다는 이유만으로 false 를 반환 → 아래 hide 가드가 스킵되어 자식이 WS_VISIBLE
+	//스타일을 유지한 채로 남고, 팝업이 다시 표시될 때 stale 바가 되살아났다(가로바 잔상의 근본 원인). GetStyle 은
+	//부모 표시 상태와 무관한 자식 자신의 의도된 표시 여부라 숨겨진 부모에서도 정확하다.
 	if (!need_v)
 	{
-		if (m_scrollbar.IsWindowVisible())
+		if (m_scrollbar.GetStyle() & WS_VISIBLE)
 			m_scrollbar.ShowWindow(SW_HIDE);
 	}
 	else
@@ -2254,7 +2259,7 @@ void CSCListBox::sync_scrollbar()
 		m_scrollbar.set_range(0, total - 1);
 		m_scrollbar.set_page(visible);
 		m_scrollbar.set_pos(top);
-		if (!m_scrollbar.IsWindowVisible())
+		if (!(m_scrollbar.GetStyle() & WS_VISIBLE))
 			m_scrollbar.ShowWindow(SW_SHOW);
 	}
 
@@ -2263,7 +2268,7 @@ void CSCListBox::sync_scrollbar()
 	{
 		if (!need_h)
 		{
-			if (m_scrollbar_h.IsWindowVisible())
+			if (m_scrollbar_h.GetStyle() & WS_VISIBLE)
 				m_scrollbar_h.ShowWindow(SW_HIDE);
 			if (m_h_scroll_pos != 0)
 			{
@@ -2280,7 +2285,7 @@ void CSCListBox::sync_scrollbar()
 			m_scrollbar_h.set_range(0, m_max_horizontal_extent - 1);
 			m_scrollbar_h.set_page(rc.Width());
 			m_scrollbar_h.set_pos(m_h_scroll_pos);
-			if (!m_scrollbar_h.IsWindowVisible())
+			if (!(m_scrollbar_h.GetStyle() & WS_VISIBLE))
 				m_scrollbar_h.ShowWindow(SW_SHOW);
 		}
 	}

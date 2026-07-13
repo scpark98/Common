@@ -2438,6 +2438,16 @@ CRect CSCStatic::apply_valign()
 	int last_bottom = m_para[last_line][0].r.bottom;
 	int j;
 
+	//20260713 by claude. first_top 은 line 0 의 "첫 run" 이 아니라 "모든 run 의 최소 top" 이어야 한다.
+	//set_line_align(DT_VCENTER) 로 작은 글자 run 이 라인 중앙으로 내려가면 m_para[0][0](작은 글자)의 top 이
+	//실제 블록 top(가장 큰 글자 run)보다 아래가 된다. 이 값을 first_top 으로 쓰면 total_h 가 과소평가되어
+	//블록이 세로중앙보다 위로 (line_h-small_h)/4 만큼 치우친다(배너 텍스트가 위로 붙던 원인). 최소 top 으로 잡아야 정확.
+	for (j = 1; j < (int)m_para[0].size(); j++)
+	{
+		if (m_para[0][j].r.top < first_top)
+			first_top = m_para[0][j].r.top;
+	}
+
 	for (j = 1; j < (int)m_para[last_line].size(); j++)
 	{
 		if (m_para[last_line][j].r.bottom > last_bottom)

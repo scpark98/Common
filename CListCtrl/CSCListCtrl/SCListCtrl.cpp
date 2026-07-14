@@ -102,6 +102,7 @@ BEGIN_MESSAGE_MAP(CSCListCtrl, CListCtrl)
 	ON_NOTIFY_REFLECT(LVN_BEGINDRAG, &CSCListCtrl::OnLvnBeginDrag)
 	ON_WM_MOUSEMOVE()
 	ON_WM_LBUTTONUP()
+	ON_WM_CAPTURECHANGED()	//20260714 by claude. 드래그 중 외부 요인(윈도우 키 등)으로 캡처 상실 시 드래그를 깔끔히 취소하기 위해.
 	ON_WM_RBUTTONDOWN()
 	ON_WM_RBUTTONUP()
 	ON_NOTIFY_REFLECT_EX(LVN_ITEMCHANGED, &CSCListCtrl::OnLvnItemchanged)
@@ -4479,7 +4480,9 @@ BOOL CSCListCtrl::OnNMClick(NMHDR *pNMHDR, LRESULT *pResult)
 			(abs(t1 - m_last_clicked) >= 800) &&
 			(abs(t1 - m_last_clicked) < 1600))
 		*/
-		//선택된 항목을 다시 원클릭하면 편집모드로 전환한다.
+		//20260714 by claude. [탐색기 방식] 선택된 항목을 다시 클릭 → 편집 진입. 단 이 NM_CLICK 은 OnLButtonDown(버튼 DOWN)에서
+		//합성되어 오므로, 여기서 edit_item 을 '즉시' 하면 그 클릭을 누른 채 드래그할 때 편집+드래그가 겹친다(부작용). 그래서 여기선
+		//조건 만족 시 '편집 예약'만 하고, 실제 진입은 OnLButtonUp 이 '드래그 없이 뗐을 때만' 수행한다(드래그로 이어지면 OnMouseMove 가 예약 취소).
 		if (m_allow_one_click_edit &&
 			(m_edit_item == item) &&
 			(m_edit_subItem == subItem) &&
@@ -4487,12 +4490,11 @@ BOOL CSCListCtrl::OnNMClick(NMHDR *pNMHDR, LRESULT *pResult)
 			(clock() - m_last_clicked_time > 500) &&	//이 값이 작으면 더블클릭에도 편집되고
 			(clock() - m_last_clicked_time < 2000))
 		{
-			//20260708 by claude. (예전엔 드라이브 리스트(내 PC) 뷰에서 편집 진입을 막았으나) 드라이브 루트는 볼륨 레이블 변경을 지원하므로
-			//편집을 허용한다. 실제 커밋은 edit_end 가 드라이브면 SetVolumeLabel, 그 외 파일/폴더면 rename 으로 분기.
-			edit_item(m_edit_item, m_edit_subItem);
+			m_pending_reclick_edit = true;
 		}
 		else
 		{
+			m_pending_reclick_edit = false;
 			m_last_clicked_time = clock();
 		}
 
@@ -5643,6 +5645,16 @@ void CSCListCtrl::OnLvnBeginDrag(NMHDR* pNMHDR, LRESULT* pResult)
 	if (!m_use_drag_and_drop)
 		return;
 
+	//20260714 by claude. 재클릭으로 편집 진입한 클릭을 '누른 채' 드래그하면 편집 중(m_in_editing)인 상태로 드래그가 시작된다.
+	//그대로 두면 아래 SetFocus(m_hWnd) 가 편집 박스 포커스를 뺏어 '비동기'(OnKillFocus→PostMessage→edit_end)로 편집이 닫히는데,
+	//edit_end 의 미변경/취소 경로는 Invalidate 를 안 해 그 행의 full-row 선택 하이라이트가 갱신되지 않고 부분만 칠해진 채 남는다.
+	//→ 드래그 시작 시점에 편집을 '동기'로 취소하고 Invalidate 로 행을 다시 그려 상태를 결정적으로 만든 뒤 드래그를 진행한다.
+	if (m_in_editing)
+	{
+		edit_end(false);
+		Invalidate(FALSE);
+	}
+
 	LPNMLISTVIEW pNMLV = reinterpret_cast<LPNMLISTVIEW>(pNMHDR);
 	// TODO: 여기에 컨트롤 알림 처리기 코드를 추가합니다.
 	LPNMITEMACTIVATE pNMItemActivate = reinterpret_cast<LPNMITEMACTIVATE>(pNMHDR);
@@ -5787,6 +5799,7 @@ void CSCListCtrl::OnMouseMove(UINT nFlags, CPoint point)
 		{
 			m_smooth_drag_pending = false;
 			m_smooth_click_defer  = -1;		//드래그 확정 → 선택 축소 취소(다중선택 유지).
+			m_pending_reclick_edit = false;	//20260714 by claude. 드래그로 이어졌으니 재클릭 편집 예약 취소(누른 채 드래그 = 편집 아님).
 
 			NMLISTVIEW nmlv = { 0 };
 			nmlv.hdr.hwndFrom = m_hWnd;
@@ -5989,7 +6002,17 @@ void CSCListCtrl::update_drag_auto_scroll(CPoint screen_pt)
 	//20260713 by claude. 타깃 선택: 스크롤 중이면(start_tick!=0) 현재 타깃 유지, 아니면 커서 밑 컨트롤로 설정. 유지 해제는
 	//auto_scroll_level 의 오버슛 상한(MAX_OVERSHOOT)이 담당 — 커서가 타깃 가장자리를 상한 이상 벗어나면 fx/fy=0→에피소드 종료→전환.
 	bool keep_target = (m_drag_scroll_start_tick != 0 && m_drag_scroll_target && ::IsWindow(m_drag_scroll_target->GetSafeHwnd()));
-	if (!keep_target && m_pDropWnd && (m_pDropWnd->IsKindOf(RUNTIME_CLASS(CSCListCtrl)) || m_pDropWnd->IsKindOf(RUNTIME_CLASS(CTreeCtrl))))
+	//20260714 by claude. 드롭 대상이 될 수 있는 컨트롤만 자동스크롤 대상으로 삼는다. 드롭 불가 리스트(예: 즐겨찾기, use_drag_and_drop=false)는
+	//드롭이 안 되므로 자동스크롤도 반응하면 안 된다(그 위에선 스크롤/드롭 모두 무의미). 리스트는 get_use_drag_and_drop() 로 판정, 트리는 대상 허용.
+	bool target_droppable = false;
+	if (m_pDropWnd)
+	{
+		if (m_pDropWnd->IsKindOf(RUNTIME_CLASS(CSCListCtrl)))
+			target_droppable = ((CSCListCtrl*)m_pDropWnd)->get_use_drag_and_drop();
+		else if (m_pDropWnd->IsKindOf(RUNTIME_CLASS(CTreeCtrl)))
+			target_droppable = true;
+	}
+	if (!keep_target && target_droppable)
 		m_drag_scroll_target = m_pDropWnd;
 
 	if (m_drag_scroll_target)
@@ -6281,11 +6304,14 @@ void CSCListCtrl::OnLButtonUp(UINT nFlags, CPoint point)
 	if (m_bDragging)
 	{
 		TRACE(_T("OnLButtonUp\n"));
-		// Release mouse capture, so that other controls can get control/messages
-		ReleaseCapture();
 
 		// Note that we are NOT in a drag operation
+		//20260714 by claude. ReleaseCapture 보다 먼저 내린다 — ReleaseCapture 가 WM_CAPTURECHANGED 를 동기로 유발하고 OnCaptureChanged 가
+		//m_bDragging 이면 cancel_drag 로 취소하므로, 스스로 놓는 이 정상 드롭 경로에선 미리 FALSE 로 해 재진입 취소가 드롭을 깨지 않게 한다.
 		m_bDragging = FALSE;
+
+		// Release mouse capture, so that other controls can get control/messages
+		ReleaseCapture();
 
 		//20260714 by claude. [진단: 드래그 slowdown] 드래그 1회 종료 시점 핸들 순증 확인 — START 대비 GDI/USER 가 늘면 드래그당 누수.
 		{
@@ -6351,19 +6377,40 @@ void CSCListCtrl::OnLButtonUp(UINT nFlags, CPoint point)
 			m_smooth_click_defer = -1;
 			Invalidate(FALSE);
 		}
+
+		//20260714 by claude. [탐색기 방식 재클릭 편집] 여기가 '드래그 없이 뗀 클릭' 지점 — 예약된 편집을 지금 진입한다.
+		//드래그로 이어졌다면 OnMouseMove 가 m_pending_reclick_edit 를 이미 껐으므로 편집이 안 된다(누른 채 드래그 = 편집 아님).
+		if (m_pending_reclick_edit)
+		{
+			m_pending_reclick_edit = false;
+			edit_item(m_edit_item, m_edit_subItem);
+		}
 	}
 
 	CListCtrl::OnLButtonUp(nFlags, point);
 }
 
 //드래그 중 ESC 등으로 드래그를 '드롭 없이' 완전 취소한다. DroppedHandler 를 부르지 않으므로 어떤 전송/이동도 일어나지 않는다.
+//20260714 by claude. 드래그 중 마우스 캡처가 '외부 요인'(윈도우 키로 시작메뉴 포그라운드 전환·Alt+Tab·UAC·다른 앱의 포커스 탈취 등)으로
+//강제 해제되면 WM_CAPTURECHANGED 가 온다. 이때 취소하지 않으면 m_bDragging 은 TRUE인데 캡처가 없어, 커서가 리스트 밖으로 나가면 그
+//리스트가 더는 mousemove 를 못 받아 드래그가 리스트 안에 '갇힌다'(밖으로 못 나감). → 외부 캡처 상실이면 ESC 와 동일하게 드래그를 취소한다.
+//우리가 드롭(OnLButtonUp)/취소(cancel_drag)로 스스로 ReleaseCapture 하는 경로는 그 직전에 m_bDragging=FALSE 로 내려두므로 여기서 재취소되지 않는다.
+void CSCListCtrl::OnCaptureChanged(CWnd* pWnd)
+{
+	if (m_bDragging)
+		cancel_drag();
+
+	CListCtrl::OnCaptureChanged(pWnd);
+}
+
 void CSCListCtrl::cancel_drag()
 {
 	if (!m_bDragging)
 		return;
 
-	ReleaseCapture();
+	//20260714 by claude. ReleaseCapture 보다 먼저 FALSE — ReleaseCapture 의 동기 WM_CAPTURECHANGED → OnCaptureChanged 재진입 시 cancel_drag 이 중복 실행되지 않게.
 	m_bDragging = FALSE;
+	ReleaseCapture();
 
 	stop_auto_scroll_timer();
 	m_drag_scroll_fx = m_drag_scroll_fy = 0.f;
@@ -6982,6 +7029,7 @@ void CSCListCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 	//그러면 다음 클릭의 LButtonUp 이 스테일 defer 로 엉뚱한(이전 편집) 항목을 select_single 해 선택이 되돌아간다 — 그 버그의 실제 원인.
 	m_smooth_click_defer  = -1;
 	m_smooth_drag_pending = false;
+	m_pending_reclick_edit = false;	//20260714 by claude. 새 클릭마다 리셋 — 아래 합성 NM_CLICK(OnNMClick)이 조건 만족 시 다시 예약한다.
 
 	int item = -1, subItem = -1;
 	hit_test(point, item, subItem, true);
@@ -7370,17 +7418,26 @@ void CSCListCtrl::OnSize(UINT nType, int cx, int cy)
 		m_button_scroll_to_end->MoveWindow(CRect(rc.right - 5 - m_auto_scroll_button_size, rc.bottom - 5 - m_auto_scroll_button_size, rc.right - 5, rc.bottom - 5));
 	}
 
-	//특정 컬럼 너비를 고정 처리
-	if (m_fixed_width_column >= 0 && m_fixed_width_column < get_column_count())
+	//특정 컬럼 너비를 고정 처리(가변 컬럼이 남는 폭 흡수).
+	//20260714 by claude. 단 사용자가 컬럼 divider 를 수동으로 끄는 중(헤더가 마우스 캡처 보유)이면 건너뛴다 — 그 사이 폭을 다시 계산하면
+	//컬럼 경계가 마우스 밑에서 밀려 헤더 track 이 어긋나고(창 밖 release 무시 등) 사용자 조정과 싸운다. 드래그가 끝나면 다음 리사이즈 때 반영된다.
+	bool header_tracking = (m_HeaderCtrlEx.GetSafeHwnd() && ::GetCapture() == m_HeaderCtrlEx.GetSafeHwnd());
+	if (!header_tracking && m_fixed_width_column >= 0 && m_fixed_width_column < get_column_count())
 	{
-		std::vector<int> width(get_column_count());
+		//20260714 by claude. (미사용 std::vector<int> width 제거 — 할당만 하고 안 쓰던 dead code.)
 		int total_column_width = 0;
 		for (int i = 0; i < get_column_count(); i++)
 		{
 			if (i != m_fixed_width_column)
 				total_column_width += GetColumnWidth(i);
 		}
-		set_column_width(m_fixed_width_column, rc.Width() - total_column_width - 2);
+		//20260714 by claude. 채울 폭이 음수/과소가 되지 않게 최소폭으로 클램프. 다른 컬럼을 client 폭보다 넓게 끌면 음수가 될 수 있고,
+		//그 값이 native SetColumnWidth 특수값(-1=LVSCW_AUTOSIZE, -2=LVSCW_AUTOSIZE_USEHEADER)과 겹치면 이 컬럼이 채우기가 아니라
+		//오토사이즈되는 이상동작을 한다. 최소폭 미만이면 최소폭으로 두고, 못 채우는 만큼은 가로 스크롤바가 자연히 표시된다.
+		int fill_width = rc.Width() - total_column_width - 2;
+		if (fill_width < m_fixed_width_column_min)
+			fill_width = m_fixed_width_column_min;
+		set_column_width(m_fixed_width_column, fill_width);
 
 		//20260705 by claude. 고정 컬럼 폭이 방금 바뀌었으니 여기서만 재동기화. (그 외 순수 resize 의 sync 는 아래처럼 제거 —
 		//OnWindowPosChanged 가 WM_SIZE 안 뜨는 케이스까지 포함해 size/move 변화마다 이미 sync 하므로, OnSize 의 무조건 호출은

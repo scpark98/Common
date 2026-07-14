@@ -334,8 +334,10 @@ public:
 	void		set_header_text_align(int header, int format = HDF_LEFT);
 	int			get_header_text_align(int header);
 
-	//WM_SIZE시에 특정 컬럼은 그 너비를 가변으로 처리한다.
-	void		set_fixed_width_column(int column) { m_fixed_width_column = column; }
+	//WM_SIZE시에 특정 컬럼은 그 너비를 가변(남는 폭을 흡수)으로 처리한다. min_width = 그 컬럼이 가질 수 있는 최소 폭(음수/과소 방지).
+	//20260714 by claude. min_width 클램프 추가 — 다른 컬럼을 client 폭보다 넓게 끌면 채울 폭이 음수가 될 수 있고, 그 값이 native 특수값
+	//(-1=LVSCW_AUTOSIZE, -2=LVSCW_AUTOSIZE_USEHEADER)과 겹치면 오토사이즈 이상동작을 한다. 못 채우면 가로 스크롤바가 자연히 뜬다.
+	void		set_fixed_width_column(int column, int min_width = 60) { m_fixed_width_column = column; m_fixed_width_column_min = min_width; }
 
 	enum
 	{
@@ -844,6 +846,7 @@ protected:
 	std::deque<int> m_column_data_type;
 	std::deque<int> m_column_text_align;
 	int				m_fixed_width_column = -1;
+	int				m_fixed_width_column_min = 60;	//20260714 by claude. 가변 컬럼 최소 폭(음수/과소 방지 클램프). set_fixed_width_column 에서 설정.
 	int				m_line_height = 16;
 
 //정렬 관련
@@ -905,6 +908,9 @@ protected:
 	//20260705 by claude. base 이미지 하단에 문구 밴드를 붙인 새 비트맵을 out 에 합성. XP 호환 위해 리스트 자체 폰트(m_lf) 사용.
 	void			compose_drag_image_with_hint(CSCGdiplusBitmap& base, const CString& text, CSCGdiplusBitmap& out);
 	bool			m_bDragging = false;		//T during a drag operation
+	//20260714 by claude. [탐색기 방식 재클릭 편집] 선택된 항목을 다시 '눌렀다 뗐을 때만'(드래그 없이) 편집 진입하도록,
+	//OnNMClick(버튼 DOWN)에서 조건 만족 시 예약만 하고 OnLButtonUp(뗄 때)에서 실제 진입. 드래그로 이어지면 OnMouseMove 가 취소.
+	bool			m_pending_reclick_edit = false;
 	//20260713 by claude. 소수 level 속도 + 누적기. tick 당 정수 라인만 스크롤 가능하므로 소수 속도를 누적해 1.0 을 넘을 때만
 	//그 정수만큼 스크롤 → level<1(가장자리 존 바깥쪽)이면 여러 tick 에 한 번씩 스크롤되어 '시작이 천천히'가 표현된다.
 	float			m_drag_scroll_fx = 0.f;		//드래그 자동 스크롤 목표속도(가로 level, 부호=방향). 0=안 함.
@@ -1034,6 +1040,7 @@ public:
 	afx_msg void OnLvnBeginDrag(NMHDR* pNMHDR, LRESULT* pResult);
 	afx_msg void OnMouseMove(UINT nFlags, CPoint point);
 	afx_msg void OnLButtonUp(UINT nFlags, CPoint point);
+	afx_msg void OnCaptureChanged(CWnd* pWnd);	//20260714 by claude. 캡처 상실(윈도우 키 등) 시 드래그 취소.
 	afx_msg void OnRButtonDown(UINT nFlags, CPoint point);	//드래그 중 우클릭 = 취소.
 	afx_msg void OnRButtonUp(UINT nFlags, CPoint point);	//취소용 우클릭의 UP 소비(팝업 메뉴 방지).
 	afx_msg void OnTimer(UINT_PTR nIDEvent);	//드래그 자동 스크롤 연속 tick.

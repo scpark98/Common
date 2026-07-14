@@ -685,6 +685,39 @@ public:
 	//return value : checkbox 클릭 시 LVHT_ONITEMSTATEICON, 이미지 클릭 시 LVHT_ONITEMICON, 그 외에는 LVHT_ONITEMLABEL을 리턴한다.
 	int			hit_test(CPoint pt, int& item, int& subItem, bool include_icon);
 
+	//20260714 by claude. [smooth API 가드] 이 컨트롤은 사실상 smooth 스크롤 고정이라, native CListCtrl::HitTest/SubItemHitTest 는
+	//세로 스크롤(m_scroll_y)을 무시해 화면 위치와 다른 엉뚱한 항목을 돌려준다. smooth 를 모르고 native API 를 그냥 호출해도
+	//올바른 항목이 나오도록 base 를 가려(shadow) smooth-aware hit_test 로 위임한다. (base 시그니처가 const 라 맞추되, hit_test 는
+	//순수 조회지만 비-const 로 선언돼 있어 const_cast 가 필요하다 — 상태 변경 없음.)
+	int HitTest(CPoint pt, UINT* pFlags = NULL) const
+	{
+		int item = -1, sub_item = -1;
+		UINT flags = (UINT)const_cast<CSCListCtrl*>(this)->hit_test(pt, item, sub_item, true);
+		if (pFlags)
+			*pFlags = flags;
+		return item;
+	}
+	int HitTest(LVHITTESTINFO* pInfo) const
+	{
+		if (pInfo == NULL)
+			return -1;
+		int item = -1, sub_item = -1;
+		pInfo->flags = (UINT)const_cast<CSCListCtrl*>(this)->hit_test(pInfo->pt, item, sub_item, true);
+		pInfo->iItem = item;
+		pInfo->iSubItem = sub_item;
+		return item;
+	}
+	int SubItemHitTest(LVHITTESTINFO* pInfo)
+	{
+		if (pInfo == NULL)
+			return -1;
+		int item = -1, sub_item = -1;
+		pInfo->flags = (UINT)hit_test(pInfo->pt, item, sub_item, true);
+		pInfo->iItem = item;
+		pInfo->iSubItem = sub_item;
+		return item;
+	}
+
 	void		show_progress_text(bool show = true) { m_show_progress_text = show; Invalidate(); }
 	//void		set_progress_text_color(Gdiplus::Color cr) { m_theme.cr_progress_text = cr; }
 

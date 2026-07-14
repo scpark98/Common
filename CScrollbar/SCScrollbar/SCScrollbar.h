@@ -144,7 +144,10 @@ protected:
 	CRect			calc_arrow_rb_rect() const;	//vertical=bottom, horizontal=right
 	CRect			calc_track_rect() const;		//arrow 사이의 트랙 전체 (arrow off 면 client 전체).
 	CRect			calc_thumb_rect() const;		//track 안의 thumb 영역.
-	int				thumb_min_extent() const { return 60; }
+	//20260714 by claude. 최소 썸 길이 = Windows 네이티브 스크롤바의 썸 하한(세로 SM_CYVTHUMB / 가로 SM_CXHTHUMB).
+	//네이티브 스크롤바도 비례 썸이 이 값보다 작아지면 이 크기로 고정한다 → 동일 기준 채택. 96 DPI 기준 ≈17px, 시스템 DPI 로 자동 스케일.
+	//(예전 고정 60px 은 항목이 아무리 많아도 썸이 60 아래로 안 줄어 '충분히 긴데도 안 짧아진다'는 인상을 줬다.)
+	int				thumb_min_extent() const { return ::GetSystemMetrics(m_orient == vertical ? SM_CYVTHUMB : SM_CXHTHUMB); }
 
 	//pos 계산 보조
 	void			clamp_pos();

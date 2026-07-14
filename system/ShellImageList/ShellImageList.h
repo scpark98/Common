@@ -165,16 +165,20 @@ public:
 
 	//C:\\, C:\\Program Files, C:\\Windows 등과 같은 주요 폴더는 rename, delete등의 액션을 허용하지 않아야 한다.
 	//내 PC, 다운로드, 바탕 화면, 문서 등의 폴더도 허용하지 않아야 한다.
-	//저수준 규칙(내부 판정). index = 0(local), 1(remote). as_destination=true 면 "수신/쓰기 목적지" 규칙(데이터 드라이브 루트 허용).
-	//시스템 폴더(Windows/Program Files 등) + 하위 전체 + 드라이브 루트 + 내 PC 는 어떤 파괴적 액션으로도 금지(균일 보수).
-	//호출부는 아래 의도-명시 래퍼(is_movable / is_copyable_from / is_writable_to)를 사용한다.
-	bool		is_protected(int index, CString folder, bool as_destination = false);
+	//20260714 by claude. 액션은 3종 — 시스템 손상 여부가 다르므로 보호 집합이 다르다.
+	// PROTECT_MOVE_SOURCE : 소스에서 제거되는 파괴적 액션(이동/삭제/이름변경). 시스템 폴더·드라이브 루트·특수 사용자 폴더 금지.
+	// PROTECT_COPY_SOURCE : 소스를 읽기만 하는 비파괴 액션(복사/전송 소스). 시스템 손상 불가 → 시스템 폴더 안의 파일도 밖으로 복사 허용.
+	//                       (내 PC 가상 폴더·드라이브 루트 자체만 금지 — 실제 복사 대상이 아니거나 드라이브 통째 전송이라.)
+	// PROTECT_DESTINATION : 쓰기 목적지(수신/복사 대상). 시스템 폴더·시스템 드라이브 루트 금지(데이터 드라이브 루트는 수신 허용).
+	enum protect_action { PROTECT_MOVE_SOURCE = 0, PROTECT_DESTINATION = 1, PROTECT_COPY_SOURCE = 2 };
 
-	//20260712 by claude. 액션별 의도-명시 래퍼. 내부 규칙은 is_protected 로 균일 — 시스템 손상 가능 경로(시스템 폴더 자신+하위·
-	//드라이브 루트·내 PC)는 어떤 액션도 절대 불가. (사용자 방침 2026-07-12: 시스템을 손상시킬 수 있는 액션은 예외 없이 금지.)
-	bool		is_movable(int index, CString folder)		{ return !is_protected(index, folder, false); }	//이동/이름변경/삭제(소스에서 제거) 가능?
-	bool		is_copyable_from(int index, CString folder)	{ return !is_protected(index, folder, false); }	//복사/전송 소스로 가능?
-	bool		is_writable_to(int index, CString folder)	{ return !is_protected(index, folder, true);  }	//수신/복사 목적지로 가능?
+	//저수준 규칙(내부 판정). index = 0(local), 1(remote). 호출부는 아래 의도-명시 래퍼를 사용한다.
+	bool		is_protected(int index, CString folder, protect_action action = PROTECT_MOVE_SOURCE);
+
+	//20260712 by claude. 액션별 의도-명시 래퍼.
+	bool		is_movable(int index, CString folder)		{ return !is_protected(index, folder, PROTECT_MOVE_SOURCE); }	//이동/이름변경/삭제(소스에서 제거) 가능?
+	bool		is_copyable_from(int index, CString folder)	{ return !is_protected(index, folder, PROTECT_COPY_SOURCE); }	//복사/전송 소스로 가능?
+	bool		is_writable_to(int index, CString folder)	{ return !is_protected(index, folder, PROTECT_DESTINATION); }	//수신/복사 목적지로 가능?
 
 
 private:

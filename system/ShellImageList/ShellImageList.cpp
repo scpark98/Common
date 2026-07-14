@@ -621,7 +621,7 @@ bool CShellImageList::is_special_folder(int index, CString path)
 //     · 소스(as_destination=false)  : 모든 드라이브 루트 금지(통째 전송/삭제/이름변경 대상 아님). 하위는 위 규칙만 적용.
 //     · 목적지(as_destination=true) : 시스템(실행 OS) 드라이브 루트(C:\)만 금지. 데이터 드라이브 루트(D:\ 등)는
 //                                     수신 허용(작업 디스크로 파일 받기 가능).
-bool CShellImageList::is_protected(int index, CString folder, bool as_destination)
+bool CShellImageList::is_protected(int index, CString folder, protect_action action)
 {
 	folder = convert_special_folder_to_real_path(index, folder);
 	if (folder.IsEmpty())
@@ -655,7 +655,7 @@ bool CShellImageList::is_protected(int index, CString folder, bool as_destinatio
 	//드라이브 루트("c:\" → rest "\", 또는 "").
 	if (rest.IsEmpty() || rest == _T("\\"))
 	{
-		if (as_destination)
+		if (action == PROTECT_DESTINATION)
 		{
 			//목적지: 시스템(실행 OS) 드라이브 루트만 금지. 데이터 드라이브 루트는 수신 허용.
 			TCHAR win_dir[MAX_PATH] = { 0, };
@@ -664,7 +664,7 @@ bool CShellImageList::is_protected(int index, CString folder, bool as_destinatio
 			sys_drive.MakeLower();
 			return (!drive.IsEmpty() && drive == sys_drive);
 		}
-		//소스: 모든 드라이브 루트 금지(통째 전송/삭제/이름변경 방지).
+		//소스(이동/복사 공통): 드라이브 루트 자체는 금지 — 통째 전송/삭제/이름변경 방지(복사도 드라이브 통째는 막는다).
 		return true;
 	}
 
@@ -677,26 +677,35 @@ bool CShellImageList::is_protected(int index, CString folder, bool as_destinatio
 		return (rest.GetLength() > len && rest.Left(len) == root && rest[len] == _T('\\'));
 	};
 
-	//시스템 폴더 + 하위 전체(어느 드라이브든 이름 기반). 소스·목적지 공통 금지 — 어떤 액션(전송/이동/복사/삭제/이름변경)으로도
-	//시스템 손상 불가하게 하위까지 예외 없이 금지(사용자 방침 2026-07-12: 시스템 손상 가능 액션은 절대 허용 안 함).
-	if (is_under(_T("\\windows")) ||
-		is_under(_T("\\program files")) ||
-		is_under(_T("\\program files (x86)")) ||
-		is_under(_T("\\programdata")) ||
-		is_under(_T("\\recovery")) ||
-		is_under(_T("\\system volume information")) ||
-		is_under(_T("\\$recycle.bin")))
-		return true;
+	//시스템 폴더(어느 드라이브든 이름 기반).
+	//  파괴적 소스(이동/삭제/이름변경)·목적지(쓰기): 폴더 자신 + 하위 전체 금지(시스템 손상 방지).
+	//  복사 소스(PROTECT_COPY_SOURCE): 폴더 "자신"만 금지 — 시스템 폴더를 통째로 전송할 일은 없다.
+	//    그 안의 파일/폴더는 밖으로 복사/전송 허용 — 읽기전용이라 시스템 손상 불가.
+	static const TCHAR* sys_roots[] = {
+		_T("\\windows"), _T("\\program files"), _T("\\program files (x86)"),
+		_T("\\programdata"), _T("\\recovery"), _T("\\system volume information"),
+		_T("\\$recycle.bin")
+	};
+	for (auto root : sys_roots)
+	{
+		if (action == PROTECT_COPY_SOURCE)
+		{
+			if (rest == root)		//폴더 자신만 금지, 하위는 허용
+				return true;
+		}
+		else if (is_under(root))	//자신 + 하위 전체 금지
+			return true;
+	}
 
-	//Users / Documents and Settings 는 루트만 금지(하위 사용자 데이터는 허용).
+	//Users / Documents and Settings 는 루트 "자신"만 금지(하위 사용자 데이터는 허용). 복사 소스도 통째 전송은 안 하므로 자신은 금지.
 	if (rest == _T("\\users") || rest == _T("\\documents and settings"))
 		return true;
 
-	//특수 사용자 폴더(프로필 및 문서/바탕화면/다운로드/음악/사진/비디오)는 소스(삭제/이름변경/전송)에서 금지.
-	//받기(as_destination)는 허용 — 사용자가 이 폴더들로 파일을 다운받을 수 있어야 하기 때문.
+	//특수 사용자 폴더(프로필 및 문서/바탕화면/다운로드/음악/사진/비디오)는 파괴적 소스(삭제/이름변경/이동)에서만 금지.
+	//받기(목적지)·복사(밖으로 전송)는 허용 — 사용자가 이 폴더로 다운받거나, 이 폴더의 내용을 복사할 수 있어야 하기 때문.
 	//폴더 "자신"만 금지하고 그 내용/하위는 허용(exact 비교). 원격(index>=1)도 볼륨에 저장된 경로로 판정된다.
 	//프로필 경로는 문서 폴더의 상위로 도출(문서 = <profile>\Documents 관례). 하위는 로케일 불변 영문명으로 비교.
-	if (!as_destination)
+	if (action == PROTECT_MOVE_SOURCE)
 	{
 		auto normalize = [](CString p) -> CString
 		{

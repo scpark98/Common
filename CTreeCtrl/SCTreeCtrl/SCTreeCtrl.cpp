@@ -4831,14 +4831,17 @@ void CSCTreeCtrl::OnTimer(UINT_PTR nIDEvent)
 //20260713 by claude. 핵심: accel_range 를 trigger 보다 훨씬 크게(가장자리 너머까지) 주면, 존 안(0..trigger)에선 t 가 작아 아주 완만하고,
 //가장자리를 넘어(d 음수) 계속 다가갈수록 t 가 서서히 1 로 커져 최대속도에 이른다. 예전엔 accel_range=trigger 라 48px 안에서 min→max 를
 //다 소화하고 가장자리에서 바로 max 클램프 → "조금만 다가가도 확 빨라짐"(급격). 이제 가장자리 넘어까지 부드럽게 이어진다.
-static float drag_scroll_level(int d, int trigger, int accel_range, float min_level, float max_level)
+static float drag_scroll_level(int d, int trigger, int accel_range, float min_level, float max_level, bool cap_overshoot)
 {
 	if (d >= trigger)
 		return 0.f;
 	//20260713 by claude. 오버슛 상한 — 가장자리를 MAX_OVERSHOOT 이상 벗어나면(=옆 컨트롤 몸통까지 확실히 이동) 0 을 반환해 이 타깃 스크롤을
 	//해제한다. 이러면 fx/fy=0 → 에피소드 종료 → 커서 밑 컨트롤로 타깃 전환. (그 전까지, 옆 컨트롤에 살짝~어느정도 걸쳐도 원래 걸 계속 스크롤.)
+	//20260714 by claude. 단 이 상한은 '커서 밑에 전환할 다른 드롭 컨트롤이 있을 때(cap_overshoot=true)만' 적용한다. 비드롭 컨트롤(즐겨찾기)·앱 밖
+	//desktop 위처럼 전환 대상이 없으면 상한을 무시하고 계속 스크롤한다 — 타깃 밑에 다른 컨트롤이 있어 타깃 하단이 앱 위쪽에 있을 때, 앱 밖으로
+	//나가는 순간 멈추던 버그(트리는 밑에 즐겨찾기가 있어 발생, 리스트는 밑에 컨트롤이 없어 안 보였던 것)를 수정. (탐색기: 창 밖으로 나가도 계속 스크롤)
 	const int MAX_OVERSHOOT = 200;
-	if (d < -MAX_OVERSHOOT)
+	if (cap_overshoot && d < -MAX_OVERSHOOT)
 		return 0.f;
 	float t = (float)(trigger - d) / (float)accel_range;	//d=trigger→0, 가장자리(d=0)→trigger/accel, 너머로 갈수록 →1
 	if (t < 0.f) t = 0.f;
@@ -4853,12 +4856,20 @@ void CSCTreeCtrl::update_drag_auto_scroll(CPoint screen_pt)
 	m_drag_scroll_fx = 0.f;
 	m_drag_scroll_fy = 0.f;
 
-	//20260713 by claude. 타깃 선택: 스크롤 중이면(start_tick!=0) 현재 타깃을 유지, 아니면 커서 밑 트리/리스트로 설정.
-	//"언제 유지가 풀리나"는 레벨함수의 오버슛 상한(MAX_OVERSHOOT)이 담당한다 — 커서가 타깃 가장자리를 상한 이상 벗어나면 fx/fy=0 이 되어
-	//에피소드가 끝나고(아래 else 에서 start_tick=0) 다음 이동에 커서 밑 컨트롤로 전환된다. 그 전까지는 옆 컨트롤에 걸쳐도 원래 걸 계속 스크롤.
-	bool keep_target = (m_drag_scroll_start_tick != 0 && m_drag_scroll_target && ::IsWindow(m_drag_scroll_target->GetSafeHwnd()));
-	if (!keep_target && m_pDropWnd && (m_pDropWnd->IsKindOf(RUNTIME_CLASS(CTreeCtrl)) || m_pDropWnd->IsKindOf(RUNTIME_CLASS(CListCtrl))))
-		m_drag_scroll_target = m_pDropWnd;
+	//20260714 by claude. 타깃 선택: 커서 밑이 '드롭 가능한' tree/list 면 그쪽으로 전환(그 컨트롤을 스크롤). 그 외(드롭 불가 리스트=즐겨찾기·데스크톱·
+	//오버레이 스크롤바 등)면 현재 타깃을 그대로 유지해 진행 중인 자동스크롤을 방해하지 않는다 — 드롭 가능 여부와 무관하게, 스크롤 중인 컨트롤을 커서가
+	//지나가는 다른 컨트롤이 가로막지 않게 한다(사용자 방침). 이러면 앱 밖(desktop)으로 나가도 현재 타깃이 유지돼 계속 스크롤된다. (오버슛 상한으로
+	//진행 중 스크롤을 끊던 방식 폐기 — 전환은 오직 '드롭 가능한 다른 컨트롤 위'일 때만.)
+	if (m_pDropWnd)
+	{
+		if (m_pDropWnd->IsKindOf(RUNTIME_CLASS(CSCListCtrl)))
+		{
+			if (((CSCListCtrl*)m_pDropWnd)->get_use_drag_and_drop())
+				m_drag_scroll_target = m_pDropWnd;
+		}
+		else if (m_pDropWnd->IsKindOf(RUNTIME_CLASS(CTreeCtrl)))
+			m_drag_scroll_target = m_pDropWnd;
+	}
 
 	if (m_drag_scroll_target)
 	{
@@ -4894,14 +4905,14 @@ void CSCTreeCtrl::update_drag_auto_scroll(CPoint screen_pt)
 		int dt = screen_pt.y - top_ref;			//위(리스트면 헤더 아래 기준)
 		int db = rw.bottom - screen_pt.y;		//아래
 
-		//가로·세로 모두 가장자리를 넘어서도(d 음수) 계속 가속 — 타깃은 start_tick 로 고정돼 있으므로, 커서가 가장자리 밖(옆/위/아래
-		//다른 컨트롤 위)으로 나가도 그 방향으로 계속 스크롤된다. (예전에 가로만 오버슛을 막았다가, 오른쪽으로 스크롤 중 옆 리스트로
-		//가면 fx=0→fy=0→에피소드 종료→멈추는 버그가 났다. 로그로 확인 후 게이트 제거.)
-		if (dl < TRIGGER)      m_drag_scroll_fx = -drag_scroll_level(dl, TRIGGER, ACCEL_RANGE, MIN_LEVEL, MAX_LEVEL);
-		else if (dr < TRIGGER) m_drag_scroll_fx =  drag_scroll_level(dr, TRIGGER, ACCEL_RANGE, MIN_LEVEL, MAX_LEVEL);
+		//20260714 by claude. 가로·세로 모두 가장자리를 넘어서도(d 음수) 계속 가속. 타깃은 위에서 '드롭 가능한 다른 컨트롤 위'일 때만 전환되고 그 외엔
+		//현재 타깃을 유지하므로, 커서가 가장자리 밖(비드롭 리스트=즐겨찾기·데스크톱 등)으로 나가도 그 방향으로 계속 스크롤된다.
+		//오버슛 상한은 드래그에선 적용하지 않는다(cap_overshoot=false) — 진행 중인 자동스크롤을 커서 위치 거리로 끊지 않는다.
+		if (dl < TRIGGER)      m_drag_scroll_fx = -drag_scroll_level(dl, TRIGGER, ACCEL_RANGE, MIN_LEVEL, MAX_LEVEL, false);
+		else if (dr < TRIGGER) m_drag_scroll_fx =  drag_scroll_level(dr, TRIGGER, ACCEL_RANGE, MIN_LEVEL, MAX_LEVEL, false);
 
-		if (dt < TRIGGER)      m_drag_scroll_fy = -drag_scroll_level(dt, TRIGGER, ACCEL_RANGE, MIN_LEVEL, MAX_LEVEL);
-		else if (db < TRIGGER) m_drag_scroll_fy =  drag_scroll_level(db, TRIGGER, ACCEL_RANGE, MIN_LEVEL, MAX_LEVEL);
+		if (dt < TRIGGER)      m_drag_scroll_fy = -drag_scroll_level(dt, TRIGGER, ACCEL_RANGE, MIN_LEVEL, MAX_LEVEL, false);
+		else if (db < TRIGGER) m_drag_scroll_fy =  drag_scroll_level(db, TRIGGER, ACCEL_RANGE, MIN_LEVEL, MAX_LEVEL, false);
 	}
 
 	if (m_drag_scroll_fx != 0.f || m_drag_scroll_fy != 0.f)

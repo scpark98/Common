@@ -5999,11 +5999,10 @@ void CSCListCtrl::update_drag_auto_scroll(CPoint screen_pt)
 	m_drag_scroll_fx = 0.f;
 	m_drag_scroll_fy = 0.f;
 
-	//20260713 by claude. 타깃 선택: 스크롤 중이면(start_tick!=0) 현재 타깃 유지, 아니면 커서 밑 컨트롤로 설정. 유지 해제는
-	//auto_scroll_level 의 오버슛 상한(MAX_OVERSHOOT)이 담당 — 커서가 타깃 가장자리를 상한 이상 벗어나면 fx/fy=0→에피소드 종료→전환.
-	bool keep_target = (m_drag_scroll_start_tick != 0 && m_drag_scroll_target && ::IsWindow(m_drag_scroll_target->GetSafeHwnd()));
-	//20260714 by claude. 드롭 대상이 될 수 있는 컨트롤만 자동스크롤 대상으로 삼는다. 드롭 불가 리스트(예: 즐겨찾기, use_drag_and_drop=false)는
-	//드롭이 안 되므로 자동스크롤도 반응하면 안 된다(그 위에선 스크롤/드롭 모두 무의미). 리스트는 get_use_drag_and_drop() 로 판정, 트리는 대상 허용.
+	//20260714 by claude. 타깃 선택: 커서 밑이 '드롭 가능한' tree/list 면 그쪽으로 전환. 그 외(드롭 불가 리스트=즐겨찾기·데스크톱·오버레이 스크롤바 등)면
+	//현재 타깃을 유지해 진행 중인 자동스크롤을 방해하지 않는다 — 드롭 가능 여부와 무관하게, 스크롤 중인 컨트롤을 커서가 지나가는 다른 컨트롤이 가로막지
+	//않게 한다(사용자 방침). 이러면 앱 밖(desktop)으로 나가도 현재 타깃이 유지돼 계속 스크롤. (오버슛 상한으로 진행 중 스크롤을 끊던 방식 폐기.)
+	//드롭 불가 리스트(get_use_drag_and_drop=false, 예: 즐겨찾기)는 전환 대상이 아님 — 그 위에서도 현재 타깃 스크롤을 계속한다.
 	bool target_droppable = false;
 	if (m_pDropWnd)
 	{
@@ -6012,7 +6011,7 @@ void CSCListCtrl::update_drag_auto_scroll(CPoint screen_pt)
 		else if (m_pDropWnd->IsKindOf(RUNTIME_CLASS(CTreeCtrl)))
 			target_droppable = true;
 	}
-	if (!keep_target && target_droppable)
+	if (target_droppable)
 		m_drag_scroll_target = m_pDropWnd;
 
 	if (m_drag_scroll_target)
@@ -6045,10 +6044,11 @@ void CSCListCtrl::update_drag_auto_scroll(CPoint screen_pt)
 		int dt = screen_pt.y - top_ref;			//위(헤더 아래 기준)
 		int db = rc.bottom - screen_pt.y;		//아래
 
-		//가로·세로 모두 가장자리를 넘어서도 계속 가속(타깃은 start_tick 로 고정). 가로만 오버슛을 막았다가 오른쪽 스크롤 중 옆 리스트로
-		//가면 fx=0→에피소드 종료→멈추던 버그가 나서 게이트 제거(세로는 원래 무제한이라 아래 favorite list 위로 가도 안 멈췄음 — 이제 가로도 동일).
-		m_drag_scroll_fx = (dl < dr) ? -auto_scroll_level(dl) : auto_scroll_level(dr);
-		m_drag_scroll_fy = (dt < db) ? -auto_scroll_level(dt) : auto_scroll_level(db);
+		//20260714 by claude. 타깃은 위에서 '드롭 가능한 다른 컨트롤 위'일 때만 전환되고 그 외엔 현재 타깃을 유지하므로, 커서가 가장자리 밖(비드롭
+		//리스트=즐겨찾기·데스크톱 등)으로 나가도 그 방향으로 계속 스크롤된다. 오버슛 상한은 드래그에선 적용 안 함(cap_overshoot=false) — 진행 중인
+		//자동스크롤을 커서 위치 거리로 끊지 않는다. (마퀴 선택 스크롤만 default true 로 종전 동작 유지.)
+		m_drag_scroll_fx = (dl < dr) ? -auto_scroll_level(dl, false) : auto_scroll_level(dr, false);
+		m_drag_scroll_fy = (dt < db) ? -auto_scroll_level(dt, false) : auto_scroll_level(db, false);
 
 		//20260713 by claude. [진단] 자동스크롤 타깃/거리/속도. 드래그로 컨트롤 넘나들 때 타깃 전환·정지 판단 근거 추적.
 		TCHAR dcls[40] = { 0, }, tcls[40] = { 0, };
@@ -6108,7 +6108,7 @@ void CSCListCtrl::stop_auto_scroll_timer()
 //존에 진입하는 순간부터 이미 빨랐다(사용자 지적: "시작 속도가 빠르다"). 호출측 누적기가 소수 속도를 모아 천천히 스크롤한다.
 //20260713 by claude. 가속을 TRIGGER 안쪽부터 시작해 ACCEL_RANGE(가장자리 너머까지)에 걸쳐 완만하게 min→max 로. SCTreeCtrl 과 동일 감각.
 //예전 2단계(존 안 MIN→EDGE=8, 너머 EDGE→MAX=20)는 가장자리에서 바로 8 이라 "조금만 다가가도 확 빨라짐"(급격). 이제 부드럽게 이어진다.
-float CSCListCtrl::auto_scroll_level(int dist)
+float CSCListCtrl::auto_scroll_level(int dist, bool cap_overshoot)
 {
 	const int   TRIGGER      = 40;		//가장자리 안쪽 이 거리(px)부터 스크롤 시작.
 	const int   ACCEL_RANGE  = 280;		//min→max 가속을 이 거리에 걸쳐(가장자리 너머까지). TRIGGER 보다 훨씬 크게.
@@ -6118,7 +6118,9 @@ float CSCListCtrl::auto_scroll_level(int dist)
 
 	if (dist >= TRIGGER)
 		return 0.f;
-	if (dist < -MAX_OVERSHOOT)
+	//20260714 by claude. 오버슛 상한은 커서 밑에 전환할 다른 드롭 컨트롤이 있을 때(cap_overshoot=true)만 적용 — 없으면 앱 밖으로 나가도 계속 스크롤.
+	//(마퀴 선택 스크롤은 자기 자신 대상이라 default true 로 종전 동작 유지.)
+	if (cap_overshoot && dist < -MAX_OVERSHOOT)
 		return 0.f;
 	float t = (float)(TRIGGER - dist) / (float)ACCEL_RANGE;
 	if (t < 0.f) t = 0.f;

@@ -927,7 +927,7 @@ protected:
 	void			start_auto_scroll_timer();
 	void			stop_auto_scroll_timer();
 	//20260709 by claude. 자동스크롤 속도 레벨 — 가장자리 거리(안쪽 양수/넘으면 음수)에 비례해 1..MAX_LEVEL 가속(멀면 0). 드래그·마퀴 공통.
-	float			auto_scroll_level(int dist);
+	float			auto_scroll_level(int dist, bool cap_overshoot = true);	//20260714 by claude. cap_overshoot=false 면 오버슛 상한 무시(전환 대상 없을 때 계속 스크롤).
 	void			cancel_drag();								//드래그 중 ESC 등으로 드롭 없이 완전 취소.
 	bool			m_swallow_rbutton = false;					//드래그 취소용 우클릭의 RBUTTONUP 을 소비할지(팝업 메뉴 방지).
 	int				m_nDragIndex = -1;			//drag되는 컨트롤이 CListCtrl일 때 그 인덱스(drag를 시작한 컨트롤의 멤버값에 저장됨, 드롭된 클래스에는 저장되지 않음)

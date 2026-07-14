@@ -1732,10 +1732,14 @@ BOOL CSCListCtrl::PreTranslateMessage(MSG* pMsg)
 	}
 
 	//20260705 by claude. 드래그 중 Ctrl/Shift 눌림·뗌 = 이동↔복사 토글 → 마우스가 안 움직여도 문구를 즉시 갱신(소비 안 함).
+	//20260714 by claude. 단, WM_KEYDOWN 자동반복(lParam bit30=이전 키 상태)은 무시한다. Ctrl/Shift 를 '누른 채' 드래그하면
+	//자동반복 WM_KEYDOWN 이 초당 수십 회 들어와 매번 refresh_drag_hint(WindowFromPoint+compute_drag_hint) 를 유발하고,
+	//이 키다운이 소비되지 않아 메시지 큐에 누적되며 드래그가 '점점' 느려지던 원인. 토글 상태는 첫 down/up 에서만 바뀌므로 전이에서만 갱신.
 	if ((pMsg->message == WM_KEYDOWN || pMsg->message == WM_KEYUP) &&
 		(pMsg->wParam == VK_CONTROL || pMsg->wParam == VK_SHIFT) && m_bDragging)
 	{
-		refresh_drag_hint();
+		if (!(pMsg->message == WM_KEYDOWN && (pMsg->lParam & 0x40000000)))
+			refresh_drag_hint();
 	}
 
 	//20260707 by claude. 마우스 back(XBUTTON1) up → 뒤로가기. 20260709 by claude. forward(XBUTTON2) → 앞으로가기(shell 리스트). 처리 시 소비.

@@ -29,6 +29,32 @@ CSCListCtrl* CSCListCtrl::s_editing_list = NULL;
 static int  _safe_weight   (const std::deque<int>&  v, int i) { return ((int)v.size() > i && i >= 0) ? v[i] : 0; }
 static BYTE _safe_bytestyle(const std::deque<BYTE>& v, int i) { return ((int)v.size() > i && i >= 0) ? v[i] : (BYTE)0; }
 
+//20260714 by claude. [진단: 드래그 progressive slowdown] Ctrl 누른 채 드래그 시 점점 느려지는(간헐적) 원인을
+//좁히기 위한 계측. 핸들 누수(GDI/USER)인지, compute_drag_hint(shell 경로)/update_drag_hint(합성+render) 시간이
+//튀는지, per-move 처리시간이 누적 증가하는지를 판별한다. (사용자 지시 2026-07-14: 원인 확정 후에도 이 로그는 유지.)
+namespace {
+	LARGE_INTEGER	g_dperf_freq = { 0 };
+	DWORD			g_dperf_start_tick = 0;		//드래그 시작 시각(ms)
+	int				g_dperf_moves = 0;			//드래그 시작 후 mousemove 처리 횟수
+	DWORD			g_dperf_last_log = 0;		//로그 스로틀 기준
+	double			g_dperf_max_compute = 0.0;	//로그 구간 내 compute_drag_hint 최대 소요(ms)
+	double			g_dperf_max_update = 0.0;	//로그 구간 내 update_drag_hint(합성+render) 최대 소요(ms)
+	double			g_dperf_max_move = 0.0;		//로그 구간 내 mousemove 드래그블록 '전체'(tail=자동스크롤+드롭재도색 포함) 최대 소요(ms)
+	double			g_dperf_max_gap = 0.0;		//로그 구간 내 이전 OnMouseMove로부터의 최대 간격(ms) — 큰 gap = 이동이 드문드문 처리됨(starvation)
+	LARGE_INTEGER	g_dperf_last_move_qpc = { 0 };	//직전 OnMouseMove 처리 시각(QPC) — gap 계산용
+	int				g_dperf_start_gdi = 0;
+	int				g_dperf_start_user = 0;
+
+	inline double dperf_ms(const LARGE_INTEGER& a, const LARGE_INTEGER& b)
+	{
+		if (g_dperf_freq.QuadPart == 0)
+			QueryPerformanceFrequency(&g_dperf_freq);
+		return (double)(b.QuadPart - a.QuadPart) * 1000.0 / (double)g_dperf_freq.QuadPart;
+	}
+	inline int dperf_gdi()  { return (int)::GetGuiResources(::GetCurrentProcess(), GR_GDIOBJECTS); }
+	inline int dperf_user() { return (int)::GetGuiResources(::GetCurrentProcess(), GR_USEROBJECTS); }
+}
+
 CSCListCtrl::CSCListCtrl()
 {
 	memset(&m_lf, 0, sizeof(LOGFONT));
@@ -5713,6 +5739,16 @@ void CSCListCtrl::OnLvnBeginDrag(NMHDR* pNMHDR, LRESULT* pResult)
 
 	TRACE(_T("start drag...\n"));
 
+	//20260714 by claude. [진단: 드래그 slowdown] 드래그 시작 기준값 리셋 + 시작 시점 핸들 수 기록.
+	g_dperf_start_tick = GetTickCount();
+	g_dperf_moves = 0;
+	g_dperf_last_log = g_dperf_start_tick;
+	g_dperf_max_compute = g_dperf_max_update = g_dperf_max_move = g_dperf_max_gap = 0.0;
+	g_dperf_last_move_qpc.QuadPart = 0;
+	g_dperf_start_gdi = dperf_gdi();
+	g_dperf_start_user = dperf_user();
+	logWrite(_T("[drag-perf] START gdi=%d user=%d hwnd=%p"), g_dperf_start_gdi, g_dperf_start_user, GetSafeHwnd());
+
 	*pResult = 0;
 }
 
@@ -5777,6 +5813,17 @@ void CSCListCtrl::OnMouseMove(UINT nFlags, CPoint point)
 	//// If we are in a drag/drop procedure (m_bDragging is true)
 	if (m_bDragging)
 	{
+		//20260714 by claude. [진단: 드래그 slowdown] 이 mousemove 드래그블록 전체 소요 측정 시작 + 직전 OnMouseMove 로부터의 간격(gap).
+		//gap 이 크면(마우스는 움직이는데 OnMouseMove 가 드문드문 불림) = 메시지 전달 starvation, gap 이 작으면 = 각 이동이 무거움.
+		LARGE_INTEGER dperf_t0;
+		QueryPerformanceCounter(&dperf_t0);
+		if (g_dperf_last_move_qpc.QuadPart != 0)
+		{
+			double gap = dperf_ms(g_dperf_last_move_qpc, dperf_t0);
+			if (gap > g_dperf_max_gap) g_dperf_max_gap = gap;
+		}
+		g_dperf_last_move_qpc = dperf_t0;
+
 		//// Move the drag image
 		CPoint pt(point);	//get our current mouse coordinates
 		ClientToScreen(&pt); //convert to screen coordinates
@@ -5803,8 +5850,23 @@ void CSCListCtrl::OnMouseMove(UINT nFlags, CPoint point)
 		m_pDropWnd = pDropWnd;
 
 		//20260705 by claude. 드래그 중 대상에 맞는 문구를 app provider 로 계산해 이미지에 반영(값 변화 시에만 재합성). pt = screen 좌표.
+		//20260714 by claude. [진단: 드래그 slowdown] compute_drag_hint(앱 콜백=shell 경로)와 update_drag_hint(합성+render)를 분리 측정.
 		if (m_fn_drag_hint)
-			update_drag_hint(m_fn_drag_hint(pDropWnd, pt));
+		{
+			LARGE_INTEGER dperf_c0, dperf_c1, dperf_c2;
+			QueryPerformanceCounter(&dperf_c0);
+			CString dperf_hint = m_fn_drag_hint(pDropWnd, pt);
+			QueryPerformanceCounter(&dperf_c1);
+			update_drag_hint(dperf_hint);
+			QueryPerformanceCounter(&dperf_c2);
+
+			g_dperf_moves++;
+			double c_ms = dperf_ms(dperf_c0, dperf_c1);
+			double u_ms = dperf_ms(dperf_c1, dperf_c2);
+			if (c_ms > g_dperf_max_compute) g_dperf_max_compute = c_ms;
+			if (u_ms > g_dperf_max_update)  g_dperf_max_update  = u_ms;
+			//전체 move 시간(tail 포함)과 300ms 스로틀 로그는 블록 '끝'에서 emit — 여기서 재면 자동스크롤+드롭재도색(UpdateWindow)이 빠진다.
+		}
 
 		//드롭 대상 컨트롤(트리/리스트) 가장자리에 마우스가 hovering 되면 자동 스크롤.
 		//가장자리와의 거리에 비례해 속도 조절 + 타이머로 연속 스크롤(마우스가 멈춰 있어도) — update_drag_auto_scroll() 로 위임.
@@ -5828,26 +5890,38 @@ void CSCListCtrl::OnMouseMove(UINT nFlags, CPoint point)
 			//Note that we can drop here
 			::SetCursor(AfxGetApp()->LoadStandardCursor(MAKEINTRESOURCE(IDC_ARROW)));
 
-			// Turn off hilight for previous drop target
-			pList->SetItemState(m_nDropIndex, 0, LVIS_DROPHILITED);
-			// Redraw previous item
-			pList->RedrawItems(m_nDropIndex, m_nDropIndex);
-
 			// Get the item that is below cursor
 			//20260706 by claude. [smooth] native HitTest 는 native 세로 위치 기준이라 픽셀 페인트(m_scroll_y)와 어긋나 드롭
 			//하이라이트가 엉뚱한 행에 뜨고 엉뚱한 곳에 드롭된다. 대상 리스트의 smooth-aware hit_test 로 커서 아래 실제 행을 구한다.
 			//(native 모드에선 hit_test 도 native 좌표를 쓰므로 동일 결과 → 회귀 없음.)
 			int drop_item = -1, drop_sub = -1;
 			((CSCListCtrl*)pDropWnd)->hit_test(pt, drop_item, drop_sub, true);
-			m_nDropIndex = drop_item;
-			//20260707 by claude. shell 리스트면 폴더(파일크기 컬럼이 빈 항목)만 유효 드롭 대상, 일반 리스트는 폴더 개념이 없으므로
-			//커서 아래 항목을 그대로 하이라이트한다. (기존엔 대상이 일반 리스트여도 col_filesize 컬럼이 우연히 빈 행만 반응했다.)
-			if (m_nDropIndex >= 0 &&
-				(!pList->is_shell_listctrl() || pList->GetItemText(m_nDropIndex, col_filesize).IsEmpty()))
-				pList->SetItemState(m_nDropIndex, LVIS_DROPHILITED, LVIS_DROPHILITED);
-			// Redraw item
-			pList->RedrawItems(m_nDropIndex, m_nDropIndex);
-			pList->UpdateWindow();
+
+			//20260714 by claude. [드래그 느려짐 수정] 드롭 하이라이트 재도색을 '커서 아래 항목이 바뀔 때만' 수행한다.
+			//예전엔 커서가 같은 항목 위에 머물러도 매 mousemove 마다 [이전 항목 clear+RedrawItems] + [새 항목 set+RedrawItems] + UpdateWindow(동기 재도색)를
+			//반복해, smooth 리스트 재도색(측정상 이동당 ~45ms)이 매 이동마다 일어나 드래그가 초당 ~20회로 제한되며 뚝뚝 끊겼다([drag-perf] max_full≈max_gap≈50ms로 확정).
+			//대상이 바뀔 때만 이전/새 항목 2개를 다시 그리면 하이라이트 정확성은 동일하고, 같은 항목 위 이동(대다수)에서는 재도색이 사라진다. m_nDropIndex 의미(커서 아래 raw 항목)는 보존.
+			if (drop_item != m_nDropIndex)
+			{
+				//이전 하이라이트 해제 + 그 항목만 재도색.
+				if (m_nDropIndex >= 0)
+				{
+					pList->SetItemState(m_nDropIndex, 0, LVIS_DROPHILITED);
+					pList->RedrawItems(m_nDropIndex, m_nDropIndex);
+				}
+
+				m_nDropIndex = drop_item;
+
+				//20260707 by claude. shell 리스트면 폴더(파일크기 컬럼이 빈 항목)만 유효 드롭 대상, 일반 리스트는 폴더 개념이 없으므로
+				//커서 아래 항목을 그대로 하이라이트한다. (기존엔 대상이 일반 리스트여도 col_filesize 컬럼이 우연히 빈 행만 반응했다.)
+				if (m_nDropIndex >= 0 &&
+					(!pList->is_shell_listctrl() || pList->GetItemText(m_nDropIndex, col_filesize).IsEmpty()))
+					pList->SetItemState(m_nDropIndex, LVIS_DROPHILITED, LVIS_DROPHILITED);
+
+				if (m_nDropIndex >= 0)
+					pList->RedrawItems(m_nDropIndex, m_nDropIndex);
+				pList->UpdateWindow();
+			}
 		}
 		else if (pDropWnd->IsKindOf(RUNTIME_CLASS(CTreeCtrl)))
 		{
@@ -5878,6 +5952,27 @@ void CSCListCtrl::OnMouseMove(UINT nFlags, CPoint point)
 			::SetCursor(AfxGetApp()->LoadStandardCursor(MAKEINTRESOURCE(IDC_NO)));
 		}
 		//20260704 by claude. (레이어드 드래그이미지는 화면 lock 이 없어 DragShowNolock 불필요 — 제거)
+
+		//20260714 by claude. [진단: 드래그 slowdown] 여기가 드래그블록 '끝' — tail(update_drag_auto_scroll + 드롭 하이라이트 RedrawItems + UpdateWindow 동기 재도색)까지
+		//포함한 OnMouseMove 전체 소요를 재고, 300ms 스로틀로 로그. max_full 이 max_compute+max_update 보다 크게 뜨면 그 tail(특히 UpdateWindow 재도색)이 범인.
+		//(위쪽 비-드롭 대상 early return 경로(5893 부근)는 이 지점을 안 지나 로그가 안 나오지만, 리스트/트리 위 정상 드래그는 여기를 지난다.)
+		LARGE_INTEGER dperf_end;
+		QueryPerformanceCounter(&dperf_end);
+		double full_ms = dperf_ms(dperf_t0, dperf_end);
+		if (full_ms > g_dperf_max_move) g_dperf_max_move = full_ms;
+
+		DWORD dperf_now = GetTickCount();
+		if (dperf_now - g_dperf_last_log >= 300)
+		{
+			int gdi = dperf_gdi();
+			int usr = dperf_user();
+			logWrite(_T("[drag-perf] t=%ums moves=%d gdi=%d(+%d) user=%d(+%d) max_gap=%.1fms max_compute=%.2fms max_update=%.2fms max_full=%.2fms"),
+				dperf_now - g_dperf_start_tick, g_dperf_moves,
+				gdi, gdi - g_dperf_start_gdi, usr, usr - g_dperf_start_user,
+				g_dperf_max_gap, g_dperf_max_compute, g_dperf_max_update, g_dperf_max_move);
+			g_dperf_last_log = dperf_now;
+			g_dperf_max_compute = g_dperf_max_update = g_dperf_max_move = g_dperf_max_gap = 0.0;
+		}
 	}
 
 	CListCtrl::OnMouseMove(nFlags, point);
@@ -6191,6 +6286,15 @@ void CSCListCtrl::OnLButtonUp(UINT nFlags, CPoint point)
 
 		// Note that we are NOT in a drag operation
 		m_bDragging = FALSE;
+
+		//20260714 by claude. [진단: 드래그 slowdown] 드래그 1회 종료 시점 핸들 순증 확인 — START 대비 GDI/USER 가 늘면 드래그당 누수.
+		{
+			int gdi = dperf_gdi();
+			int usr = dperf_user();
+			logWrite(_T("[drag-perf] END t=%ums moves=%d gdi=%d(net %+d) user=%d(net %+d)"),
+				GetTickCount() - g_dperf_start_tick, g_dperf_moves,
+				gdi, gdi - g_dperf_start_gdi, usr, usr - g_dperf_start_user);
+		}
 
 		//드래그 자동 스크롤 타이머 정지.
 		stop_auto_scroll_timer();

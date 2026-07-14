@@ -308,7 +308,12 @@ void CSCHeaderCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 
 void CSCHeaderCtrl::OnLButtonUp(UINT nFlags, CPoint point)
 {
-	if ((!m_allow_sort || !m_header_is_clicked) && is_separator(point) < 0)
+	//20260714 by claude. 컬럼 divider 드래그 중에는 native 헤더가 track 을 위해 마우스 캡처를 잡는다. 그 track 종료(capture 해제)는 base 가
+	//담당하므로, 드래그 중(캡처 보유)이면 release 지점이 separator 를 벗어났든(min-width 를 지나쳐 끌거나 창 밖으로 나가도) 반드시 base 를 불러 끝낸다.
+	//예전엔 is_separator(point)<0(release 가 divider 를 벗어남)이면 sort off 상태에서 early return 으로 base 를 건너뛰어 track 이 안 끝났다
+	//(조정모드가 살아있거나 창 밖 release 가 무시되던 원인). 순수 클릭 release(캡처 없음)만 종전 가드를 적용한다.
+	bool tracking = (::GetCapture() == GetSafeHwnd());
+	if (!tracking && (!m_allow_sort || !m_header_is_clicked) && is_separator(point) < 0)
 		return;
 
 	// TODO: Add your message handler code here and/or call default

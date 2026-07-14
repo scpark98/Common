@@ -138,6 +138,7 @@ public:
 		message_expand_changed,			//노드 확장/축소로 '펼쳐진 폴더 집합'이 바뀌었음을 parent에게 알린다(dir watcher 재설정용).
 		//20260708 by claude. 드라이브 볼륨 레이블 변경 통지 — param0=드라이브 root("C:\\"), param1=새 볼륨 레이블. parent 가 받아 형제 컨트롤(리스트 등) 드라이브 표시 동기화.
 		message_drive_volume_changed,
+		message_folder_created,			//20260714 by claude. 새 폴더 생성+명명 완료. param0=새 폴더 실경로. parent 가 그 노드를 선택(→ pathctrl/listctrl 갱신). rename(message_path_changed)과 구분.
 	};
 
 	//해당 아이템의 depth level을 리턴한다. hItem == NULL이면 -1을 리턴한다.
@@ -651,6 +652,7 @@ protected:
 //편집 관련
 	bool			m_allow_edit = true;
 	bool			m_in_editing = false;		//편집중인지
+	bool			m_editing_is_new_folder = false;	//20260714 by claude. 현재 편집이 add_new_item 의 '새 폴더 생성'인지. edit_end 가 message_folder_created / message_path_changed 를 구분하는 데 사용.
 	bool			m_in_context_menu = false;	//우클릭 메뉴 표시 중 — focus 가 menu 로 가도 selected 항목을 active 색으로 그리기 위한 가드
 	CSCStaticEdit*	m_pEdit = NULL;
 	CString			m_edit_old_text;

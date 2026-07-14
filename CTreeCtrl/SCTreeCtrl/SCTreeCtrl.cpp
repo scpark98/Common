@@ -3750,6 +3750,9 @@ BOOL CSCTreeCtrl::OnTvnEndlabeledit(NMHDR* pNMHDR, LRESULT* pResult)
 
 void CSCTreeCtrl::edit_item(HTREEITEM hItem)
 {
+	//20260714 by claude. 기본은 rename 편집. '새 폴더 생성' 편집은 add_new_item 이 이 호출 뒤에 true 로 표시한다(stale 방지).
+	m_editing_is_new_folder = false;
+
 	if (!m_allow_edit)
 		return;
 
@@ -3919,6 +3922,10 @@ void CSCTreeCtrl::edit_end(bool valid)
 
 	m_in_editing = false;
 
+	//20260714 by claude. '새 폴더 생성' 편집 여부를 1회 소비 — 어느 return 경로로 나가든 다음 편집에 새지 않게 즉시 리셋.
+	bool is_new_folder = m_editing_is_new_folder;
+	m_editing_is_new_folder = false;
+
 	m_pEdit->GetWindowText(m_edit_new_text);
 	m_pEdit->ShowWindow(SW_HIDE);
 
@@ -3934,6 +3941,15 @@ void CSCTreeCtrl::edit_end(bool valid)
 		dispinfo.item.mask = TVIF_TEXT;
 		dispinfo.item.hItem = m_edit_item;
 		GetParent()->SendMessage(WM_NOTIFY, GetDlgCtrlID(), (LPARAM)&dispinfo);
+
+		//20260714 by claude. 새 폴더를 기본 이름 그대로(엔터) 확정한 경우도 그 폴더를 선택하도록 parent 에 알린다(escape 제외).
+		if (valid && is_new_folder && m_pShellImageList)
+		{
+			CString real = m_pShellImageList->convert_special_folder_to_real_path(!m_is_local, get_path(m_edit_item));
+			::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCTreeCtrl,
+				(WPARAM) & (CSCTreeCtrlMessage(this, message_folder_created, NULL, real)), (LPARAM)0);
+		}
+
 		Invalidate();
 		return;
 	}
@@ -4008,10 +4024,11 @@ void CSCTreeCtrl::edit_end(bool valid)
 			else
 			{
 				SetItemText(m_edit_item, m_edit_new_text);
-				//path가 변경된 것을 parent에게 알려야 listctrl, pathctrl을 갱신한다.
+				//20260714 by claude. 새 폴더 생성이면 message_folder_created(그 노드 선택), 기존 폴더 rename 이면 message_path_changed
+				//(현재 경로 갱신)로 구분한다. 최종 폴더 선택 후처리는 parent(메인)가 담당 — pathctrl/listctrl 까지 갱신되도록.
 				::SendMessage(GetParent()->GetSafeHwnd(),
 					Message_CSCTreeCtrl,
-					(WPARAM) & (CSCTreeCtrlMessage(this, message_path_changed, NULL, new_path)),
+					(WPARAM) & (CSCTreeCtrlMessage(this, is_new_folder ? message_folder_created : message_path_changed, NULL, new_path)),
 					(LPARAM)&res);
 			}
 		}
@@ -5228,7 +5245,10 @@ HTREEITEM CSCTreeCtrl::add_new_item(HTREEITEM hParent, CString label, bool auto_
 		Expand(hParent, TVE_EXPAND);
 
 		if (edit_mode)
+		{
 			edit_item(hItem);
+			m_editing_is_new_folder = true;	//20260714 by claude. 이 편집은 '새 폴더 생성' — 완료 시 edit_end 가 message_folder_created 로 알려 parent 가 그 폴더를 선택한다.
+		}
 	}
 
 	return hItem;

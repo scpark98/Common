@@ -5,6 +5,7 @@
 #include "../../MemoryDC.h"
 #include "../../CEdit/SCEdit/SCEdit.h"
 #include "../../Functions.h"	//get_monitor_index / get_monitor_rect / g_monitors — 서브폴더 팝업 모니터 보정용.
+#include "../../log/SCLog/SCLog.h"	//20260715 by claude. [진단 임시] logWrite 사용 — 원인 확정 후 이 include 도 함께 정리.
 
 // CPathCtrl
 
@@ -466,7 +467,21 @@ void CPathCtrl::set_path(CString path, std::deque<CString>* sub_folders)
 
 	if (m_is_local)
 	{
-		m_has_subfolder = has_sub_folders(path);	//마지막 폴더명 아래 서브폴더가 존재하는지
+		//"내 PC"는 파일시스템 경로가 아니라 셸 가상 폴더라 FindFirstFile("내 PC\\*")가 열 수 없다.
+		//즉 has_sub_folders()는 이 경우 항상 false 를 낸다. 내 PC의 하위 폴더는 드라이브이고 드라이브가 없는 PC 는 없으므로 true.
+		if (path == m_pShellImageList->m_volume[!m_is_local].get_label(CSIDL_DRIVES))
+		{
+			m_has_subfolder = true;
+		}
+		else
+		{
+			m_has_subfolder = has_sub_folders(path);	//마지막 폴더명 아래 서브폴더가 존재하는지
+		}
+
+		//20260715 by claude. [진단 임시] 로컬 마지막 세그먼트의 화살표 판정 값.
+		logWrite(_T("[pathctrl] set_path LOCAL path=[%s] m_has_subfolder=%d drives=%d"),
+			(LPCTSTR)path, (int)m_has_subfolder,
+			(int)m_pShellImageList->m_volume[!m_is_local].get_drive_list()->size());
 	}
 	else
 	{
@@ -974,11 +989,16 @@ void CPathCtrl::recalc_path_position()
 		//좌우 여백을 추가하고
 		rt.right += m_width_margin * 2;
 
-		//해당 폴더 아래 하위 폴더가 있다면 드롭다운 영역도 추가
-		//remote인 경우는 하위 폴더목록을 request해서 받기 전까지는 구할 수 없다.
-		//하지만 m_path.size() - 1보다 하위의 폴더라면 이미 하위폴더가 있다는 뜻이므로 우선 이렇게 처리한다.
-		bool has_sub = (m_is_local ? has_sub_folders(m_pShellImageList->convert_special_folder_to_real_path(!m_is_local, get_path(i))) : true);
-		rt.right += (has_sub || (i < m_path.size() - 1) ? m_arrow_area_width : 0);
+		//해당 폴더 아래 하위 폴더가 있다면 드롭다운 영역도 추가.
+		//마지막보다 앞의 세그먼트는 자식이 있다는 게 자명하고, 마지막 세그먼트의 자식 유무는 set_path 가 이미
+		//m_has_subfolder 에 판정해 뒀다. 여기서 다시 판정하면 OnPaint 의 그리기 조건과 어긋날 수 있는데,
+		//어긋나면 그리기는 화살표 자리를 빼면서 폭은 안 더해져 레이블이 잘린다("내 PC" → "내..."). 조건을 OnPaint 와 동일하게 맞춘다.
+		rt.right += (i < m_path.size() - 1 || m_has_subfolder ? m_arrow_area_width : 0);
+
+		//20260715 by claude. [진단 임시] 세그먼트별 폭 판정.
+		logWrite(_T("[pathctrl] recalc i=%d/%d local=%d label=[%s] path=[%s] arrow_added=%d m_has_subfolder=%d w=%d"),
+			i, (int)m_path.size() - 1, (int)m_is_local, (LPCTSTR)m_path[i].label, (LPCTSTR)get_path(i),
+			(int)(i < (int)m_path.size() - 1 || m_has_subfolder), (int)m_has_subfolder, rt.Width());
 
 		rt.top = rc.top;
 		rt.bottom = rc.bottom;

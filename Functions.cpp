@@ -5124,28 +5124,28 @@ HINSTANCE FindExecutableEx(LPCTSTR lpFile, LPCTSTR lpDirectory, LPTSTR lpResult)
 */
 ULONGLONG get_disk_free_size(CString sDrive)
 {
-	TCHAR Drive[10];
-	ULARGE_INTEGER	m_lFreeBytesAvailableToCaller;    
-	ULARGE_INTEGER	m_lTotalNumberOfBytes;
-	ULARGE_INTEGER	m_lTotalNumberOfFreeBytes;
-	
+	//20260715 by claude. 고정 버퍼(TCHAR Drive[10]) + 무경계 _stprintf 를 제거하고 CString 을 그대로 넘긴다.
+	//9자를 넘는 인자가 오면(예: 호출측이 "D:\작업 디스크1" 같은 잘못된 경로를 넘긴 경우) 스택이 깨졌다
+	//("Stack around the variable 'Drive' was corrupted" 크래시). GetDiskFreeSpaceEx/GetDriveType 은 루트뿐 아니라
+	//디렉터리 경로도 받으므로 버퍼를 만들 이유가 없다.
+	ULARGE_INTEGER	free_bytes_available = { 0 };
+	ULARGE_INTEGER	total_bytes = { 0 };
+	ULARGE_INTEGER	total_free_bytes = { 0 };
+
 	if (sDrive.IsEmpty())
 		sDrive = GetCurrentDirectory();
 
-	if (sDrive.GetLength() == 1)
-		_stprintf(Drive, _T("%s:\\"), sDrive);
-	else
-		_stprintf(Drive, _T("%s"), sDrive);
+	if (sDrive.GetLength() == 1)	//"D" → "D:\"
+		sDrive += _T(":\\");
 
-	if (GetDriveType(Drive) == DRIVE_CDROM)
+	if (GetDriveType(sDrive) == DRIVE_CDROM)
 		return 0;
-	
-	int res =  GetDiskFreeSpaceEx(Drive, 
-		&m_lFreeBytesAvailableToCaller, 
-		&m_lTotalNumberOfBytes, 
-		&m_lTotalNumberOfFreeBytes);
 
-	return m_lTotalNumberOfFreeBytes.QuadPart;
+	//20260715 by claude. 실패 시 예전엔 초기화되지 않은 값을 그대로 반환했다(res 를 검사하지 않음) → 0 반환으로 교정.
+	if (!GetDiskFreeSpaceEx(sDrive, &free_bytes_available, &total_bytes, &total_free_bytes))
+		return 0;
+
+	return total_free_bytes.QuadPart;
 }
 
 ULONGLONG get_disk_total_size(CString sDrive)

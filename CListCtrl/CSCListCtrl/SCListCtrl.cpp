@@ -4700,7 +4700,10 @@ void CSCListCtrl::edit_end(bool valid)
 	//반드시 위 통지 '뒤'라야 한다: 부모(앱)가 이 통지에서 m_edit_item 인덱스로 백업 데이터(WIN32_FIND_DATA)를 갱신하는데, 그 전에 정렬하면
 	//그 인덱스가 다른 행을 가리켜 엉뚱한 항목의 데이터를 덮어쓴다. SendMessage 는 동기라 이 줄에선 부모의 뒷정리가 이미 끝나 있다.
 	//정렬로 인덱스가 바뀌므로 선택은 이름으로 되찾는다(ensure_visible 포함). 셸 리스트(파일 목록)에만 적용 — 일반 리스트는 행 순서가 의미를 가질 수 있다.
-	if (m_is_shell_listctrl && valid && m_edit_new_text != m_edit_old_text)
+	//20260715 by claude. 드라이브(내 PC 뷰)는 제외한다 — 탐색기와 동일하게 드라이브 '문자' 순으로 이미 정렬돼 있고 볼륨 레이블을 바꿔도
+	//순서가 바뀌지 않는다(정렬 기준 cFileName 이 "D:\" 라 결과도 동일). 무의미할 뿐 아니라 resort→refresh_list→display_filelist 의
+	//드라이브 여유공간 조회 경로를 타서 크래시를 유발했다.
+	if (m_is_shell_listctrl && valid && !m_edit_is_drive && m_edit_new_text != m_edit_old_text)
 	{
 		resort();
 		select_items_by_names(std::deque<CString>{ m_edit_new_text });

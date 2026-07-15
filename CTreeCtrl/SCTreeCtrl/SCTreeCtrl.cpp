@@ -4784,10 +4784,16 @@ void CSCTreeCtrl::OnTimer(UINT_PTR nIDEvent)
 			float ramp = (float)(GetTickCount() - m_drag_scroll_start_tick) / RAMP_MS;
 			if (ramp < RAMP_FLOOR) ramp = RAMP_FLOOR;
 			if (ramp > 1.0f)       ramp = 1.0f;
-			m_drag_scroll_ax += m_drag_scroll_fx * ramp;
+
+			//20260715 by claude. 가로는 '픽셀'로 누적한다(세로는 종전대로 라인 수). 예전엔 level 을 정수로 절삭한 뒤 step_x*30 을 보내
+			//가로가 30px 단위로만 움직였다 — 느릴수록 "몇 tick 에 한 번 30px 점프"(툭툭툭)가 되고, 트리/리스트는 폭이 좁아 30px 이
+			//화면에서 큰 비중이라 특히 거슬렸다. level*PX_PER_LEVEL 을 먼저 곱해 누적하면 남는 소수가 다음 tick 으로 이월돼 1px 단위로
+			//움직인다(느리면 몇 tick 에 1px, 빠르면 tick 당 수십 px). 최대/최소 속도는 종전과 동일 — 양자화만 30px → 1px 로 줄인 것.
+			const int PX_PER_LEVEL = 30;		//가로 level 1 = 30px/tick (종전 step_x*30 과 동일한 속도 기준).
+			m_drag_scroll_ax += m_drag_scroll_fx * ramp * PX_PER_LEVEL;
 			m_drag_scroll_ay += m_drag_scroll_fy * ramp;
-			int step_x = (int)m_drag_scroll_ax;	//0 방향으로 절삭
-			int step_y = (int)m_drag_scroll_ay;
+			int step_x = (int)m_drag_scroll_ax;	//가로 px(0 방향으로 절삭 — 남는 소수는 누적기에 남아 이월)
+			int step_y = (int)m_drag_scroll_ay;	//세로 라인 수
 			m_drag_scroll_ax -= step_x;
 			m_drag_scroll_ay -= step_y;
 
@@ -4799,7 +4805,7 @@ void CSCTreeCtrl::OnTimer(UINT_PTR nIDEvent)
 				//drag_scroll_by(m_h_scroll_pos + sync_scrollbar 동기)를 수행하고 1 을 반환한다. 미처리(일반 CListCtrl/CTreeCtrl)면 폴백.
 				//(레이어드 드래그 이미지라 화면 lock(DragShowNolock) 불필요.)
 				LRESULT handled = m_drag_scroll_target->SendMessage(Message_DragScrollBy,
-					(WPARAM)(step_x * 30), (LPARAM)step_y);	//가로 px, 세로 라인 수
+					(WPARAM)step_x, (LPARAM)step_y);	//가로 px(누적기가 이미 px), 세로 라인 수
 
 				if (!handled)
 				{
@@ -4807,7 +4813,7 @@ void CSCTreeCtrl::OnTimer(UINT_PTR nIDEvent)
 					{
 						//일반 CListCtrl(오버레이 바 없음)은 WM_*SCROLL SB_LINE 이 안 먹으므로 raw Scroll(픽셀).
 						CListCtrl* pl = (CListCtrl*)m_drag_scroll_target;
-						pl->Scroll(CSize(step_x * 30, step_y * 20));
+						pl->Scroll(CSize(step_x, step_y * 20));
 						pl->UpdateWindow();
 					}
 					else
@@ -4815,7 +4821,9 @@ void CSCTreeCtrl::OnTimer(UINT_PTR nIDEvent)
 						//일반 CTreeCtrl 등 — SB_LINE 경로.
 						for (int i = 0; i < abs(step_y); i++)
 							m_drag_scroll_target->SendMessage(WM_VSCROLL, (step_y < 0) ? SB_LINEUP   : SB_LINEDOWN);
-						for (int i = 0; i < abs(step_x); i++)
+
+						//20260715 by claude. step_x 는 이제 px 이므로 라인 단위(SB_LINE)인 이 폴백에는 PX_PER_LEVEL 로 나눠 보낸다(종전 동작 그대로).
+						for (int i = 0; i < abs(step_x) / PX_PER_LEVEL; i++)
 							m_drag_scroll_target->SendMessage(WM_HSCROLL, (step_x < 0) ? SB_LINELEFT : SB_LINERIGHT);
 					}
 				}

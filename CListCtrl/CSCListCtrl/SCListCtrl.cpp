@@ -6250,10 +6250,16 @@ void CSCListCtrl::OnTimer(UINT_PTR nIDEvent)
 		float ramp = (float)(GetTickCount() - m_drag_scroll_start_tick) / RAMP_MS;
 		if (ramp < RAMP_FLOOR) ramp = RAMP_FLOOR;
 		if (ramp > 1.0f)       ramp = 1.0f;
-		m_drag_scroll_ax += m_drag_scroll_fx * ramp;
+
+		//20260715 by claude. 가로는 '픽셀'로 누적한다(세로는 종전대로 라인 수). 예전엔 level 을 정수로 절삭한 뒤 step_x*30 을 보내
+		//가로가 30px 단위로만 움직였다 — 느릴수록 "몇 tick 에 한 번 30px 점프"(툭툭툭)가 되고, 트리/리스트는 폭이 좁아 30px 이
+		//화면에서 큰 비중이라 특히 거슬렸다. level*PX_PER_LEVEL 을 먼저 곱해 누적하면 남는 소수가 다음 tick 으로 이월돼 1px 단위로
+		//움직인다. 최대/최소 속도는 종전과 동일 — 양자화만 30px → 1px 로 줄인 것. (마퀴 자동스크롤 경로는 종전 유지.)
+		const int PX_PER_LEVEL = 30;		//가로 level 1 = 30px/tick (종전 step_x*30 과 동일한 속도 기준).
+		m_drag_scroll_ax += m_drag_scroll_fx * ramp * PX_PER_LEVEL;
 		m_drag_scroll_ay += m_drag_scroll_fy * ramp;
-		int step_x = (int)m_drag_scroll_ax;	//0 방향으로 절삭
-		int step_y = (int)m_drag_scroll_ay;
+		int step_x = (int)m_drag_scroll_ax;	//가로 px(0 방향으로 절삭 — 남는 소수는 누적기에 남아 이월)
+		int step_y = (int)m_drag_scroll_ay;	//세로 라인 수
 		m_drag_scroll_ax -= step_x;
 		m_drag_scroll_ay -= step_y;
 
@@ -6261,19 +6267,21 @@ void CSCListCtrl::OnTimer(UINT_PTR nIDEvent)
 			return;
 
 		//m_pDropWnd 가 아니라 m_drag_scroll_target 로 — 커서가 오버레이 스크롤바 위여도 실제 리스트/트리로 스크롤.
-		if (m_drag_scroll_target->IsKindOf(RUNTIME_CLASS(CSCListCtrl)))
-		{
-			//20260704 by claude. 레이어드 드래그이미지는 화면 lock 이 없으므로 스크롤 전후로 이미지를 내렸다 올릴 필요가 없다
-			//(예전 CImageList 는 DragLeave→scroll→DragEnter 로 매 tick 깜빡였다). 그냥 스크롤만 한다.
-			//drag_scroll_by(): 가로는 m_h_scroll_pos 갱신+sync_scrollbar 로 가로바/헤더까지 동기화, 세로는 WM_VSCROLL SB_LINE.
-			CSCListCtrl* pl = (CSCListCtrl*)m_drag_scroll_target;
-			pl->drag_scroll_by(step_x * 30, step_y);	//가로 px, 세로 라인 수
-		}
-		else
+		//20260704 by claude. 레이어드 드래그이미지는 화면 lock 이 없으므로 스크롤 전후로 이미지를 내렸다 올릴 필요가 없다
+		//(예전 CImageList 는 DragLeave→scroll→DragEnter 로 매 tick 깜빡였다). 그냥 스크롤만 한다.
+		//20260715 by claude. 대상 타입을 CSCListCtrl 로 한정해 직접 호출하던 것을 SCTreeCtrl 과 동일하게 Message_DragScrollBy 위임으로 통일.
+		//예전엔 대상이 트리면 else 폴백의 WM_HSCROLL SB_LINELEFT(=60px, 휠과 공유) 로 밀려 가로가 훨씬 거칠고 오버레이 가로바와도
+		//desync 됐다. 이 메시지를 처리하는 컨트롤(CSCTreeCtrl/CSCListCtrl/CVtListCtrlEx)은 각자 drag_scroll_by 로 px 스크롤 + sync_scrollbar 한다.
+		LRESULT handled = m_drag_scroll_target->SendMessage(Message_DragScrollBy,
+			(WPARAM)step_x, (LPARAM)step_y);	//가로 px(누적기가 이미 px), 세로 라인 수
+
+		if (!handled)
 		{
 			for (int i = 0; i < abs(step_y); i++)
 				m_drag_scroll_target->SendMessage(WM_VSCROLL, (step_y < 0) ? SB_LINEUP   : SB_LINEDOWN);
-			for (int i = 0; i < abs(step_x); i++)
+
+			//20260715 by claude. step_x 는 이제 px 이므로 라인 단위(SB_LINE)인 이 폴백에는 PX_PER_LEVEL 로 나눠 보낸다(종전 동작 그대로).
+			for (int i = 0; i < abs(step_x) / PX_PER_LEVEL; i++)
 				m_drag_scroll_target->SendMessage(WM_HSCROLL, (step_x < 0) ? SB_LINELEFT : SB_LINERIGHT);
 		}
 

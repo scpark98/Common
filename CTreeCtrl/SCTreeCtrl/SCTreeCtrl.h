@@ -516,8 +516,9 @@ protected:
 	//→ level<1 이면 여러 tick 에 한 번씩 스크롤되어 '천천히' 표현(예전 정수 level 은 최소 1라인/tick 이라 시작부터 빨랐다).
 	float			m_drag_scroll_fx = 0.f;		//목표 속도(가로 level, 부호=방향)
 	float			m_drag_scroll_fy = 0.f;		//목표 속도(세로 level)
-	float			m_drag_scroll_ax = 0.f;		//가로 누적기
-	float			m_drag_scroll_ay = 0.f;		//세로 누적기
+	//20260715 by claude. 가로 누적기의 단위는 level 이 아니라 px — level 을 정수 절삭 후 *30 하면 30px 단위로만 튀어(툭툭툭), *30 을 먼저 곱해 px 로 누적한다.
+	float			m_drag_scroll_ax = 0.f;		//가로 누적기(px)
+	float			m_drag_scroll_ay = 0.f;		//세로 누적기(라인)
 	//20260713 by claude. 시간 램프 — 스크롤 에피소드 시작(존 진입) 시각. 시작 직후엔 아주 느리게, 유지할수록 최대속도로 가속(탐색기식).
 	//거리 레벨(가까울수록 빠름)에 시간 램프(막 시작=느림)를 곱해, "시작 속도가 너무 빠르다"를 해소. 존을 벗어나면 0 으로 리셋.
 	DWORD			m_drag_scroll_start_tick = 0;

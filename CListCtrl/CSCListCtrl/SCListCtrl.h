@@ -915,8 +915,9 @@ protected:
 	//그 정수만큼 스크롤 → level<1(가장자리 존 바깥쪽)이면 여러 tick 에 한 번씩 스크롤되어 '시작이 천천히'가 표현된다.
 	float			m_drag_scroll_fx = 0.f;		//드래그 자동 스크롤 목표속도(가로 level, 부호=방향). 0=안 함.
 	float			m_drag_scroll_fy = 0.f;		//세로 목표속도.
-	float			m_drag_scroll_ax = 0.f;		//가로 누적기.
-	float			m_drag_scroll_ay = 0.f;		//세로 누적기.
+	//20260715 by claude. 가로 누적기의 단위는 level 이 아니라 px — level 을 정수 절삭 후 *30 하면 30px 단위로만 튀어(툭툭툭), *30 을 먼저 곱해 px 로 누적한다.
+	float			m_drag_scroll_ax = 0.f;		//가로 누적기(px).
+	float			m_drag_scroll_ay = 0.f;		//세로 누적기(라인).
 	//20260713 by claude. 시간 램프 — 스크롤 에피소드 시작 시각. 시작 직후 아주 느리게 → 유지하면 최대속도로 가속(탐색기식). 존 벗어나면 0.
 	DWORD			m_drag_scroll_start_tick = 0;
 	CWnd*			m_drag_scroll_target = NULL;	//자동 스크롤을 실제로 보낼 리스트/트리(오버레이 스크롤바 위여도 이 컨트롤로 전송).

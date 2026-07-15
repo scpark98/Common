@@ -1,4 +1,5 @@
 ﻿#include "SCDirWatcher.h"
+#include "../../log/SCLog/SCLog.h"	//20260715 by claude. [진단 임시] logWrite 사용 — 원인 확정 후 이 include 도 함께 제거.
 
 CSCDirWatcher::CSCDirWatcher()
 {
@@ -188,6 +189,13 @@ void CSCDirWatcher::thread_directory_change_watcher()
                 DWORD dwAction;
                 m_watcher.Pop(dwAction, wstrFilename);
                 //TRACE(_T("rc = %d, %s %s\n"), rc, ExplainAction(dwAction), wstrFilename.c_str());
+
+                //20260715 by claude. [진단 임시] OS(ReadDirectoryChangesW)가 준 원시 통지 — 앱 콜백이 거르기 전 값. 생성/이름변경이
+                //반영 안 되는 게 (1) 통지 자체가 안 오는 것인지 (2) 와도 앱이 거르는 것인지 구분하려고 여기서 먼저 찍는다.
+                logWrite(_T("[watch] raw action=%d(%s) file=[%s] old=[%s] paused=%d"),
+                    dwAction, (LPCTSTR)action_str((int)dwAction), wstrFilename.c_str(),
+                    (LPCTSTR)m_old_path, (int)is_paused(CString(wstrFilename.c_str())));
+
                 if (dwAction == FILE_ACTION_RENAMED_OLD_NAME)
                 {
                     m_old_path = CString(wstrFilename.c_str());

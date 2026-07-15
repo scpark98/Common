@@ -536,6 +536,9 @@ public:
 	void			sort(int column, int ascending);
 	void			sort_by_text_color(int column, int ascending, bool text_sort_on_same_color = true);
 	int				cur_sorted_column_index() { return m_cur_sort_column; }
+	//20260715 by claude. 현재 정렬 기준(컬럼·오름/내림)을 그대로 다시 적용 — 항목 텍스트가 바뀌어(이름변경) 순서가 어긋났을 때 쓴다.
+	//sort() 는 목록을 reload 하지 않고 정렬만 다시 하므로 refresh_list 보다 싸고, 선택 인덱스는 바뀌므로 호출측이 이름으로 재선택해야 한다.
+	void			resort();
 
 //컬러 관련
 	void			set_color_theme(int theme, bool invalidate = true);

@@ -1321,6 +1321,23 @@ void CSCListCtrl::allow_sort(bool allow)
 
 //debug모드에서는 매우 느리다. lambda때문인지 모르겠다.
 //0번 컬럼이 아닌 다른 컬럼으로 정렬할 때 두 값이 같으면 0번 컬럼으로 한번 더 검사한다.
+//20260715 by claude. 현재 정렬 기준(컬럼·오름/내림)을 그대로 다시 적용. sort() 는 reload 없이 정렬만 하므로 refresh_list 보다 싸다.
+//ascending 을 -1 로 주면 sort() 가 방향을 토글해버리므로 현재 방향을 그대로 넘긴다.
+void CSCListCtrl::resort()
+{
+	if (m_cur_sort_column < 0 || m_cur_sort_column >= (int)m_column_sort_type.size())
+	{
+		return;
+	}
+
+	if (m_column_sort_type[m_cur_sort_column] == sort_none)
+	{
+		return;
+	}
+
+	sort(m_cur_sort_column, m_column_sort_type[m_cur_sort_column]);
+}
+
 void CSCListCtrl::sort(int subItem, int ascending)
 {
 	if (!m_allow_sort)
@@ -1915,11 +1932,19 @@ BOOL CSCListCtrl::PreTranslateMessage(MSG* pMsg)
 									return true;
 								}
 								break;
-			case VK_F5		:	
+			case VK_F5		:
 								//editing일 경우는 F5키가 CEdit에서 발생하므로 여기 오지 않는다.
 								//CEdit을 파생해서 F5 이벤트가 발생하면 편집을 종료시키고 새로고침 해줘야 한다.
 								if (m_in_editing)
 									edit_end();
+
+								//20260715 by claude. 셸 리스트(파일 목록)만 여기서 새로고침한다. 일반 리스트는 refresh_list 가 맨 앞의
+								//!m_is_shell_listctrl 가드로 아무것도 안 하면서 return true 로 F5 를 삼켜, 부모가 F5 를 처리할 방법이
+								//없었다(포커스 컨트롤이 PreTranslateMessage 를 먼저 받으므로). 미처리로 넘겨 부모가 정의하게 한다.
+								if (!m_is_shell_listctrl)
+								{
+									return false;
+								}
 
 								refresh_list();
 								return true;
@@ -2180,10 +2205,17 @@ CSCStaticEdit* CSCListCtrl::edit_item(int item, int subItem)
 		subItem = 0;
 
 	if (subItem >= nColumnCount || GetColumnWidth(subItem) < 5)
+	{
+		logWrite(_T("[reclick] edit_item REJECT(column) item=%d sub=%d colcnt=%d w=%d"),	//20260715 by claude. [진단 임시]
+			item, subItem, nColumnCount, subItem < nColumnCount ? GetColumnWidth(subItem) : -1);
 		return NULL;
+	}
 
 	if (!m_allow_edit_column[subItem])
+	{
+		logWrite(_T("[reclick] edit_item REJECT(allow_edit_column) item=%d sub=%d"), item, subItem);	//20260715 by claude. [진단 임시]
 		return NULL;
+	}
 
 	//20260707 by claude. 보호 항목(시스템 폴더·파일 등)은 이름 변경 금지 — 트리는 막는데 리스트는 안 막던 버그 수정.
 	//단 드라이브 루트는 '볼륨 레이블' 변경이므로 허용한다(드라이브 문자 변경은 아님). 이름 컬럼(col_filename) 편집에만 적용.
@@ -2191,7 +2223,10 @@ CSCStaticEdit* CSCListCtrl::edit_item(int item, int subItem)
 	{
 		CString real = m_pShellImageList->convert_special_folder_to_real_path(!m_is_local, get_path(item));
 		if (!is_drive_root(real) && m_pShellImageList->is_protected(!m_is_local, real))
+		{
+			logWrite(_T("[reclick] edit_item REJECT(protected) item=%d real=[%s]"), item, (LPCTSTR)real);	//20260715 by claude. [진단 임시]
 			return NULL;
+		}
 	}
 	// The returned pointer should not be saved
 
@@ -3062,12 +3097,17 @@ CString CSCListCtrl::new_folder(CString &new_folder_title)
 	}
 
 	folder = get_part(folder, fn_name);
-	index = insert_folder(-1, folder, false);
+
+	//20260715 by claude. 예전엔 insert_folder(-1) 로 '맨 끝'에 추가하고 그 인덱스에 편집을 열었다. 그런데 위 폴더 생성이 유발한 dir watcher
+	//ADDED 통지가 곧이어 도착해 부모가 refresh_list(정렬 재적용)를 돌리면, 항목은 정렬 위치로 올라가는데 편집 박스만 예전 인덱스(맨 끝)에
+	//남아 엉뚱한 행에 떠 있었다. 폴더는 이미 만들어졌으므로 여기서 먼저 새로고침해 정렬을 확정하고, 그 최종 인덱스에서 편집을 연다.
+	//(뒤늦게 오는 워처 refresh 는 같은 순서를 다시 만들 뿐이라 박스가 밀리지 않는다.)
+	refresh_list(true, true);
+	index = select_items_by_names(std::deque<CString>{ folder });
 
 	if (index < 0)
 		return _T("");
 
-	select_item(index, true, true, true);
 	edit_item(index, 0);
 
 	return folder;
@@ -4447,6 +4487,12 @@ BOOL CSCListCtrl::OnNMClick(NMHDR *pNMHDR, LRESULT *pResult)
 	if (((ht = hit_test(pNMItemActivate->ptAction, item, subItem, false)) == LVHT_NOWHERE) ||
 		item < 0 || subItem < 0)
 	{
+		//20260715 by claude. [진단 임시] 여기서 나가면 재클릭 편집 예약 자체가 없다 — 클릭 위치가 항목/컬럼으로 안 잡힌 경우.
+		//hit_test 는 '행은 잡혔는데 어느 컬럼 rect 에도 안 걸리면' subItem=-1 인 채로 LVHT_ONITEMICON 을 리턴한다(1293) → 여기로 온다.
+		//그래서 ht, sub, 그리고 컬럼 rect 판정에 영향을 주는 가로 스크롤(native/미러)을 함께 찍는다.
+		logWrite(_T("[reclick] NMClick EARLY-OUT pt=(%d,%d) ht=%d item=%d sub=%d hscroll(native=%d mirror=%d) col0w=%d"),
+			pNMItemActivate->ptAction.x, pNMItemActivate->ptAction.y, ht, item, subItem,
+			GetScrollPos(SB_HORZ), m_h_scroll_pos, GetColumnWidth(0));
 		return FALSE;
 	}
 
@@ -4483,12 +4529,19 @@ BOOL CSCListCtrl::OnNMClick(NMHDR *pNMHDR, LRESULT *pResult)
 		//20260714 by claude. [탐색기 방식] 선택된 항목을 다시 클릭 → 편집 진입. 단 이 NM_CLICK 은 OnLButtonDown(버튼 DOWN)에서
 		//합성되어 오므로, 여기서 edit_item 을 '즉시' 하면 그 클릭을 누른 채 드래그할 때 편집+드래그가 겹친다(부작용). 그래서 여기선
 		//조건 만족 시 '편집 예약'만 하고, 실제 진입은 OnLButtonUp 이 '드래그 없이 뗐을 때만' 수행한다(드래그로 이어지면 OnMouseMove 가 예약 취소).
+		//20260715 by claude. 하한을 500 고정 → '시스템 더블클릭 간격 + 100' 으로. 500 은 기본 더블클릭 간격(GetDoubleClickTime 기본값)과
+		//'같은' 값이라 경계에서 겹쳤고, 사용자가 제어판(마우스 → 두 번 클릭 속도)에서 900 으로 올리면 600ms 간격이 시스템엔 더블클릭인데
+		//여기선 재클릭 편집으로 오판했다. GetDoubleClickTime 은 HKCU\Control Panel\Mouse\DoubleClickSpeed 를 읽으므로 설정을 자동 반영한다.
+		//여유 100ms(더블클릭 간격~하한)는 '느린 더블클릭'이 이름변경으로 새지 않게 하는 완충. 트리(CSCTreeCtrl 재클릭 판정)와 동일 규격.
+		const DWORD reclick_min = ::GetDoubleClickTime() + 100;
+		DWORD since_click = (DWORD)(clock() - m_last_clicked_time);
+
 		if (m_allow_one_click_edit &&
 			(m_edit_item == item) &&
 			(m_edit_subItem == subItem) &&
 			(GetSelectedCount() == 1) &&
-			(clock() - m_last_clicked_time > 500) &&	//이 값이 작으면 더블클릭에도 편집되고
-			(clock() - m_last_clicked_time < 2000))
+			(since_click > reclick_min) &&
+			(since_click < 2000))
 		{
 			m_pending_reclick_edit = true;
 		}
@@ -4498,8 +4551,30 @@ BOOL CSCListCtrl::OnNMClick(NMHDR *pNMHDR, LRESULT *pResult)
 			m_last_clicked_time = clock();
 		}
 
+		//20260715 by claude. [진단 임시] 재클릭 편집이 클릭 위치에 따라 되고 안 되는 원인 추적 — 클릭 좌표와 hit_test 결과(item/subItem),
+		//그리고 어느 조건에서 예약이 실패하는지. col0 폭과 함께 봐야 "레이블 밖/다른 컬럼을 짚었나"를 판정할 수 있다.
+		CRect rc_sub0, rc_row;
+		GetSubItemRect(item, 0, LVIR_BOUNDS, rc_sub0);
+		GetItemRect(item, &rc_row, LVIR_BOUNDS);
+		logWrite(_T("[reclick] NMClick pt=(%d,%d) item=%d(prev=%d) sub=%d(prev=%d) ht=%d col0w=%d hscroll(native=%d mirror=%d) row=(%d,%d,%d,%d) sub0=(%d,%d,%d,%d) one_click=%d selcnt=%d since_click=%d(%d~2000) pending=%d"),
+			pNMItemActivate->ptAction.x, pNMItemActivate->ptAction.y,
+			item, m_edit_item, subItem, m_edit_subItem, ht, GetColumnWidth(0),
+			GetScrollPos(SB_HORZ), m_h_scroll_pos,
+			rc_row.left, rc_row.top, rc_row.right, rc_row.bottom,
+			rc_sub0.left, rc_sub0.top, rc_sub0.right, rc_sub0.bottom,
+			(int)m_allow_one_click_edit,
+			(int)GetSelectedCount(), (int)since_click, (int)reclick_min, (int)m_pending_reclick_edit);
+
 		m_edit_item = item;
 		m_edit_subItem = subItem;
+	}
+	else
+	{
+		//20260715 by claude. [진단 임시] 편집 허용 조건에서 걸러진 경우 — 여기선 m_edit_item/m_pending_reclick_edit 갱신도 안 되므로
+		//(예: 크기·날짜 컬럼을 짚으면 allow_edit_column 이 false) 다음 재클릭 판정이 어긋난다.
+		logWrite(_T("[reclick] NMClick SKIP(allow_edit block) pt=(%d,%d) item=%d sub=%d ht=%d allow_edit=%d col_editable=%d"),
+			pNMItemActivate->ptAction.x, pNMItemActivate->ptAction.y, item, subItem, ht, (int)m_allow_edit,
+			(subItem >= 0 && subItem < get_column_count()) ? (int)m_allow_edit_column[subItem] : -1);
 	}
 
 	//edit mode까지 들어가지 않고 단순 클릭이라면 해당 셀에 설정된 action control이 있다면 표시해준다.
@@ -4620,6 +4695,16 @@ void CSCListCtrl::edit_end(bool valid)
 
 	//이 컨트롤에 LVN_ENDLABELEDIT 이벤트를 보내 기본 핸들러에서 처리할 것이 있다면 처리한다.
 	GetParent()->SendMessage(WM_NOTIFY, GetDlgCtrlID(), (LPARAM)&dispinfo);
+
+	//20260715 by claude. 이름이 바뀌면 정렬 위치도 바뀌므로 재정렬한다(SetItemText/set_text 는 레이블만 바꿔 제자리에 남는다 — 탐색기는 옮긴다).
+	//반드시 위 통지 '뒤'라야 한다: 부모(앱)가 이 통지에서 m_edit_item 인덱스로 백업 데이터(WIN32_FIND_DATA)를 갱신하는데, 그 전에 정렬하면
+	//그 인덱스가 다른 행을 가리켜 엉뚱한 항목의 데이터를 덮어쓴다. SendMessage 는 동기라 이 줄에선 부모의 뒷정리가 이미 끝나 있다.
+	//정렬로 인덱스가 바뀌므로 선택은 이름으로 되찾는다(ensure_visible 포함). 셸 리스트(파일 목록)에만 적용 — 일반 리스트는 행 순서가 의미를 가질 수 있다.
+	if (m_is_shell_listctrl && valid && m_edit_new_text != m_edit_old_text)
+	{
+		resort();
+		select_items_by_names(std::deque<CString>{ m_edit_new_text });
+	}
 }
 
 //어떤 항목이 특정 위치에 표시되도록 스크롤시킨다.
@@ -4861,6 +4946,13 @@ void CSCListCtrl::set_as_shell_listctrl(CShellImageList* pShellImageList, bool i
 	set_column_data_type(col_filesize, column_data_type_numeric);
 
 	set_column_text_align(col_filesize, HDF_RIGHT, false);
+
+	//20260715 by claude. 셸 리스트의 기본 표시 순서는 '이름 오름차순'(폴더 먼저)이다. 그런데 set_headings 가 m_column_sort_type 을
+	//전부 sort_none 으로 채우므로(792), 사용자가 컬럼 헤더를 누르기 전까지는 "현재 정렬 기준"이 비어 있었다. 그래서 이름변경 후
+	//재정렬(resort) 처럼 '현재 기준을 다시 적용'하는 후처리가 기준을 못 찾아 아무 일도 못 했다 → 기본 기준을 명시한다.
+	//표시 순서는 안 바뀐다: 로드 경로(find_all_files)와 sort() 의 비교자가 모두 StrCmpLogicalW(is_greater_with_numeric 내부도 동일)로 같다.
+	m_cur_sort_column = col_filename;
+	m_column_sort_type[col_filename] = sort_ascending;
 
 	allow_edit();
 	allow_edit_column(col_filesize, false);
@@ -6393,7 +6485,14 @@ void CSCListCtrl::OnLButtonUp(UINT nFlags, CPoint point)
 		if (m_pending_reclick_edit)
 		{
 			m_pending_reclick_edit = false;
-			edit_item(m_edit_item, m_edit_subItem);
+			//20260715 by claude. [진단 임시] 예약이 살아서 여기까지 왔는지 + edit_item 이 조용히 NULL 로 거부하는지 구분.
+			CSCStaticEdit* pe = edit_item(m_edit_item, m_edit_subItem);
+			logWrite(_T("[reclick] LButtonUp edit_item(item=%d sub=%d) -> %s"),
+				m_edit_item, m_edit_subItem, pe ? _T("OK") : _T("NULL(거부)"));
+		}
+		else
+		{
+			logWrite(_T("[reclick] LButtonUp no pending"));
 		}
 	}
 

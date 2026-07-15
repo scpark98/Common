@@ -8,6 +8,7 @@
 #include "../../SCGdiPlusBitmap.h"
 #include "Common/drag_scroll_message.h"		//20260707 by claude. 드래그 자동스크롤을 대상 타입 무관 메시지로 위임 — CVtListCtrlEx 하드 의존 제거(점진 이행용).
 #include "Common/CListCtrl/CSCListCtrl/SCListCtrl.h"	//20260713 by claude. 트리→리스트 드롭 시 대상 리스트의 smooth-aware hit_test 사용(native HitTest 는 스크롤 무시).
+#include "../../log/SCLog/SCLog.h"	//20260715 by claude. [진단 임시] logWrite 사용 — 원인 확정 후 이 include 도 함께 정리.
 
 #include <fstream>
 // CSCTreeCtrl
@@ -1140,7 +1141,7 @@ HTREEITEM CSCTreeCtrl::insert_folder(HTREEITEM hParent, WIN32_FIND_DATA* data, b
 
 //is_greater_with_numeric(탐색기식 숫자 인식) 정렬 순서에 맞는 위치를 찾아 폴더 노드 1개를 삽입한다.
 //열거(insert_folder(hParent, path))가 쓰는 std::sort 비교자와 동일 규칙이라, 단일 노드 삽입 후에도 정렬이 어긋나지 않는다.
-HTREEITEM CSCTreeCtrl::insert_folder_sorted(HTREEITEM hParent, WIN32_FIND_DATA* data)
+HTREEITEM CSCTreeCtrl::insert_folder_sorted(HTREEITEM hParent, WIN32_FIND_DATA* data, bool has_children)
 {
 	//data->cFileName 이 fullpath 일 수 있으므로 leaf 폴더명으로 비교한다.
 	CString name = (get_char_count(data->cFileName, '\\') > 0) ? get_part(data->cFileName, fn_leaf_folder) : CString(data->cFileName);
@@ -1154,7 +1155,50 @@ HTREEITEM CSCTreeCtrl::insert_folder_sorted(HTREEITEM hParent, WIN32_FIND_DATA* 
 		hAfter = hChild;										//child <= name → name 은 이 형제 뒤로
 	}
 
-	return insert_folder(hParent, data, true, hAfter);
+	return insert_folder(hParent, data, has_children, hAfter);
+}
+
+//20260715 by claude. SortChildrenCB 비교 콜백. lParam1/2 는 아래 sort_children_explorer 가 각 자식에 임시로 넣어둔 HTREEITEM 이다.
+//native SortChildren 은 비교가 lstrcmpi 로 고정이라 못 쓴다 — 열거 정렬(insert_folder 의 std::sort)·insert_folder_sorted 가 모두
+//is_greater_with_numeric(탐색기식 숫자 인식: "2" < "10")를 쓰므로 여기서도 같은 비교자를 써야 순서가 어긋나지 않는다.
+static int CALLBACK sort_children_explorer_compare(LPARAM lParam1, LPARAM lParam2, LPARAM lParamSort)
+{
+	CSCTreeCtrl* pTree = (CSCTreeCtrl*)lParamSort;
+	CString name0 = pTree->GetItemText((HTREEITEM)lParam1);
+	CString name1 = pTree->GetItemText((HTREEITEM)lParam2);
+
+	if (name0.CompareNoCase(name1) == 0)
+		return 0;
+
+	return is_greater_with_numeric(name0, name1) ? 1 : -1;
+}
+
+//hParent 의 자식들을 열거 정렬과 같은 순서(is_greater_with_numeric 오름차순)로 '제자리' 재정렬한다.
+//20260715 by claude. DeleteItem+재삽입(move_tree_item_as_sibling)과 달리 노드를 다시 만들지 않으므로 HTREEITEM·자식·펼침 상태가
+//모두 보존되고 SelectItem 부작용도 없다 — 이름변경(edit_end) 직후처럼 m_edit_item 이 살아있어야 하는 지점에서 필수.
+//SortChildrenCB 콜백은 항목 텍스트가 아니라 lParam 을 받는데 셸 트리는 lParam 을 안 쓰므로(InsertItem 시 미지정=0), 정렬 직전에
+//각 자식의 lParam 에 자기 HTREEITEM 을 넣고 정렬 후 0 으로 되돌린다. 정렬은 동기라 그 사이 lParam 을 보는 코드가 끼어들 수 없다.
+void CSCTreeCtrl::sort_children_explorer(HTREEITEM hParent)
+{
+	//루트(hParent=NULL)는 바탕화면/문서/내 PC 가 고정 순서로 앞에 오므로(insert_folder 의 std::sort 도 begin()+3 부터) 재정렬 대상이 아니다.
+	if (hParent == NULL || GetChildItem(hParent) == NULL)
+		return;
+
+	for (HTREEITEM h = GetChildItem(hParent); h != NULL; h = GetNextSiblingItem(h))
+	{
+		SetItemData(h, (DWORD_PTR)h);
+	}
+
+	TVSORTCB tv;
+	tv.hParent = hParent;
+	tv.lpfnCompare = sort_children_explorer_compare;
+	tv.lParam = (LPARAM)this;
+	SortChildrenCB(&tv);
+
+	for (HTREEITEM h = GetChildItem(hParent); h != NULL; h = GetNextSiblingItem(h))
+	{
+		SetItemData(h, 0);
+	}
 }
 
 //local이면 drive_list를 NULL로 주고 remote이면 실제 리스트를 주고 갱신시킨다.
@@ -2796,6 +2840,16 @@ void CSCTreeCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 				CRect r;
 				GetItemRect(hItem, r, TRUE);
 				r.OffsetRect(-get_over_shift(), 0);
+
+				//20260715 by claude. [진단 임시] 재클릭 편집이 클릭 위치에 따라 되고 안 되는 원인 — 클릭 좌표 vs 레이블 rect(TRUE=텍스트만).
+				//선택 표시는 full-row 인데 이 트리거는 텍스트 영역만이라, 아이콘 쪽/텍스트 오른쪽 빈 공간을 클릭하면 여기서 탈락한다.
+				CRect r_full;
+				GetItemRect(hItem, r_full, FALSE);
+				logWrite(_T("[reclick-tree] DOWN pt=(%d,%d) label=(%d,%d,%d,%d) full=(%d,%d,%d,%d) over_shift=%d in_label=%d text=[%s]"),
+					point.x, point.y, r.left, r.top, r.right, r.bottom,
+					r_full.left, r_full.top, r_full.right, r_full.bottom,
+					get_over_shift(), (int)r.PtInRect(point), (LPCTSTR)GetItemText(hItem));
+
 				if (r.PtInRect(point))
 				{
 					m_pending_edit_item = hItem;
@@ -2817,12 +2871,44 @@ void CSCTreeCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 		m_click_pending_select = NULL;
 
 		//20260712 by claude. 선택 변경 후 2초 이내의 재클릭만 이름변경으로 본다(그 이후엔 오래된 선택이므로 이름변경 안 함 — 사용자 요구).
-		if (cand == m_down_prev_sel && m_down_had_focus && (::GetTickCount() - m_select_tick <= 2000))
+		//20260715 by claude. 시간창의 기준을 m_select_tick(마지막 '선택 변경')에서 m_last_clicked_time(이 항목을 마지막으로 '클릭'한 시각)으로
+		//교정. 같은 항목을 재클릭해도 선택은 안 바뀌어 m_select_tick 이 갱신되지 않으므로, 선택된 지 2초가 지난 항목은 몇 번을 시간차 클릭해도
+		//이름변경이 영영 안 됐다(다른 노드에 갔다 와야만 창이 다시 열림 — 사용자 리포트). 탐색기와 리스트(CSCListCtrl::OnNMClick 의
+		//m_last_clicked_time 기준)가 모두 '마지막 클릭' 기준이라, 이 교정으로 셋이 일치한다.
+		//20260715 by claude. 창은 '이전 클릭과의 간격'으로 판정한다(기존 구현 CVtListCtrlEx/CSCListCtrl::OnNMClick 과 동일 개념).
+		//하한은 더블클릭과 겹치면 안 되므로 시스템 설정(GetDoubleClickTime, 제어판 마우스에서 200~900 조정 가능)보다 크게 잡는다.
+		//기존 리스트는 500 고정이었는데 이는 기본 더블클릭 간격과 '같은' 값이라 경계에서 겹치고, 사용자가 더블클릭 속도를 900 으로
+		//올려두면 600ms 간격이 시스템엔 더블클릭인데 우리는 재클릭으로 오판한다 → 시스템 값에서 파생시킨다(기본 500 → 하한 600).
+		//GetDoubleClickTime 은 HKCU\Control Panel\Mouse\DoubleClickSpeed 를 읽으므로 사용자가 제어판에서 바꾸면 자동으로 따라간다.
+		//여유 100ms 구간(더블클릭 간격~하한)은 '느린 더블클릭'이 이름변경으로 새지 않게 하는 완충 — 그 구간엔 아무 일도 안 일어난다.
+		//OnLButtonDblClk 의 타이머 취소와 이중 방어.
+		const DWORD reclick_min = ::GetDoubleClickTime() + 100;
+		const DWORD reclick_max = 2000;
+		DWORD since_click = ::GetTickCount() - m_last_clicked_time;
+		bool reclick_in_time = (cand == m_last_clicked_item) && (since_click > reclick_min) && (since_click < reclick_max);
+
+		//20260715 by claude. [진단 임시] 재클릭 편집 '후보' 판정 자체를 찍는다 — 예전엔 로그가 아래 if 안에만 있어, 조건이 실패한
+		//클릭(=사용자가 겪는 실패 케이스)은 한 줄도 안 남았다. 어느 항이 무너졌는지 여기서 갈린다.
+		logWrite(_T("[reclick-tree] UP-check cand=%p prev_sel=%p same=%d had_focus=%d since_click=%d(%d~%d) same_item=%d in_time=%d text=[%s]"),
+			cand, m_down_prev_sel, (int)(cand == m_down_prev_sel), (int)m_down_had_focus,
+			(int)since_click, (int)reclick_min, (int)reclick_max, (int)(cand == m_last_clicked_item),
+			(int)reclick_in_time, (LPCTSTR)GetItemText(cand));
+
+		if (cand == m_down_prev_sel && m_down_had_focus && reclick_in_time)
 		{
 			//이미 선택돼 있던 항목의 레이블 재클릭 → 지연 이름변경(브라우징 없음). down 좌표로 레이블 판정.
 			CRect r;
 			GetItemRect(cand, r, TRUE);
 			r.OffsetRect(-get_over_shift(), 0);
+
+			//20260715 by claude. [진단 임시] select-on-up 경로의 레이블 판정 — DOWN 좌표 vs 레이블 rect.
+			CRect r_full;
+			GetItemRect(cand, r_full, FALSE);
+			logWrite(_T("[reclick-tree] UP down_pt=(%d,%d) label=(%d,%d,%d,%d) full=(%d,%d,%d,%d) over_shift=%d in_label=%d elapsed=%d text=[%s]"),
+				m_down_point.x, m_down_point.y, r.left, r.top, r.right, r.bottom,
+				r_full.left, r_full.top, r_full.right, r_full.bottom,
+				get_over_shift(), (int)r.PtInRect(m_down_point), (int)(::GetTickCount() - m_select_tick), (LPCTSTR)GetItemText(cand));
+
 			if (r.PtInRect(m_down_point))
 			{
 				m_pending_edit_item = cand;
@@ -2834,6 +2920,11 @@ void CSCTreeCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 			SelectItem(cand);	//선택 + 브라우징(TVN_SELCHANGED)
 			SetFocus();
 		}
+
+		//20260715 by claude. 이번 클릭을 기록한다 — 다음 클릭의 재클릭 판정 기준(위 reclick_in_time). 반드시 위 판정 '뒤'라야 한다.
+		//(예전엔 이 멤버들을 edit_item 이 리셋만 하고 아무도 설정하지 않아 사실상 죽은 값이었다.)
+		m_last_clicked_item = cand;
+		m_last_clicked_time = ::GetTickCount();
 	}
 }
 
@@ -3754,13 +3845,19 @@ void CSCTreeCtrl::edit_item(HTREEITEM hItem)
 	m_editing_is_new_folder = false;
 
 	if (!m_allow_edit)
+	{
+		logWrite(_T("[reclick-tree] edit_item REJECT(!m_allow_edit)"));	//20260715 by claude. [진단 임시]
 		return;
+	}
 
 	if (hItem == NULL)
 	{
 		hItem = GetSelectedItem();
 		if (hItem == NULL)
+		{
+			logWrite(_T("[reclick-tree] edit_item REJECT(hItem NULL)"));	//20260715 by claude. [진단 임시]
 			return;
+		}
 	}
 
 	//20260708 by claude. 보호 항목(시스템 폴더 등)은 이름 변경 금지 — 단 드라이브 루트는 볼륨 레이블 변경이므로 허용(드라이브 문자 변경 아님).
@@ -3769,7 +3866,10 @@ void CSCTreeCtrl::edit_item(HTREEITEM hItem)
 	{
 		CString real = m_pShellImageList->convert_special_folder_to_real_path(!m_is_local, get_path(hItem));
 		if (!is_drive_root(real) && m_pShellImageList->is_protected(!m_is_local, real))
+		{
+			logWrite(_T("[reclick-tree] edit_item REJECT(protected) real=[%s]"), (LPCTSTR)real);	//20260715 by claude. [진단 임시]
 			return;
+		}
 	}
 
 	//20260704 by claude. EnsureVisible 는 부분적으로 가려진 항목을 native H-scroll 로 reveal 하는데(스마트 동작 — 유지),
@@ -3897,6 +3997,11 @@ void CSCTreeCtrl::edit_item(HTREEITEM hItem)
 
 	m_in_editing = true;
 
+	//20260715 by claude. [진단 임시] 편집창 생성·표시까지 도달했는지 + 실제 위치/가시성. 여기까지 왔는데 화면에 없다면 직후에 닫히는 것이다.
+	logWrite(_T("[reclick-tree] edit_item OPEN rect=(%d,%d,%d,%d) visible=%d focus=%p edit_hwnd=%p text=[%s]"),
+		r.left, r.top, r.right, r.bottom, (int)m_pEdit->IsWindowVisible(),
+		::GetFocus(), m_pEdit->GetSafeHwnd(), (LPCTSTR)m_edit_old_text);
+
 	//편집 모드 외부 클릭 감지용 마우스 훅 설치 (다른 컨트롤·다이얼로그 빈 영역·NC 어디든) — CSCListBox/CPathCtrl 패턴.
 	install_edit_mouse_hook();
 
@@ -3919,6 +4024,10 @@ void CSCTreeCtrl::edit_end(bool valid)
 
 	if (m_in_editing == false || m_pEdit == NULL)
 		return;
+
+	//20260715 by claude. [진단 임시] 편집이 언제/왜 닫히는지 — edit_item OPEN 직후에 이게 찍히면 '열자마자 닫힌' 것이다.
+	logWrite(_T("[reclick-tree] edit_end ENTER valid=%d focus=%p edit_hwnd=%p"),
+		(int)valid, ::GetFocus(), m_pEdit->GetSafeHwnd());
 
 	m_in_editing = false;
 
@@ -4024,6 +4133,11 @@ void CSCTreeCtrl::edit_end(bool valid)
 			else
 			{
 				SetItemText(m_edit_item, m_edit_new_text);
+
+				//20260715 by claude. 이름이 바뀌면 형제 사이 정렬 위치도 바뀌므로 재정렬한다(SetItemText 는 레이블만 바꿔 제자리에 남는다).
+				//제자리 정렬이라 m_edit_item 이 그대로 유효 — 아래 통지·TVN_ENDLABELEDIT 가 그 핸들을 계속 쓴다.
+				sort_children_explorer(GetParentItem(m_edit_item));
+
 				//20260714 by claude. 새 폴더 생성이면 message_folder_created(그 노드 선택), 기존 폴더 rename 이면 message_path_changed
 				//(현재 경로 갱신)로 구분한다. 최종 폴더 선택 후처리는 parent(메인)가 담당 — pathctrl/listctrl 까지 갱신되도록.
 				::SendMessage(GetParent()->GetSafeHwnd(),
@@ -4764,6 +4878,12 @@ void CSCTreeCtrl::OnTimer(UINT_PTR nIDEvent)
 		KillTimer(timer_edit_label);
 		HTREEITEM h = m_pending_edit_item;
 		m_pending_edit_item = NULL;
+
+		//20260715 by claude. [진단 임시] 타이머까지 살아왔는지 + 여기서 선택/편집중 조건에 걸리는지.
+		logWrite(_T("[reclick-tree] TIMER h=%p sel=%p in_editing=%d -> %s"),
+			h, GetSelectedItem(), (int)m_in_editing,
+			(h != NULL && h == GetSelectedItem() && !m_in_editing) ? _T("edit_item") : _T("skip"));
+
 		if (h != NULL && h == GetSelectedItem() && !m_in_editing)
 			edit_item(h);
 		return;
@@ -5232,6 +5352,10 @@ HTREEITEM CSCTreeCtrl::add_new_item(HTREEITEM hParent, CString label, bool auto_
 				m_pShellImageList->GetSystemImageListIcon(0, _T("C:\\windows")),
 				m_pShellImageList->GetSystemImageListIcon(0, _T("C:\\windows")),
 				hParent);
+
+			//20260715 by claude. InsertItem 은 insertAfter 기본값이 TVI_LAST 라 새 폴더가 형제들 맨 끝에 붙어 정렬이 깨진다
+			//(탐색기는 이름 순서 위치에 표시). 삽입 후 형제를 재정렬해 열거 정렬과 같은 순서로 맞춘다. hItem 은 재정렬 후에도 유효.
+			sort_children_explorer(hParent);
 		}
 	}
 	else
@@ -5308,6 +5432,11 @@ void CSCTreeCtrl::rename_child_item(HTREEITEM hParent, CString old_label, CStrin
 		return;
 
 	SetItemText(hItem, new_label);
+
+	//20260715 by claude. 이름이 바뀌면 형제 사이 정렬 위치도 바뀌므로 재정렬한다(SetItemText 는 레이블만 바꿔 제자리에 남는다).
+	//이 함수는 (1) 리스트에서 폴더 이름변경 시 앱이 트리를 맞추는 경로 (2) 탐색기 등 외부 rename 을 dir watcher 가 반영하는 경로가
+	//공유하므로, 여기 한 곳에 두면 둘 다 해결된다. 제자리 정렬이라 hItem·자식·펼침 상태는 그대로 유지된다.
+	sort_children_explorer(hParent);
 }
 
 //only_children이 true이면 해당 노드의 자식들만 제거한다.

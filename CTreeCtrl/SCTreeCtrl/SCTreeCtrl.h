@@ -242,7 +242,12 @@ public:
 	void		insert_folder(HTREEITEM hParent, CString sParentPath);
 	HTREEITEM	insert_folder(HTREEITEM hParent, WIN32_FIND_DATA* pFindFileData, bool has_children = true, HTREEITEM hInsertAfter = TVI_LAST);
 	//is_greater_with_numeric(탐색기식 숫자 인식) 정렬 위치에 폴더 노드 1개를 삽입 — 단일 노드 추가 시에도 오름차순 유지.
-	HTREEITEM	insert_folder_sorted(HTREEITEM hParent, WIN32_FIND_DATA* pFindFileData);
+	//20260715 by claude. has_children: 확장버튼(chevron) 표시 여부. 예전엔 true 고정이라 하위폴더가 없는 폴더에도 확장버튼이 붙었다.
+	//호출측이 실제 유무를 알 수 있으면(로컬=has_sub_folders, 원격=폴더목록 응답의 하위폴더 수) 그 값을 넘긴다.
+	HTREEITEM	insert_folder_sorted(HTREEITEM hParent, WIN32_FIND_DATA* pFindFileData, bool has_children = true);
+	//20260715 by claude. hParent 의 자식들을 열거 정렬(is_greater_with_numeric)과 같은 순서로 '제자리' 재정렬. 새 폴더 추가·이름변경처럼
+	//노드 텍스트가 바뀌어 순서가 어긋났을 때 쓴다. hParent=NULL(루트)은 바탕화면/문서/내 PC 고정 순서라 대상에서 제외.
+	void		sort_children_explorer(HTREEITEM hParent);
 
 	//local이면 drive_list를 NULL로 주고 remote이면 실제 리스트를 주고 갱신시킨다.
 	void		update_drive_list(CString thisPC, std::deque<CDiskDriveInfo>* drive_list = NULL);
@@ -663,8 +668,10 @@ protected:
 	CString			m_edit_drive_root;
 	HTREEITEM		m_edit_item = NULL;			//편집중인 아이템 인덱스
 
-	long			m_last_clicked_time = 0;
-	HTREEITEM		m_last_clicked_item;
+	//20260715 by claude. 재클릭 이름변경의 시간창 기준 — '이 항목을 마지막으로 클릭한 시각'(GetTickCount). 예전엔 m_select_tick
+	//(마지막 '선택 변경' 시각)으로 판정해, 재클릭해도 선택이 안 바뀌니 기준점이 갱신되지 않아 선택된 지 2초 지난 항목은 영영 안 됐다.
+	DWORD			m_last_clicked_time = 0;
+	HTREEITEM		m_last_clicked_item = NULL;
 	HTREEITEM		m_pending_edit_item = NULL;	//20260710 by claude. timer_edit_label 발화 시 편집할 항목(대기 중이 아니면 NULL).
 	//20260712 by claude. 탐색기식 select-on-up 관련 상태.
 	bool			m_select_on_button_up = false;	//true 면 UP 에서 선택(set_select_on_button_up).

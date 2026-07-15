@@ -4627,9 +4627,17 @@ void CSCListCtrl::edit_end(bool valid)
 		//드라이브 문자는 안 바뀌고 실제 탐색기에도 반영된다.
 		bool is_drive = (m_is_local && m_edit_is_drive);
 
+		//20260715 by claude. [진단 임시] 드라이브 볼륨 변경 통지가 앱까지 안 오던 원인 — 여기서 is_drive 가 false 면 파일 rename 경로로 샌다.
+		logWrite(_T("[rename-tree] LIST edit_end shell: is_drive=%d (is_local=%d edit_is_drive=%d) old=[%s] new=[%s] path=[%s]"),
+			(int)is_drive, (int)m_is_local, (int)m_edit_is_drive, (LPCTSTR)m_edit_old_text, (LPCTSTR)m_edit_new_text, (LPCTSTR)path);
+
 		if (is_drive)
 		{
 			res = !!SetVolumeLabel(m_edit_drive_root, m_edit_new_text);
+
+			//20260715 by claude. [진단 임시] 드라이브 볼륨 변경 통지가 앱까지 안 오던 원인 추적 — SetVolumeLabel 성공 여부와 root/새이름.
+			logWrite(_T("[rename-tree] LIST is_drive: root=[%s] new=[%s] SetVolumeLabel res=%d err=%d → 통지=%s"),
+				(LPCTSTR)m_edit_drive_root, (LPCTSTR)m_edit_new_text, (int)res, (int)GetLastError(), res ? _T("보냄") : _T("안 보냄"));
 
 			//성공 시 parent 에 드라이브 볼륨 변경 통지 → 형제 컨트롤(트리) 드라이브 표시 동기화. param0=root("C:\\"), param1=새 볼륨명.
 			if (res)

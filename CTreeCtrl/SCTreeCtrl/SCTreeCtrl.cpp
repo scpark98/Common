@@ -5428,6 +5428,16 @@ void CSCTreeCtrl::rename_child_item(HTREEITEM hParent, CString old_label, CStrin
 		hParent = GetSelectedItem();
 
 	HTREEITEM hItem = find_children_item(old_label, hParent);
+
+	//20260715 by claude. [진단 임시] 리스트에서 폴더 이름을 바꿨는데 트리가 안 바뀌는 원인 추적 — 부모 노드와 old_label 로 자식을 찾는데
+	//둘 중 하나가 어긋나면 조용히 return 한다. 부모의 실제 자식 목록까지 찍어 무엇과 비교되는지 본다.
+	{
+		CString kids; int nk = 0;
+		for (HTREEITEM hc = GetChildItem(hParent); hc && nk < 30; hc = GetNextSiblingItem(hc)) { kids += _T("["); kids += GetItemText(hc); kids += _T("]"); nk++; }
+		logWrite(_T("[rename-tree] hParent=%p(%s) old=[%s] new=[%s] found=%p kids(n=%d)=%s"),
+			hParent, (LPCTSTR)GetItemText(hParent), (LPCTSTR)old_label, (LPCTSTR)new_label, hItem, nk, (LPCTSTR)kids);
+	}
+
 	if (!hItem)
 		return;
 

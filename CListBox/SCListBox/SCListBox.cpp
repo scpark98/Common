@@ -1142,7 +1142,11 @@ int CSCListBox::set_path(CString root, CString selected_text)
 	}
 	else
 	{
-		get_sub_folders(root, &m_folder_list, true);
+		//20260715 by claude. special_folders=false. true 면 root 가 "내 PC" 일 때 문서·바탕 화면까지 끼워 넣는데(get_sub_folders 규약),
+		//그 둘은 위 root.IsEmpty() 분기가 이미 '내 PC 와 같은 레벨'로 넣고 있어 내 PC 하위에 또 나오면 중복이고 계층도 틀린다
+		//(트리 구조·원격 팝업 모두 내 PC 의 자식은 드라이브뿐). 게다가 호출측 PathCtrl 은 개수를 셀 때 기본값 false 로 불러
+		//'개수(드라이브 수) ≠ 실제 표시 항목 수' 로 어긋나 있었다.
+		get_sub_folders(root, &m_folder_list, false);
 	}
 
 	return set_folder_list(NULL, selected_text);

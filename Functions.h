@@ -1558,6 +1558,9 @@ struct	NETWORK_INFO
 
 	CString		get_system_label(int csidl, int *sysIconIndex = NULL);
 
+	//드라이브 볼륨 레이블 변경(SetVolumeLabel) 후 셸에 알린다. 안 하면 이미 열려 있는 탐색기 창이 옛 이름을 유지한다.
+	void		notify_shell_drive_label_changed(CString drive_root);
+
 	bool		run_self_update_batch();
 
 	//이 값은 윈도우가 설치될 때 생성되고 재설치되지 않으면 유지된다.

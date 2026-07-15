@@ -36,6 +36,7 @@ namespace {
 	LARGE_INTEGER	g_dperf_freq = { 0 };
 	DWORD			g_dperf_start_tick = 0;		//드래그 시작 시각(ms)
 	int				g_dperf_moves = 0;			//드래그 시작 후 mousemove 처리 횟수
+	int				g_dperf_hint_calls = 0;		//20260715 by claude. 그 중 실제로 provider(m_fn_drag_hint)를 부른 횟수 — 게이팅 효과 확인용.
 	DWORD			g_dperf_last_log = 0;		//로그 스로틀 기준
 	double			g_dperf_max_compute = 0.0;	//로그 구간 내 compute_drag_hint 최대 소요(ms)
 	double			g_dperf_max_update = 0.0;	//로그 구간 내 update_drag_hint(합성+render) 최대 소요(ms)
@@ -4625,19 +4626,53 @@ void CSCListCtrl::edit_end(bool valid)
 		//20260708 by claude. 드라이브 루트는 파일 rename 이 아니라 '볼륨 레이블' 변경이다. 드라이브 여부·root 는 edit_item 이 멤버에 저장했고
 		//편집 박스엔 볼륨명만 보였으므로 m_edit_new_text 가 곧 새 볼륨명이다. SetVolumeLabel 로 반영하고 표시엔 " (X:)" 를 다시 붙인다(아래).
 		//드라이브 문자는 안 바뀌고 실제 탐색기에도 반영된다.
-		bool is_drive = (m_is_local && m_edit_is_drive);
+		//20260715 by claude. 드라이브 여부는 로컬/리모트 공통이다(edit_item 이 양쪽 모두에서 m_edit_is_drive 를 세운다).
+		//예전엔 m_is_local 을 and 로 묶어 리모트 드라이브가 아래 파일 rename 경로로 새서, 실재하지 않는 "내 PC\볼륨명" 을
+		//agent 에 rename 요청하고 무조건 실패했다.
+		bool is_drive = m_edit_is_drive;
 
-		//20260715 by claude. [진단 임시] 드라이브 볼륨 변경 통지가 앱까지 안 오던 원인 — 여기서 is_drive 가 false 면 파일 rename 경로로 샌다.
+		//20260715 by claude. 실패 시 편집을 다시 열지 여부. 파일/폴더 rename 실패는 '이미 존재하는 이름'이라 사용자가 다른 이름으로
+		//고칠 수 있으므로 다시 열어 재입력 단계를 줄여준다(사용자가 의도적으로 넣은 동작 — 제거 금지).
+		//드라이브 볼륨 변경만 실패 원인에 따라 아래에서 다시 판정한다.
+		bool can_retry_edit = true;
+
+		//20260715 by claude. [진단 임시] 리스트 편집 종료 시점의 판정값.
 		logWrite(_T("[rename-tree] LIST edit_end shell: is_drive=%d (is_local=%d edit_is_drive=%d) old=[%s] new=[%s] path=[%s]"),
 			(int)is_drive, (int)m_is_local, (int)m_edit_is_drive, (LPCTSTR)m_edit_old_text, (LPCTSTR)m_edit_new_text, (LPCTSTR)path);
 
 		if (is_drive)
 		{
-			res = !!SetVolumeLabel(m_edit_drive_root, m_edit_new_text);
+			DWORD err = 0;
 
-			//20260715 by claude. [진단 임시] 드라이브 볼륨 변경 통지가 앱까지 안 오던 원인 추적 — SetVolumeLabel 성공 여부와 root/새이름.
-			logWrite(_T("[rename-tree] LIST is_drive: root=[%s] new=[%s] SetVolumeLabel res=%d err=%d → 통지=%s"),
-				(LPCTSTR)m_edit_drive_root, (LPCTSTR)m_edit_new_text, (int)res, (int)GetLastError(), res ? _T("보냄") : _T("안 보냄"));
+			if (m_is_local)
+			{
+				res = !!SetVolumeLabel(m_edit_drive_root, m_edit_new_text);
+				err = GetLastError();
+
+				//20260715 by claude. SetVolumeLabel 은 셸에 통지하지 않는다 — 우리가 알려줘야 이미 열려 있는 탐색기 창의 이름이 갱신된다.
+				if (res)
+					notify_shell_drive_label_changed(m_edit_drive_root);
+			}
+			else
+			{
+				//리모트는 소켓 명령이라 parent 가 수행한다. 구버전 agent 면 parent 가 skip 하고 res=false 로 돌려준다.
+				bool remote_res = false;
+				::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCListCtrl,
+					(WPARAM) & (CSCListCtrlMessage(this, message_request_set_volume_label, NULL, m_edit_drive_root, m_edit_new_text)),
+					(LPARAM)&remote_res);
+				res = remote_res;
+			}
+
+			//20260715 by claude. 재편집 여부의 기준은 '드라이브냐'가 아니라 '사용자가 다시 입력해서 고칠 수 있는 실패냐'다.
+			//입력이 원인이면(볼륨명 32자 초과·사용 불가 문자) 다시 열어 고치게 하고, 입력과 무관하면(권한 없음, 미지원 FS,
+			//구버전 agent) 다시 열어봐야 취소하려 ESC 를 한 번 더 누르게 할 뿐이다.
+			//리모트는 실패 원인이 소켓 너머라 알 수 없고, 구버전 agent 스킵이 대부분이므로 다시 열지 않는다.
+			can_retry_edit = (m_is_local && (err == ERROR_LABEL_TOO_LONG || err == ERROR_INVALID_NAME));
+
+			//20260715 by claude. [진단 임시] 볼륨 변경 성공 여부와 통지 발송 여부.
+			logWrite(_T("[rename-tree] LIST is_drive: local=%d root=[%s] new=[%s] res=%d err=%d retry=%d → 통지=%s"),
+				(int)m_is_local, (LPCTSTR)m_edit_drive_root, (LPCTSTR)m_edit_new_text, (int)res, (int)err,
+				(int)can_retry_edit, res ? _T("보냄") : _T("안 보냄"));
 
 			//성공 시 parent 에 드라이브 볼륨 변경 통지 → 형제 컨트롤(트리) 드라이브 표시 동기화. param0=root("C:\\"), param1=새 볼륨명.
 			if (res)
@@ -4682,7 +4717,9 @@ void CSCListCtrl::edit_end(bool valid)
 			else
 				set_text(m_edit_item, m_edit_subItem, m_edit_new_text);
 		}
-		else
+		//사용자가 다시 입력해서 고칠 수 있는 실패일 때만 편집을 다시 연다(위 can_retry_edit 참조).
+		//고칠 수 없는 실패면 그대로 끝낸다 — 항목 텍스트를 안 건드렸으므로 옛 이름이 남는다.
+		else if (can_retry_edit)
 		{
 			edit_item(m_edit_item, m_edit_subItem);
 		}
@@ -5854,9 +5891,14 @@ void CSCListCtrl::OnLvnBeginDrag(NMHDR* pNMHDR, LRESULT* pResult)
 
 	TRACE(_T("start drag...\n"));
 
+	//20260715 by claude. 드롭 대상 캐시 리셋 — 새 드래그의 첫 이동에서 문구가 반드시 한 번 계산되도록.
+	m_drag_hint_wnd = NULL;
+	m_drag_hint_item = -2;
+
 	//20260714 by claude. [진단: 드래그 slowdown] 드래그 시작 기준값 리셋 + 시작 시점 핸들 수 기록.
 	g_dperf_start_tick = GetTickCount();
 	g_dperf_moves = 0;
+	g_dperf_hint_calls = 0;
 	g_dperf_last_log = g_dperf_start_tick;
 	g_dperf_max_compute = g_dperf_max_update = g_dperf_max_move = g_dperf_max_gap = 0.0;
 	g_dperf_last_move_qpc.QuadPart = 0;
@@ -5967,20 +6009,50 @@ void CSCListCtrl::OnMouseMove(UINT nFlags, CPoint point)
 
 		//20260705 by claude. 드래그 중 대상에 맞는 문구를 app provider 로 계산해 이미지에 반영(값 변화 시에만 재합성). pt = screen 좌표.
 		//20260714 by claude. [진단: 드래그 slowdown] compute_drag_hint(앱 콜백=shell 경로)와 update_drag_hint(합성+render)를 분리 측정.
+		//20260715 by claude. [드래그 느려짐] provider 를 '드롭 대상(창+커서 밑 항목)이 바뀔 때만' 부른다. 예전엔 커서가 1픽셀만
+		//움직여도 매 mousemove(초당 ~60회) 마다 불렀는데, 문구는 대상이 바뀔 때만 달라지므로 대다수 호출이 같은 값을 다시 만드는
+		//순수 낭비였다. 캐시(m_drag_hint_text)는 provider 가 값을 '만든 뒤' 재합성만 막아서 비싼 계산은 이미 치른 뒤였다.
+		//측정: provider 1회 = 리모트 ~10ms(convert_special_folder_to_real_path 안의 ::get_system_label 이 매번 CoInitialize+
+		//SHGetFileInfo 를 도는 탓). 아래 드롭 하이라이트 재도색이 이미 같은 방식(6056 drop_item != m_nDropIndex)으로 게이팅돼 있다.
+		//Ctrl/Shift 토글은 refresh_drag_hint() 가 이 게이트를 거치지 않고 직접 갱신하므로 즉시 반영된다.
 		if (m_fn_drag_hint)
 		{
-			LARGE_INTEGER dperf_c0, dperf_c1, dperf_c2;
-			QueryPerformanceCounter(&dperf_c0);
-			CString dperf_hint = m_fn_drag_hint(pDropWnd, pt);
-			QueryPerformanceCounter(&dperf_c1);
-			update_drag_hint(dperf_hint);
-			QueryPerformanceCounter(&dperf_c2);
+			HWND	hint_wnd = pDropWnd->GetSafeHwnd();
+			int		hint_item = -1;
+			CPoint	hint_cli = pt;					//pt 는 screen 좌표 — 여기서 client 로 바꿔 hit 만 구한다(아래 pt 는 그대로 유지).
+			pDropWnd->ScreenToClient(&hint_cli);
+
+			if (pDropWnd->IsKindOf(RUNTIME_CLASS(CSCListCtrl)))
+			{
+				int hint_sub = -1;
+				((CSCListCtrl*)pDropWnd)->hit_test(hint_cli, hint_item, hint_sub, true);
+			}
+			else if (pDropWnd->IsKindOf(RUNTIME_CLASS(CTreeCtrl)))
+			{
+				UINT hint_flags = 0;
+				hint_item = (int)(INT_PTR)((CTreeCtrl*)pDropWnd)->HitTest(hint_cli, &hint_flags);
+			}
+
+			if (hint_wnd != m_drag_hint_wnd || hint_item != m_drag_hint_item)
+			{
+				m_drag_hint_wnd = hint_wnd;
+				m_drag_hint_item = hint_item;
+
+				LARGE_INTEGER dperf_c0, dperf_c1, dperf_c2;
+				QueryPerformanceCounter(&dperf_c0);
+				CString dperf_hint = m_fn_drag_hint(pDropWnd, pt);
+				QueryPerformanceCounter(&dperf_c1);
+				update_drag_hint(dperf_hint);
+				QueryPerformanceCounter(&dperf_c2);
+
+				double c_ms = dperf_ms(dperf_c0, dperf_c1);
+				double u_ms = dperf_ms(dperf_c1, dperf_c2);
+				if (c_ms > g_dperf_max_compute) g_dperf_max_compute = c_ms;
+				if (u_ms > g_dperf_max_update)  g_dperf_max_update  = u_ms;
+				g_dperf_hint_calls++;		//20260715 by claude. [진단 임시] provider 실제 호출 횟수 — moves 대비 얼마나 줄었는지.
+			}
 
 			g_dperf_moves++;
-			double c_ms = dperf_ms(dperf_c0, dperf_c1);
-			double u_ms = dperf_ms(dperf_c1, dperf_c2);
-			if (c_ms > g_dperf_max_compute) g_dperf_max_compute = c_ms;
-			if (u_ms > g_dperf_max_update)  g_dperf_max_update  = u_ms;
 			//전체 move 시간(tail 포함)과 300ms 스로틀 로그는 블록 '끝'에서 emit — 여기서 재면 자동스크롤+드롭재도색(UpdateWindow)이 빠진다.
 		}
 
@@ -6082,8 +6154,8 @@ void CSCListCtrl::OnMouseMove(UINT nFlags, CPoint point)
 		{
 			int gdi = dperf_gdi();
 			int usr = dperf_user();
-			logWrite(_T("[drag-perf] t=%ums moves=%d gdi=%d(+%d) user=%d(+%d) max_gap=%.1fms max_compute=%.2fms max_update=%.2fms max_full=%.2fms"),
-				dperf_now - g_dperf_start_tick, g_dperf_moves,
+			logWrite(_T("[drag-perf] t=%ums moves=%d hint_calls=%d gdi=%d(+%d) user=%d(+%d) max_gap=%.1fms max_compute=%.2fms max_update=%.2fms max_full=%.2fms"),
+				dperf_now - g_dperf_start_tick, g_dperf_moves, g_dperf_hint_calls,
 				gdi, gdi - g_dperf_start_gdi, usr, usr - g_dperf_start_user,
 				g_dperf_max_gap, g_dperf_max_compute, g_dperf_max_update, g_dperf_max_move);
 			g_dperf_last_log = dperf_now;

@@ -448,6 +448,17 @@ void CPathCtrl::SetWindowText(CString path, std::deque<CString>* sub_folders)
 	set_path(path, sub_folders);
 }
 
+//경로는 그대로인데 세그먼트 표시 이름만 바뀐 경우(드라이브 볼륨 레이블 변경)용. get_path() 는 레이블의 " (X:)" 에서
+//드라이브 문자를 뽑으므로 레이블이 옛 이름이어도 경로 자체는 정확하다. m_path 를 비워 set_path 의 조기 리턴을 지나가게 한 뒤
+//같은 경로로 다시 구성하면 레이블이 새 볼륨 캐시에서 다시 만들어진다.
+void CPathCtrl::refresh_path()
+{
+	CString path = get_path();
+
+	m_path.clear();
+	set_path(path);
+}
+
 void CPathCtrl::set_path(CString path, std::deque<CString>* sub_folders)
 {
 	if (m_pShellImageList == NULL)

@@ -88,6 +88,10 @@ public:
 	void			set_path(CString path, std::deque<CString> *sub_folders = NULL);
 	void			SetWindowText(CString path, std::deque<CString>* sub_folders = NULL);
 
+	//경로는 그대로인데 표시 이름만 바뀐 경우(드라이브 볼륨 레이블 변경 등) 현재 경로를 새 볼륨 캐시로 다시 구성한다.
+	//set_path 는 인자가 get_path() 와 같으면 조기 리턴하므로 같은 경로를 다시 넣는 방식으로는 갱신되지 않는다.
+	void			refresh_path();
+
 	bool			use_edit() { return m_use_edit; }
 	void			use_edit(bool use) { m_use_edit = use; }
 	//편집중인데 edit box가 focus를 잃거나, esc를 입력하거나, enter를 입력하면 편집모드를 종료시킨다.

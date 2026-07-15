@@ -521,11 +521,18 @@ CString CShellImageList::convert_special_folder_to_real_path(int index, CString 
 	CString rest_path = special_folder;
 	rest_path.Replace(drive_prefix, _T(""));
 
+	//20260715 by claude. 레이블은 m_volume[index] 에 이미 캐시돼 있다(CShellVolumeList 생성자에서 1회 조회).
+	//예전엔 여기서 ::get_system_label() 전역을 불렀는데 두 가지가 틀렸다.
+	//(1) 성능: 그 전역은 캐시가 없어 호출마다 CoInitialize + SHGetSpecialFolderLocation + SHGetFileInfo(SHGFI_SYSICONINDEX)
+	//    + CoUninitialize 를 돈다. 이 함수 1회에 2번 불려 ~4ms. 드래그 중 mousemove 마다 불려 드래그가 슬로우비디오가 됐다
+	//    ([drag-perf] 측정: convert 1회 4.5ms, max_compute 10~16ms).
+	//(2) 정확성: 그 전역은 '서버(자기)' 레이블을 준다. index=리모트일 때 서버의 "바탕 화면"/"문서" 와 비교하게 돼,
+	//    양쪽 표시명이 다르면(로케일·OS 버전 차이) 판정이 틀린다. 바로 윗줄 CSIDL_DRIVES 는 이미 멤버를 쓰고 있었다.
 	if (drive_prefix == m_volume[index].get_label(CSIDL_DRIVES))
 		real_path.Format(_T("%s%s"), m_volume[index].get_label(CSIDL_DRIVES), rest_path);
-	else if (drive_prefix == ::get_system_label(CSIDL_DESKTOP))
+	else if (drive_prefix == m_volume[index].get_label(CSIDL_DESKTOP))
 		real_path.Format(_T("%s%s"), m_volume[index].get_path(CSIDL_DESKTOP), rest_path);
-	else if (drive_prefix == ::get_system_label(CSIDL_MYDOCUMENTS))
+	else if (drive_prefix == m_volume[index].get_label(CSIDL_MYDOCUMENTS))
 		real_path.Format(_T("%s%s"), m_volume[index].get_path(CSIDL_MYDOCUMENTS), rest_path);
 	else
 	{

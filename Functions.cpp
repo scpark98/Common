@@ -10980,6 +10980,21 @@ CString	get_system_label(int csidl, int* sysIconIndex)
 	return sfi.szDisplayName;
 }
 
+//드라이브 볼륨 레이블을 바꾼 뒤 셸(탐색기)에 알린다. SetVolumeLabel 은 셸에 아무 통지도 하지 않으므로,
+//이걸 안 하면 이미 열려 있는 탐색기 창이 F5 를 누르기 전까지 옛 이름을 그대로 표시한다(탐색기 자신은 이름을 바꿀 때 통지한다).
+//SHCNF_PATH 로 드라이브 루트를 넘기면 탐색기가 '그 폴더의 내용이 바뀌었다'로 해석해 표시 이름은 갱신되지 않는다.
+//바뀐 것은 '내 PC' 안에 있는 드라이브 항목의 표시 이름이므로, 그 항목의 PIDL 로 통지해야 한다.
+void notify_shell_drive_label_changed(CString drive_root)
+{
+	LPITEMIDLIST pidl = NULL;
+
+	if (FAILED(SHParseDisplayName(CStringW(drive_root), NULL, &pidl, 0, NULL)))
+		return;
+
+	SHChangeNotify(SHCNE_UPDATEITEM, SHCNF_IDLIST | SHCNF_FLUSH, pidl, NULL);
+	CoTaskMemFree(pidl);
+}
+
 //현재 실행파일의 새 버전을 특정 임시 이름으로 다운받았다는 가정하에 이 함수를 실행하면
 //자신을 스스로 업데이트시키는 bat파일을 생성하고 실행시킨다.
 //메인은 이 함수를 호출하고 약간의 시간 딜레이를 준 후 종료시키면

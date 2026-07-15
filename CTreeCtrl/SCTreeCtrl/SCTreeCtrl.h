@@ -139,6 +139,9 @@ public:
 		//20260708 by claude. 드라이브 볼륨 레이블 변경 통지 — param0=드라이브 root("C:\\"), param1=새 볼륨 레이블. parent 가 받아 형제 컨트롤(리스트 등) 드라이브 표시 동기화.
 		message_drive_volume_changed,
 		message_folder_created,			//20260714 by claude. 새 폴더 생성+명명 완료. param0=새 폴더 실경로. parent 가 그 노드를 선택(→ pathctrl/listctrl 갱신). rename(message_path_changed)과 구분.
+		//20260715 by claude. 리모트 드라이브 볼륨 레이블 변경 요청 — param0=드라이브 root("C:\\"), param1=새 볼륨 레이블, lParam=(bool*)결과.
+		//로컬은 컨트롤이 직접 SetVolumeLabel 하지만 리모트는 소켓 명령이라 parent 가 수행해야 한다(rename 과 동일 구조).
+		message_request_set_volume_label,
 	};
 
 	//해당 아이템의 depth level을 리턴한다. hItem == NULL이면 -1을 리턴한다.

@@ -221,7 +221,12 @@ BOOL CSCTreeCtrl::PreTranslateMessage(MSG* pMsg)
 	if ((pMsg->message == WM_KEYDOWN || pMsg->message == WM_KEYUP) &&
 		(pMsg->wParam == VK_CONTROL || pMsg->wParam == VK_SHIFT) && m_bDragging)
 	{
-		refresh_drag_hint();
+		//20260715 by claude. 단, WM_KEYDOWN 자동반복(lParam bit30=이전 키 상태)은 무시한다. Ctrl/Shift 를 '누른 채' 드래그하면
+		//자동반복 WM_KEYDOWN 이 초당 수십 회 들어와 매번 refresh_drag_hint(WindowFromPoint+compute_drag_hint) 를 유발하고,
+		//이 키다운이 소비되지 않아 메시지 큐에 누적되며 드래그가 '점점' 느려진다. 토글 상태는 첫 down/up 에서만 바뀌므로 전이에서만 갱신.
+		//(2026-07-14 38d4747 에서 CSCListCtrl 에만 적용됐고 같은 구조인 트리는 누락돼 있었다.)
+		if (!(pMsg->message == WM_KEYDOWN && (pMsg->lParam & 0x40000000)))
+			refresh_drag_hint();
 	}
 
 	// TODO: 여기에 특수화된 코드를 추가 및/또는 기본 클래스를 호출합니다.
@@ -4075,17 +4080,63 @@ void CSCTreeCtrl::edit_end(bool valid)
 
 		//20260708 by claude. 드라이브 루트는 파일 rename 이 아니라 '볼륨 레이블' 변경. 드라이브 여부·root 는 edit_item 이 멤버에 저장했고
 		//편집 박스엔 볼륨명만 보였으므로 m_edit_new_text 가 곧 새 볼륨명이다. SetVolumeLabel 로 반영하고 표시엔 " (X:)" 를 다시 붙인다(아래).
-		bool is_drive = (m_is_local && m_edit_is_drive);
+		//20260715 by claude. 드라이브 여부는 로컬/리모트 공통이다(edit_item 이 양쪽 모두에서 m_edit_is_drive 를 세운다).
+		//예전엔 m_is_local 을 and 로 묶어 리모트 드라이브가 아래 폴더 rename 경로로 새서, 실재하지 않는 "내 PC\볼륨명" 을
+		//agent 에 rename 요청하고 무조건 실패했다.
+		bool is_drive = m_edit_is_drive;
+
+		//20260715 by claude. 실패 시 편집을 다시 열지 여부. 폴더 rename 실패는 '이미 존재하는 이름'이라 사용자가 다른 이름으로
+		//고칠 수 있으므로 다시 열어 재입력 단계를 줄여준다(사용자가 의도적으로 넣은 동작 — 제거 금지).
+		//드라이브 볼륨 변경만 실패 원인에 따라 아래에서 다시 판정한다.
+		bool can_retry_edit = true;
+
+		//20260715 by claude. [진단 임시] 트리 편집 종료 시점의 판정값.
+		logWrite(_T("[rename-tree] TREE edit_end: is_drive=%d (is_local=%d edit_is_drive=%d) root=[%s] old=[%s] new=[%s] parent_path=[%s]"),
+			(int)is_drive, (int)m_is_local, (int)m_edit_is_drive, (LPCTSTR)m_edit_drive_root,
+			(LPCTSTR)m_edit_old_text, (LPCTSTR)m_edit_new_text, (LPCTSTR)parent_path);
 
 		if (is_drive)
 		{
-			res = SetVolumeLabel(m_edit_drive_root, m_edit_new_text);
+			DWORD err = 0;
+
+			if (m_is_local)
+			{
+				res = SetVolumeLabel(m_edit_drive_root, m_edit_new_text);
+				err = GetLastError();
+
+				//20260715 by claude. SetVolumeLabel 은 셸에 통지하지 않는다 — 우리가 알려줘야 이미 열려 있는 탐색기 창의 이름이 갱신된다.
+				if (res)
+					notify_shell_drive_label_changed(m_edit_drive_root);
+			}
+			else
+			{
+				//리모트는 소켓 명령이라 parent 가 수행한다. 구버전 agent 면 parent 가 skip 하고 res=false 로 돌려준다.
+				bool remote_res = false;
+				::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCTreeCtrl,
+					(WPARAM) & (CSCTreeCtrlMessage(this, message_request_set_volume_label, NULL, m_edit_drive_root, m_edit_new_text)),
+					(LPARAM)&remote_res);
+				res = remote_res;
+			}
+
+			//20260715 by claude. 재편집 여부의 기준은 '드라이브냐'가 아니라 '사용자가 다시 입력해서 고칠 수 있는 실패냐'다.
+			//입력이 원인이면(볼륨명 32자 초과·사용 불가 문자) 다시 열어 고치게 하고, 입력과 무관하면(권한 없음, 미지원 FS,
+			//구버전 agent) 다시 열어봐야 취소하려 ESC 를 한 번 더 누르게 할 뿐이다.
+			//리모트는 실패 원인이 소켓 너머라 알 수 없고, 구버전 agent 스킵이 대부분이므로 다시 열지 않는다.
+			can_retry_edit = (m_is_local && (err == ERROR_LABEL_TOO_LONG || err == ERROR_INVALID_NAME));
+
+			//20260715 by claude. [진단 임시] 볼륨 변경 성공 여부와 통지 발송 여부.
+			logWrite(_T("[rename-tree] TREE is_drive: local=%d root=[%s] new=[%s] res=%d err=%d retry=%d → 통지=%s"),
+				(int)m_is_local, (LPCTSTR)m_edit_drive_root, (LPCTSTR)m_edit_new_text, (int)res, (int)err,
+				(int)can_retry_edit, res ? _T("보냄") : _T("안 보냄"));
 
 			//성공 시 parent 에 드라이브 볼륨 변경 통지 → 형제 컨트롤(리스트) 드라이브 표시 동기화. param0=root("C:\\"), param1=새 볼륨명.
 			if (res)
+			{
 				::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCTreeCtrl,
 					(WPARAM) & (CSCTreeCtrlMessage(this, message_drive_volume_changed, NULL, m_edit_drive_root, m_edit_new_text)),
 					(LPARAM)0);
+			}
+			//실패 시 편집 재진입은 아래 'if (res) ... else if (can_retry_edit)' 한 곳에서만 판정한다(여기서 또 하면 이중 호출).
 		}
 		else if (m_is_local)
 		{
@@ -4146,7 +4197,9 @@ void CSCTreeCtrl::edit_end(bool valid)
 					(LPARAM)&res);
 			}
 		}
-		else
+		//20260715 by claude. 사용자가 다시 입력해서 고칠 수 있는 실패일 때만 편집을 다시 연다(위 can_retry_edit 참조).
+		//폴더 rename 실패(이름 중복)는 그대로 다시 열리고, 구버전 agent·권한 같은 못 고치는 실패만 안 열린다.
+		else if (can_retry_edit)
 		{
 			//undo_edit_label();
 			edit_item(m_edit_item);

@@ -199,6 +199,9 @@ public:
 		message_get_remote_free_space,
 		message_get_remote_total_space,
 		message_list_processing,		//C:\Windows, C:\Windows\WinSxS 등과 같은 폴더는 그 갯수가 많으므로 parent에게 이를 알린다.
+		//20260715 by claude. 리모트 드라이브 볼륨 레이블 변경 요청 — param0=드라이브 root("C:\\"), param1=새 볼륨 레이블, lParam=(bool*)결과.
+		//로컬은 컨트롤이 직접 SetVolumeLabel 하지만 리모트는 소켓 명령이라 parent 가 수행해야 한다(rename 과 동일 구조).
+		message_request_set_volume_label,
 	};
 
 
@@ -908,6 +911,10 @@ protected:
 	CString			m_drag_hint_text;			//20260705 by claude. 현재 표시 중인 문구(캐시) — 값이 바뀔 때만 재합성
 	DWORD			m_last_drag_hint_tick = 0;	//20260713 by claude. 마지막 재합성 시각(GetTickCount) — 재합성 스로틀용.
 	std::function<CString(CWnd* pDropWnd, CPoint pt_screen)> m_fn_drag_hint;		//드래그 문구 provider(app 설정)
+	//20260715 by claude. provider 를 마지막으로 부른 '드롭 대상'(창 + 커서 밑 항목). 문구는 대상이 바뀔 때만 달라지므로
+	//같은 항목 위에서 움직이는 동안은 provider 호출 자체를 건너뛴다(대다수 이동이 여기 해당).
+	HWND			m_drag_hint_wnd = NULL;
+	int				m_drag_hint_item = -2;		//-1 = 빈 공간, -2 = 아직 계산 안 함(드래그 시작 시 리셋)
 	//20260705 by claude. base 이미지 하단에 문구 밴드를 붙인 새 비트맵을 out 에 합성. XP 호환 위해 리스트 자체 폰트(m_lf) 사용.
 	void			compose_drag_image_with_hint(CSCGdiplusBitmap& base, const CString& text, CSCGdiplusBitmap& out);
 	bool			m_bDragging = false;		//T during a drag operation

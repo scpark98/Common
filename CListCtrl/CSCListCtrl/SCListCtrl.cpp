@@ -5863,7 +5863,8 @@ void CSCListCtrl::OnMouseMove(UINT nFlags, CPoint point)
 			abs(point.y - m_smooth_drag_pt.y) >= GetSystemMetrics(SM_CYDRAG))
 		{
 			m_smooth_drag_pending = false;
-			m_smooth_click_defer  = -1;		//드래그 확정 → 선택 축소 취소(다중선택 유지).
+			m_smooth_click_defer  = -1;		//드래그 확정 → 미뤄둔 선택 변경 취소(선택 그대로 유지 — 다중선택 드래그, ctrl 드래그 복사).
+			m_smooth_click_defer_ctrl = false;
 			m_pending_reclick_edit = false;	//20260714 by claude. 드래그로 이어졌으니 재클릭 편집 예약 취소(누른 채 드래그 = 편집 아님).
 
 			NMLISTVIEW nmlv = { 0 };
@@ -6410,8 +6411,13 @@ void CSCListCtrl::OnLButtonUp(UINT nFlags, CPoint point)
 		m_smooth_drag_pending = false;
 		if (m_smooth_click_defer >= 0)
 		{
-			select_single(m_smooth_click_defer);
+			//20260716 by claude. 누를 때 미뤄둔 선택 변경을 여기서 확정 — ctrl 이면 토글 해제, 아니면 다중선택 축소.
+			if (m_smooth_click_defer_ctrl)
+				toggle_item_select(m_smooth_click_defer);
+			else
+				select_single(m_smooth_click_defer);
 			m_smooth_click_defer = -1;
+			m_smooth_click_defer_ctrl = false;
 			Invalidate(FALSE);
 		}
 
@@ -7065,6 +7071,7 @@ void CSCListCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 	//이미 선택된 항목 클릭으로 defer 를 설정하고 그 클릭이 편집을 진입시키면, LButtonUp 이 편집 박스로 가 defer 가 정리되지 않는다.
 	//그러면 다음 클릭의 LButtonUp 이 스테일 defer 로 엉뚱한(이전 편집) 항목을 select_single 해 선택이 되돌아간다 — 그 버그의 실제 원인.
 	m_smooth_click_defer  = -1;
+	m_smooth_click_defer_ctrl = false;
 	m_smooth_drag_pending = false;
 	m_pending_reclick_edit = false;	//20260714 by claude. 새 클릭마다 리셋 — 아래 합성 NM_CLICK(OnNMClick)이 조건 만족 시 다시 예약한다.
 
@@ -7098,11 +7105,16 @@ void CSCListCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 		bool anchor_valid = (m_focus_anchor >= 0 && m_focus_anchor < total);
 		bool already_sel  = (GetItemState(item, LVIS_SELECTED) & LVIS_SELECTED) != 0;
 
-		//20260707 by claude. 다중선택 상태에서 이미 선택된 항목을 plain(ctrl/shift 없이) 클릭하면, 이 눌림이 드래그의 시작일 수
-		//있으므로 선택을 지금 축소하지 않는다(탐색기 동작). 드래그로 이어지면 다중선택 유지, 단순 클릭이면 LButtonUp 에서 single 로 축소.
-		bool defer_collapse = (multi && already_sel && !ctrl && !shift);
-		if (defer_collapse)
+		//20260707 by claude. 다중선택 상태에서 이미 선택된 항목을 클릭하면, 이 눌림이 드래그의 시작일 수 있으므로 선택을
+		//지금 바꾸지 않는다(탐색기 동작). 드래그로 이어지면 다중선택 유지, 단순 클릭이면 LButtonUp 에서 확정한다.
+		//20260716 by claude. ctrl 도 지연 대상이다. 예전엔 ctrl 이면 여기서 곧바로 toggle_item_select 로 꺼버려서, 다중선택을
+		//ctrl+드래그(=복사)하려고 그중 하나를 잡는 순간 그 항목이 선택 해제되고 색이 변했다(탐색기는 그러지 않는다 — 사용자 확인).
+		bool defer_click = (multi && already_sel && !shift);
+		if (defer_click)
+		{
 			m_smooth_click_defer = item;
+			m_smooth_click_defer_ctrl = ctrl;	//뗄 때 ctrl=토글 해제 / plain=단일 축소.
+		}
 		else if (multi && ctrl && shift && anchor_valid)
 			select_range_add(m_focus_anchor, item);
 		else if (multi && ctrl)

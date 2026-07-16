@@ -970,7 +970,10 @@ protected:
 	bool			m_smooth_drag_pending = false;		//항목 위 LButton 눌림 — 드래그 제스처 대기 중.
 	CPoint			m_smooth_drag_pt = CPoint(0, 0);	//누른 지점(client).
 	int				m_smooth_drag_item = -1;			//누른 항목.
-	int				m_smooth_click_defer = -1;			//다중선택 상태에서 이미 선택된 항목을 plain 클릭 → 드래그가 아니면 LButtonUp 에서 single 로 축소.
+	//20260716 by claude. 다중선택 상태에서 이미 선택된 항목을 클릭 → 드래그가 아니면 LButtonUp 에서 선택 확정.
+	//드래그로 이어지면 OnMouseMove 가 취소해 선택이 그대로 유지된다(다중선택 드래그, ctrl+드래그 복사).
+	int				m_smooth_click_defer = -1;			//UP 에서 확정할 항목. -1 = 없음.
+	bool			m_smooth_click_defer_ctrl = false;	//확정 방식: true=ctrl 토글 해제, false=단일 축소.
 
 	//https://jiniya.net/tt/594/
 	//이 함수는 드래그 이미지를 직접 생성해주는 코드지만 취약점이 많은 코드이므로 참고만 할것.

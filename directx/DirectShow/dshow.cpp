@@ -3388,16 +3388,61 @@ void CDShow::set_video_position(CRect r)
 
 			CComQIPtr<IBasicVideo> pBV(m_VMR);
 			CComQIPtr<IVideoWindow> pVW(m_VMR);
+
+			//20260716 by claude. [진단] 세로영상 전체화면 검정 원인 격리 — ambient 축소 경로/rect/pin QI 결과 기록.
+			logWrite(_T("[ambient/diag] win=(%d,%d,%d,%d) vid=(x%d y%d w%d h%d) eff=%dx%d disp_ar=%.3f keep=%d rot=%d ambient_pillarbox=%d eligible=%d pBV=%p pVW=%p"),
+				r.left, r.top, r.right, r.bottom, vid_x, vid_y, vid_w, vid_h,
+				eff_vw, eff_vh, disp_ar, (int)m_keep_aspect, m_video_rotation,
+				(int)m_ambient_pillarbox, (int)ambient_eligible, (void*)pBV.p, (void*)pVW.p);
+
 			if (ambient_eligible)
 			{
 				//렌더러는 영상 영역만 덮는다 → 좌우 여백은 부모 client 로 노출.
+				HRESULT hr_dsp = S_OK, hr_wp = S_OK;		//20260716 by claude. [진단]
 				if (pBV)
 				{
 					pBV->SetDefaultSourcePosition();
-					pBV->SetDestinationPosition(0, 0, vid_w, vid_h);
+					hr_dsp = pBV->SetDestinationPosition(0, 0, vid_w, vid_h);
 				}
 				if (pVW)
-					pVW->SetWindowPosition(r.left + vid_x, r.top + vid_y, vid_w, vid_h);
+					hr_wp = pVW->SetWindowPosition(r.left + vid_x, r.top + vid_y, vid_w, vid_h);
+
+				//20260716 by claude. [진단] ambient 축소 실제 적용 결과.
+				logWrite(_T("[ambient/diag] SHRINK dst(0,0,%d,%d) hr=0x%08x  win(%d,%d,%d,%d) hr=0x%08x"),
+					vid_w, vid_h, hr_dsp, r.left + vid_x, r.top + vid_y, vid_w, vid_h, hr_wp);
+
+				//20260716 by claude. [진단] IVideoWindow::get_* 는 MPC-VR 에서 E_NOTIMPL — owner 자식창을 열거해 실제 화면 rect 확인.
+				if (pBV)
+				{
+					long dl = -1, dt = -1, dw = -1, dh = -1;
+					pBV->GetDestinationPosition(&dl, &dt, &dw, &dh);
+					long sw = -1, sh = -1;
+					pBV->GetVideoSize(&sw, &sh);
+					logWrite(_T("[ambient/diag] READBACK BV dest(%ld,%ld,%ld,%ld) videosize=%ldx%ld"),
+						dl, dt, dw, dh, sw, sh);
+				}
+				if (m_pParent && m_pParent->GetSafeHwnd())
+				{
+					HWND owner = m_pParent->GetSafeHwnd();
+					RECT ors = { 0 };
+					::GetWindowRect(owner, &ors);
+					logWrite(_T("[ambient/diag] owner hwnd=%p screen_rect=(%ld,%ld,%ld,%ld)"),
+						(void*)owner, ors.left, ors.top, ors.right, ors.bottom);
+					HWND child = ::GetWindow(owner, GW_CHILD);
+					int ci = 0;
+					while (child && ci < 20)
+					{
+						TCHAR cls[64] = { 0 };
+						::GetClassName(child, cls, 64);
+						RECT crs = { 0 };
+						::GetWindowRect(child, &crs);
+						BOOL cvis = ::IsWindowVisible(child);
+						logWrite(_T("[ambient/diag]   child[%d] hwnd=%p cls='%s' visible=%d screen_rect=(%ld,%ld,%ld,%ld)"),
+							ci, (void*)child, cls, (int)cvis, crs.left, crs.top, crs.right, crs.bottom);
+						child = ::GetWindow(child, GW_HWNDNEXT);
+						ci++;
+					}
+				}
 
 				m_ambient_active	= true;
 				m_ambient_full_rect = r;
@@ -3435,6 +3480,11 @@ void CDShow::set_video_position(CRect r)
 	{
 		OAFilterState state = State_Running;
 		HRESULT hr = m_pMC->GetState(0, &state);
+
+		//20260716 by claude. [진단] 재생 상태 사실 기록 — 세로영상 ambient 검정이 running/paused 어느 쪽에서 나는지 확정.
+		logWrite(_T("[ambient/diag] state hr=0x%08x state=%ld (0=Stopped 1=Paused 2=Running) mpcvr=%d ambient_active=%d"),
+			hr, state, (int)m_use_mpcvr, (int)m_ambient_active);
+
 		if (hr == S_OK && state == State_Paused)
 		{
 			if (m_pVMRWC && m_pParent && m_pParent->GetSafeHwnd())
@@ -3448,6 +3498,17 @@ void CDShow::set_video_position(CRect r)
 				CComQIPtr<IExFilterConfig> pCfg(m_VMR);
 				if (pCfg)
 					pCfg->Flt_SetBool("cmd_redraw", true);
+			}
+		}
+		//20260716 by claude. [진단/테스트] ambient 축소 상태에서 재생 중이면 lessRedraws 로 present 가 생략됐을 가능성 —
+		//축소된 swapchain 에 강제 재그리기 요청. 비-ambient 정상 경로는 건드리지 않음(회귀 방지).
+		else if (hr == S_OK && state == State_Running && m_use_mpcvr && m_VMR && m_ambient_active)
+		{
+			CComQIPtr<IExFilterConfig> pCfg(m_VMR);
+			if (pCfg)
+			{
+				HRESULT hr_rd = pCfg->Flt_SetBool("cmd_redraw", true);
+				logWrite(_T("[ambient/diag] running cmd_redraw hr=0x%08x"), hr_rd);
 			}
 		}
 	}

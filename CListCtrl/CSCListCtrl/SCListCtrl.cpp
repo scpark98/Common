@@ -11,7 +11,6 @@
 
 #include "../../colors.h"
 #include "../../MemoryDC.h"
-#include "../../log/SCLog/SCLog.h"	//20260706 by claude. [진단 임시] logWrite 사용 — 원인 확정 후 이 include 도 함께 제거.
 #include "Common/drag_scroll_message.h"	//20260707 by claude. SCTreeCtrl 드래그 자동스크롤 위임 메시지 수신용.
 #include <afxvslistbox.h>
 
@@ -28,33 +27,6 @@ CSCListCtrl* CSCListCtrl::s_editing_list = NULL;
 //OnDrawItem 의 cell 그리기에서 직접 호출 + setter 들의 _apply_style_field 와 짝.
 static int  _safe_weight   (const std::deque<int>&  v, int i) { return ((int)v.size() > i && i >= 0) ? v[i] : 0; }
 static BYTE _safe_bytestyle(const std::deque<BYTE>& v, int i) { return ((int)v.size() > i && i >= 0) ? v[i] : (BYTE)0; }
-
-//20260714 by claude. [진단: 드래그 progressive slowdown] Ctrl 누른 채 드래그 시 점점 느려지는(간헐적) 원인을
-//좁히기 위한 계측. 핸들 누수(GDI/USER)인지, compute_drag_hint(shell 경로)/update_drag_hint(합성+render) 시간이
-//튀는지, per-move 처리시간이 누적 증가하는지를 판별한다. (사용자 지시 2026-07-14: 원인 확정 후에도 이 로그는 유지.)
-namespace {
-	LARGE_INTEGER	g_dperf_freq = { 0 };
-	DWORD			g_dperf_start_tick = 0;		//드래그 시작 시각(ms)
-	int				g_dperf_moves = 0;			//드래그 시작 후 mousemove 처리 횟수
-	int				g_dperf_hint_calls = 0;		//20260715 by claude. 그 중 실제로 provider(m_fn_drag_hint)를 부른 횟수 — 게이팅 효과 확인용.
-	DWORD			g_dperf_last_log = 0;		//로그 스로틀 기준
-	double			g_dperf_max_compute = 0.0;	//로그 구간 내 compute_drag_hint 최대 소요(ms)
-	double			g_dperf_max_update = 0.0;	//로그 구간 내 update_drag_hint(합성+render) 최대 소요(ms)
-	double			g_dperf_max_move = 0.0;		//로그 구간 내 mousemove 드래그블록 '전체'(tail=자동스크롤+드롭재도색 포함) 최대 소요(ms)
-	double			g_dperf_max_gap = 0.0;		//로그 구간 내 이전 OnMouseMove로부터의 최대 간격(ms) — 큰 gap = 이동이 드문드문 처리됨(starvation)
-	LARGE_INTEGER	g_dperf_last_move_qpc = { 0 };	//직전 OnMouseMove 처리 시각(QPC) — gap 계산용
-	int				g_dperf_start_gdi = 0;
-	int				g_dperf_start_user = 0;
-
-	inline double dperf_ms(const LARGE_INTEGER& a, const LARGE_INTEGER& b)
-	{
-		if (g_dperf_freq.QuadPart == 0)
-			QueryPerformanceFrequency(&g_dperf_freq);
-		return (double)(b.QuadPart - a.QuadPart) * 1000.0 / (double)g_dperf_freq.QuadPart;
-	}
-	inline int dperf_gdi()  { return (int)::GetGuiResources(::GetCurrentProcess(), GR_GDIOBJECTS); }
-	inline int dperf_user() { return (int)::GetGuiResources(::GetCurrentProcess(), GR_USEROBJECTS); }
-}
 
 CSCListCtrl::CSCListCtrl()
 {
@@ -2207,14 +2179,11 @@ CSCStaticEdit* CSCListCtrl::edit_item(int item, int subItem)
 
 	if (subItem >= nColumnCount || GetColumnWidth(subItem) < 5)
 	{
-		logWrite(_T("[reclick] edit_item REJECT(column) item=%d sub=%d colcnt=%d w=%d"),	//20260715 by claude. [진단 임시]
-			item, subItem, nColumnCount, subItem < nColumnCount ? GetColumnWidth(subItem) : -1);
 		return NULL;
 	}
 
 	if (!m_allow_edit_column[subItem])
 	{
-		logWrite(_T("[reclick] edit_item REJECT(allow_edit_column) item=%d sub=%d"), item, subItem);	//20260715 by claude. [진단 임시]
 		return NULL;
 	}
 
@@ -2225,7 +2194,6 @@ CSCStaticEdit* CSCListCtrl::edit_item(int item, int subItem)
 		CString real = m_pShellImageList->convert_special_folder_to_real_path(!m_is_local, get_path(item));
 		if (!is_drive_root(real) && m_pShellImageList->is_protected(!m_is_local, real))
 		{
-			logWrite(_T("[reclick] edit_item REJECT(protected) item=%d real=[%s]"), item, (LPCTSTR)real);	//20260715 by claude. [진단 임시]
 			return NULL;
 		}
 	}
@@ -4488,12 +4456,6 @@ BOOL CSCListCtrl::OnNMClick(NMHDR *pNMHDR, LRESULT *pResult)
 	if (((ht = hit_test(pNMItemActivate->ptAction, item, subItem, false)) == LVHT_NOWHERE) ||
 		item < 0 || subItem < 0)
 	{
-		//20260715 by claude. [진단 임시] 여기서 나가면 재클릭 편집 예약 자체가 없다 — 클릭 위치가 항목/컬럼으로 안 잡힌 경우.
-		//hit_test 는 '행은 잡혔는데 어느 컬럼 rect 에도 안 걸리면' subItem=-1 인 채로 LVHT_ONITEMICON 을 리턴한다(1293) → 여기로 온다.
-		//그래서 ht, sub, 그리고 컬럼 rect 판정에 영향을 주는 가로 스크롤(native/미러)을 함께 찍는다.
-		logWrite(_T("[reclick] NMClick EARLY-OUT pt=(%d,%d) ht=%d item=%d sub=%d hscroll(native=%d mirror=%d) col0w=%d"),
-			pNMItemActivate->ptAction.x, pNMItemActivate->ptAction.y, ht, item, subItem,
-			GetScrollPos(SB_HORZ), m_h_scroll_pos, GetColumnWidth(0));
 		return FALSE;
 	}
 
@@ -4552,30 +4514,8 @@ BOOL CSCListCtrl::OnNMClick(NMHDR *pNMHDR, LRESULT *pResult)
 			m_last_clicked_time = clock();
 		}
 
-		//20260715 by claude. [진단 임시] 재클릭 편집이 클릭 위치에 따라 되고 안 되는 원인 추적 — 클릭 좌표와 hit_test 결과(item/subItem),
-		//그리고 어느 조건에서 예약이 실패하는지. col0 폭과 함께 봐야 "레이블 밖/다른 컬럼을 짚었나"를 판정할 수 있다.
-		CRect rc_sub0, rc_row;
-		GetSubItemRect(item, 0, LVIR_BOUNDS, rc_sub0);
-		GetItemRect(item, &rc_row, LVIR_BOUNDS);
-		logWrite(_T("[reclick] NMClick pt=(%d,%d) item=%d(prev=%d) sub=%d(prev=%d) ht=%d col0w=%d hscroll(native=%d mirror=%d) row=(%d,%d,%d,%d) sub0=(%d,%d,%d,%d) one_click=%d selcnt=%d since_click=%d(%d~2000) pending=%d"),
-			pNMItemActivate->ptAction.x, pNMItemActivate->ptAction.y,
-			item, m_edit_item, subItem, m_edit_subItem, ht, GetColumnWidth(0),
-			GetScrollPos(SB_HORZ), m_h_scroll_pos,
-			rc_row.left, rc_row.top, rc_row.right, rc_row.bottom,
-			rc_sub0.left, rc_sub0.top, rc_sub0.right, rc_sub0.bottom,
-			(int)m_allow_one_click_edit,
-			(int)GetSelectedCount(), (int)since_click, (int)reclick_min, (int)m_pending_reclick_edit);
-
 		m_edit_item = item;
 		m_edit_subItem = subItem;
-	}
-	else
-	{
-		//20260715 by claude. [진단 임시] 편집 허용 조건에서 걸러진 경우 — 여기선 m_edit_item/m_pending_reclick_edit 갱신도 안 되므로
-		//(예: 크기·날짜 컬럼을 짚으면 allow_edit_column 이 false) 다음 재클릭 판정이 어긋난다.
-		logWrite(_T("[reclick] NMClick SKIP(allow_edit block) pt=(%d,%d) item=%d sub=%d ht=%d allow_edit=%d col_editable=%d"),
-			pNMItemActivate->ptAction.x, pNMItemActivate->ptAction.y, item, subItem, ht, (int)m_allow_edit,
-			(subItem >= 0 && subItem < get_column_count()) ? (int)m_allow_edit_column[subItem] : -1);
 	}
 
 	//edit mode까지 들어가지 않고 단순 클릭이라면 해당 셀에 설정된 action control이 있다면 표시해준다.
@@ -4636,10 +4576,6 @@ void CSCListCtrl::edit_end(bool valid)
 		//드라이브 볼륨 변경만 실패 원인에 따라 아래에서 다시 판정한다.
 		bool can_retry_edit = true;
 
-		//20260715 by claude. [진단 임시] 리스트 편집 종료 시점의 판정값.
-		logWrite(_T("[rename-tree] LIST edit_end shell: is_drive=%d (is_local=%d edit_is_drive=%d) old=[%s] new=[%s] path=[%s]"),
-			(int)is_drive, (int)m_is_local, (int)m_edit_is_drive, (LPCTSTR)m_edit_old_text, (LPCTSTR)m_edit_new_text, (LPCTSTR)path);
-
 		if (is_drive)
 		{
 			DWORD err = 0;
@@ -4668,11 +4604,6 @@ void CSCListCtrl::edit_end(bool valid)
 			//구버전 agent) 다시 열어봐야 취소하려 ESC 를 한 번 더 누르게 할 뿐이다.
 			//리모트는 실패 원인이 소켓 너머라 알 수 없고, 구버전 agent 스킵이 대부분이므로 다시 열지 않는다.
 			can_retry_edit = (m_is_local && (err == ERROR_LABEL_TOO_LONG || err == ERROR_INVALID_NAME));
-
-			//20260715 by claude. [진단 임시] 볼륨 변경 성공 여부와 통지 발송 여부.
-			logWrite(_T("[rename-tree] LIST is_drive: local=%d root=[%s] new=[%s] res=%d err=%d retry=%d → 통지=%s"),
-				(int)m_is_local, (LPCTSTR)m_edit_drive_root, (LPCTSTR)m_edit_new_text, (int)res, (int)err,
-				(int)can_retry_edit, res ? _T("보냄") : _T("안 보냄"));
 
 			//성공 시 parent 에 드라이브 볼륨 변경 통지 → 형제 컨트롤(트리) 드라이브 표시 동기화. param0=root("C:\\"), param1=새 볼륨명.
 			if (res)
@@ -4996,7 +4927,7 @@ void CSCListCtrl::set_as_shell_listctrl(CShellImageList* pShellImageList, bool i
 	set_column_text_align(col_filesize, HDF_RIGHT, false);
 
 	//20260715 by claude. 셸 리스트의 기본 표시 순서는 '이름 오름차순'(폴더 먼저)이다. 그런데 set_headings 가 m_column_sort_type 을
-	//전부 sort_none 으로 채우므로(792), 사용자가 컬럼 헤더를 누르기 전까지는 "현재 정렬 기준"이 비어 있었다. 그래서 이름변경 후
+	//전부 sort_none 으로 assign 하므로, 사용자가 컬럼 헤더를 누르기 전까지는 "현재 정렬 기준"이 비어 있었다. 그래서 이름변경 후
 	//재정렬(resort) 처럼 '현재 기준을 다시 적용'하는 후처리가 기준을 못 찾아 아무 일도 못 했다 → 기본 기준을 명시한다.
 	//표시 순서는 안 바뀐다: 로드 경로(find_all_files)와 sort() 의 비교자가 모두 StrCmpLogicalW(is_greater_with_numeric 내부도 동일)로 같다.
 	m_cur_sort_column = col_filename;
@@ -5895,17 +5826,6 @@ void CSCListCtrl::OnLvnBeginDrag(NMHDR* pNMHDR, LRESULT* pResult)
 	m_drag_hint_wnd = NULL;
 	m_drag_hint_item = -2;
 
-	//20260714 by claude. [진단: 드래그 slowdown] 드래그 시작 기준값 리셋 + 시작 시점 핸들 수 기록.
-	g_dperf_start_tick = GetTickCount();
-	g_dperf_moves = 0;
-	g_dperf_hint_calls = 0;
-	g_dperf_last_log = g_dperf_start_tick;
-	g_dperf_max_compute = g_dperf_max_update = g_dperf_max_move = g_dperf_max_gap = 0.0;
-	g_dperf_last_move_qpc.QuadPart = 0;
-	g_dperf_start_gdi = dperf_gdi();
-	g_dperf_start_user = dperf_user();
-	logWrite(_T("[drag-perf] START gdi=%d user=%d hwnd=%p"), g_dperf_start_gdi, g_dperf_start_user, GetSafeHwnd());
-
 	*pResult = 0;
 }
 
@@ -5971,17 +5891,6 @@ void CSCListCtrl::OnMouseMove(UINT nFlags, CPoint point)
 	//// If we are in a drag/drop procedure (m_bDragging is true)
 	if (m_bDragging)
 	{
-		//20260714 by claude. [진단: 드래그 slowdown] 이 mousemove 드래그블록 전체 소요 측정 시작 + 직전 OnMouseMove 로부터의 간격(gap).
-		//gap 이 크면(마우스는 움직이는데 OnMouseMove 가 드문드문 불림) = 메시지 전달 starvation, gap 이 작으면 = 각 이동이 무거움.
-		LARGE_INTEGER dperf_t0;
-		QueryPerformanceCounter(&dperf_t0);
-		if (g_dperf_last_move_qpc.QuadPart != 0)
-		{
-			double gap = dperf_ms(g_dperf_last_move_qpc, dperf_t0);
-			if (gap > g_dperf_max_gap) g_dperf_max_gap = gap;
-		}
-		g_dperf_last_move_qpc = dperf_t0;
-
 		//// Move the drag image
 		CPoint pt(point);	//get our current mouse coordinates
 		ClientToScreen(&pt); //convert to screen coordinates
@@ -6008,12 +5917,11 @@ void CSCListCtrl::OnMouseMove(UINT nFlags, CPoint point)
 		m_pDropWnd = pDropWnd;
 
 		//20260705 by claude. 드래그 중 대상에 맞는 문구를 app provider 로 계산해 이미지에 반영(값 변화 시에만 재합성). pt = screen 좌표.
-		//20260714 by claude. [진단: 드래그 slowdown] compute_drag_hint(앱 콜백=shell 경로)와 update_drag_hint(합성+render)를 분리 측정.
 		//20260715 by claude. [드래그 느려짐] provider 를 '드롭 대상(창+커서 밑 항목)이 바뀔 때만' 부른다. 예전엔 커서가 1픽셀만
 		//움직여도 매 mousemove(초당 ~60회) 마다 불렀는데, 문구는 대상이 바뀔 때만 달라지므로 대다수 호출이 같은 값을 다시 만드는
 		//순수 낭비였다. 캐시(m_drag_hint_text)는 provider 가 값을 '만든 뒤' 재합성만 막아서 비싼 계산은 이미 치른 뒤였다.
 		//측정: provider 1회 = 리모트 ~10ms(convert_special_folder_to_real_path 안의 ::get_system_label 이 매번 CoInitialize+
-		//SHGetFileInfo 를 도는 탓). 아래 드롭 하이라이트 재도색이 이미 같은 방식(6056 drop_item != m_nDropIndex)으로 게이팅돼 있다.
+		//SHGetFileInfo 를 도는 탓). 이 함수 아래쪽 드롭 하이라이트 재도색이 이미 같은 방식(drop_item != m_nDropIndex 비교)으로 게이팅돼 있다.
 		//Ctrl/Shift 토글은 refresh_drag_hint() 가 이 게이트를 거치지 않고 직접 갱신하므로 즉시 반영된다.
 		if (m_fn_drag_hint)
 		{
@@ -6038,22 +5946,8 @@ void CSCListCtrl::OnMouseMove(UINT nFlags, CPoint point)
 				m_drag_hint_wnd = hint_wnd;
 				m_drag_hint_item = hint_item;
 
-				LARGE_INTEGER dperf_c0, dperf_c1, dperf_c2;
-				QueryPerformanceCounter(&dperf_c0);
-				CString dperf_hint = m_fn_drag_hint(pDropWnd, pt);
-				QueryPerformanceCounter(&dperf_c1);
-				update_drag_hint(dperf_hint);
-				QueryPerformanceCounter(&dperf_c2);
-
-				double c_ms = dperf_ms(dperf_c0, dperf_c1);
-				double u_ms = dperf_ms(dperf_c1, dperf_c2);
-				if (c_ms > g_dperf_max_compute) g_dperf_max_compute = c_ms;
-				if (u_ms > g_dperf_max_update)  g_dperf_max_update  = u_ms;
-				g_dperf_hint_calls++;		//20260715 by claude. [진단 임시] provider 실제 호출 횟수 — moves 대비 얼마나 줄었는지.
+				update_drag_hint(m_fn_drag_hint(pDropWnd, pt));
 			}
-
-			g_dperf_moves++;
-			//전체 move 시간(tail 포함)과 300ms 스로틀 로그는 블록 '끝'에서 emit — 여기서 재면 자동스크롤+드롭재도색(UpdateWindow)이 빠진다.
 		}
 
 		//드롭 대상 컨트롤(트리/리스트) 가장자리에 마우스가 hovering 되면 자동 스크롤.
@@ -6140,27 +6034,6 @@ void CSCListCtrl::OnMouseMove(UINT nFlags, CPoint point)
 			::SetCursor(AfxGetApp()->LoadStandardCursor(MAKEINTRESOURCE(IDC_NO)));
 		}
 		//20260704 by claude. (레이어드 드래그이미지는 화면 lock 이 없어 DragShowNolock 불필요 — 제거)
-
-		//20260714 by claude. [진단: 드래그 slowdown] 여기가 드래그블록 '끝' — tail(update_drag_auto_scroll + 드롭 하이라이트 RedrawItems + UpdateWindow 동기 재도색)까지
-		//포함한 OnMouseMove 전체 소요를 재고, 300ms 스로틀로 로그. max_full 이 max_compute+max_update 보다 크게 뜨면 그 tail(특히 UpdateWindow 재도색)이 범인.
-		//(위쪽 비-드롭 대상 early return 경로(5893 부근)는 이 지점을 안 지나 로그가 안 나오지만, 리스트/트리 위 정상 드래그는 여기를 지난다.)
-		LARGE_INTEGER dperf_end;
-		QueryPerformanceCounter(&dperf_end);
-		double full_ms = dperf_ms(dperf_t0, dperf_end);
-		if (full_ms > g_dperf_max_move) g_dperf_max_move = full_ms;
-
-		DWORD dperf_now = GetTickCount();
-		if (dperf_now - g_dperf_last_log >= 300)
-		{
-			int gdi = dperf_gdi();
-			int usr = dperf_user();
-			logWrite(_T("[drag-perf] t=%ums moves=%d hint_calls=%d gdi=%d(+%d) user=%d(+%d) max_gap=%.1fms max_compute=%.2fms max_update=%.2fms max_full=%.2fms"),
-				dperf_now - g_dperf_start_tick, g_dperf_moves, g_dperf_hint_calls,
-				gdi, gdi - g_dperf_start_gdi, usr, usr - g_dperf_start_user,
-				g_dperf_max_gap, g_dperf_max_compute, g_dperf_max_update, g_dperf_max_move);
-			g_dperf_last_log = dperf_now;
-			g_dperf_max_compute = g_dperf_max_update = g_dperf_max_move = g_dperf_max_gap = 0.0;
-		}
 	}
 
 	CListCtrl::OnMouseMove(nFlags, point);
@@ -6224,19 +6097,7 @@ void CSCListCtrl::update_drag_auto_scroll(CPoint screen_pt)
 		//자동스크롤을 커서 위치 거리로 끊지 않는다. (마퀴 선택 스크롤만 default true 로 종전 동작 유지.)
 		m_drag_scroll_fx = (dl < dr) ? -auto_scroll_level(dl, false) : auto_scroll_level(dr, false);
 		m_drag_scroll_fy = (dt < db) ? -auto_scroll_level(dt, false) : auto_scroll_level(db, false);
-
-		//20260713 by claude. [진단] 자동스크롤 타깃/거리/속도. 드래그로 컨트롤 넘나들 때 타깃 전환·정지 판단 근거 추적.
-		TCHAR dcls[40] = { 0, }, tcls[40] = { 0, };
-		if (m_pDropWnd) ::GetClassName(m_pDropWnd->GetSafeHwnd(), dcls, 39);
-		if (m_drag_scroll_target) ::GetClassName(m_drag_scroll_target->GetSafeHwnd(), tcls, 39);
-		CRect dr2(0,0,0,0); if (m_pDropWnd) m_pDropWnd->GetWindowRect(dr2);
-		logWrite(_T("[asL] pt=(%d,%d) drop=%p[%s](%d,%d,%d,%d) tgt=%p[%s] start=%u tgtRC=(%d,%d,%d,%d) d(l,r,t,b)=(%d,%d,%d,%d) fx=%.2f fy=%.2f"),
-			screen_pt.x, screen_pt.y, m_pDropWnd ? m_pDropWnd->GetSafeHwnd() : NULL, dcls, dr2.left, dr2.top, dr2.right, dr2.bottom,
-			m_drag_scroll_target ? m_drag_scroll_target->GetSafeHwnd() : NULL, tcls, m_drag_scroll_start_tick,
-			rc.left, rc.top, rc.right, rc.bottom, dl, dr, dt, db, m_drag_scroll_fx, m_drag_scroll_fy);
 	}
-	else
-		logWrite(_T("[asL] pt=(%d,%d) NO TARGET drop=%p"), screen_pt.x, screen_pt.y, m_pDropWnd ? m_pDropWnd->GetSafeHwnd() : NULL);
 
 	if (m_drag_scroll_fx != 0.f || m_drag_scroll_fy != 0.f)
 	{
@@ -6498,15 +6359,6 @@ void CSCListCtrl::OnLButtonUp(UINT nFlags, CPoint point)
 		// Release mouse capture, so that other controls can get control/messages
 		ReleaseCapture();
 
-		//20260714 by claude. [진단: 드래그 slowdown] 드래그 1회 종료 시점 핸들 순증 확인 — START 대비 GDI/USER 가 늘면 드래그당 누수.
-		{
-			int gdi = dperf_gdi();
-			int usr = dperf_user();
-			logWrite(_T("[drag-perf] END t=%ums moves=%d gdi=%d(net %+d) user=%d(net %+d)"),
-				GetTickCount() - g_dperf_start_tick, g_dperf_moves,
-				gdi, gdi - g_dperf_start_gdi, usr, usr - g_dperf_start_user);
-		}
-
 		//드래그 자동 스크롤 타이머 정지.
 		stop_auto_scroll_timer();
 		m_drag_scroll_fx = m_drag_scroll_fy = 0.f;
@@ -6568,14 +6420,7 @@ void CSCListCtrl::OnLButtonUp(UINT nFlags, CPoint point)
 		if (m_pending_reclick_edit)
 		{
 			m_pending_reclick_edit = false;
-			//20260715 by claude. [진단 임시] 예약이 살아서 여기까지 왔는지 + edit_item 이 조용히 NULL 로 거부하는지 구분.
-			CSCStaticEdit* pe = edit_item(m_edit_item, m_edit_subItem);
-			logWrite(_T("[reclick] LButtonUp edit_item(item=%d sub=%d) -> %s"),
-				m_edit_item, m_edit_subItem, pe ? _T("OK") : _T("NULL(거부)"));
-		}
-		else
-		{
-			logWrite(_T("[reclick] LButtonUp no pending"));
+			edit_item(m_edit_item, m_edit_subItem);
 		}
 	}
 
@@ -7359,7 +7204,6 @@ bool CSCListCtrl::smooth_key_navigate(UINT vk)
 
 	smooth_ensure_visible(target);
 	Invalidate(FALSE);
-	logWrite(_T("[smooth-nav] vk=0x%X focus=%d->%d page_rows=%d m_scroll_y=%d"), vk, focus, target, page_rows, m_scroll_y);
 	return true;
 }
 
@@ -7455,7 +7299,6 @@ void CSCListCtrl::OnHScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar)
 	//이 핸들러 미진입). 따라서 여기서 native 실제 가로 위치를 m_h_scroll_pos 로 미러링하면 native hwheel 이 썸에 반영되고
 	//우리 자체 스크롤 경로(드래그/휠/OnMouseHWheel)에는 영향이 없다.
 	m_h_scroll_pos = GetScrollPos(SB_HORZ);
-	//logWrite(_T("[hscroll] nSBCode=%u native SB_HORZ=%d -> m_h_scroll_pos=%d"), nSBCode, GetScrollPos(SB_HORZ), m_h_scroll_pos);	//[진단 §5-2] 폭주 노이즈 → 주석.
 
 	//20260706 by claude. [§5 폭주 완화] native 리스트뷰는 마우스 가로휠 1회를 smooth-scroll 로 풀어 WM_HSCROLL 을 수십~백여 회
 	//연속 발생시킨다. 매 스텝 full sync_scrollbar(오버레이 재배치 + 동기 RedrawWindow)는 성능 저하 요인 → ~30ms 로 스로틀하고,
@@ -7744,10 +7587,6 @@ void CSCListCtrl::OnNcPaint()
 	//아래 CListCtrl::OnNcPaint();를 호출하지 않으면 스크롤바 등의 일부 영역이 제대로 그려지지 않게 되므로 반드시 기본 핸들러 호출 필요.
 	CListCtrl::OnNcPaint();
 
-	//20260712 by claude. [진단] 리사이즈 중 세로바 찢김 원인 측정 — NC paint 발화 시점·세로/가로바 가시 상태. 재조사 시 해제(§2J).
-	//logWrite(_T("[vbar-ncpaint] tick=%u setup=%d v_visible=%d h_visible=%d"),
-	//	::GetTickCount(), (int)m_scrollbar_setup, (int)m_v_visible_state, (int)m_h_visible_state);
-
 	//20260712 by claude. [바 찢김 수정] base CListCtrl::OnNcPaint 는 window DC 로 우측/하단 NC 띠를 그린다. 이 띠엔
 	//WS_VSCROLL 유지(bottom-align 목적)로 남아있는 native 세로 스크롤바 시각화가 포함돼, 그 자리에 놓인 오버레이 바를
 	//덮어써 리사이즈 중 바가 찢겨 보인다(WS_CLIPSIBLINGS 는 client DC 만 clip → NC(window) DC 미적용이라 못 막음).
@@ -7976,14 +7815,6 @@ void CSCListCtrl::sync_scrollbar()
 	}
 
 
-	//20260706 by claude. [진단 폭주 §5-2] sync_scrollbar 가 어떤 메시지 처리 중 호출되는지 특정 완료(WM_HSCROLL 0x0114
-	//148회 / WM_NOTIFY 0x004E 144회 = native hwheel→WM_HSCROLL smooth-scroll 스텝). 폭주라 상시 노이즈 → 주석 처리.
-	//{
-	//	const MSG* pm = GetCurrentMessage();
-	//	logWrite(_T("[sync-caller] curmsg=0x%04X wParam=0x%IX lParam=0x%IX"),
-	//		pm ? pm->message : 0, pm ? (UINT_PTR)pm->wParam : 0, pm ? (UINT_PTR)pm->lParam : 0);
-	//}
-
 	//native scrollbar 의 시각화는 setup_scrollbar 의 SWP_FRAMECHANGED + OnNcCalcSize(NC=0) 가
 	//영구 차단 — sync 마다 ShowScrollBar 토글은 무용하면서 OS 가 NCCALCSIZE/paint 사이클을 발화시켜
 	//컬럼 폭 드래그 중 변경 컬럼이 추가 repaint 되는 flicker 원인. 따라서 sync 진입부에선 호출 X.
@@ -8208,9 +8039,6 @@ void CSCListCtrl::sync_scrollbar()
 			m_scrollbar.SetWindowPos(&CWnd::wndTop, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
 	}
 
-	//20260706 by claude. [진단 hsync §5-2] 가로 sync 진입값 측정 — sync 마다 폭주라 주석 처리(필요시 해제).
-	//logWrite(_T("[hsync] need_h=%d m_h_scroll_pos(in)=%d total_col_width=%d content_view_w=%d"),
-	//	(int)need_h, m_h_scroll_pos, total_col_width, content_view_w);
 	if (!need_h)
 	{
 		m_scrollbar_h.ShowWindow(SW_HIDE);
@@ -8229,8 +8057,6 @@ void CSCListCtrl::sync_scrollbar()
 		m_scrollbar_h.set_range(0, total_h_range - 1);
 		m_scrollbar_h.set_page(content_view_w);
 		m_scrollbar_h.set_pos(m_h_scroll_pos);
-		//logWrite(_T("[hsync] set thumb: max_h=%d range=[0,%d] page=%d pos=%d"),
-		//	max_h, total_h_range - 1, content_view_w, m_h_scroll_pos);
 		m_scrollbar_h.ShowWindow(SW_SHOW);
 		//parent dialog 의 child 라 형제인 listctrl 위로 z-order 올려야 보인다. [perf] show 전환에만 1회.
 		if (!old_h)
@@ -8306,29 +8132,6 @@ LRESULT CSCListCtrl::on_message_CSCScrollbar(WPARAM wParam, LPARAM lParam)
 			}
 		}
 
-		//20260706 by claude. [진단2 · 임시] top-index 가 0 에 고정되는(=끝 항목 도달 불가) 원인 추적.
-		//이전 진단으로 행 높이(26=26)·부분 무효화는 무관 확정. 이제 스크롤 상태 전량을 찍어 어느 분기(SB_BOTTOM vs 픽셀
-		//Scroll)를 타는지, native GetTopIndex 가 왜 안 오르는지, 마지막 항목 rect 가 client 안에 드는지, WS_VSCROLL 유무를 본다.
-		//판별 후 제거 예정.
-		{
-			CRect rc2;
-			GetClientRect(&rc2);
-			int hdr2 = m_HeaderCtrlEx.GetSafeHwnd() ? get_header_height() : 0;
-			CRect r0, rL;
-			int i0top = GetItemRect(0, &r0, LVIR_BOUNDS) ? r0.top : -9999;
-			int iLbot = (total > 0 && GetItemRect(total - 1, &rL, LVIR_BOUNDS)) ? rL.bottom : -9999;
-			bool has_vsb = (GetStyle() & WS_VSCROLL) != 0;
-			//20260706 by claude. [진단2] native 세로 스크롤바의 *내부* range/page/pos 를 직접 관찰 — 지금까지는 GetTopIndex(스크롤 결과)만
-			//봤고 native 가 자기 스크롤 범위를 어떻게 잡는지는 추론이었다. si.nPage 가 GetCountPerPage(=visible) 인지 floor(clientH/rowH)
-			//인지, si.nMax−si.nPage+1 이 우리가 필요한 max_top 과 얼마나 어긋나는지를 숫자로 확정한다(팬텀 없이 native page 보정이 가능한지 판별).
-			SCROLLINFO si = { sizeof(SCROLLINFO), SIF_ALL };
-			GetScrollInfo(SB_VERT, &si);
-			logWrite(_T("[BLANKROW2] pos=%d new_top=%d cur_top=%d max_top=%d visible=%d total=%d gcp=%d nativeCount=%d branch=%s | afterTop=%d item0.top=%d last.bottom=%d clientH=%d hdr=%d reserve=%d WS_VSCROLL=%d | si.nMin=%d nMax=%d nPage=%u nPos=%d nTrack=%d"),
-				msg->pos, new_top, cur_top, max_top, visible, total, GetCountPerPage(), GetItemCount(),
-				(new_top >= max_top && total > 0) ? _T("SB_BOTTOM") : _T("pixel"),
-				GetTopIndex(), i0top, iLbot, rc2.Height(), hdr2, m_bottom_reserve, has_vsb ? 1 : 0,
-				si.nMin, si.nMax, si.nPage, si.nPos, si.nTrackPos);
-		}
 	}
 	else if (msg->pThis == &m_scrollbar_h)
 	{
@@ -8348,9 +8151,6 @@ LRESULT CSCListCtrl::on_message_CSCScrollbar(WPARAM wParam, LPARAM lParam)
 
 BOOL CSCListCtrl::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
 {
-	//20260706 by claude. [진단 §5-2] 진입 확인 — 가로휠이 WM_MOUSEWHEEL 로 오는지, MK_SHIFT 유무.
-	logWrite(_T("[wheel-entry] OnMouseWheel nFlags=0x%X zDelta=%d shift=%d setup=%d count=%d"),
-		nFlags, zDelta, (nFlags & MK_SHIFT) ? 1 : 0, (int)m_scrollbar_setup, GetItemCount());
 	if (m_scrollbar_setup && GetItemCount() > 0)
 	{
 		m_last_user_scroll_at = GetTickCount();
@@ -8360,11 +8160,8 @@ BOOL CSCListCtrl::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
 			int dx = -zDelta / WHEEL_DELTA * 60;
 			if (dx == 0)
 				dx = (zDelta > 0) ? -60 : 60;
-			//20260706 by claude. [진단 shiftwheel §5-2] 정상 동작하는 shift+세로휠 가로 경로 — hwheel 과 비교용.
-			int before_pos = m_h_scroll_pos;
 			m_h_scroll_pos += dx;
 			Scroll(CSize(dx, 0));
-			logWrite(_T("[shiftwheel] zDelta=%d dx=%d m_h_scroll_pos %d->%d"), zDelta, dx, before_pos, m_h_scroll_pos);
 			UpdateWindow();
 			sync_scrollbar();
 			return TRUE;
@@ -8416,26 +8213,16 @@ BOOL CSCListCtrl::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
 
 void CSCListCtrl::OnMouseHWheel(UINT nFlags, short zDelta, CPoint pt)
 {
-	//20260706 by claude. [진단 §5-2] 진입 확인 — 가로휠이 이 핸들러로 오는지.
-	logWrite(_T("[hwheel-entry] OnMouseHWheel nFlags=0x%X zDelta=%d setup=%d"), nFlags, zDelta, (int)m_scrollbar_setup);
 	if (m_scrollbar_setup)
 	{
 		m_last_user_scroll_at = GetTickCount();
 		int dx = zDelta / WHEEL_DELTA * 60;
 		if (dx == 0)
 			dx = (zDelta > 0) ? 60 : -60;
-		//20260706 by claude. [진단 hwheel §5-2] 가로휠 시 썸 미동기 측정.
-		int before_pos = m_h_scroll_pos;
-		int before_native = GetScrollPos(SB_HORZ);
-		int before_limit = GetScrollLimit(SB_HORZ);
 		m_h_scroll_pos += dx;
 		Scroll(CSize(dx, 0));
-		int after_native = GetScrollPos(SB_HORZ);
-		logWrite(_T("[hwheel] zDelta=%d dx=%d m_h_scroll_pos %d->%d | native SB_HORZ %d->%d limit=%d"),
-			zDelta, dx, before_pos, m_h_scroll_pos, before_native, after_native, before_limit);
 		UpdateWindow();
 		sync_scrollbar();
-		logWrite(_T("[hwheel] after sync_scrollbar: m_h_scroll_pos=%d"), m_h_scroll_pos);
 		return;
 	}
 	CListCtrl::OnMouseHWheel(nFlags, zDelta, pt);

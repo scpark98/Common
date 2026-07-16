@@ -8,7 +8,6 @@
 #include "../../SCGdiPlusBitmap.h"
 #include "Common/drag_scroll_message.h"		//20260707 by claude. 드래그 자동스크롤을 대상 타입 무관 메시지로 위임 — CVtListCtrlEx 하드 의존 제거(점진 이행용).
 #include "Common/CListCtrl/CSCListCtrl/SCListCtrl.h"	//20260713 by claude. 트리→리스트 드롭 시 대상 리스트의 smooth-aware hit_test 사용(native HitTest 는 스크롤 무시).
-#include "../../log/SCLog/SCLog.h"	//20260715 by claude. [진단 임시] logWrite 사용 — 원인 확정 후 이 include 도 함께 정리.
 
 #include <fstream>
 // CSCTreeCtrl
@@ -763,8 +762,6 @@ BOOL CSCTreeCtrl::OnTvnSelchanging(NMHDR* pNMHDR, LRESULT* pResult)
 BOOL CSCTreeCtrl::OnTvnSelchanged(NMHDR* pNMHDR, LRESULT* pResult)
 {
 	LPNMTREEVIEW pNMTreeView = reinterpret_cast<LPNMTREEVIEW>(pNMHDR);
-	//20260712 by claude. 선택이 실제로 바뀐 시각 기록 — 재클릭 이름변경(select-on-up)의 시간창 판정에 사용.
-	m_select_tick = ::GetTickCount();
 	*pResult = 0;
 	return FALSE;
 }
@@ -2846,15 +2843,6 @@ void CSCTreeCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 				GetItemRect(hItem, r, TRUE);
 				r.OffsetRect(-get_over_shift(), 0);
 
-				//20260715 by claude. [진단 임시] 재클릭 편집이 클릭 위치에 따라 되고 안 되는 원인 — 클릭 좌표 vs 레이블 rect(TRUE=텍스트만).
-				//선택 표시는 full-row 인데 이 트리거는 텍스트 영역만이라, 아이콘 쪽/텍스트 오른쪽 빈 공간을 클릭하면 여기서 탈락한다.
-				CRect r_full;
-				GetItemRect(hItem, r_full, FALSE);
-				logWrite(_T("[reclick-tree] DOWN pt=(%d,%d) label=(%d,%d,%d,%d) full=(%d,%d,%d,%d) over_shift=%d in_label=%d text=[%s]"),
-					point.x, point.y, r.left, r.top, r.right, r.bottom,
-					r_full.left, r_full.top, r_full.right, r_full.bottom,
-					get_over_shift(), (int)r.PtInRect(point), (LPCTSTR)GetItemText(hItem));
-
 				if (r.PtInRect(point))
 				{
 					m_pending_edit_item = hItem;
@@ -2876,10 +2864,10 @@ void CSCTreeCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 		m_click_pending_select = NULL;
 
 		//20260712 by claude. 선택 변경 후 2초 이내의 재클릭만 이름변경으로 본다(그 이후엔 오래된 선택이므로 이름변경 안 함 — 사용자 요구).
-		//20260715 by claude. 시간창의 기준을 m_select_tick(마지막 '선택 변경')에서 m_last_clicked_time(이 항목을 마지막으로 '클릭'한 시각)으로
-		//교정. 같은 항목을 재클릭해도 선택은 안 바뀌어 m_select_tick 이 갱신되지 않으므로, 선택된 지 2초가 지난 항목은 몇 번을 시간차 클릭해도
-		//이름변경이 영영 안 됐다(다른 노드에 갔다 와야만 창이 다시 열림 — 사용자 리포트). 탐색기와 리스트(CSCListCtrl::OnNMClick 의
-		//m_last_clicked_time 기준)가 모두 '마지막 클릭' 기준이라, 이 교정으로 셋이 일치한다.
+		//20260715 by claude. 시간창의 기준은 '마지막 선택 변경'이 아니라 '이 항목을 마지막으로 클릭한 시각'(m_last_clicked_time)이다.
+		//같은 항목을 재클릭하면 선택이 안 바뀌어 선택 변경 시각은 갱신되지 않으므로, 그 기준으로는 선택된 지 2초가 지난 항목을
+		//몇 번을 시간차 클릭해도 이름변경이 영영 안 된다(다른 노드에 갔다 와야만 창이 다시 열림 — 사용자 리포트). 탐색기와
+		//리스트(CSCListCtrl::OnNMClick 의 m_last_clicked_time 기준)가 모두 '마지막 클릭' 기준이라, 이 기준으로 셋이 일치한다.
 		//20260715 by claude. 창은 '이전 클릭과의 간격'으로 판정한다(기존 구현 CVtListCtrlEx/CSCListCtrl::OnNMClick 과 동일 개념).
 		//하한은 더블클릭과 겹치면 안 되므로 시스템 설정(GetDoubleClickTime, 제어판 마우스에서 200~900 조정 가능)보다 크게 잡는다.
 		//기존 리스트는 500 고정이었는데 이는 기본 더블클릭 간격과 '같은' 값이라 경계에서 겹치고, 사용자가 더블클릭 속도를 900 으로
@@ -2892,27 +2880,12 @@ void CSCTreeCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 		DWORD since_click = ::GetTickCount() - m_last_clicked_time;
 		bool reclick_in_time = (cand == m_last_clicked_item) && (since_click > reclick_min) && (since_click < reclick_max);
 
-		//20260715 by claude. [진단 임시] 재클릭 편집 '후보' 판정 자체를 찍는다 — 예전엔 로그가 아래 if 안에만 있어, 조건이 실패한
-		//클릭(=사용자가 겪는 실패 케이스)은 한 줄도 안 남았다. 어느 항이 무너졌는지 여기서 갈린다.
-		logWrite(_T("[reclick-tree] UP-check cand=%p prev_sel=%p same=%d had_focus=%d since_click=%d(%d~%d) same_item=%d in_time=%d text=[%s]"),
-			cand, m_down_prev_sel, (int)(cand == m_down_prev_sel), (int)m_down_had_focus,
-			(int)since_click, (int)reclick_min, (int)reclick_max, (int)(cand == m_last_clicked_item),
-			(int)reclick_in_time, (LPCTSTR)GetItemText(cand));
-
 		if (cand == m_down_prev_sel && m_down_had_focus && reclick_in_time)
 		{
 			//이미 선택돼 있던 항목의 레이블 재클릭 → 지연 이름변경(브라우징 없음). down 좌표로 레이블 판정.
 			CRect r;
 			GetItemRect(cand, r, TRUE);
 			r.OffsetRect(-get_over_shift(), 0);
-
-			//20260715 by claude. [진단 임시] select-on-up 경로의 레이블 판정 — DOWN 좌표 vs 레이블 rect.
-			CRect r_full;
-			GetItemRect(cand, r_full, FALSE);
-			logWrite(_T("[reclick-tree] UP down_pt=(%d,%d) label=(%d,%d,%d,%d) full=(%d,%d,%d,%d) over_shift=%d in_label=%d elapsed=%d text=[%s]"),
-				m_down_point.x, m_down_point.y, r.left, r.top, r.right, r.bottom,
-				r_full.left, r_full.top, r_full.right, r_full.bottom,
-				get_over_shift(), (int)r.PtInRect(m_down_point), (int)(::GetTickCount() - m_select_tick), (LPCTSTR)GetItemText(cand));
 
 			if (r.PtInRect(m_down_point))
 			{
@@ -3851,7 +3824,6 @@ void CSCTreeCtrl::edit_item(HTREEITEM hItem)
 
 	if (!m_allow_edit)
 	{
-		logWrite(_T("[reclick-tree] edit_item REJECT(!m_allow_edit)"));	//20260715 by claude. [진단 임시]
 		return;
 	}
 
@@ -3860,7 +3832,6 @@ void CSCTreeCtrl::edit_item(HTREEITEM hItem)
 		hItem = GetSelectedItem();
 		if (hItem == NULL)
 		{
-			logWrite(_T("[reclick-tree] edit_item REJECT(hItem NULL)"));	//20260715 by claude. [진단 임시]
 			return;
 		}
 	}
@@ -3872,7 +3843,6 @@ void CSCTreeCtrl::edit_item(HTREEITEM hItem)
 		CString real = m_pShellImageList->convert_special_folder_to_real_path(!m_is_local, get_path(hItem));
 		if (!is_drive_root(real) && m_pShellImageList->is_protected(!m_is_local, real))
 		{
-			logWrite(_T("[reclick-tree] edit_item REJECT(protected) real=[%s]"), (LPCTSTR)real);	//20260715 by claude. [진단 임시]
 			return;
 		}
 	}
@@ -4002,11 +3972,6 @@ void CSCTreeCtrl::edit_item(HTREEITEM hItem)
 
 	m_in_editing = true;
 
-	//20260715 by claude. [진단 임시] 편집창 생성·표시까지 도달했는지 + 실제 위치/가시성. 여기까지 왔는데 화면에 없다면 직후에 닫히는 것이다.
-	logWrite(_T("[reclick-tree] edit_item OPEN rect=(%d,%d,%d,%d) visible=%d focus=%p edit_hwnd=%p text=[%s]"),
-		r.left, r.top, r.right, r.bottom, (int)m_pEdit->IsWindowVisible(),
-		::GetFocus(), m_pEdit->GetSafeHwnd(), (LPCTSTR)m_edit_old_text);
-
 	//편집 모드 외부 클릭 감지용 마우스 훅 설치 (다른 컨트롤·다이얼로그 빈 영역·NC 어디든) — CSCListBox/CPathCtrl 패턴.
 	install_edit_mouse_hook();
 
@@ -4029,10 +3994,6 @@ void CSCTreeCtrl::edit_end(bool valid)
 
 	if (m_in_editing == false || m_pEdit == NULL)
 		return;
-
-	//20260715 by claude. [진단 임시] 편집이 언제/왜 닫히는지 — edit_item OPEN 직후에 이게 찍히면 '열자마자 닫힌' 것이다.
-	logWrite(_T("[reclick-tree] edit_end ENTER valid=%d focus=%p edit_hwnd=%p"),
-		(int)valid, ::GetFocus(), m_pEdit->GetSafeHwnd());
 
 	m_in_editing = false;
 
@@ -4090,11 +4051,6 @@ void CSCTreeCtrl::edit_end(bool valid)
 		//드라이브 볼륨 변경만 실패 원인에 따라 아래에서 다시 판정한다.
 		bool can_retry_edit = true;
 
-		//20260715 by claude. [진단 임시] 트리 편집 종료 시점의 판정값.
-		logWrite(_T("[rename-tree] TREE edit_end: is_drive=%d (is_local=%d edit_is_drive=%d) root=[%s] old=[%s] new=[%s] parent_path=[%s]"),
-			(int)is_drive, (int)m_is_local, (int)m_edit_is_drive, (LPCTSTR)m_edit_drive_root,
-			(LPCTSTR)m_edit_old_text, (LPCTSTR)m_edit_new_text, (LPCTSTR)parent_path);
-
 		if (is_drive)
 		{
 			DWORD err = 0;
@@ -4123,11 +4079,6 @@ void CSCTreeCtrl::edit_end(bool valid)
 			//구버전 agent) 다시 열어봐야 취소하려 ESC 를 한 번 더 누르게 할 뿐이다.
 			//리모트는 실패 원인이 소켓 너머라 알 수 없고, 구버전 agent 스킵이 대부분이므로 다시 열지 않는다.
 			can_retry_edit = (m_is_local && (err == ERROR_LABEL_TOO_LONG || err == ERROR_INVALID_NAME));
-
-			//20260715 by claude. [진단 임시] 볼륨 변경 성공 여부와 통지 발송 여부.
-			logWrite(_T("[rename-tree] TREE is_drive: local=%d root=[%s] new=[%s] res=%d err=%d retry=%d → 통지=%s"),
-				(int)m_is_local, (LPCTSTR)m_edit_drive_root, (LPCTSTR)m_edit_new_text, (int)res, (int)err,
-				(int)can_retry_edit, res ? _T("보냄") : _T("안 보냄"));
 
 			//성공 시 parent 에 드라이브 볼륨 변경 통지 → 형제 컨트롤(리스트) 드라이브 표시 동기화. param0=root("C:\\"), param1=새 볼륨명.
 			if (res)
@@ -4932,11 +4883,6 @@ void CSCTreeCtrl::OnTimer(UINT_PTR nIDEvent)
 		HTREEITEM h = m_pending_edit_item;
 		m_pending_edit_item = NULL;
 
-		//20260715 by claude. [진단 임시] 타이머까지 살아왔는지 + 여기서 선택/편집중 조건에 걸리는지.
-		logWrite(_T("[reclick-tree] TIMER h=%p sel=%p in_editing=%d -> %s"),
-			h, GetSelectedItem(), (int)m_in_editing,
-			(h != NULL && h == GetSelectedItem() && !m_in_editing) ? _T("edit_item") : _T("skip"));
-
 		if (h != NULL && h == GetSelectedItem() && !m_in_editing)
 			edit_item(h);
 		return;
@@ -5481,15 +5427,6 @@ void CSCTreeCtrl::rename_child_item(HTREEITEM hParent, CString old_label, CStrin
 		hParent = GetSelectedItem();
 
 	HTREEITEM hItem = find_children_item(old_label, hParent);
-
-	//20260715 by claude. [진단 임시] 리스트에서 폴더 이름을 바꿨는데 트리가 안 바뀌는 원인 추적 — 부모 노드와 old_label 로 자식을 찾는데
-	//둘 중 하나가 어긋나면 조용히 return 한다. 부모의 실제 자식 목록까지 찍어 무엇과 비교되는지 본다.
-	{
-		CString kids; int nk = 0;
-		for (HTREEITEM hc = GetChildItem(hParent); hc && nk < 30; hc = GetNextSiblingItem(hc)) { kids += _T("["); kids += GetItemText(hc); kids += _T("]"); nk++; }
-		logWrite(_T("[rename-tree] hParent=%p(%s) old=[%s] new=[%s] found=%p kids(n=%d)=%s"),
-			hParent, (LPCTSTR)GetItemText(hParent), (LPCTSTR)old_label, (LPCTSTR)new_label, hItem, nk, (LPCTSTR)kids);
-	}
 
 	if (!hItem)
 		return;

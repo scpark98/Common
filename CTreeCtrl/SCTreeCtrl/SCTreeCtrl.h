@@ -671,8 +671,8 @@ protected:
 	CString			m_edit_drive_root;
 	HTREEITEM		m_edit_item = NULL;			//편집중인 아이템 인덱스
 
-	//20260715 by claude. 재클릭 이름변경의 시간창 기준 — '이 항목을 마지막으로 클릭한 시각'(GetTickCount). 예전엔 m_select_tick
-	//(마지막 '선택 변경' 시각)으로 판정해, 재클릭해도 선택이 안 바뀌니 기준점이 갱신되지 않아 선택된 지 2초 지난 항목은 영영 안 됐다.
+	//20260715 by claude. 재클릭 이름변경의 시간창 기준 — '이 항목을 마지막으로 클릭한 시각'(GetTickCount). '마지막 선택 변경' 시각을
+	//기준으로 하면 재클릭해도 선택이 안 바뀌어 기준점이 갱신되지 않아, 선택된 지 2초 지난 항목은 영영 이름변경이 안 된다.
 	DWORD			m_last_clicked_time = 0;
 	HTREEITEM		m_last_clicked_item = NULL;
 	HTREEITEM		m_pending_edit_item = NULL;	//20260710 by claude. timer_edit_label 발화 시 편집할 항목(대기 중이 아니면 NULL).
@@ -683,7 +683,6 @@ protected:
 	HTREEITEM		m_down_prev_sel = NULL;			//down 직전 선택(재클릭 이름변경 판정용).
 	bool			m_down_had_focus = false;		//down 직전 포커스 보유 여부.
 	CPoint			m_down_point = CPoint(0, 0);	//down 좌표.
-	DWORD			m_select_tick = 0;				//마지막 선택 변경 시각(GetTickCount). 재클릭 이름변경의 시간창 판정용.
 
 	enum ROW_ITEM_RECT
 	{

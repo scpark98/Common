@@ -5,7 +5,6 @@
 #include "../../Functions.h"
 #include "../../MemoryDC.h"
 #include "../../win_compat/dwm.h"
-//#include "../../log/SCLog/SCLog.h"	//20260706 by claude. [진단 임시·주석] apply_client_titlebar_layout 측정 로그용. 재조사 시 해제. §2J
 
 //Dwmapi.lib 정적 링크는 XP에서 dwmapi.dll 부재로 로드 실패. win_compat::dwm 가 LoadLibrary 로 안전 호출하므로 정적 링크 제거.
 //#pragma comment(lib, "Dwmapi.lib")
@@ -221,17 +220,6 @@ void CSCThemeDlg::apply_client_titlebar_layout(const CRect& rc_template_client)
 		SetWindowPos(nullptr, 0, 0, rc_win.Width() + ddw, rc_win.Height() + ddh,
 			SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
 	}
-
-	//20260706 by claude. [진단 임시·주석] 폭/높이 복원 측정 로그. 재조사 시 아래 블록 + 상단 SCLog.h include 를 함께 해제.
-	//(모든 CSCThemeDlg 창마다 매번 찍혀 로그가 시끄러우므로 평시엔 주석 유지. §2J)
-	//{
-	//	CRect rc_now;    GetClientRect(rc_now);
-	//	CRect rc_after;  GetClientRect(rc_after);   //수렴 후 결과
-	//	int dw = want_cw - rc_now.Width(), dh = want_ch - rc_now.Height();
-	//	logWrite(_T("[TBLAYOUT] template=%dx%d  want=%dx%d  after=%dx%d  tb=%d dw=%d dh=%d"),
-	//		rc_template_client.Width(), rc_template_client.Height(), want_cw, want_ch,
-	//		rc_after.Width(), rc_after.Height(), m_titlebar_height, dw, dh);
-	//}
 
 	if (m_titlebar_height <= 0)
 		return;

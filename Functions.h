@@ -3077,10 +3077,6 @@ class CRequestUrlParams;
 //request_url() 내부에서 또는 단독적으로 서버가 현재 기동중인지를 빠르게 판별하기 위한 함수
 bool		is_server_reachable(CString ip, int port, int timeout_ms = 1000);
 
-// 서버 도달 가능 여부를 공유 캐시로 관리하는 클래스
-// 529행 그대로
-class CRequestUrlParams;
-
 class CServerReachabilityCache
 {
 public:

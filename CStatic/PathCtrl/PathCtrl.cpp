@@ -5,7 +5,6 @@
 #include "../../MemoryDC.h"
 #include "../../CEdit/SCEdit/SCEdit.h"
 #include "../../Functions.h"	//get_monitor_index / get_monitor_rect / g_monitors — 서브폴더 팝업 모니터 보정용.
-#include "../../log/SCLog/SCLog.h"	//20260715 by claude. [진단 임시] logWrite 사용 — 원인 확정 후 이 include 도 함께 정리.
 
 // CPathCtrl
 
@@ -243,8 +242,8 @@ void CPathCtrl::OnPaint()
 
 	dc.FillSolidRect(rc, m_theme.cr_back.ToCOLORREF());
 
-	//path 가 비어 있을 때도 border 는 그려야 한다 — 기존 early return 이 line 340 의 border 분기 도달을 막아
-	//resource editor 의 Border=true 가 효과 없어보이는 원인이 되었다. 여기서 한 번 그리고 빠진 뒤,
+	//path 가 비어 있을 때도 border 는 그려야 한다 — 기존 early return 이 이 함수 끝의 else if (m_draw_border) 분기
+	//도달을 막아 resource editor 의 Border=true 가 효과 없어보이는 원인이 되었다. 여기서 한 번 그리고 빠진 뒤,
 	//path 가 채워진 경우는 함수 끝에서 한 번 더 그리게 된다 (drawing 비용 무시할 만하고, edit 활성 시
 	//cr_border_active 로 덮어쓰는 경로도 유지).
 	if (m_path.size() == 0)
@@ -488,11 +487,6 @@ void CPathCtrl::set_path(CString path, std::deque<CString>* sub_folders)
 		{
 			m_has_subfolder = has_sub_folders(path);	//마지막 폴더명 아래 서브폴더가 존재하는지
 		}
-
-		//20260715 by claude. [진단 임시] 로컬 마지막 세그먼트의 화살표 판정 값.
-		logWrite(_T("[pathctrl] set_path LOCAL path=[%s] m_has_subfolder=%d drives=%d"),
-			(LPCTSTR)path, (int)m_has_subfolder,
-			(int)m_pShellImageList->m_volume[!m_is_local].get_drive_list()->size());
 	}
 	else
 	{
@@ -1005,11 +999,6 @@ void CPathCtrl::recalc_path_position()
 		//m_has_subfolder 에 판정해 뒀다. 여기서 다시 판정하면 OnPaint 의 그리기 조건과 어긋날 수 있는데,
 		//어긋나면 그리기는 화살표 자리를 빼면서 폭은 안 더해져 레이블이 잘린다("내 PC" → "내..."). 조건을 OnPaint 와 동일하게 맞춘다.
 		rt.right += (i < m_path.size() - 1 || m_has_subfolder ? m_arrow_area_width : 0);
-
-		//20260715 by claude. [진단 임시] 세그먼트별 폭 판정.
-		logWrite(_T("[pathctrl] recalc i=%d/%d local=%d label=[%s] path=[%s] arrow_added=%d m_has_subfolder=%d w=%d"),
-			i, (int)m_path.size() - 1, (int)m_is_local, (LPCTSTR)m_path[i].label, (LPCTSTR)get_path(i),
-			(int)(i < (int)m_path.size() - 1 || m_has_subfolder), (int)m_has_subfolder, rt.Width());
 
 		rt.top = rc.top;
 		rt.bottom = rc.bottom;

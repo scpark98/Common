@@ -721,7 +721,8 @@ void CSCStatic::OnPaint()
 				//                 컬럼 경계를 넘어 값 직전까지 자유롭게 그려진다(컬럼 정렬보다 라벨 가독성 우선).
 				//                 라벨이 그 한계도 못 들어가면 비로소 ellipsis. 기본 사용자(opt-out)는 WORDBREAK 동작 유지 → 회귀 없음.
 				//DT_END_ELLIPSIS 발동 요건 — DT_SINGLELINE 명시 + DT_WORDBREAK 제거(충돌) + DT_NOCLIP 제거(영역 밖 그리기 허용 시 truncation 회피).
-				//기본 dwText 는 SS_ENDELLIPSIS 가 없으면 DT_WORDBREAK 가 자동 포함(line 406-410 매핑)되므로 위 셋업 필수.
+				//기본 dwText 는 SS_ENDELLIPSIS 가 없으면 DT_WORDBREAK 가 자동 포함(이 함수 앞부분의
+				//NMAP_STYLE(SS_LEFTNOWORDWRAP | ... | SS_PATHELLIPSIS, DT_WORDBREAK) 매핑)되므로 위 셋업 필수.
 				CRect label_rect = m_text_rect;
 				DWORD label_flags = dwText;
 				if (m_label_auto_ellipsis && m_use_edit && !m_text_value.IsEmpty())

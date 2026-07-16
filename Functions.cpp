@@ -21863,7 +21863,6 @@ bool install_WebView2Runtime(CString runtimeExePath, bool silentInstall)
 	if (silentInstall)
 		return true;
 
-	//gLog.write(_T("WebView2 Runtime installed successfully."));
 	Wait(1000);
 
 	//HANDLE hProcess = NULL;

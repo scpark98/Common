@@ -356,10 +356,6 @@ public:
 	//드래그앤드롭 기능을 사용할 것인지. 드래그앤드롭 기능이 false이면 순서 변경도 의미가 없다.
 	bool			get_use_drag_and_drop() { return m_use_drag_and_drop; }
 	void			set_use_drag_and_drop(bool use_drag = true) { m_use_drag_and_drop = use_drag; }
-	//20260712 by claude. 탐색기식 select-on-up: DOWN 에선 선택/브라우징하지 않고 UP(드래그가 아닐 때)에서 선택한다.
-	//드래그하려고 클릭한 폴더가 브라우징되지 않고 기존 선택이 유지된다. default = false(기존 down-select 동작).
-	void			set_select_on_button_up(bool b = true) { m_select_on_button_up = b; }
-	bool			get_select_on_button_up() { return m_select_on_button_up; }
 	//순서도 변경 가능하도록 할것인지. m_use_drag_and_drop = false이면 무의미하다.
 	bool			get_use_rearrange_order() { return m_use_rearrange_order; }
 	void			set_use_rearrange_order(bool use_rearrange = true) { m_use_rearrange_order = use_rearrange; }
@@ -676,8 +672,7 @@ protected:
 	DWORD			m_last_clicked_time = 0;
 	HTREEITEM		m_last_clicked_item = NULL;
 	HTREEITEM		m_pending_edit_item = NULL;	//20260710 by claude. timer_edit_label 발화 시 편집할 항목(대기 중이 아니면 NULL).
-	//20260712 by claude. 탐색기식 select-on-up 관련 상태.
-	bool			m_select_on_button_up = false;	//true 면 UP 에서 선택(set_select_on_button_up).
+	//20260712 by claude. 탐색기식 select-on-up 관련 상태 — DOWN 에선 선택하지 않고 클릭이 끝난 시점(드래그가 아닐 때)에 선택한다.
 	bool			m_defer_select = false;			//down 동안 base 자동선택을 OnTvnSelchanging 이 veto 하는 창.
 	HTREEITEM		m_click_pending_select = NULL;	//UP 에서 선택할 후보(down 시 기록).
 	HTREEITEM		m_down_prev_sel = NULL;			//down 직전 선택(재클릭 이름변경 판정용).

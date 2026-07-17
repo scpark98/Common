@@ -575,6 +575,12 @@ protected:
 	CRect			reapply_line_spacings();
 	CRect			apply_halign();
 	CRect			apply_valign();
+
+	//20260717 by claude. 최상단(line 0) run 들의 절대 잉크 top y 최솟값(박스 top→잉크 사이 여백 = headroom 산출용).
+	//올바른 pixel em(dpi*pt/72)으로 GraphicsPath 외곽선을 만들어 GetBounds. 측정 불가 시 -1.
+	//apply_valign 의 top-align auto-fit 이 위로 당길 수 있는 안전 한도(상단 잉크가 안 잘리는)를 정하는 데 쓴다.
+	float			measure_top_ink_top();
+
 	int				get_header_lead_width();	//20260705 by claude. 좌측 헤더이미지/아이콘 폭(2+폭+gap). 단락 layout·정렬 좌측 오프셋용.
 
 	int				m_max_width = 0;

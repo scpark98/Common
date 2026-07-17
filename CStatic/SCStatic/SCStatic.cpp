@@ -2466,7 +2466,33 @@ CRect CSCStatic::apply_valign()
 	else if (valign & DT_BOTTOM)
 		target_top = rc.bottom - total_h;
 	else
+	{
+		//20260717 by claude. top-align auto-fit. GDI+ MeasureString 라인박스(단락 run 높이)는 리소스 에디터가
+		//CStatic 을 자동 생성할 때 맞춘 GDI 셀(tmHeight)보다 1~몇 px 크다. 그래서 top-align 이면 블록 바닥이
+		//클라이언트를 넘어 받침 있는 글자("를" 등) 최하단이 창에 잘렸다(로그: client 13, 박스 14, 잉크 y≈2.4..12.5).
+		//넘칠 때 초과분(overflow)만큼 위로 당겨 바닥을 맞추되, "잉크 위 여백(headroom)"을 넘겨 올리면 이번엔
+		//상단 잉크가 잘리므로 shift_up = min(overflow, headroom) 으로 제한한다.
+		//headroom = 최상단 잉크가 창 top(rc.top) 위로 넘지 않는 최대 상향량 = (최상단 잉크 y − rc.top).
+		//측정 실패 시엔 기존 단순식(overflow 전부)으로 폴백(작은 초과 리소스 라벨엔 안전).
 		target_top = rc.top;
+
+		int overflow = total_h - rc.Height();
+		if (overflow > 0)
+		{
+			int shift_up = overflow;
+
+			float ink_top = measure_top_ink_top();
+			if (ink_top >= 0.0f)
+			{
+				int headroom = (int)floor(ink_top - rc.top);
+				if (headroom < 0)
+					headroom = 0;
+				shift_up = min(overflow, headroom);
+			}
+
+			target_top = rc.top - shift_up;
+		}
+	}
 
 	int shift_y = target_top - first_top;
 	if (shift_y != 0)
@@ -2482,6 +2508,44 @@ CRect CSCStatic::apply_valign()
 	rect_text.top = target_top;
 	rect_text.bottom = target_top + total_h;
 	return rect_text;
+}
+
+float CSCStatic::measure_top_ink_top()
+{
+	if (m_para.empty() || m_para[0].empty())
+		return -1.0f;
+
+	CClientDC dc(this);
+	Gdiplus::Graphics g(dc.m_hDC);
+	float dpiY = g.GetDpiY();
+
+	float ink_top = -1.0f;
+	for (int j = 0; j < (int)m_para[0].size(); j++)
+	{
+		CSCParagraph& run = m_para[0][j];
+		if (run.text.IsEmpty())
+			continue;
+
+		Gdiplus::FontFamily ff((WCHAR*)(const WCHAR*)CStringW(run.text_prop.name));
+		if (!ff.IsAvailable())
+			continue;
+
+		float em_px = dpiY * run.text_prop.size / 72.0f;
+		Gdiplus::GraphicsPath ip;
+		ip.AddString(CStringW(run.text), -1, &ff, run.text_prop.style, em_px,
+			Gdiplus::PointF(0, 0), Gdiplus::StringFormat::GenericTypographic());
+
+		Gdiplus::RectF b;
+		if (ip.GetBounds(&b) != Gdiplus::Ok)
+			continue;
+
+		//run 의 절대 잉크 top = 그 run 의 박스 top(r.top) + 박스 top→잉크 여백(b.Y). 라인의 여러 run 중 최상단(min).
+		float run_ink_top = (float)run.r.top + b.Y;
+		if (ink_top < 0.0f || run_ink_top < ink_top)
+			ink_top = run_ink_top;
+	}
+
+	return ink_top;
 }
 
 void CSCStatic::OnMouseMove(UINT nFlags, CPoint point)

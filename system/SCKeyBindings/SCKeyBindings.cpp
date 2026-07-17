@@ -272,6 +272,9 @@ static WORD key_name_to_vk(const CString& token)
 	{
 		{ _T("LEFT"),		VK_LEFT },		{ _T("RIGHT"),		VK_RIGHT },
 		{ _T("UP"),			VK_UP },		{ _T("DOWN"),		VK_DOWN },
+		//20260717 by claude. 메뉴가 "Alt+Dn"(축약)으로 표기해도 인식 — 테이블에 DOWN 만 있어 Dn 이 파싱 실패,
+		//Alt+Down(자막 아래로) 액셀러레이터가 미등록됐다. PgDn↔PGDN 과 같은 축약 관례라 DN 별칭 추가.
+		{ _T("DN"),			VK_DOWN },
 		{ _T("SPACE"),		VK_SPACE },
 		{ _T("ENTER"),		VK_RETURN },	{ _T("RETURN"),		VK_RETURN },
 		{ _T("ESC"),		VK_ESCAPE },	{ _T("ESCAPE"),		VK_ESCAPE },

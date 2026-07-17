@@ -19,7 +19,18 @@ public:
 	int			border_style;					// 0: outline, 1: opaque box
 	double		outline_widthX, outline_widthY;
 	double		shadow_depthX, shadow_depthY;
-	Gdiplus::Color	cr[4];						// ARGB. usually: {primary, secondary, outline/background, shadow}
+	//20260717 by claude. 자막 4색 인덱스. ASS/SSA V4+ 표준 순서(Primary/Secondary/Outline/Back)를 그대로 미러링 —
+	//이 순서가 직렬화(operator<<=)·ASS export(Subtitle.cpp) 와 묶여 있으므로 재배열 금지(저장값·ASS 호환 깨짐).
+	//cr=색상, sub=자막, 마지막=용도 의 계층 네이밍.
+	enum cr_sub_index
+	{
+		cr_sub_primary   = 0,	//자막 본색 (렌더 fill)
+		cr_sub_secondary = 1,	//ASS SecondaryColour(가라오케 전색) — 이 플레이어는 렌더에 미사용, ASS 왕복 보존용 예약 슬롯
+		cr_sub_outline   = 2,	//외곽선색
+		cr_sub_shadow    = 3,	//그림자색 (= ASS BackColour; opaque-box 미구현이라 배경 아님)
+		cr_sub_count     = 4,
+	};
+	Gdiplus::Color	cr[cr_sub_count];			// ARGB. 인덱스는 위 cr_sub_index 사용. (OSD 설정도 이 구조체를 재사용 — 그 경우 sub=OSD 로 읽음)
 
 	int			font_size;						// height
 	bool		font_auto_size;

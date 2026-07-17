@@ -43,10 +43,10 @@ void CSubtitleSetting::set_default()
 	outline_widthX = outline_widthY = 3;
 	shadow_depthX = shadow_depthY = 3;
 
-	cr[0] = Gdiplus::Color(0xff, 255, 243, 212);
-	cr[1] = Gdiplus::Color(0xff,   0, 255, 255);
-	cr[2] = Gdiplus::Color(0xff,   0,   0,   0);
-	cr[3] = Gdiplus::Color(0x80,  32,  32,  32);
+	cr[cr_sub_primary]   = Gdiplus::Color(0xff, 255, 243, 212);
+	cr[cr_sub_secondary] = Gdiplus::Color(0xff,   0, 255, 255);
+	cr[cr_sub_outline]   = Gdiplus::Color(0xff,   0,   0,   0);
+	cr[cr_sub_shadow]    = Gdiplus::Color(0x80,  32,  32,  32);
 
 	pos_x = 50;
 	pos_y = 90;
@@ -96,7 +96,7 @@ CString& operator <<= (CString& style, CSubtitleSetting& s)
 		s.outline_widthX, s.outline_widthY,
 		s.shadow_depthX, s.shadow_depthY,
 
-		s.cr[0].GetValue(), s.cr[1].GetValue(), s.cr[2].GetValue(), s.cr[3].GetValue(),
+		s.cr[CSubtitleSetting::cr_sub_primary].GetValue(), s.cr[CSubtitleSetting::cr_sub_secondary].GetValue(), s.cr[CSubtitleSetting::cr_sub_outline].GetValue(), s.cr[CSubtitleSetting::cr_sub_shadow].GetValue(),
 
 		s.pos_x, s.pos_y,
 		s.line_spacing,
@@ -148,7 +148,7 @@ CSubtitleSetting& operator <<= (CSubtitleSetting& s, CString& style)
 			s.shadow_depthX = get_double(str);
 			s.shadow_depthY = get_double(str);
 
-			for(ptrdiff_t i = 0; i < 4; i++)
+			for(ptrdiff_t i = 0; i < CSubtitleSetting::cr_sub_count; i++)
 				s.cr[i] = Gdiplus::Color((Gdiplus::ARGB)get_int(str));
 
 			s.pos_x = get_int(str);

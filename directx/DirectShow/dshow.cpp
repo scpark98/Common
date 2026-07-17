@@ -3620,7 +3620,10 @@ double CDShow::get_track_pos()
 				ffi::CFFiVideoStream* vs = ((ffi::CFFiSource*)m_pFFiSource)->video_stream();
 				int64_t v = vs ? vs->last_emitted_pts_ms() : -1;
 				if (v >= 0)
-					return (double)v - 1000.0 / m_frame_rate;
+					//20260717 by claude. 렌더러 큐 1프레임 보정으로 한 프레임(1000/fps) 빼면 시작 근처(v=0)에서 음수가
+					//된다 — seek-to-0 직후 INTERMEDIATE 상태로 이 경로를 타면 -33ms(=1프레임@30fps)가 표시됐다(뒤로 이동 OSD).
+					//위치는 음수가 될 수 없으므로 0 으로 클램프.
+					return max(0.0, (double)v - 1000.0 / m_frame_rate);
 			}
 			return m_last_track_pos_ms;
 		}
@@ -5435,19 +5438,19 @@ HRESULT CDShow::update_osd_subtitle()
 		{
 			TextDesigner::OutlineText td;
 
-			Gdiplus::Color color = m_subCfg.cr[0];
+			Gdiplus::Color color = m_subCfg.cr[CSubtitleSetting::cr_sub_primary];
 			if (m_cur_subtitle.sentences[i].color.IsEmpty() == false)
 			{
 				COLORREF crText = get_color(m_cur_subtitle.sentences[i].color);
-				color = Gdiplus::Color(m_subCfg.cr[0].GetA(), GetRValue(crText), GetGValue(crText), GetBValue(crText));
+				color = Gdiplus::Color(m_subCfg.cr[CSubtitleSetting::cr_sub_primary].GetA(), GetRValue(crText), GetGValue(crText), GetBValue(crText));
 			}
 
-			td.TextOutline(color, m_subCfg.cr[2], m_subCfg.outline_widthX * 2.5);
+			td.TextOutline(color, m_subCfg.cr[CSubtitleSetting::cr_sub_outline], m_subCfg.outline_widthX * 2.5);
 			//text.TextGlow(Gdiplus::Color(255, 255, 255), Gdiplus::Color(32, 255, 0, 0), 16);
 
 			td.EnableShadow(true);
 
-			td.Shadow(m_subCfg.cr[3],
+			td.Shadow(m_subCfg.cr[CSubtitleSetting::cr_sub_shadow],
 									m_subCfg.shadow_depthX,
 									Gdiplus::Point(m_subCfg.shadow_depthX, m_subCfg.shadow_depthY));
 			/*
@@ -5527,7 +5530,7 @@ HRESULT CDShow::update_osd_subtitle()
 
 
 			//마지막으로 실제 글자 출력
-			Gdiplus::SolidBrush brush(m_subCfg.cr[0]);
+			Gdiplus::SolidBrush brush(m_subCfg.cr[CSubtitleSetting::cr_sub_primary]);
 			if (m_cur_subtitle.sentences[i].color.IsEmpty() == false)
 			{
 				Gdiplus::Color crText = get_color(m_cur_subtitle.sentences[i].color);

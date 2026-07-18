@@ -1353,8 +1353,12 @@ CRect CSCParagraph::draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCPar
 				str_path.AddString(CStringW(para[i][j].text), para[i][j].text.GetLength(), fontFamily,
 					para[i][j].text_prop.style, emSize, Gdiplus::Point(r.left, r.top), sf.GenericTypographic());
 
+				//20260718 by claude. 반투명(글자 alpha<255)+외곽선 글자는 아래 if(ss_translucent) 에서 그림자·외곽선·fill 을
+				//한 임시 비트맵에 SS 배로 그린 뒤 고품질 축소해 AA 를 얻는다(그림자도 그 안에서). 그래서 여기 1x 그림자는 건너뛴다.
+				bool ss_translucent = (para[i][j].text_prop.thickness > 0.0f && para[i][j].text_prop.cr_text.GetA() < 255);
+
 				//사전 패스에서 blur 그림자를 이미 그렸다면 음절 단위 하드 엣지 그림자는 건너뛴다.
-				if (para[i][j].text_prop.shadow_depth != 0 && global_blur_sigma <= 0.0f)
+				if (!ss_translucent && para[i][j].text_prop.shadow_depth != 0 && global_blur_sigma <= 0.0f)
 				{
 					Gdiplus::SolidBrush br_shadow(para[0][0].text_prop.cr_shadow);
 
@@ -1386,12 +1390,105 @@ CRect CSCParagraph::draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCPar
 				//pen.SetLineJoin(Gdiplus::LineJoinMiter);
 				pen.SetLineJoin(Gdiplus::LineJoinRound);
 
-				//thickness가 0.0f이면 g.DrawPath()가 아닌 g.DrawString()으로 그리면 되고 이전 버전은 잘 그려졌으나
-				//뭔가 옵셋이 틀어진 현상이 발생하여 우선 아래와 같이 조건에 의해 g.DrawPath()를 실행하도록 한다.
-				if (para[i][j].text_prop.thickness > 0.0f)
-					g.DrawPath(&pen, &str_path);
+				//20260718 by claude. 반투명 글자 + 외곽선: 외곽선을 fill 밑에 두고 내부를 SourceCopy 로 교체하면 (1) 외곽선이
+				//바깥 절반만 보여 글자 침범이 없고 (2) 뒤 stroke/shadow 가 안 비친다. 다만 SourceCopy 는 AA 가 안 돼 경계가 거칠다.
+				//→ 이 그룹(그림자+외곽선+fill)을 SS 배 크기의 임시 비트맵에 그린 뒤 고품질 축소 → 축소가 AA 를 만들어 매끄럽다.
+				//불투명(alpha==255) 글자는 기존 1x 경로(외곽선 먼저 → fill) 그대로라 회귀 없음.
+				if (ss_translucent)
+				{
+					const int SS = 3;
 
-				g.FillPath(&brush, &str_path);
+					//그림자 오프셋(1x 경로와 동일 계산).
+					float shx = 0.0f, shy = 0.0f;
+					bool has_shadow = (para[i][j].text_prop.shadow_depth != 0 && global_blur_sigma <= 0.0f);
+					if (has_shadow)
+					{
+						if (para[i][j].text_prop.shadow_depth > 0)
+						{
+							shx = shy = para[i][j].text_prop.shadow_depth;
+						}
+						else
+						{
+							shx = max((float)(para[i][j].r.Height()) / 30.0f, 2.0f);
+							shx = max(shx, para[i][j].text_prop.thickness / 1.4f);
+							shy = shx;
+						}
+					}
+
+					//글자(외곽선 포함) + 그림자 오프셋을 아우르는 bounds.
+					Gdiplus::RectF gb;
+					str_path.GetBounds(&gb, NULL, &pen);
+					const float margin = 2.0f;
+					float minx = gb.X - margin;
+					float miny = gb.Y - margin;
+					float maxx = gb.X + gb.Width + shx + margin;
+					float maxy = gb.Y + gb.Height + shy + margin;
+					int bw = (int)ceil(maxx - minx);
+					int bh = (int)ceil(maxy - miny);
+
+					if (bw > 0 && bh > 0)
+					{
+						CSCGdiplusBitmap tmp(bw * SS, bh * SS, Gdiplus::Color::Transparent, PixelFormat32bppARGB);
+						Gdiplus::Graphics gt(tmp.m_pBitmap);
+						gt.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
+						gt.SetTextRenderingHint(g.GetTextRenderingHint());
+						gt.ScaleTransform((Gdiplus::REAL)SS, (Gdiplus::REAL)SS);
+						gt.TranslateTransform(-minx, -miny);
+
+						//그림자(오프셋 위치).
+						if (has_shadow)
+						{
+							Gdiplus::GraphicsPath sp;
+							sp.SetFillMode(Gdiplus::FillModeWinding);
+							CRect rs = para[i][j].r;
+							rs.OffsetRect((int)shx, (int)shy);
+							sp.AddString(CStringW(para[i][j].text), para[i][j].text.GetLength(), fontFamily,
+								para[i][j].text_prop.style, emSize, Gdiplus::Point(rs.left, rs.top), sf.GenericTypographic());
+							Gdiplus::SolidBrush br_shadow(para[0][0].text_prop.cr_shadow);
+							gt.FillPath(&br_shadow, &sp);
+						}
+
+						//외곽선(밑) → 내부 SourceCopy 교체(안쪽 외곽선/그림자 제거) → 바깥 외곽선만 남음.
+						gt.DrawPath(&pen, &str_path);
+						gt.SetCompositingMode(Gdiplus::CompositingModeSourceCopy);
+						gt.FillPath(&brush, &str_path);
+						gt.SetCompositingMode(Gdiplus::CompositingModeSourceOver);
+
+						//g 에 이미 그려진 그림자(사전 blur 패스 등)가 글자 내부에 깔려 있으면 반투명 fill 뒤로 비친다.
+						//SS temp 를 얹기 전에 g 의 글자 내부(str_path)를 투명으로 punch — 그 자리 그림자 제거. 바깥 소프트
+						//그림자 halo 는 유지된다. 경계는 아래 축소된 temp 의 AA 외곽선이 덮어 감춘다.
+						{
+							Gdiplus::CompositingMode gcm = g.GetCompositingMode();
+							Gdiplus::SmoothingMode  gsm = g.GetSmoothingMode();
+							g.SetCompositingMode(Gdiplus::CompositingModeSourceCopy);
+							g.SetSmoothingMode(Gdiplus::SmoothingModeNone);
+							Gdiplus::SolidBrush clear_br(Gdiplus::Color(0, 0, 0, 0));
+							g.FillPath(&clear_br, &str_path);
+							g.SetSmoothingMode(gsm);
+							g.SetCompositingMode(gcm);
+						}
+
+						//고품질 축소 → AA.
+						Gdiplus::InterpolationMode old_interp = g.GetInterpolationMode();
+						Gdiplus::PixelOffsetMode  old_pom = g.GetPixelOffsetMode();
+						g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
+						g.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHalf);
+						g.DrawImage(tmp.m_pBitmap,
+							Gdiplus::RectF(minx, miny, (Gdiplus::REAL)bw, (Gdiplus::REAL)bh),
+							0.0f, 0.0f, (Gdiplus::REAL)(bw * SS), (Gdiplus::REAL)(bh * SS), Gdiplus::UnitPixel);
+						g.SetInterpolationMode(old_interp);
+						g.SetPixelOffsetMode(old_pom);
+					}
+				}
+				else
+				{
+					//thickness가 0.0f이면 g.DrawPath()가 아닌 g.DrawString()으로 그리면 되고 이전 버전은 잘 그려졌으나
+					//뭔가 옵셋이 틀어진 현상이 발생하여 우선 아래와 같이 조건에 의해 g.DrawPath()를 실행하도록 한다.
+					if (para[i][j].text_prop.thickness > 0.0f)
+						g.DrawPath(&pen, &str_path);
+
+					g.FillPath(&brush, &str_path);
+				}
 			}
 #endif
 

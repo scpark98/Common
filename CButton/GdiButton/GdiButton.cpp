@@ -1287,12 +1287,31 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 				cr_back = m_cr_back[0];
 		}
 
+		//20260718 by claude. 배경색이 반투명(alpha<255)이고 패턴 표시가 켜져 있으면, 색 밑에 투명 체커를 먼저 깔아
+		//알파 정도를 시각화한다(ASee 이미지 dlg 가 알파 이미지 배경에 zigzag 를 까는 것과 동일 idiom).
+		bool trans_pattern = (m_show_trans_pattern && cr_back.GetA() < 255);
+
 		if (m_round == 0)
 		{
-			dc.FillSolidRect(rc, cr_back.ToCOLORREF());
+			if (trans_pattern)
+			{
+				Gdiplus::TextureBrush tb(CSCGdiplusBitmap::checker_bmp(5), Gdiplus::WrapModeTile);
+				g.FillRectangle(&tb, rc.left, rc.top, rc.Width(), rc.Height());
+				Gdiplus::SolidBrush brush(cr_back);
+				g.FillRectangle(&brush, rc.left, rc.top, rc.Width(), rc.Height());
+			}
+			else
+			{
+				dc.FillSolidRect(rc, cr_back.ToCOLORREF());
+			}
 		}
 		else
 		{
+			if (trans_pattern)
+			{
+				Gdiplus::TextureBrush tb(CSCGdiplusBitmap::checker_bmp(5), Gdiplus::WrapModeTile);
+				g.FillPath(&tb, &roundPath);
+			}
 			Gdiplus::SolidBrush brush(cr_back);
 			g.FillPath(&brush, &roundPath);
 		}

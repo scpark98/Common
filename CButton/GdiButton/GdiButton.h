@@ -408,6 +408,10 @@ public:
 	void		set_focus_rect_width(int nWidth) { m_focus_rect_width = nWidth; Invalidate(); }
 
 	void		use_hover(bool use = true);
+
+	//20260718 by claude. 배경색 alpha<255 일 때 색 밑에 투명 체커 패턴을 그려 알파를 시각화(색상 선택 스와치용). 기본 off.
+	void		show_trans_pattern(bool show = true) { m_show_trans_pattern = show; Invalidate(); }
+
 	//thick, round 값이 -1이면 기존 설정값의 변경없음의 의미임
 	void		draw_hover_rect(bool draw = true, int thick = -1, int round = -1, Gdiplus::Color cr = Gdiplus::Color::Transparent);
 	void		set_hover_rect_thick(int thick);
@@ -586,6 +590,10 @@ protected:
 	//int			m_height = 0;
 
 	int			m_round = 0;				//round rect
+
+	//20260718 by claude. 배경색 alpha<255 일 때 투명 체커 패턴을 색 밑에 깔지 여부(색-스와치가 알파를 시각화).
+	//기본 false — 일반 버튼은 배경색에 알파를 거의 안 쓰므로 영향 없음. 색상 선택 스와치에서만 켠다.
+	bool		m_show_trans_pattern = false;
 
 	UINT		m_nAnchor = ANCHOR_NONE;
 	int			m_nAnchorMarginX = 0;

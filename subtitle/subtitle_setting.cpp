@@ -54,6 +54,9 @@ void CSubtitleSetting::set_default()
 	char_spacing = -2;
 	line_spacing = 0;
 	text_align = 0;
+
+	background_on = false;
+	cr_background = Gdiplus::Color(0xb4, 245, 235, 210);		//반투명 연베이지 (alpha 180)
 }
 
 
@@ -70,7 +73,8 @@ CString& operator <<= (CString& style, CSubtitleSetting& s)
 0x%08x|0x%08x|0x%08x|0x%08x|\
 %d|%d|\
 %d|\
-%d"),
+%d|\
+%d|0x%08x"),
 		s.lf->lfFaceName,
 		s.lf->lfCharSet,
 		s.lf->lfHeight,
@@ -100,7 +104,9 @@ CString& operator <<= (CString& style, CSubtitleSetting& s)
 
 		s.pos_x, s.pos_y,
 		s.line_spacing,
-		s.text_align
+		s.text_align,
+
+		s.background_on, s.cr_background.GetValue()
 	);
 
 	return(style);
@@ -156,6 +162,20 @@ CSubtitleSetting& operator <<= (CSubtitleSetting& s, CString& style)
 
 			s.line_spacing = get_int(str);
 			s.text_align = get_int(str);
+
+			//20260719 by claude. 신규 배경 필드 — append-only 라 구 저장 문자열엔 이 토큰이 없다.
+			//get_int 는 토큰이 없으면 throw 하므로 내부 try 로 감싼다. 여기서 삼키지 않으면 outer catch 가
+			//set_default() 로 통째 reset 해 구 사용자의 자막 설정이 전부 유실된다. 없으면 set_default 값 유지.
+			try
+			{
+				s.background_on = (get_int(str) != 0);
+				Gdiplus::Color bg((Gdiplus::ARGB)get_int(str));
+				//20260719 by claude. alpha 0 = 완전 투명 = 보이지 않는 배경(무의미/미설정 garbage). 사용자가 실제로 고른
+				//색이 아니므로 set_default 의 기본 베이지를 유지한다 (아래 is_sane 이 cr[] 4채널 alpha=0 을 garbage 로 보는 것과 동일 취지).
+				if (bg.GetA() != 0)
+					s.cr_background = bg;
+			}
+			catch (...) {}
 		}
 	}
 	catch(...)

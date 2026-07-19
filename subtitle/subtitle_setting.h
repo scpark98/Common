@@ -50,6 +50,12 @@ public:
 	//0:center, 1:left of center
 	int			text_align;
 
+	//20260719 by claude. 자막 뒤 배경 라운드 박스 (사용자 요청). background_on 이 true 일 때만 cr_background 로 칠한다.
+	//배경 테두리색은 별도 저장하지 않고 렌더 시 cr_background 에서 유도(조금 더 진한 색). 여백·반경·테두리색 등 세부 옵션은 추후 필요 시 추가.
+	//직렬화는 append-only (operator<<= 끝에 추가) — 구 저장 문자열엔 이 토큰이 없어 deserialize 가 default 값으로 채운다(구 설정 유실 없음).
+	bool			background_on;
+	Gdiplus::Color	cr_background;					// ARGB. background_on 일 때 자막 뒤 라운드 박스 색.
+
 	void		set_default();
 	//deserialize 후 또는 외부에서 값 정합성 검증. 한 필드라도 임계 범위 밖이면 false.
 	//부적합한 값이 GdiPlus path / VMR9 SetAlphaBitmap 호출에 garbage 로 흘러가 hang 유발하는 것을 방지.

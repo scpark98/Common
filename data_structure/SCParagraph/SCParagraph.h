@@ -23,14 +23,16 @@
 	<s>						//strike out
 	<cr=red> = <ct=red>		//cr_text
 	<crb=Blue> = <cb=Blue>	//cr_back
-	<br>					//line break
+	<br>					//line break — 줄 "종결자"다. 진행 중인 텍스트가 있으면 그 줄을 확정만 하므로
+							//20260721 by claude. 빈 줄(공백 한 줄)을 넣으려면 <br> 를 두 개 쓴다. 단 맨 앞은 진행 중인 줄이 없어 하나로 빈 줄이 생긴다.
 	<ls=0.5>				//line spacing — 이 태그 이후 텍스트를 새 라인으로 시작하며, 그 라인과 바로 전 라인 사이의 '빈 여백' 크기를 지정한다.
 							//<ls> 자체가 줄바꿈을 내포하므로 <br> 를 따로 둘 필요 없다 (둘 다 써도 빈 줄·중복 줄바꿈 없음).
 							//값은 "기본 여백의 배수": 1.0 = 기본(태그 없을 때)과 동일, 0.5 = 그 절반(여백만 좁아짐, 안 겹침), 0 = 딱 붙음, 2.0 = 2배.
 	ex. "<b><cr=red>This</b></cr > is a <ct=blue><i>sample</i> <b>paragraph</b>."
 
 	- cr은 Gdiplus::Color에 명시된 컬러 외에 다음 형식들도 지원한다.
-	  <cr=#RRGGBBAA>,			//rgba, #으로 시작되는 16진수값.
+	  <cr=#RRGGBB>,				//#으로 시작되는 16진수값. 6자리는 alpha = 255.
+	  <cr=#AARRGGBB>,			//20260721 by claude. 8자리는 alpha 가 **앞**에 온다 (get_gcolor_from_hexa_str). RRGGBBAA 아님.
 	  <cr=123,45,67,128>		//rgba, 숫자로만 3자리 또는 4자리를 콤마로 구분한다.
 	  <cr=h90,30,100>,		//hsi, h로 시작되고 콤마로 구분한다.
 

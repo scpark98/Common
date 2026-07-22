@@ -7811,8 +7811,6 @@ LRESULT CSCListCtrl::on_message_CSCScrollbar(WPARAM wParam, LPARAM lParam)
 	if (msg->msg != CSCScrollbarMsg::msg_scrollbar_pos_changed)
 		return 0;
 
-	m_last_user_scroll_at = GetTickCount();
-
 	if (msg->pThis == &m_scrollbar)
 	{
 		//20260706 by claude. 세로 썸 = 픽셀 위치. msg->pos 를 m_scroll_y 로 직접 반영(sync_scrollbar 가 max 로 클램프)하고 재그리기.
@@ -7841,7 +7839,6 @@ BOOL CSCListCtrl::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
 {
 	if (m_scrollbar_setup && GetItemCount() > 0)
 	{
-		m_last_user_scroll_at = GetTickCount();
 		bool shift = (nFlags & MK_SHIFT) != 0;
 		if (shift)
 		{
@@ -7872,7 +7869,6 @@ void CSCListCtrl::OnMouseHWheel(UINT nFlags, short zDelta, CPoint pt)
 {
 	if (m_scrollbar_setup)
 	{
-		m_last_user_scroll_at = GetTickCount();
 		int dx = zDelta / WHEEL_DELTA * 60;
 		if (dx == 0)
 			dx = (zDelta > 0) ? 60 : -60;

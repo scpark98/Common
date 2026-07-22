@@ -6676,8 +6676,6 @@ LRESULT CVtListCtrlEx::on_message_CSCScrollbar(WPARAM wParam, LPARAM lParam)
 	if (msg->msg != CSCScrollbarMsg::msg_scrollbar_pos_changed)
 		return 0;
 
-	m_last_user_scroll_at = GetTickCount();
-
 	if (msg->pThis == &m_scrollbar)
 	{
 		//msg->pos 는 이미 scrollbar 가 max_pos(=total - sync 에서 계산한 visible) 로 클램프해 보낸다. 여기서
@@ -6745,7 +6743,6 @@ BOOL CVtListCtrlEx::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
 {
 	if (m_scrollbar_setup && GetItemCount() > 0)
 	{
-		m_last_user_scroll_at = GetTickCount();
 		bool shift = (nFlags & MK_SHIFT) != 0;
 		if (shift)
 		{
@@ -6794,7 +6791,6 @@ void CVtListCtrlEx::OnMouseHWheel(UINT nFlags, short zDelta, CPoint pt)
 {
 	if (m_scrollbar_setup)
 	{
-		m_last_user_scroll_at = GetTickCount();
 		int dx = zDelta / WHEEL_DELTA * 60;
 		if (dx == 0)
 			dx = (zDelta > 0) ? 60 : -60;

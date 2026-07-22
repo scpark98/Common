@@ -1111,7 +1111,6 @@ public:
 	bool			m_border_recalc_tried = false;	//미확보 시 강제 recalc 를 이미 시도했는지(무한 재시도 방지).
 	int				m_last_top_index = -1;
 	int				m_h_scroll_pos = 0;		//가로 scroll 누적 pixel offset — WS_HSCROLL 제거 후 GetScrollPos(SB_HORZ) 가 stale 이라 자체 추적.
-	DWORD			m_last_user_scroll_at = 0;	//사용자 입력에 의한 scroll tick — 자동 ensure_visible 호출 측에서 sticky timeout 으로 사용.
 	DWORD			m_last_hsync_tick = 0;		//20260706 by claude. 가로 스크롤 sync 스로틀용 마지막 sync tick(WM_HSCROLL 폭주 완화).
 	void			setup_scrollbar();
 	void			sync_scrollbar();
@@ -1128,9 +1127,6 @@ public:
 	//(true 면 드래그 중 바가 잠깐 사라졌다 놓으면 복원. false 면 바는 유지되나 리사이즈가 느림.) 컨트롤별 선택 가능.
 	void			set_hide_scroll_when_resize(bool b) { m_hide_scroll_when_resize = b; }
 	bool			m_hide_scroll_when_resize = false;
-
-public:
-	DWORD			get_last_user_scroll_at() const { return m_last_user_scroll_at; }
 };
 
 

@@ -353,6 +353,14 @@ void CSCStaticEdit::set_use_default_readonly_color(bool use_default, Gdiplus::Co
 	Invalidate();
 }
 
+void CSCStaticEdit::set_use_default_disabled_color(bool use_default, Gdiplus::Color cr_back_disabled)
+{
+	m_use_default_disabled_color = use_default;
+	if (cr_back_disabled.GetValue() != Gdiplus::Color::Transparent)
+		m_cr_back_disabled = cr_back_disabled;
+	Invalidate();
+}
+
 void CSCStaticEdit::set_password_mode(bool password, TCHAR mask_char)
 {
 	m_password = password;
@@ -1208,10 +1216,10 @@ void CSCStaticEdit::OnPaint()
 // ──────────────────────────────────────────────────────────
 void CSCStaticEdit::draw_background(Gdiplus::Graphics& g, const CRect& rc)
 {
-	// disabled : CSCEdit 과 동일한 disable 배경색(LightGray)으로 통일 (CSCEdit::m_cr_back_disabled 기본값).
+	// disabled : 기본 LightGray. set_use_default_disabled_color(false, cr) 로 테마 색 지정 가능.
 	// readonly + use_default_readonly_color : 표준 다이얼로그 배경(COLOR_3DFACE) 그대로.
 	Gdiplus::Color cr_back =
-		!IsWindowEnabled()                                       ? Gdiplus::Color::LightGray           :
+		!IsWindowEnabled()                                       ? (m_use_default_disabled_color ? Gdiplus::Color::LightGray : m_cr_back_disabled) :
 		(m_readonly && m_use_default_readonly_color)             ? get_sys_color(COLOR_3DFACE)         :
 		                                                           m_theme.cr_back;
 

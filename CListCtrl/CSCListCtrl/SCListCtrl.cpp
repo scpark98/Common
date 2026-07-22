@@ -172,9 +172,6 @@ void CSCListCtrl::OnLvnGetdispinfo(NMHDR *pNMHDR, LRESULT *pResult)
 {
 	*pResult = 0;
 
-	//if (!m_use_virtual_list)
-	//	return;
-
 	//NMLVDISPINFO *pDispInfo = reinterpret_cast<NMLVDISPINFO*>(pNMHDR);
 	// TODO: Add your control notification handler code here
 	LV_DISPINFO* pDispInfo = (LV_DISPINFO*)pNMHDR;
@@ -280,9 +277,6 @@ void CSCListCtrl::OnLvnOdcachehint(NMHDR *pNMHDR, LRESULT *pResult)
 
 void CSCListCtrl::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 {
-	if (!m_use_virtual_list)
-		return;
-
 	int	iItem = (int)lpDIS->itemID;
 
 	//20260706 by claude. [팬텀 행] native 스크롤 범위 확장용 pad 인덱스는 데이터가 없으므로 그리지 않는다(아래 m_list_db[iItem] OOB 방지).
@@ -1105,15 +1099,12 @@ CRect CSCListCtrl::get_item_rect(int item, int subItem)
 
 	GetItemRect(item, &Rect, LVIR_BOUNDS);
 
-	//20260713 by claude. smooth_scroll 시 행의 Y 는 native 스크롤이 아니라 m_scroll_y(픽셀) 기준으로 그려진다(draw_row/hit_test 와 동일 규칙).
+	//20260713 by claude. 행의 Y 는 native 스크롤이 아니라 m_scroll_y(픽셀) 기준으로 그려진다(draw_row/hit_test 와 동일 규칙).
 	//native GetItemRect 의 Y 를 그대로 쓰면 set_text 등의 InvalidateRect(get_item_rect()) 가 실제 그려진 위치와 m_scroll_y 만큼 어긋난
 	//밴드를 무효화해, 리스트가 아래로 스크롤된 상태에서 마지막 항목의 progress 셀이 전송 완료 후에도 갱신되지 않던(창 resize 해야 보이던) 문제가 났다.
-	if (m_smooth_scroll)
-	{
-		int rowH = row_height();
-		Rect.top    = get_header_height() + item * rowH - m_scroll_y;
-		Rect.bottom = Rect.top + rowH;
-	}
+	int rowH = row_height();
+	Rect.top    = get_header_height() + item * rowH - m_scroll_y;
+	Rect.bottom = Rect.top + rowH;
 
 	// Now scroll if we need to expose the column
 	GetClientRect(&rc);
@@ -1173,17 +1164,8 @@ int CSCListCtrl::hit_test(CPoint pt, int& item, int& subItem, bool include_icon)
 	//20260706 by claude. smooth 모드: 행 위치가 native 스크롤이 아니라 m_scroll_y(픽셀) 기준 → 후보 행 범위·Y 판정을 m_scroll_y 로.
 	int header = get_header_height();
 	int rowH   = row_height();
-	int first, last;
-	if (m_smooth_scroll)
-	{
-		first = max(0, m_scroll_y / rowH);
-		last  = MIN(size(), first + rc.Height() / rowH + 2);
-	}
-	else
-	{
-		first = GetTopIndex();
-		last  = MIN(size(), first + GetCountPerPage());
-	}
+	int first = max(0, m_scroll_y / rowH);
+	int last  = MIN(size(), first + rc.Height() / rowH + 2);
 
 	//20260706 by claude. 맨 우측 컬럼 오른쪽(컬럼 총폭 밖)은 항목이 아닌 빈 영역으로 본다(탐색기와 동일). item 검사 우측 한계를
 	//컬럼 총폭(가로 스크롤 반영)으로 제한 → 우측 빈 영역 클릭/드래그는 item=-1 → 마퀴 선택 시작 등 빈 공간 처리로 이어진다.
@@ -1197,11 +1179,8 @@ int CSCListCtrl::hit_test(CPoint pt, int& item, int& subItem, bool include_icon)
 		//20260706 by claude. item 검사 우측 한계 = 컬럼 총폭(col_right). 그 오른쪽 빈 영역은 항목으로 잡지 않아(item=-1)
 		//빈 공간 처리(마퀴 등)로 넘어간다. col_right 가 rc.right 보다 크면(컬럼이 화면을 넘침) rc.right 로 클램프.
 		GetItemRect(i, &itemRect, LVIR_BOUNDS);
-		if (m_smooth_scroll)
-		{
-			itemRect.top    = header + i * rowH - m_scroll_y;
-			itemRect.bottom = itemRect.top + rowH;
-		}
+		itemRect.top    = header + i * rowH - m_scroll_y;
+		itemRect.bottom = itemRect.top + rowH;
 		itemRect.right = min((LONG)rc.right, (LONG)col_right);
 
 		if (itemRect.PtInRect(pt))
@@ -1212,11 +1191,8 @@ int CSCListCtrl::hit_test(CPoint pt, int& item, int& subItem, bool include_icon)
 			for (int j = get_column_count() - 1; j >= 0; j--)
 			{
 				GetSubItemRect(i, j, LVIR_BOUNDS, itemRect);
-				if (m_smooth_scroll)
-				{
-					itemRect.top    = header + i * rowH - m_scroll_y;
-					itemRect.bottom = itemRect.top + rowH;
-				}
+				itemRect.top    = header + i * rowH - m_scroll_y;
+				itemRect.bottom = itemRect.top + rowH;
 
 				//0번 컬럼은 한 라인 전체의 영역을 리턴하므로
 				if (j == 0)
@@ -1805,7 +1781,7 @@ BOOL CSCListCtrl::PreTranslateMessage(MSG* pMsg)
 		//20260706 by claude. [smooth §3] 픽셀 페인트 모드에서는 native 세로 스크롤을 안 쓰므로 방향키/Page/Home/End 를
 		//직접 처리해 포커스 이동 + 선택 + m_scroll_y 로 가시 유지한다. native 위임 시 native 는 자기 세로 top 기준으로
 		//선택·스크롤해 픽셀 뷰포트(m_scroll_y)와 어긋난다. 처리한 키는 TRUE 로 소비(native 스크롤과 m_scroll_y 충돌 방지).
-		if (m_smooth_scroll && smooth_key_navigate((UINT)pMsg->wParam))
+		if (smooth_key_navigate((UINT)pMsg->wParam))
 			return TRUE;
 
 		switch (pMsg->wParam)
@@ -1835,7 +1811,7 @@ BOOL CSCListCtrl::PreTranslateMessage(MSG* pMsg)
 			}
 			case VK_SPACE:
 			{
-				if (!m_use_virtual_list || m_in_editing)
+				if (m_in_editing)
 					break;
 
 				if (GetExtendedStyle() & LVS_EX_CHECKBOXES)
@@ -1958,8 +1934,7 @@ void CSCListCtrl::OnLvnOdstatechanged(NMHDR *pNMHDR, LRESULT *pResult)
 	//20260706 by claude. owner-data 범위 상태변경(전체선택/해제 = iFrom..iTo, SetItemState(-1)) 알림. smooth 모드는 우리가
 	//픽셀 위치로 그리므로, native 의 per-item 무효화(native 좌표라 픽셀 뷰포트와 어긋남)에 의존하면 하단 잔상이 남는다.
 	//항목 영역을 통째로 무효화해 OnPaint 가 올바른 픽셀 위치로 다시 그리게 한다.
-	if (m_smooth_scroll)
-		Invalidate(FALSE);
+	Invalidate(FALSE);
 	*pResult = 0;
 }
 
@@ -2023,38 +1998,31 @@ void CSCListCtrl::OnPaint()
 
 		pDC->FillSolidRect(rc, m_theme.cr_back.ToCOLORREF());
 
-		if (m_smooth_scroll)
+		//20260706 by claude. [픽셀 페인트] 항목을 m_scroll_y(픽셀) 기준으로 직접 그린다.
+		//viewport = 콘텐츠의 [m_scroll_y, m_scroll_y+항목영역높이] 구간 → 맨 위/아래 부분행이 자연 발생, 바닥까지 스크롤 시 하단 여백 0.
+		//X(컬럼/가로스크롤)는 draw_row 내부 GetSubItemRect 가 담당(세로 위치 무관), Y 만 여기서 픽셀로 계산해 넘긴다.
+		//부분행이 헤더/코너를 침범하지 않게 항목 영역(rc)으로 클립. 헤더 child 는 WS_CLIPCHILDREN 로 별도 보존.
+		int rowH = row_height();
+		int total = size();
+		int area_bottom = rcFull.bottom;
+		pDC->IntersectClipRect(&rc);
+		//20260706 by claude. 픽셀 페인트는 직접 그리므로 폰트를 DC 에 선택해야
+		//기본(시스템) 폰트가 아닌 컨트롤 폰트로 텍스트가 그려진다. (셀별 styled font 는 draw_row 내부에서 별도 SelectObject.)
+		CFont* pCtrlFont = GetFont();
+		CFont* pOldFont  = pCtrlFont ? pDC->SelectObject(pCtrlFont) : nullptr;
+		//20260707 by claude. m_scroll_y 는 정상적으로 [0, content-area] 이지만, 드래그 자동스크롤 등에서 클램프 직전 음수가 될 수 있다.
+		//음수면 first 가 음수 → draw_row(음수) → m_list_db[음수] deque OOB 크래시. 여기서 0 하한으로 방어(정상 경로엔 영향 없음).
+		int scroll_y = max(0, m_scroll_y);
+		int first = scroll_y / rowH;
+		int y = rc.top - (scroll_y % rowH);
+		for (int i = first; i < total && y < area_bottom; i++, y += rowH)
 		{
-			//20260706 by claude. [smooth 픽셀 페인트] native 위임(DefWindowProc) 대신 항목을 m_scroll_y(픽셀) 기준으로 직접 그린다.
-			//viewport = 콘텐츠의 [m_scroll_y, m_scroll_y+항목영역높이] 구간 → 맨 위/아래 부분행이 자연 발생, 바닥까지 스크롤 시 하단 여백 0.
-			//X(컬럼/가로스크롤)는 draw_row 내부 GetSubItemRect 가 담당(세로 위치 무관), Y 만 여기서 픽셀로 계산해 넘긴다.
-			//부분행이 헤더/코너를 침범하지 않게 항목 영역(rc)으로 클립. 헤더 child 는 WS_CLIPCHILDREN 로 별도 보존.
-			int rowH = row_height();
-			int total = size();
-			int area_bottom = rcFull.bottom;
-			pDC->IntersectClipRect(&rc);
-			//20260706 by claude. native 위임 시엔 native 가 컨트롤 폰트를 DC 에 선택해 주지만, smooth 픽셀 페인트는 직접 그리므로 폰트를 선택해야
-			//기본(시스템) 폰트가 아닌 컨트롤 폰트로 텍스트가 그려진다. (셀별 styled font 는 draw_row 내부에서 별도 SelectObject.)
-			CFont* pCtrlFont = GetFont();
-			CFont* pOldFont  = pCtrlFont ? pDC->SelectObject(pCtrlFont) : nullptr;
-			//20260707 by claude. m_scroll_y 는 정상적으로 [0, content-area] 이지만, 드래그 자동스크롤 등에서 클램프 직전 음수가 될 수 있다.
-			//음수면 first 가 음수 → draw_row(음수) → m_list_db[음수] deque OOB 크래시. 여기서 0 하한으로 방어(정상 경로엔 영향 없음).
-			int scroll_y = max(0, m_scroll_y);
-			int first = scroll_y / rowH;
-			int y = rc.top - (scroll_y % rowH);
-			for (int i = first; i < total && y < area_bottom; i++, y += rowH)
-			{
-				CRect row_bounds(rc.left, y, rc.right, y + rowH);
-				draw_row(pDC, i, row_bounds);
-			}
-			if (pOldFont)
-				pDC->SelectObject(pOldFont);
-			draw_marquee(pDC);		//20260706 by claude. 마퀴 사각형은 행 위에.
-			return;
+			CRect row_bounds(rc.left, y, rc.right, y + rowH);
+			draw_row(pDC, i, row_bounds);
 		}
-
-		DefWindowProc(WM_PAINT, (WPARAM)pDC->m_hDC, (LPARAM)0);
-		draw_marquee(pDC);			//20260706 by claude. native 그리기 후 마퀴 사각형 오버레이.
+		if (pOldFont)
+			pDC->SelectObject(pOldFont);
+		draw_marquee(pDC);		//20260706 by claude. 마퀴 사각형은 행 위에.
 		return;
 	}
 
@@ -2200,18 +2168,9 @@ CSCStaticEdit* CSCListCtrl::edit_item(int item, int subItem)
 	// The returned pointer should not be saved
 
 	// Make sure that the item is visible
-	//20260706 by claude. [smooth §4] native EnsureVisible 은 native 세로 top 을 움직일 뿐 픽셀 뷰포트(m_scroll_y)와 무관 →
-	//편집 박스가 실제 그려진 행과 다른 Y 에 뜬다. smooth 모드는 픽셀 EnsureVisible 로 항목을 화면에 들인다.
-	if (m_smooth_scroll)
-	{
-		smooth_ensure_visible(item);
-	}
-	else if (!EnsureVisible(item, false))
-	{
-		//InsertItem()
-		if (!EnsureVisible(item, TRUE))
-			return NULL;
-	}
+	//20260706 by claude. native EnsureVisible 은 native 세로 top 을 움직일 뿐 픽셀 뷰포트(m_scroll_y)와 무관 →
+	//편집 박스가 실제 그려진 행과 다른 Y 에 뜬다. 픽셀 EnsureVisible 로 항목을 화면에 들인다.
+	ensure_visible(item, visible_minimal);
 
 	//20260706 by claude. 편집 진입 전 편집할 셀(레이블)이 가로로 가려져 있으면 가로 스크롤로 완전히 노출시킨다.
 	ensure_column_visible(subItem);
@@ -2222,10 +2181,9 @@ CSCStaticEdit* CSCListCtrl::edit_item(int item, int subItem)
 	CRect r = get_item_rect(item, subItem);
 	CRect rc;
 
-	//20260706 by claude. [smooth §4] get_item_rect 의 Y 는 native GetItemRect(=native 세로 top) 기준이라 픽셀 페인트와 어긋난다.
-	//행 Y 는 OnPaint 픽셀 루프와 동일 식(header + item*rowH - m_scroll_y)으로 덮어 편집 박스를 실제 그려진 행 위에 정확히 올린다.
-	//X(컬럼/가로스크롤)는 get_item_rect 가 native 가로 스크롤 기준으로 이미 맞다(smooth 도 가로는 native 사용).
-	if (m_smooth_scroll)
+	//20260706 by claude. 행 Y 는 OnPaint 픽셀 루프와 동일 식(header + item*rowH - m_scroll_y)으로 덮어
+	//편집 박스를 실제 그려진 행 위에 정확히 올린다.
+	//X(컬럼/가로스크롤)는 get_item_rect 가 native 가로 스크롤 기준으로 이미 맞다(가로는 native 사용).
 	{
 		int rowH   = row_height();
 		int header = get_header_height();
@@ -2522,9 +2480,6 @@ void CSCListCtrl::set_back_alternate_color(bool use, Gdiplus::Color cr)
 
 void CSCListCtrl::set_text_color(int item, int subItem, Gdiplus::Color crText, bool erase, bool invalidate)
 {
-	if (!m_use_virtual_list)
-		return;
-
 	int i, j;
 
 	if (item < 0)
@@ -2871,30 +2826,14 @@ int CSCListCtrl::insert_item(int index, CString text, int image_index, bool ensu
 		image_index = m_pShellImageList->GetSystemImageListIcon(!m_is_local, text, false);
 	}
 
-	if (m_use_virtual_list)
-	{
-		m_list_db.insert(m_list_db.begin() + index, CSCListCtrlData(text, image_index, m_HeaderCtrlEx.GetItemCount()));
+	m_list_db.insert(m_list_db.begin() + index, CSCListCtrlData(text, image_index, m_HeaderCtrlEx.GetItemCount()));
 
-		//LVSICF_NOSCROLL 옵션을 주지 않으면 특정 항목 선택 후 해당 항목이 보이지 않도록 스크롤하려 해도
-		//데이터가 계속 추가되는 상황에서는 선택된 항목이 보이지 않는 영역으로의 스크롤이 되지 않는 현상이 있다.
-		//bulk 모드(대량 populate)면 매 항목 SetItemCountEx 를 생략하고 end_bulk_insert(또는 display_filelist 루프
-		//종료)가 한 번에 갱신 — 수천 항목에서 N 회 호출 비용 제거.
-		if (!m_in_bulk_insert)
-			SetItemCountEx(m_list_db.size(), LVSICF_NOSCROLL);
-	}
-	else
-	{
-		LV_ITEM item;
-		item.mask = LVIF_TEXT | LVIF_IMAGE | LVIF_STATE;
-		item.iItem = index;
-		item.iSubItem = 0;
-		item.pszText = (LPTSTR)(LPCTSTR)text;
-		item.iImage = image_index;
-		item.state = 0;
-		item.stateMask = 0;
-		item.mask |= LVIF_STATE;
-		index = InsertItem(&item);
-	}
+	//LVSICF_NOSCROLL 옵션을 주지 않으면 특정 항목 선택 후 해당 항목이 보이지 않도록 스크롤하려 해도
+	//데이터가 계속 추가되는 상황에서는 선택된 항목이 보이지 않는 영역으로의 스크롤이 되지 않는 현상이 있다.
+	//bulk 모드(대량 populate)면 매 항목 SetItemCountEx 를 생략하고 end_bulk_insert(또는 display_filelist 루프
+	//종료)가 한 번에 갱신 — 수천 항목에서 N 회 호출 비용 제거.
+	if (!m_in_bulk_insert)
+		SetItemCountEx(m_list_db.size(), LVSICF_NOSCROLL);
 
 	//bulk_insert 모드면 ensure/Invalidate/sync 모두 skip — end_bulk_insert 가 한 번에 처리.
 	if (!m_in_bulk_insert)
@@ -3185,7 +3124,7 @@ int CSCListCtrl::insert_item(int index, LPCTSTR pszText, ...)
 
 int CSCListCtrl::size()
 {
-	return (m_use_virtual_list ? m_list_db.size() : GetItemCount());
+	return (int)m_list_db.size();
 }
 
 //지우기 전 확인창은 호출루틴에서 처리해야 함
@@ -3347,10 +3286,7 @@ CString CSCListCtrl::get_text(int item, int subItem)
 	if (item < 0 || item >= size() || subItem < 0 || subItem >= get_column_count())
 		return _T("");
 
-	if (m_use_virtual_list)
-		return m_list_db[item].text[subItem];
-
-	return GetItemText(item, subItem);
+	return m_list_db[item].text[subItem];
 }
 
 void CSCListCtrl::set_text(int item, int subItem, CString text, bool invalidate)
@@ -3364,22 +3300,15 @@ void CSCListCtrl::set_text(int item, int subItem, CString text, bool invalidate)
 	if (m_is_shell_listctrl && !m_pShellImageList)
 		return;
 
-	if (m_use_virtual_list)
-	{
-		//양방향 파일전송2에서 전송 중 취소를 누르면 간혹 m_list_db의 size가 매우 큰 수로 나오는 경우가 있다.
-		//원인을 파악중이며 우선 임시로 처리한다.
-		//20250822. dispatch info 등 민감한 핸들러에서 뭔가 잘못 처리되어
-		//m_list_db의 메모리 영역을 침범한 듯 하다.
-		//현재로서는 문제없으므로 아래 제한을 두었던 코드는 주석처리함.
-		//if (m_list_db.size() > 10000)
-		//	return;
+	//양방향 파일전송2에서 전송 중 취소를 누르면 간혹 m_list_db의 size가 매우 큰 수로 나오는 경우가 있다.
+	//원인을 파악중이며 우선 임시로 처리한다.
+	//20250822. dispatch info 등 민감한 핸들러에서 뭔가 잘못 처리되어
+	//m_list_db의 메모리 영역을 침범한 듯 하다.
+	//현재로서는 문제없으므로 아래 제한을 두었던 코드는 주석처리함.
+	//if (m_list_db.size() > 10000)
+	//	return;
 
-		m_list_db[item].text[subItem] = text;
-	}
-	else
-	{
-		SetItemText(item, subItem, text);
-	}
+	m_list_db[item].text[subItem] = text;
 
 	if (invalidate && !m_in_bulk_insert)
 		InvalidateRect(get_item_rect(item, subItem), false);
@@ -3686,10 +3615,7 @@ int CSCListCtrl::get_check(int index)
 	if (index < 0 || index >= size())
 		return 0;
 
-	if (m_use_virtual_list)
-		return m_list_db[index].checked;
-
-	return GetCheck(index);
+	return m_list_db[index].checked;
 }
 
 //index = -1 : 전체선택
@@ -3700,8 +3626,7 @@ void CSCListCtrl::set_check(int index, bool check)
 		for (int i = 0; i < size(); i++)
 		{
 			CListCtrl::SetCheck(i, check);
-			if (m_use_virtual_list)
-				m_list_db[i].checked = check;
+			m_list_db[i].checked = check;
 		}
 
 		Invalidate();
@@ -3712,8 +3637,7 @@ void CSCListCtrl::set_check(int index, bool check)
 			return;
 
 		CListCtrl::SetCheck(index, check);
-		if (m_use_virtual_list)
-			m_list_db[index].checked = check;
+		m_list_db[index].checked = check;
 	}
 }
 
@@ -3725,8 +3649,7 @@ void CSCListCtrl::set_check(std::deque<int> indices, bool check)
 			continue;
 
 		CListCtrl::SetCheck(index, check);
-		if (m_use_virtual_list)
-			m_list_db[index].checked = check;
+		m_list_db[index].checked = check;
 	}
 }
 
@@ -3737,16 +3660,8 @@ int CSCListCtrl::get_checked_items(std::deque<int>* dq)
 
 	for (int i = 0; i < size(); i++)
 	{
-		if (m_use_virtual_list)
-		{
-			if (m_list_db[i].checked)
-				checked.push_back(i);
-		}
-		else
-		{
-			if (GetCheck(i))
-				checked.push_back(i);
-		}
+		if (m_list_db[i].checked)
+			checked.push_back(i);
 	}
 
 	if (dq != NULL)
@@ -3768,7 +3683,7 @@ void CSCListCtrl::unselect_selected_item()
 	//	select_item(dqSelected[i], false);
 }
 
-int CSCListCtrl::select_items_by_names(const std::deque<CString>& names, int visible_mode)
+int CSCListCtrl::select_items_by_names(const std::deque<CString>& names, CLISTCTRLEX_ENSURE_VISIBLE_MODE visible_mode)
 {
 	if (names.empty())
 		return -1;
@@ -4008,9 +3923,8 @@ BOOL CSCListCtrl::OnNMDblclk(NMHDR *pNMHDR, LRESULT *pResult)
 	int item;// = pNMItemActivate->iItem;
 	int subItem;// = pNMItemActivate->iSubItem;
 
-	//20260710 by claude. smooth 모드에서 NM_DBLCLK 의 iItem/iSubItem 은 native hit-test(스크롤 미반영)라 틀린 항목(대개 최상단=0)을 가리킨다.
-	//ptAction 을 smooth hit_test 로 재판별해 알림 값을 보정 → 아래 shell 처리도, 부모(비-shell, 예: 자막편집기)가 읽는 iItem 도 올바르게 한다.
-	if (m_smooth_scroll)
+	//20260710 by claude. NM_DBLCLK 의 iItem/iSubItem 은 native hit-test(픽셀 스크롤 미반영)라 틀린 항목(대개 최상단=0)을 가리킨다.
+	//ptAction 을 우리 hit_test 로 재판별해 알림 값을 보정 → 아래 shell 처리도, 부모(비-shell, 예: 자막편집기)가 읽는 iItem 도 올바르게 한다.
 	{
 		int hi = -1, hs = -1;
 		hit_test(pNMItemActivate->ptAction, hi, hs, true);
@@ -4459,13 +4373,10 @@ BOOL CSCListCtrl::OnNMClick(NMHDR *pNMHDR, LRESULT *pResult)
 		return FALSE;
 	}
 
-	if (m_use_virtual_list)
+	if (ht == LVHT_ONITEMSTATEICON)
 	{
-		if (ht == LVHT_ONITEMSTATEICON)
-		{
-			toggle_check(item);
-			return FALSE;
-		}
+		toggle_check(item);
+		return FALSE;
 	}
 
 	//TRACE(_T("%d, %d\n"), item, subItem);
@@ -4686,92 +4597,78 @@ void CSCListCtrl::edit_end(bool valid)
 	}
 }
 
-//어떤 항목이 특정 위치에 표시되도록 스크롤시킨다.
-//mode가 visible_first이고 offset이 3이면 위에서 3인 인덱스, 즉 4번째 위치에 해당 아이템이 표시되도록 스크롤시킨다.
-//mode가 visible_center이고 offset이 0이면 중앙 위치에 해당 아이템이 표시되도록 스크롤시킨다.
-//mode가 visible_last이고 offset이 3이면 아래에서 -3-1인 위치에 해당 아이템이 표시되도록 스크롤시킨다.
-void CSCListCtrl::ensure_visible(int index, int mode, int offset)
+void CSCListCtrl::ensure_visible(int index, CLISTCTRLEX_ENSURE_VISIBLE_MODE mode, int offset, bool only_if_invisible)
 {
-	//20260710 by claude. smooth 모드는 native Scroll 로 못 움직이므로 m_scroll_y 를 직접 계산해 모드/offset 을 그대로 반영한다.
-	//(자막 추적처럼 visible_first+offset 으로 항목을 특정 위치에 고정하는 호출을 보존 — 최소 가시화로 근사하면 위치가 달라진다.)
-	if (m_smooth_scroll)
-	{
-		int rowH = row_height();
-		CRect rc;
-		GetClientRect(&rc);
-		int area_h = max(0, rc.Height() - get_header_height());
-		int page   = (rowH > 0) ? max(1, area_h / rowH) : 1;
-
-		int target;		//m_scroll_y 목표(항목 영역 픽셀 오프셋)
-		if (mode == visible_first)
-			target = (index - offset) * rowH;
-		else if (mode == visible_last)
-			target = (index + offset - page + 1) * rowH;
-		else			//visible_center(기본)
-			target = (index - page / 2) * rowH;
-
-		m_scroll_y = target;
-		sync_scrollbar();		//[0, content-area] clamp + 세로 썸 위치 반영.
-		Invalidate(FALSE);
+	if (index < 0 || index >= size())
 		return;
-	}
 
-	//EnsureVisible(index, FALSE);
+	//20260722 by claude. 이미 완전히 보이는 항목은 움직이지 않는다 — 예전엔 무조건 지정 위치로 옮겨서, 보고 있던 행이
+	//선택만 바뀌어도 화면이 튀었다. 호출측이 자기 기준으로 이미 판정했다면 only_if_invisible = false 로 이 검사를 건너뛴다.
+	if (only_if_invisible && IsItemVisible(index))
+		return;
 
-	int items_per_page = GetCountPerPage();
-	int top_index = GetTopIndex();
+	//20260710 by claude. native Scroll 로는 픽셀 뷰포트를 못 움직이므로 m_scroll_y 를 직접 계산해 모드/offset 을 그대로 반영한다.
+	//(자막 추적처럼 visible_first+offset 으로 항목을 특정 위치에 고정하는 호출을 보존 — 최소 가시화로 근사하면 위치가 달라진다.)
+	int rowH = row_height();
+	CRect rc;
+	GetClientRect(&rc);
+	int area_h = max(0, rc.Height() - get_header_height());
+	int page   = (rowH > 0) ? max(1, area_h / rowH) : 1;
 
-	CRect r;
-	GetItemRect(0, r, LVIR_BOUNDS);
+	int old_scroll = m_scroll_y;
 
-	if (mode == visible_first)
+	if (mode == visible_minimal)
 	{
-		Scroll(CSize(0, (index - offset - top_index) * r.Height()));
+		//위로 벗어났으면 항목 top 에, 아래로 벗어났으면 항목 bottom 이 영역 바닥에 닿게 — 그 이상 움직이지 않는다.
+		int item_top    = index * rowH;
+		int item_bottom = item_top + rowH;
+		if (item_top < m_scroll_y)
+			m_scroll_y = item_top;
+		else if (item_bottom > m_scroll_y + area_h)
+			m_scroll_y = item_bottom - area_h;
 	}
-	else if (mode == visible_center)
-	{
-		Scroll(CSize(0, (index - offset - items_per_page/2 - top_index) * r.Height()));
-	}
+	else if (mode == visible_first)
+		m_scroll_y = (index - offset) * rowH;
 	else if (mode == visible_last)
-	{
-		Scroll(CSize(0, (index + offset - items_per_page - top_index + 1) * r.Height()));
-	}
+		m_scroll_y = (index + offset - page + 1) * rowH;
+	else			//visible_center(기본)
+		m_scroll_y = (index - page / 2) * rowH;
+
+	sync_scrollbar();		//[0, content-area] clamp + 세로 썸 위치 반영.
+
+	//sync_scrollbar 는 썸만 옮기므로 내용은 여기서 다시 그려야 한다. 안 그리면 썸만 움직이고 화면은 그대로다.
+	if (m_scroll_y != old_scroll)
+		Invalidate(FALSE);
 }
 
-//20260710 by claude. 표준 CListCtrl geometry/scroll API 의 smooth-aware shadow. smooth 면 픽셀 뷰포트(m_scroll_y·row_height) 기준, native 면 기반 구현 위임.
-//소비자·내부 모두 표준 이름으로 호출해도 두 모드에서 정상 동작 → 자막 선택 미추적·EnsureVisible 무한루프 freeze 같은 부작용 제거.
+//20260710 by claude. 표준 CListCtrl geometry/scroll API 를 픽셀 뷰포트(m_scroll_y·row_height) 기준으로 덮는 shadow.
+//소비자·내부 모두 표준 이름으로 호출해도 정상 동작 → 자막 선택 미추적·EnsureVisible 무한루프 freeze 같은 부작용 제거.
 BOOL CSCListCtrl::EnsureVisible(int nItem, BOOL bPartialOK)
 {
-	if (m_smooth_scroll)
-	{
-		smooth_ensure_visible(nItem);		//m_scroll_y 를 최소 조정해 항목을 항목 영역에 들인다.
+	//bPartialOK 를 존중하려면 가시성 판정을 여기서 해야 하므로(ensure_visible 의 기본 판정은 '완전히 보임' 고정)
+	//판정 후 only_if_invisible = false 로 넘겨 중복 검사를 피한다.
+	if (IsItemVisible(nItem, bPartialOK))
 		return TRUE;
-	}
-	return CListCtrl::EnsureVisible(nItem, bPartialOK);
+
+	ensure_visible(nItem, visible_minimal, 0, false);
+	return TRUE;
 }
 
 int CSCListCtrl::GetTopIndex()
 {
-	if (m_smooth_scroll)
-	{
-		int rowH = row_height();
-		return (rowH > 0) ? (m_scroll_y / rowH) : 0;		//항목 영역 상단에 걸린 항목.
-	}
-	return CListCtrl::GetTopIndex();
+	int rowH = row_height();
+	return (rowH > 0) ? (m_scroll_y / rowH) : 0;		//항목 영역 상단에 걸린 항목.
 }
 
 int CSCListCtrl::GetCountPerPage()
 {
-	if (m_smooth_scroll)
+	int rowH = row_height();
+	if (rowH > 0)
 	{
-		int rowH = row_height();
-		if (rowH > 0)
-		{
-			CRect rc;
-			GetClientRect(&rc);
-			int area_h = max(0, rc.Height() - get_header_height());
-			return max(1, area_h / rowH);
-		}
+		CRect rc;
+		GetClientRect(&rc);
+		int area_h = max(0, rc.Height() - get_header_height());
+		return max(1, area_h / rowH);
 	}
 	return CListCtrl::GetCountPerPage();
 }
@@ -4785,20 +4682,9 @@ BOOL CSCListCtrl::IsItemVisible(int nItem, BOOL bPartial)
 	GetClientRect(&rc);
 	int area_top = get_header_height();		//항목 영역 상단(클라이언트 기준).
 
-	int item_top, item_bottom;
-	if (m_smooth_scroll)
-	{
-		int rowH    = row_height();
-		item_top    = area_top + nItem * rowH - m_scroll_y;
-		item_bottom = item_top + rowH;
-	}
-	else
-	{
-		CRect itemRect;
-		GetItemRect(nItem, itemRect, LVIR_BOUNDS);		//native 는 스크롤 반영된 실제 Y.
-		item_top    = itemRect.top;
-		item_bottom = itemRect.bottom;
-	}
+	int rowH        = row_height();
+	int item_top    = area_top + nItem * rowH - m_scroll_y;
+	int item_bottom = item_top + rowH;
 
 	if (!bPartial)
 		return (item_top >= area_top && item_bottom <= rc.bottom) ? TRUE : FALSE;
@@ -5409,8 +5295,7 @@ void CSCListCtrl::display_filelist(CString cur_path)
 
 	//bulk 종료 — 항목수·scrollbar 를 한 번만 갱신.
 	m_in_bulk_insert = false;
-	if (m_use_virtual_list)
-		SetItemCountEx(m_list_db.size(), LVSICF_NOSCROLL);
+	SetItemCountEx(m_list_db.size(), LVSICF_NOSCROLL);
 	sync_scrollbar();
 
 	SetRedraw(TRUE);
@@ -5854,10 +5739,10 @@ void CSCListCtrl::OnMouseMove(UINT nFlags, CPoint point)
 	}
 
 
-	//20260707 by claude. [smooth] 드래그 제스처 감지 — 항목 위 LButton 누른 뒤 문턱 이상 이동하면 LVN_BEGINDRAG 를 합성한다.
-	//native 모드는 리스트뷰가 이 감지를 대신 해주지만, smooth 는 OnLButtonDown 이 native 를 우회 소비하므로 여기서 직접 감지한다.
+	//20260707 by claude. 드래그 제스처 감지 — 항목 위 LButton 누른 뒤 문턱 이상 이동하면 LVN_BEGINDRAG 를 합성한다.
+	//native 리스트뷰가 해주던 감지를 OnLButtonDown 이 우회 소비하므로 여기서 직접 감지한다.
 	//OnLvnBeginDrag 가 m_bDragging=TRUE + SetCapture 하고, 이번 이동이 아래 m_bDragging 블록으로 흘러 드래그 이미지를 곧바로 배치.
-	if (m_smooth_scroll && m_smooth_drag_pending && (nFlags & MK_LBUTTON) && !m_bDragging && !m_marquee_active)
+	if (m_smooth_drag_pending && (nFlags & MK_LBUTTON) && !m_bDragging && !m_marquee_active)
 	{
 		if (abs(point.x - m_smooth_drag_pt.x) >= GetSystemMetrics(SM_CXDRAG) ||
 			abs(point.y - m_smooth_drag_pt.y) >= GetSystemMetrics(SM_CYDRAG))
@@ -6170,18 +6055,10 @@ void CSCListCtrl::drag_scroll_by(int dx_px, int dy_lines)
 	if (!::IsWindow(m_hWnd))
 		return;
 
-	//20260707 by claude. 세로: smooth 모드는 native 세로 스크롤(WM_VSCROLL)을 안 쓰고 m_scroll_y 로 그린다. 라인 수만큼 m_scroll_y 를
-	//직접 이동시켜야 실제로 스크롤되고 세로 썸도 따라온다(sync_scrollbar 가 [0,content-area] clamp + 썸 위치 반영). native 모드는 종전 SB_LINE.
-	if (m_smooth_scroll)
-	{
-		if (dy_lines != 0)
-			m_scroll_y += dy_lines * row_height();	//[0,content-area] clamp 는 아래 sync_scrollbar 가 수행(음수/과대 방지).
-	}
-	else
-	{
-		for (int i = 0; i < abs(dy_lines); i++)
-			SendMessage(WM_VSCROLL, (dy_lines < 0) ? SB_LINEUP : SB_LINEDOWN);
-	}
+	//20260707 by claude. 세로: native 세로 스크롤(WM_VSCROLL)을 안 쓰고 m_scroll_y 로 그린다. 라인 수만큼 m_scroll_y 를
+	//직접 이동시켜야 실제로 스크롤되고 세로 썸도 따라온다(sync_scrollbar 가 [0,content-area] clamp + 썸 위치 반영).
+	if (dy_lines != 0)
+		m_scroll_y += dy_lines * row_height();	//[0,content-area] clamp 는 아래 sync_scrollbar 가 수행(음수/과대 방지).
 
 	if (dx_px != 0)
 	{
@@ -6192,8 +6069,7 @@ void CSCListCtrl::drag_scroll_by(int dx_px, int dy_lines)
 	//20260707 by claude. sync_scrollbar 를 먼저 호출해 m_scroll_y 를 clamp(+썸 반영)한 뒤 paint 한다. UpdateWindow 를 clamp 이전에
 	//부르면 위로 드래그 시 음수가 된 m_scroll_y 로 그려져 draw_row(음수) OOB 크래시가 났다(#9b).
 	sync_scrollbar();
-	if (m_smooth_scroll)
-		Invalidate(FALSE);
+	Invalidate(FALSE);
 	UpdateWindow();
 }
 
@@ -6244,21 +6120,11 @@ void CSCListCtrl::OnTimer(UINT_PTR nIDEvent)
 
 			if (m_marquee_scroll_vy != 0)
 			{
-				if (m_smooth_scroll)
-				{
-					m_scroll_y += m_marquee_scroll_vy * row_height();	//level 당 1행/tick.
-					sync_scrollbar();									//[0, content-area] 클램프 + 세로 썸.
-				}
-				else
-				{
-					UINT code = (m_marquee_scroll_vy < 0) ? SB_LINEUP : SB_LINEDOWN;
-					for (int i = 0; i < abs(m_marquee_scroll_vy); i++)
-						SendMessage(WM_VSCROLL, code);
-					sync_scrollbar();
-				}
+				m_scroll_y += m_marquee_scroll_vy * row_height();	//level 당 1행/tick.
+				sync_scrollbar();									//[0, content-area] 클램프 + 세로 썸.
 			}
 			if (m_marquee_scroll_vx != 0)
-				Scroll(CSize(m_marquee_scroll_vx * 30, 0));	//가로는 두 모드 다 native scroll(OnHScroll 이 m_h_scroll_pos 미러+sync).
+				Scroll(CSize(m_marquee_scroll_vx * 30, 0));	//가로는 native scroll(OnHScroll 이 m_h_scroll_pos 미러+sync).
 
 			//시작 앵커를 콘텐츠에 고정: 기준항목의 화면 이동량(세로)·가로 스크롤 delta 만큼 시작점(client)을 이동.
 			if (have_ref)
@@ -6404,30 +6270,27 @@ void CSCListCtrl::OnLButtonUp(UINT nFlags, CPoint point)
 		::SendMessage(GetParent()->GetSafeHwnd(), Message_CSCListCtrl, (WPARAM) & (CSCListCtrlMessage(this, message_drag_and_drop, NULL)), (LPARAM)0);
 	}
 
-	//20260707 by claude. [smooth] 드래그로 이어지지 않은 클릭 마무리 — 제스처 대기 해제 + 지연해둔 다중선택 축소(single) 반영.
+	//20260707 by claude. 드래그로 이어지지 않은 클릭 마무리 — 제스처 대기 해제 + 지연해둔 다중선택 축소(single) 반영.
 	//드래그가 시작됐다면 m_smooth_click_defer 는 이미 -1(OnMouseMove 에서 취소)이라 여기서 축소가 일어나지 않는다.
-	if (m_smooth_scroll)
+	m_smooth_drag_pending = false;
+	if (m_smooth_click_defer >= 0)
 	{
-		m_smooth_drag_pending = false;
-		if (m_smooth_click_defer >= 0)
-		{
-			//20260716 by claude. 누를 때 미뤄둔 선택 변경을 여기서 확정 — ctrl 이면 토글 해제, 아니면 다중선택 축소.
-			if (m_smooth_click_defer_ctrl)
-				toggle_item_select(m_smooth_click_defer);
-			else
-				select_single(m_smooth_click_defer);
-			m_smooth_click_defer = -1;
-			m_smooth_click_defer_ctrl = false;
-			Invalidate(FALSE);
-		}
+		//20260716 by claude. 누를 때 미뤄둔 선택 변경을 여기서 확정 — ctrl 이면 토글 해제, 아니면 다중선택 축소.
+		if (m_smooth_click_defer_ctrl)
+			toggle_item_select(m_smooth_click_defer);
+		else
+			select_single(m_smooth_click_defer);
+		m_smooth_click_defer = -1;
+		m_smooth_click_defer_ctrl = false;
+		Invalidate(FALSE);
+	}
 
-		//20260714 by claude. [탐색기 방식 재클릭 편집] 여기가 '드래그 없이 뗀 클릭' 지점 — 예약된 편집을 지금 진입한다.
-		//드래그로 이어졌다면 OnMouseMove 가 m_pending_reclick_edit 를 이미 껐으므로 편집이 안 된다(누른 채 드래그 = 편집 아님).
-		if (m_pending_reclick_edit)
-		{
-			m_pending_reclick_edit = false;
-			edit_item(m_edit_item, m_edit_subItem);
-		}
+	//20260714 by claude. [탐색기 방식 재클릭 편집] 여기가 '드래그 없이 뗀 클릭' 지점 — 예약된 편집을 지금 진입한다.
+	//드래그로 이어졌다면 OnMouseMove 가 m_pending_reclick_edit 를 이미 껐으므로 편집이 안 된다(누른 채 드래그 = 편집 아님).
+	if (m_pending_reclick_edit)
+	{
+		m_pending_reclick_edit = false;
+		edit_item(m_edit_item, m_edit_subItem);
 	}
 
 	CListCtrl::OnLButtonUp(nFlags, point);
@@ -6488,25 +6351,19 @@ void CSCListCtrl::OnRButtonDown(UINT nFlags, CPoint point)
 		return;
 	}
 
-	//20260706 by claude. [smooth] native 우클릭 선택은 native 세로 스크롤 기준이라 어긋난다 → 직접 선택.
+	//20260706 by claude. native 우클릭 선택은 native 세로 스크롤 기준이라 픽셀 뷰포트와 어긋난다 → 직접 선택.
 	//표준 우클릭: 클릭 항목이 미선택이면 그것만 선택, 이미 선택돼 있으면 다중선택 유지. 메뉴는 RButtonUp→WM_CONTEXTMENU 로 그대로 뜬다(native down 미호출).
-	if (m_smooth_scroll)
+	SetFocus();
+	int item = -1, subItem = -1;
+	hit_test(point, item, subItem, true);
+	if (item >= 0 && item < size())
 	{
-		SetFocus();
-		int item = -1, subItem = -1;
-		hit_test(point, item, subItem, true);
-		if (item >= 0 && item < size())
-		{
-			//우클릭 정책: 미선택이면 단일선택, 이미 선택돼 있으면 다중선택 유지.
-			if (!(GetItemState(item, LVIS_SELECTED) & LVIS_SELECTED))
-				select_single(item);
-			SetItemState(item, LVIS_FOCUSED, LVIS_FOCUSED);
-			Invalidate(FALSE);
-		}
-		return;
+		//우클릭 정책: 미선택이면 단일선택, 이미 선택돼 있으면 다중선택 유지.
+		if (!(GetItemState(item, LVIS_SELECTED) & LVIS_SELECTED))
+			select_single(item);
+		SetItemState(item, LVIS_FOCUSED, LVIS_FOCUSED);
+		Invalidate(FALSE);
 	}
-
-	CListCtrl::OnRButtonDown(nFlags, point);
 }
 
 void CSCListCtrl::OnRButtonUp(UINT nFlags, CPoint point)
@@ -6575,11 +6432,10 @@ BOOL CSCListCtrl::OnLvnItemchanged(NMHDR* pNMHDR, LRESULT* pResult)
 	if (pNMListView->uNewState & LVIS_SELECTED)
 		set_auto_scroll(false);
 
-	//20260706 by claude. smooth 모드는 선택 하이라이트를 우리가 픽셀 위치로 그린다. native 의 per-item 무효화는 native 좌표라
+	//20260706 by claude. 선택 하이라이트를 우리가 픽셀 위치로 그린다. native 의 per-item 무효화는 native 좌표라
 	//픽셀 뷰포트와 어긋나 잔상이 남으므로, 상태 변경 시 항목 영역을 무효화해 OnPaint 로 올바르게 다시 그린다.
 	//(더블버퍼 OnPaint 라 다중 SetItemState 로 여러 번 호출돼도 WM_PAINT 는 1회로 합쳐져 깜빡임 없음.)
-	if (m_smooth_scroll)
-		Invalidate(FALSE);
+	Invalidate(FALSE);
 
 	//trace(pNMListView->iItem);
 
@@ -6600,9 +6456,6 @@ BOOL CSCListCtrl::OnLvnItemchanged(NMHDR* pNMHDR, LRESULT* pResult)
 	}
 	sync_scrollbar();
 
-	//if (!m_use_virtual_list)
-	//	return FALSE;
-
 	if (pNMListView->uChanged & LVIF_STATE)
 	{
 		//체크박스 상태가 변경된 경우에만 처리하기 위해.
@@ -6610,15 +6463,6 @@ BOOL CSCListCtrl::OnLvnItemchanged(NMHDR* pNMHDR, LRESULT* pResult)
 		UINT new_check = pNMLV->uNewState & LVIS_STATEIMAGEMASK;
 		//TRACE(_T("pNMListView->uChanged = %d, old = %d, new = %d\n"), pNMListView->uChanged, old_check, new_check);
 
-		/*
-		if (m_use_virtual_list)
-		{
-			m_list_db[pNMListView->iItem].checked = !m_list_db[pNMListView->iItem].checked;
-			//Invalidate();
-			TRACE(_T("list item changed: %d, checked = %d\n"), pNMListView->iItem, m_list_db[pNMListView->iItem].checked);
-		}
-		else 
-		*/
 		//if (old_check && new_check && old_check != new_check)
 		{
 			//else
@@ -6874,24 +6718,15 @@ void CSCListCtrl::toggle_check(int item)
 }
 
 
-//20260706 by claude. 마퀴(rubber-band) 선택 — 빈 공간 드래그로 사각형에 겹치는 항목 선택. smooth/native 공용.
-//행 화면 rect: smooth 는 m_scroll_y 픽셀 기준, native 는 GetItemRect. report 뷰라 가로는 전체폭.
+//20260706 by claude. 마퀴(rubber-band) 선택 — 빈 공간 드래그로 사각형에 겹치는 항목 선택.
+//행 화면 rect 는 m_scroll_y 픽셀 기준. report 뷰라 가로는 전체폭.
 void CSCListCtrl::row_screen_rect(int item, CRect& out)
 {
 	CRect rc;
 	GetClientRect(&rc);
-	if (m_smooth_scroll)
-	{
-		int rowH = row_height();
-		int top = get_header_height() + item * rowH - m_scroll_y;
-		out = CRect(rc.left, top, rc.right, top + rowH);
-	}
-	else
-	{
-		GetItemRect(item, &out, LVIR_BOUNDS);
-		out.left  = rc.left;
-		out.right = rc.right;
-	}
+	int rowH = row_height();
+	int top = get_header_height() + item * rowH - m_scroll_y;
+	out = CRect(rc.left, top, rc.right, top + rowH);
 }
 
 void CSCListCtrl::start_marquee(CPoint point, bool ctrl)
@@ -6981,16 +6816,7 @@ void CSCListCtrl::apply_marquee_selection(bool ctrl)
 	else
 	{
 		int row_h = row_height();
-		int base_top;
-		if (m_smooth_scroll)
-		{
-			base_top = get_header_height() - m_scroll_y;
-		}
-		else
-		{
-			CRect r0;
-			base_top = GetItemRect(0, &r0, LVIR_BOUNDS) ? r0.top : get_header_height();
-		}
+		int base_top = get_header_height() - m_scroll_y;
 		lo = (m.top    - base_top) / row_h - 1;
 		hi = (m.bottom - base_top) / row_h + 1;
 		if (lo < 0)			lo = 0;
@@ -7097,63 +6923,57 @@ void CSCListCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 		return;
 	}
 
-	//20260706 by claude. [smooth] native 선택은 native 세로 스크롤 기준이라 픽셀 페인트와 어긋난다 → 직접 선택 처리.
-	if (m_smooth_scroll)
+	//20260706 by claude. native 선택은 native 세로 스크롤 기준이라 픽셀 페인트와 어긋난다 → 직접 선택 처리.
+	SetFocus();
+	//마우스 클릭 정책: ctrl+shift=기존 선택에 anchor~item 범위 추가, ctrl=토글, shift=anchor~item 범위(나머지 해제), plain=단일.
+	bool anchor_valid = (m_focus_anchor >= 0 && m_focus_anchor < total);
+	bool already_sel  = (GetItemState(item, LVIS_SELECTED) & LVIS_SELECTED) != 0;
+
+	//20260707 by claude. 다중선택 상태에서 이미 선택된 항목을 클릭하면, 이 눌림이 드래그의 시작일 수 있으므로 선택을
+	//지금 바꾸지 않는다(탐색기 동작). 드래그로 이어지면 다중선택 유지, 단순 클릭이면 LButtonUp 에서 확정한다.
+	//20260716 by claude. ctrl 도 지연 대상이다. 예전엔 ctrl 이면 여기서 곧바로 toggle_item_select 로 꺼버려서, 다중선택을
+	//ctrl+드래그(=복사)하려고 그중 하나를 잡는 순간 그 항목이 선택 해제되고 색이 변했다(탐색기는 그러지 않는다 — 사용자 확인).
+	bool defer_click = (multi && already_sel && !shift);
+	if (defer_click)
 	{
-		SetFocus();
-		//마우스 클릭 정책: ctrl+shift=기존 선택에 anchor~item 범위 추가, ctrl=토글, shift=anchor~item 범위(나머지 해제), plain=단일.
-		bool anchor_valid = (m_focus_anchor >= 0 && m_focus_anchor < total);
-		bool already_sel  = (GetItemState(item, LVIS_SELECTED) & LVIS_SELECTED) != 0;
+		m_smooth_click_defer = item;
+		m_smooth_click_defer_ctrl = ctrl;	//뗄 때 ctrl=토글 해제 / plain=단일 축소.
+	}
+	else if (multi && ctrl && shift && anchor_valid)
+		select_range_add(m_focus_anchor, item);
+	else if (multi && ctrl)
+		toggle_item_select(item);
+	else if (multi && shift && anchor_valid)
+		select_range(m_focus_anchor, item);
+	else
+		select_single(item);
+	SetItemState(item, LVIS_FOCUSED, LVIS_FOCUSED);
 
-		//20260707 by claude. 다중선택 상태에서 이미 선택된 항목을 클릭하면, 이 눌림이 드래그의 시작일 수 있으므로 선택을
-		//지금 바꾸지 않는다(탐색기 동작). 드래그로 이어지면 다중선택 유지, 단순 클릭이면 LButtonUp 에서 확정한다.
-		//20260716 by claude. ctrl 도 지연 대상이다. 예전엔 ctrl 이면 여기서 곧바로 toggle_item_select 로 꺼버려서, 다중선택을
-		//ctrl+드래그(=복사)하려고 그중 하나를 잡는 순간 그 항목이 선택 해제되고 색이 변했다(탐색기는 그러지 않는다 — 사용자 확인).
-		bool defer_click = (multi && already_sel && !shift);
-		if (defer_click)
-		{
-			m_smooth_click_defer = item;
-			m_smooth_click_defer_ctrl = ctrl;	//뗄 때 ctrl=토글 해제 / plain=단일 축소.
-		}
-		else if (multi && ctrl && shift && anchor_valid)
-			select_range_add(m_focus_anchor, item);
-		else if (multi && ctrl)
-			toggle_item_select(item);
-		else if (multi && shift && anchor_valid)
-			select_range(m_focus_anchor, item);
-		else
-			select_single(item);
-		SetItemState(item, LVIS_FOCUSED, LVIS_FOCUSED);
-
-		//20260707 by claude. 드래그 제스처 대기 시작(드래그 허용 리스트일 때만). OnMouseMove 가 문턱 이상 이동을 감지하면
-		//LVN_BEGINDRAG 를 합성해 OnLvnBeginDrag 로 실제 드래그를 시작한다. m_focus_anchor 는 select_* 가 이미 갱신.
-		if (m_use_drag_and_drop)
-		{
-			m_smooth_drag_pending = true;
-			m_smooth_drag_pt      = point;
-			m_smooth_drag_item    = item;
-		}
-
-		//20260710 by claude. [smooth §4] smooth 는 native 클릭 경로를 우회하므로 native 가 부모로 보내던 NM_CLICK 도
-		//사라진다(부모의 ON_NOTIFY(NM_CLICK) 가 영영 안 뜸 — 선택 통지 유실). native 와 동일 계약을 위해 합성 NM_CLICK 을
-		//부모로 보낸다. 부모 WM_NOTIFY 처리가 자식(OnNMClick)에 먼저 반사(체크박스 토글·재클릭 편집진입 후처리)한 뒤
-		//부모 ON_NOTIFY(NM_CLICK) 핸들러를 호출한다 — 이는 native 리스트뷰가 하던 그대로다.
-		//iItem/iSubItem 은 부모 핸들러용(smooth-aware hit_test 결과), ptAction 은 반사된 OnNMClick 의 재-hit_test 용.
-		NMITEMACTIVATE nmia = { 0 };
-		nmia.hdr.hwndFrom = m_hWnd;
-		nmia.hdr.idFrom   = (UINT_PTR)GetDlgCtrlID();
-		nmia.hdr.code     = NM_CLICK;
-		nmia.iItem        = item;
-		nmia.iSubItem     = subItem;
-		nmia.ptAction     = point;
-		if (GetParent())
-			GetParent()->SendMessage(WM_NOTIFY, GetDlgCtrlID(), (LPARAM)&nmia);
-
-		Invalidate(FALSE);
-		return;
+	//20260707 by claude. 드래그 제스처 대기 시작(드래그 허용 리스트일 때만). OnMouseMove 가 문턱 이상 이동을 감지하면
+	//LVN_BEGINDRAG 를 합성해 OnLvnBeginDrag 로 실제 드래그를 시작한다. m_focus_anchor 는 select_* 가 이미 갱신.
+	if (m_use_drag_and_drop)
+	{
+		m_smooth_drag_pending = true;
+		m_smooth_drag_pt      = point;
+		m_smooth_drag_item    = item;
 	}
 
-	CListCtrl::OnLButtonDown(nFlags, point);
+	//20260710 by claude. 우리가 native 클릭 경로를 우회하므로 native 가 부모로 보내던 NM_CLICK 도
+	//사라진다(부모의 ON_NOTIFY(NM_CLICK) 가 영영 안 뜸 — 선택 통지 유실). native 와 동일 계약을 위해 합성 NM_CLICK 을
+	//부모로 보낸다. 부모 WM_NOTIFY 처리가 자식(OnNMClick)에 먼저 반사(체크박스 토글·재클릭 편집진입 후처리)한 뒤
+	//부모 ON_NOTIFY(NM_CLICK) 핸들러를 호출한다 — 이는 native 리스트뷰가 하던 그대로다.
+	//iItem/iSubItem 은 부모 핸들러용(hit_test 결과), ptAction 은 반사된 OnNMClick 의 재-hit_test 용.
+	NMITEMACTIVATE nmia = { 0 };
+	nmia.hdr.hwndFrom = m_hWnd;
+	nmia.hdr.idFrom   = (UINT_PTR)GetDlgCtrlID();
+	nmia.hdr.code     = NM_CLICK;
+	nmia.iItem        = item;
+	nmia.iSubItem     = subItem;
+	nmia.ptAction     = point;
+	if (GetParent())
+		GetParent()->SendMessage(WM_NOTIFY, GetDlgCtrlID(), (LPARAM)&nmia);
+
+	Invalidate(FALSE);
 }
 
 
@@ -7214,41 +7034,11 @@ bool CSCListCtrl::smooth_key_navigate(UINT vk)
 	}
 	SetItemState(target, LVIS_FOCUSED, LVIS_FOCUSED);
 
-	smooth_ensure_visible(target);
+	ensure_visible(target, visible_minimal);
 	Invalidate(FALSE);
 	return true;
 }
 
-
-//20260706 by claude. [smooth §3] item 이 항목 영역에 완전히 보이도록 m_scroll_y 를 최소 조정한다(native EnsureVisible 의 픽셀판).
-//위로 벗어나면 item.top 에 맞추고, 아래로 벗어나면 item.bottom 이 영역 바닥에 닿게 한다. 최종 클램프·썸 반영은 sync_scrollbar.
-void CSCListCtrl::smooth_ensure_visible(int item)
-{
-	if (!m_smooth_scroll || item < 0)
-		return;
-
-	int rowH = row_height();
-	CRect rc;
-	GetClientRect(&rc);
-	int header = get_header_height();
-	int area_h = max(0, rc.Height() - header);
-
-	int item_top    = item * rowH;
-	int item_bottom = item_top + rowH;
-
-	int old_scroll = m_scroll_y;
-	if (item_top < m_scroll_y)
-		m_scroll_y = item_top;
-	else if (item_bottom > m_scroll_y + area_h)
-		m_scroll_y = item_bottom - area_h;
-
-	sync_scrollbar();	//[0, content-area] 최종 클램프 + 세로 썸 위치 반영.
-
-	//20260706 by claude. 스크롤이 바뀌면 내용도 새 위치로 다시 그려야 한다. sync_scrollbar 는 썸만 옮길 뿐이라,
-	//이걸 빠뜨리면 썸은 움직이는데 화면은 안 스크롤되고(편집 박스가 옛 행 위치에 어긋나게 뜸) 문제가 생긴다.
-	if (m_scroll_y != old_scroll)
-		Invalidate(FALSE);
-}
 
 
 //20260706 by claude. subItem 컬럼이 가로 뷰포트에 완전히 들어오도록 가로 스크롤. 편집 진입 전 셀을 노출하는 용도.
@@ -7697,22 +7487,8 @@ void CSCListCtrl::OnNcCalcSize(BOOL bCalcValidRects, NCCALCSIZE_PARAMS* lpncsp)
 		//완전히 보여준다(끝 항목 잘림·thumb 튐의 근본 해결). 예약한 remainder 는 마지막 행 아래의 빈 영역(cr_back).
 		//20260706 by claude. bottom-align(부분행) 시도는 native report-view 의 세로 스크롤이 whole-item 으로 양자화돼
 		//(로그 확정: Scroll(0,-23)→native 가 -26 으로 스냅) 부분 행 표현이 불가능해 폐기. remainder 예약을 유지한다.
+		//20260706 by claude. 부분행 픽셀 페인트로 하단 여백을 직접 0 으로 만들므로 remainder 예약을 하지 않는다(예약하면 그 띠가 여백으로 남음).
 		m_bottom_reserve = 0;
-		//20260706 by claude. smooth 모드는 부분행 픽셀 페인트로 하단 여백을 직접 0 으로 만들므로 remainder 예약을 하지 않는다(예약하면 그 띠가 여백으로 남음).
-		if (m_v_visible_state && bCalcValidRects && m_line_height > 0 && !m_smooth_scroll)
-		{
-			int hdr = get_header_height();
-			int item_area = (lpncsp->rgrc[0].bottom - lpncsp->rgrc[0].top) - hdr;
-			if (item_area > m_line_height)
-			{
-				int rem = item_area % m_line_height;
-				if (rem > 0)
-				{
-					lpncsp->rgrc[0].bottom -= rem;
-					m_bottom_reserve = rem;
-				}
-			}
-		}
 		return;
 	}
 
@@ -7789,9 +7565,8 @@ void CSCListCtrl::begin_bulk_insert()
 void CSCListCtrl::end_bulk_insert()
 {
 	m_in_bulk_insert = false;
-	//bulk 중 생략했던 가상리스트 항목수를 한 번에 반영.
-	if (m_use_virtual_list)
-		SetItemCountEx(m_list_db.size(), LVSICF_NOSCROLL);
+	//bulk 중 생략했던 항목수를 한 번에 반영.
+	SetItemCountEx(m_list_db.size(), LVSICF_NOSCROLL);
 	SetRedraw(TRUE);
 	sync_scrollbar();
 	Invalidate();
@@ -7900,45 +7675,14 @@ void CSCListCtrl::sync_scrollbar()
 	//최종 content 영역 기준 — NC 가 이미 우측/하단 gw 를 뺐으므로 rc 가 곧 가시 영역.
 	//가로 폭 단일 출처(회귀 방지): content_view_w = rc.Width(). need_h 판정·가로바 길이·max scroll·page·range 가 모두 사용.
 	int content_view_w = rc.Width();
-	int avail_rows = (m_line_height > 0) ? max(0, (rc.Height() - header) / m_line_height) : GetCountPerPage();
-	int visible = avail_rows;
 
-	//20260706 by claude. [팬텀 행 — 마지막 항목 도달 불가 근본 수정]
-	//native report-view 의 세로 스크롤 최대 top = itemcount - GetCountPerPage(). 그런데 커스텀 헤더(높이=행높이)를
-	//native 가 page 계수에서 제대로 빼지 않아 GetCountPerPage()가 실제 가시행수(visible)보다 크게(= 헤더 1행분) 나온다.
-	//→ native max top 이 우리가 필요한 (total-visible)보다 그만큼 작아, SB_BOTTOM·픽셀 Scroll 모두 그 지점에서 clamp 되어
-	//마지막 항목이 영영 화면에 안 올라온다(로그로 확정: afterTop 이 max_top-1 에서 멈춤).
-	//해결: native item count 만 pad(=GetCountPerPage()-visible) 만큼 늘려 native max top 을 정확히 (total-visible)로 맞춘다.
-	//로직상의 total 은 위에서 size()(실제값)로 고정했으므로 pad 는 오직 native 스크롤 범위 확장에만 작용한다.
-	//pad 행(가상 인덱스 total..)은 DrawItem 의 (iItem >= m_list_db.size()) 가드로 그려지지 않고, 바닥까지 스크롤 시
-	//하단 reserve 띠(NC 예약, client 밖)에 위치해 실제로 페인트되지 않는다.
-	//native 의 세로 스크롤 page 는 GetCountPerPage()(=완전 가시행수=visible)가 아니라 floor(clientH/rowH) 다 — 헤더 1행을
-	//page 에서 빼지 않는다(로그 확정: clientH=624,row=26 → native page=24 이나 GetCountPerPage=visible=23). 그래서 native max
-	//top = nativeCount - floor(clientH/rowH). 이걸 우리가 필요한 (total - visible) 로 맞추려면 pad = floor(clientH/rowH) - visible.
-	//reserve 로 clientH = (visible+1)*rowH 가 되어 pad 는 사실상 1 이지만, 헤더가 여러 행일 경우까지 일반화해 기하식으로 계산.
-	if (m_use_virtual_list && m_scrollbar_setup)
+	if (m_scrollbar_setup)
 	{
+		//20260722 by claude. 팬텀 pad 제거 — pad 는 native 세로 스크롤의 max top 을 늘리기 위한 보정이었는데
+		//세로는 m_scroll_y 픽셀 스크롤만 쓰므로 native max top 자체가 무의미하다. native item count = 실제 개수.
 		int real = (int)m_list_db.size();
-		//20260706 by claude. [팬텀 행 — 실측 native page 기반 pad]
-		//native 세로 스크롤 최대 top = nativeItemCount − native_page. 우리가 필요한 max = total − visible.
-		//→ pad(= nativeItemCount − total) = native_page − visible.
-		//예전엔 native_page 를 floor(clientH/rowH) 로 *추측* 했으나, GetScrollInfo(SB_VERT).nPage 로 native 가 *실제로* 잡은
-		//page 를 직접 읽으면 추측 오차가 사라진다. 실측(2026-07-06): native 가 커스텀 헤더(28)를 page 에 반영하는 run 에서는
-		//nPage=visible → pad=0 (팬텀 불필요, 마지막 항목이 client 바닥에 flush). 반영 못하는 run 에서는 nPage=visible+1 →
-		//pad=1 (팬텀 필요). 둘 다 native max = total−visible 로 정확히 수렴한다. floor(clientH/rowH) 고정 추측은 전자에서
-		//1 과대(pad=1) → 마지막 항목 아래에 빈 팬텀 행 1줄이 노출되던 하단 여백의 원인이었다.
-		int native_page = visible;
-		if (need_v)
-		{
-			SCROLLINFO si = { sizeof(SCROLLINFO), SIF_PAGE };
-			if (GetScrollInfo(SB_VERT, &si) && (int)si.nPage > 0)
-				native_page = (int)si.nPage;
-			else if (m_line_height > 0)
-				native_page = rc.Height() / m_line_height;	//native page 미확정 시 기하 추측으로 안전 폴백.
-		}
-		int pad = (need_v && !m_smooth_scroll) ? max(0, native_page - visible) : 0;	//20260706 by claude. smooth 모드는 native 세로 스크롤을 안 쓰므로 팬텀 불필요(pad=0).
-		if (GetItemCount() != real + pad)
-			SetItemCountEx(real + pad, LVSICF_NOSCROLL);
+		if (GetItemCount() != real)
+			SetItemCountEx(real, LVSICF_NOSCROLL);
 	}
 
 
@@ -7995,11 +7739,10 @@ void CSCListCtrl::sync_scrollbar()
 	}
 
 
-	//20260706 by claude. [smooth §5-1] m_scroll_y 는 오버플로 유무와 무관하게 항상 클램프한다.
+	//20260706 by claude. m_scroll_y 는 오버플로 유무와 무관하게 항상 클램프한다.
 	//항목 많은 폴더에서 스크롤(m_scroll_y 큰 값) 후 항목 적은(오버플로 없는) 폴더로 이동하면 need_v=false 라
-	//아래 else-if(smooth) 클램프가 스킵된다. 잔류한 큰 m_scroll_y 로 OnPaint 의 first=m_scroll_y/rowH 가 total 을
+	//아래 세로바 분기가 스킵된다. 잔류한 큰 m_scroll_y 로 OnPaint 의 first=m_scroll_y/rowH 가 total 을
 	//넘어 한 행도 안 그려져 리스트가 통째로 빈 것처럼 보인다. 여기서 항상 [0, content−area] 로 조인다(오버플로 없으면 0).
-	if (m_smooth_scroll)
 	{
 		int rowH = row_height();
 		int area_h = max(0, rc.Height() - header);
@@ -8015,9 +7758,9 @@ void CSCListCtrl::sync_scrollbar()
 	{
 		m_scrollbar.ShowWindow(SW_HIDE);
 	}
-	else if (m_smooth_scroll)
+	else
 	{
-		//20260706 by claude. [smooth] 세로 스크롤바를 픽셀 단위로 구동 — range=콘텐츠 전체 높이(total*rowH), page=항목영역 높이, pos=m_scroll_y.
+		//20260706 by claude. 세로 스크롤바를 픽셀 단위로 구동 — range=콘텐츠 전체 높이(total*rowH), page=항목영역 높이, pos=m_scroll_y.
 		//바닥까지 내리면 마지막 행이 항목영역 바닥에 flush(여백 0), 맨 위는 부분행. (m_scroll_y 클램프는 위에서 항상 수행.)
 		int rowH = row_height();
 		int content_h = total * rowH;
@@ -8027,26 +7770,6 @@ void CSCListCtrl::sync_scrollbar()
 		m_scrollbar.set_pos(m_scroll_y);
 		m_scrollbar.ShowWindow(SW_SHOW);
 		//20260712 by claude. [perf] z-order 는 show 전환(old_v false)에만 1회 — 매 sync SetWindowPos(wndTop)는 dialog WS_CLIPCHILDREN 형제 clip 재계산이라 resize 병목.
-		if (!old_v)
-			m_scrollbar.SetWindowPos(&CWnd::wndTop, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
-	}
-	else
-	{
-		int top = GetTopIndex();
-		if (top < 0) top = 0;
-		int page = visible;
-		int max_pos = (total - 1) - page + 1;
-		//마지막 항목이 content 바닥 안에 완전히 들어왔으면(=바닥까지 스크롤됨) thumb 은 GetTopIndex 대신 max_pos 로 pin —
-		//트랙 끝에 닿게 하고 튐 제거. 그 외엔 GetTopIndex 그대로.
-		int thumb_pos = top;
-		CRect rLast;
-		if (total > 0 && GetItemRect(total - 1, &rLast, LVIR_BOUNDS) && rLast.bottom <= rc.Height())
-			thumb_pos = max_pos;
-		m_scrollbar.set_range(0, total - 1);
-		m_scrollbar.set_page(page);
-		m_scrollbar.set_pos(thumb_pos);
-		m_scrollbar.ShowWindow(SW_SHOW);
-		//parent dialog 의 child 라 형제인 listctrl 위로 z-order 올려야 보인다. [perf] show 전환에만 1회(위 smooth 분기와 동일 이유).
 		if (!old_v)
 			m_scrollbar.SetWindowPos(&CWnd::wndTop, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
 	}
@@ -8092,58 +7815,11 @@ LRESULT CSCListCtrl::on_message_CSCScrollbar(WPARAM wParam, LPARAM lParam)
 
 	if (msg->pThis == &m_scrollbar)
 	{
-		if (m_smooth_scroll)
-		{
-			//20260706 by claude. [smooth] 세로 썸 = 픽셀 위치. msg->pos 를 m_scroll_y 로 직접 반영(sync_scrollbar 가 max 로 클램프)하고 재그리기.
-			m_scroll_y = max(0, msg->pos);
-			sync_scrollbar();		//클램프 + 썸 위치 정합
-			Invalidate(FALSE);
-			return 0;
-		}
-		//msg->pos 는 이미 scrollbar 가 max_pos(=total - sync 에서 계산한 visible) 로 클램프해 보낸다. 여기서
-		//GetCountPerPage 로 다시 클램프하면 가로바·헤더 차감을 반영 못해 new_top 이 강제로 작아져, 끝까지
-		//드래그해도 마지막 항목이 보이지 않는다. msg->pos 를 그대로 쓰고 total-1 안전 클램프만 둔다.
-		int total = size();	//20260706 by claude. [팬텀 행] 실제 항목수 기준(native count 는 pad 로 커져 있으므로 GetItemCount 를 쓰면 안 됨).
-		int new_top = max(0, min(msg->pos, total - 1));
-		int cur_top = GetTopIndex();
-
-		CRect rc;
-		GetClientRect(&rc);
-		int header = m_HeaderCtrlEx.GetSafeHwnd() ? get_header_height() : 0;
-		int visible = (m_line_height > 0) ? max(0, (rc.Height() - header) / m_line_height) : GetCountPerPage();
-		int max_top = max(0, total - visible);
-
-		if (new_top >= max_top && total > 0)
-		{
-			//바닥 — Scroll()/EnsureVisible 은 item-aligned(첫 항목 flush)에서 멈춰 마지막 항목이 잘린다.
-			//native 자체 스크롤바 메시지 SB_BOTTOM 은 bottom-align(마지막 항목 flush)한다. WS_VSCROLL 유지가 전제.
-			SendMessage(WM_VSCROLL, MAKEWPARAM(SB_BOTTOM, 0), 0);
-		}
-		else
-		{
-			if (new_top != cur_top && total > 0)
-			{
-				CRect rItem;
-				if (GetItemRect(0, &rItem, LVIR_BOUNDS))
-				{
-					int item_h = rItem.Height();
-					if (item_h > 0)
-						Scroll(CSize(0, (new_top - cur_top) * item_h));
-				}
-			}
-
-			//pixel 정렬 보정 — ensure_visible(visible_center) 등이 top 한계를 넘는 Scroll 을 호출하면
-			//listctrl 이 부분 스크롤로 끝내 item 0 top y 가 header_bottom 와 어긋난 채 정착할 수 있음.
-			//top_index 가 같아 위 Scroll 이 발화 안 해도 잔여 offset 을 여기서 보정.
-			CRect rItem;
-			if (GetItemRect(new_top, &rItem, LVIR_BOUNDS))
-			{
-				int dy = rItem.top - header;
-				if (dy != 0)
-					Scroll(CSize(0, dy));
-			}
-		}
-
+		//20260706 by claude. 세로 썸 = 픽셀 위치. msg->pos 를 m_scroll_y 로 직접 반영(sync_scrollbar 가 max 로 클램프)하고 재그리기.
+		m_scroll_y = max(0, msg->pos);
+		sync_scrollbar();		//클램프 + 썸 위치 정합
+		Invalidate(FALSE);
+		return 0;
 	}
 	else if (msg->pThis == &m_scrollbar_h)
 	{
@@ -8179,46 +7855,15 @@ BOOL CSCListCtrl::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
 			return TRUE;
 		}
 
-		if (m_smooth_scroll)
-		{
-			//20260706 by claude. [smooth] 세로 휠 = 픽셀 이동(한 노치 = 3행). m_scroll_y 갱신 → sync 클램프 → 재그리기.
-			int rowH = row_height();
-			int dy = -zDelta / WHEEL_DELTA * 3 * rowH;
-			if (dy == 0)
-				dy = (zDelta > 0) ? -rowH : rowH;
-			m_scroll_y += dy;
-			sync_scrollbar();
-			Invalidate(FALSE);
-			return TRUE;
-		}
-
-		int lines = -zDelta / WHEEL_DELTA * 3;
-		if (lines == 0)
-			lines = (zDelta > 0) ? -1 : 1;
-
-		CRect rItem;
-		if (GetItemRect(0, &rItem, LVIR_BOUNDS))
-		{
-			int item_h = rItem.Height();
-			if (item_h > 0)
-			{
-				int total = size();	//20260706 by claude. [팬텀 행] 실제 항목수 기준(native count pad 무관).
-				CRect rc;
-				GetClientRect(&rc);
-				int header = m_HeaderCtrlEx.GetSafeHwnd() ? get_header_height() : 0;
-				int visible = (m_line_height > 0) ? max(0, (rc.Height() - header) / m_line_height) : GetCountPerPage();
-				int max_top = max(0, total - visible);
-				int target_top = GetTopIndex() + lines;
-
-				if (lines > 0 && target_top >= max_top)
-					SendMessage(WM_VSCROLL, MAKEWPARAM(SB_BOTTOM, 0), 0);	//바닥 — native bottom-align 시도
-				else
-					Scroll(CSize(0, lines * item_h));
-				UpdateWindow();
-				sync_scrollbar();
-				return TRUE;
-			}
-		}
+		//20260706 by claude. 세로 휠 = 픽셀 이동(한 노치 = 3행). m_scroll_y 갱신 → sync 클램프 → 재그리기.
+		int rowH = row_height();
+		int dy = -zDelta / WHEEL_DELTA * 3 * rowH;
+		if (dy == 0)
+			dy = (zDelta > 0) ? -rowH : rowH;
+		m_scroll_y += dy;
+		sync_scrollbar();
+		Invalidate(FALSE);
+		return TRUE;
 	}
 	return CListCtrl::OnMouseWheel(nFlags, zDelta, pt);
 }

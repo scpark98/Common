@@ -152,13 +152,21 @@ public:
 	CSCListCtrl();
 	virtual ~CSCListCtrl();
 
-	//virtual list 기능을 사용하기 위해서는 Owner Data, Owner Draw Fixed를 모두 true로 설정해야 한다.
-	//이 옵션은 동적으로 변경 불가하고 WM_DRAWITEM 핸들러인 OnDrawItem()에서 그리게 된다.
-	//단, virtual list에서 checkbox가 올바르게 표시되지 않는 문제가 있었으나 check = !check로 m_list_db에서 처리하고
-	//OnDrawItem()에서 체크여부에 따라 직접 그리도록 수정하였다.
-	//간혹 OnDrawItem()으로 직접 그리는 등의 세세한 기능들을 사용하지 않고 기본 CListCtrl과 같이 동작시키고 싶다면
-	//Owner Data, Owner Draw Fixed를 모두 false로 설정하고 왠만한 method는 공통적으로 사용 가능하다.
-	void			set_use_virtual_list(bool use_virtual = true) { m_use_virtual_list = use_virtual; }
+	//20260722 by claude. ensure_visible / select_items_by_names 의 파라미터 타입이라 그 선언들보다 반드시 앞에 있어야 한다.
+	//(클래스 멤버 선언은 위에서 아래로 파싱되므로 파라미터 타입은 먼저 나와야 한다.)
+	enum CLISTCTRLEX_ENSURE_VISIBLE_MODE
+	{
+		//최소 이동 — 위로 벗어났으면 항목 top 에, 아래로 벗어났으면 bottom 이 영역 바닥에 닿게만 스크롤.
+		//표준 ListView_EnsureVisible 의 의미다. 키보드 네비·편집 진입처럼 '보이기만 하면 되는' 경우에 쓴다.
+		visible_minimal,
+		visible_first,
+		visible_center,
+		visible_last,
+	};
+
+	//20260722 by claude. 이 컨트롤은 virtual list 단일 모드다 — 항목 데이터는 항상 m_list_db 가 보유하고 DrawItem 이 직접 그린다.
+	//따라서 리소스 편집기에서 이 컨트롤에 Owner Data(LVS_OWNERDATA) + Owner Draw Fixed(LVS_OWNERDRAWFIXED) 를 반드시 켜야 한다.
+	//(이 스타일은 동적 변경이 안 돼 PreSubclassWindow 에서 못 붙인다. 과거의 set_use_virtual_list(false) 비-virtual 경로는 제거했다.)
 
 	//대량 insert/set 사이 sync_scrollbar/Invalidate/InvalidateRect 호출 일괄 차단.
 	//N row populate 시 매 호출마다 GetClientRect+GetColumnWidth*col+MoveWindow 가 N 회 누적 → 성능 저하.
@@ -475,7 +483,7 @@ public:
 	void		unselect_selected_item();
 	//names(각 항목의 leaf 파일/폴더명)에 매칭되는 항목만 선택하고, 마지막 매칭 항목으로 스크롤한다(기존 선택은 모두 해제).
 	//리로드(refresh_list) 후 선택/스크롤 복원, 전송된 항목 재선택 등에 사용. 반환: 마지막으로 선택된 인덱스(없으면 -1).
-	int			select_items_by_names(const std::deque<CString>& names, int visible_mode = visible_last);
+	int			select_items_by_names(const std::deque<CString>& names, CLISTCTRLEX_ENSURE_VISIBLE_MODE visible_mode = visible_last);
 
 	int			get_check(int index);
 	//CListCtrl::GetCheck() override.
@@ -679,10 +687,6 @@ public:
 	int			get_line_height() { return m_line_height; }
 	void		set_line_height(int height, bool invalidate = false);
 
-	//20260706 by claude. 픽셀 페인트(부분행/여백0) 모드 on/off. off(기본) 면 기존 native 위임 동작 그대로.
-	void		set_smooth_scroll(bool smooth = true) { m_smooth_scroll = smooth; if (::IsWindow(m_hWnd)) { sync_scrollbar(); Invalidate(); } }
-	bool		is_smooth_scroll() { return m_smooth_scroll; }
-
 	void		set_column_width(int nCol, int cx, bool invalidate = false);
 	//레지스트리에 저장된 각 컬럼너비를 복원한다.
 	void		restore_column_width(CWinApp* pApp, CString sSection, bool invalidate = false);
@@ -745,18 +749,17 @@ public:
 	void		set_border_color(Gdiplus::Color cr_border) { m_theme.cr_border_inactive = cr_border; Invalidate(); }
 
 //scroll
-	enum CLISTCTRLEX_ENSURE_VISIBLE_MODE
-	{
-		visible_first = 0,
-		visible_center,
-		visible_last,
-	};
-	//어떤 항목이 특정 위치에 표시되도록 스크롤시킨다.
-	//mode가 visible_first(0)이고 offset이 3이면 위에서 3+1인 위치에 해당 아이템이 표시되도록 스크롤시킨다.
-	//mode가 visible_center(1)이고 offset이 0이면 중앙 위치에 해당 아이템이 표시되도록 스크롤시킨다.
-	//mode가 visible_last(2)이고 offset이 3이면 아래에서 -3-1인 위치에 해당 아이템이 표시되도록 스크롤시킨다.
+	//어떤 항목이 보이지 않을 때 지정된 위치에 표시되도록 스크롤시킨다.
+	//mode가 visible_minimal이면 offset은 무시하고 최소 거리만 스크롤한다.
+	//mode가 visible_first이고 offset이 3이면 위에서 3+1인 위치에 해당 아이템이 표시되도록 스크롤시킨다.
+	//mode가 visible_center이고 offset이 0이면 중앙 위치에 해당 아이템이 표시되도록 스크롤시킨다.
+	//mode가 visible_last이고 offset이 3이면 아래에서 -3-1인 위치에 해당 아이템이 표시되도록 스크롤시킨다.
 	//mode default = visible_center
-	void			ensure_visible(int index, int mode = visible_center, int offset = 0);
+	//20260722 by claude. only_if_invisible = true(기본) 면 이미 완전히 보이는 항목은 스크롤하지 않는다.
+	//false 는 호출측이 자기만의 가시성 기준을 쓰는 경우에만 — 예: Endorphin2 자막 추적은 IsItemVisible(i + 4) 로
+	//네 행 앞을 미리 확보하므로, 현재 행이 보이더라도 앞당겨 스크롤해야 한다.
+	//20260722 by claude. mode 는 int 가 아니라 enum 타입이다 — 숫자를 직접 넘기면 컴파일 에러가 나게 해서 enum 이 유일한 표기가 되게 한다.
+	void			ensure_visible(int index, CLISTCTRLEX_ENSURE_VISIBLE_MODE mode = visible_center, int offset = 0, bool only_if_invisible = true);
 	//original IsItemVisible method does not check partial. only check vertical axis.
 	bool			is_item_visible(int index, bool bPartial = false);
 
@@ -835,8 +838,6 @@ public:
 	void			set_action(int item, int subItem, int action);
 
 protected:
-	bool			m_use_virtual_list = true;
-
 	//begin_bulk_insert/end_bulk_insert 사이는 true — insert_item / set_text* 의 sync_scrollbar/Invalidate 차단.
 	bool			m_in_bulk_insert = false;
 
@@ -1026,7 +1027,6 @@ public:
 	//20260706 by claude. 행 높이(픽셀) — m_line_height 미설정(0 이하) 시 16 기본. 픽셀 페인트/히트테스트/스크롤 계산이 공유.
 	int			row_height() const { return (m_line_height > 0) ? m_line_height : 16; }
 	//20260706 by claude. [smooth §3] item 이 항목 영역에 완전히 보이도록 m_scroll_y 최소 조정(native EnsureVisible 의 픽셀판).
-	void		smooth_ensure_visible(int item);
 	//20260706 by claude. subItem 컬럼이 가로 뷰포트에 완전히 들어오도록 가로 스크롤(편집 진입 전 셀 노출). smooth/native 공용.
 	void		ensure_column_visible(int subItem);
 	//20260706 by claude. 선택 원자연산 — 마우스(L/R)·키보드 핸들러가 공유(중복 방지). 정책(ctrl/shift 의미)은 각 핸들러가 결정하고 연산만 공용.
@@ -1095,13 +1095,12 @@ public:
 	int				m_bottom_reserve = 0;		//세로바 시 하단 partial row 예약 px — OnNcCalcSize 가 설정, sync(바 위치)·OnNcPaint(빈영역 fill)가 읽음
 	bool			m_syncing = false;			//framechange 재진입 가드 (SWP_FRAMECHANGED → OnSize → sync 재진입 차단)
 	bool			m_snapping = false;			//top 항목 헤더 스냅 재진입 가드 (Scroll → LVN_ENDSCROLL 재귀 차단)
-	//20260706 by claude. [smooth scroll — 픽셀 페인트 모드] 항목을 직접 픽셀 위치에 그려 부분행/하단여백0 을 구현.
-	//20260708 by claude. 기본값을 true 로 — CSCListCtrl 은 native 위임의 근본적 하단여백 한계를 없애려 만든 픽셀 페인트 리스트라, smooth 가 기본이다.
-	//(CVtListCtrlEx 를 이걸로 대체 중. 다른 소비자는 아직 CVtListCtrlEx 를 쓰므로 기본 변경은 안전.) set_smooth_scroll(false) 로 native 위임 복귀 가능.
+	//20260722 by claude. 이 컨트롤은 픽셀 페인트 단일 모드다 — 항목을 직접 픽셀 위치에 그려 부분행/하단여백0 을 구현한다.
+	//native 위임 경로(과거 set_smooth_scroll(false))는 없앴다. native report-view 의 세로 스크롤이 whole-item 으로 양자화돼
+	//하단 여백을 못 없애는 것이 이 클래스를 만든 이유이므로, 그 경로를 남겨둘 이유가 없다.
 	//m_scroll_y = 픽셀 세로 오프셋(항목 영역 기준, 헤더 아래).
-	bool			m_smooth_scroll = true;
 	int				m_scroll_y = 0;
-	int				m_focus_anchor = -1;		//smooth 모드 shift-range 선택 기준 항목.
+	int				m_focus_anchor = -1;		//shift-range 선택 기준 항목.
 	//WS_BORDER/WS_EX_CLIENTEDGE 가 켜져 있으면 PreSubclassWindow 에서 native border 제거하고 이 플래그를 켠 뒤
 	//OnNcCalcSize 에서 1px NC 확보 → OnNcPaint 가 theme 색으로 직접 그린다. (CSCTreeCtrl 와 동일 패턴.)
 	bool			m_draw_border = false;

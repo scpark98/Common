@@ -943,7 +943,8 @@ void CSCImageDlg::OnMouseMove(UINT nFlags, CPoint point)
 
 			{
 				m_static_pixel.set_back_color(m_cr_pixel.GetA() == 0 ? Gdiplus::Color::White : m_cr_pixel);
-				m_static_pixel.set_text_color(m_cr_pixel.GetA() == 0 ? Gdiplus::Color::DimGray : get_distinct_color(m_cr_pixel));
+				//20260723 by claude. get_distinct_color(hue 회전)는 밝기를 보존해 밝은 픽셀 위 글자가 묻힌다. D2D 판(SCD2ImageDlg)과 동일하게 흑/백 대비로.
+				m_static_pixel.set_text_color(m_cr_pixel.GetA() == 0 ? Gdiplus::Color::DimGray : get_distinct_bw_color(m_cr_pixel));
 				m_static_pixel.set_text(str);
 				m_cr_pixel_old = m_cr_pixel;
 			}

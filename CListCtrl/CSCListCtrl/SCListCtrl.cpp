@@ -680,8 +680,11 @@ void CSCListCtrl::draw_row(CDC* pDC, int iItem, const CRect& row_bounds)
 		//선택된 항목을 표시하는 사각형을 그릴때는 반드시 PenAlignmentInset으로 그려줘야 한다.
 		//특히 width가 2이상이면 unselect되는 항목의 선택 사각형 표시가 갱신되지 않게 되므로
 		//선택 사각형은 반드시 inset으로 그려져야 한다.
+		//20260723 by claude. get_distinct_color(hue 180도 회전)가 아니라 get_distinct_bw_color(휘도 기준 흑/백)를 쓴다.
+		//hue 회전은 S·V 를 보존하므로 밝은 배경의 "보색"도 똑같이 밝아 테두리가 배경에 묻힌다
+		//(Ivory 255,255,240 → 240,240,255). 표준 140색 중 97색이 휘도차 60 미만이었다.
 		if (m_use_distinct_border_color)
-			draw_rect(pDC, rowRect, get_distinct_color(crBack), Gdiplus::Color::Transparent, m_selected_border_width, Gdiplus::PenAlignmentInset, m_selected_border_style);
+			draw_rect(pDC, rowRect, get_distinct_bw_color(crBack), Gdiplus::Color::Transparent, m_selected_border_width, Gdiplus::PenAlignmentInset, m_selected_border_style);
 		else
 			draw_rect(pDC, rowRect, m_theme.cr_selected_border, Gdiplus::Color::Transparent, m_selected_border_width, Gdiplus::PenAlignmentInset, m_selected_border_style);
 	}

@@ -101,7 +101,7 @@ public:
 	//.cpp의 OnInitDialog()에서 create() 및 필요한 설정을 하면
 	//그 클래스의 어디서든 ret = DoModal(_T("message");처럼 호출해서사용할 수 있다.
 
-	bool			create(CWnd* parent, CString title, UINT icon_id = 0, bool as_modal = true, int cx = -1, int cy = -1);
+	bool			create(CWnd* parent, CString title = _T(""), UINT icon_id = 0, bool as_modal = true, int cx = -1, int cy = -1);
 
 	//theApp 공유 인스턴스로 사용할 때 parent 를 사후에 바인딩하기 위한 setter.
 	//특히 modeless 모드에서 버튼 응답 메시지(Message_CSCMessageBox)의 수신자가 되므로

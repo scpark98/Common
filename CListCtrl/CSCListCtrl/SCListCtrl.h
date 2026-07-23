@@ -680,7 +680,7 @@ public:
 	//우선은 mainDlg에서 이 함수 호출후에 RestoreWindowPosition()등과 같이
 	//CSCListCtrl에 WM_SIZE가 발생하도록 하는 함수를 사용하면 된다)
 	//CSCListCtrl가 아닌 그냥 mainDlg만 resize한다고 해서 되지 않는다.
-	//자체 imagelist를 사용하지 않는 컨트롤이라면 쉽게 lineheight를 조절할 수 있다.
+	//자체 imagelist를 사용하지 않는 컨트롤이라면 쉽게 line height를 조절할 수 있다.
 	bool		m_use_own_imagelist = true;
 	void		set_use_own_imagelist(bool use) { m_use_own_imagelist = use; }
 

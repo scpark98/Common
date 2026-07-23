@@ -1340,6 +1340,7 @@ void CSCColorTheme::set_theme_from_editor_palette(Gdiplus::Color bg, Gdiplus::Co
 	cr_selected_border_inactive	= cr_back_selected_inactive;
 	cr_border_inactive			= get_weak_color(bg, 56);
 	cr_separator				= get_weak_color(bg, 30);
+	cr_gridlines				= get_weak_color(bg, 16);
 
 	//list 헤더 = 에디터의 line-number margin(gutter) 색
 	cr_header_back	= header_bg;
@@ -2664,6 +2665,10 @@ void CSCColorTheme::set_color_theme(int color_theme)
 	//마지막으로 테마 강도 적용. 위 debug 검사는 base(정의값) 대비를 검증하고, 사용자가 조절한
 	//강도 변형은 의도적이므로 그 뒤에 일괄 스케일한다. level=1.0 이면 no-op.
 	apply_theme_level(m_theme_level);
+
+	//20260723 by claude. 격자선은 테마별 정의 없이 cr_back 에서 파생한다. apply_theme_level *뒤* 에
+	//산출해야 leveled cr_back 기준이 되어, apply_theme_level 목록에 따로 넣지 않아도 항상 일치한다.
+	cr_gridlines = get_weak_color(cr_back, 16);
 }
 
 Gdiplus::Color get_sys_color(int index)

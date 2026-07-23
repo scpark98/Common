@@ -301,6 +301,9 @@ void CSCListCtrl::draw_row(CDC* pDC, int iItem, const CRect& row_bounds)
 	bool		is_selected = (GetItemState(iItem, LVIS_SELECTED) & LVIS_SELECTED);
 	bool		is_drophilited = GetItemState(iItem, LVIS_DROPHILITED);
 	bool		is_full_row_selection = (GetExtendedStyle() & LVS_EX_FULLROWSELECT);
+	//20260723 by claude. 격자선 on/off 는 LVS_EX_GRIDLINES 비트가 단일 소스다(별도 멤버 없음).
+	//셀 루프 안에서 매번 GetExtendedStyle() 을 호출하지 않도록 행 단위로 1회만 읽는다.
+	bool		is_use_gridlines = (GetExtendedStyle() & LVS_EX_GRIDLINES);
 
 	Gdiplus::Color	crText = m_theme.cr_text;
 	Gdiplus::Color	crBack = m_theme.cr_back;
@@ -665,6 +668,13 @@ void CSCListCtrl::draw_row(CDC* pDC, int iItem, const CRect& row_bounds)
 			if (pOldFont)
 				pDC->SelectObject(pOldFont);
 		}
+
+		//격자선(세로): 각 셀 우측 1px. 마지막 컬럼도 포함해 셀 사이 경계가 모두 그어진다.
+		//가로 격자선은 for 루프 밖에서 rowRect 기준으로 1회만 그린다(subitem 개수만큼 오버드로 방지).
+		if (is_use_gridlines)
+		{
+			draw_line(pDC, itemRect.right - 1, itemRect.top, itemRect.right - 1, itemRect.bottom, m_theme.cr_gridlines.ToCOLORREF());
+		}
 	}
 
 	//선택된 항목은 선택 색상보다 진한 색으로 테두리가 그려진다.
@@ -715,6 +725,12 @@ void CSCListCtrl::draw_row(CDC* pDC, int iItem, const CRect& row_bounds)
 	{
 		//rowRect.bottom으로 써주면 아이템 영역밖이므로 그려지지 않는다. 반드시 -1을 해야 함.
 		draw_line(pDC, rowRect.left, rowRect.bottom - 1, rowRect.right, rowRect.bottom - 1, m_cr_bottom_line.ToCOLORREF());
+	}
+
+	//격자선(가로): 행 하단 1px. 세로 격자는 subitem 루프 안에서 셀별로 그린다.
+	if (is_use_gridlines)
+	{
+		draw_line(pDC, rowRect.left, rowRect.bottom - 1, rowRect.right, rowRect.bottom - 1, m_theme.cr_gridlines.ToCOLORREF());
 	}
 }
 

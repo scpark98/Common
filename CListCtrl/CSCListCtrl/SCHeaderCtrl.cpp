@@ -120,12 +120,16 @@ void CSCHeaderCtrl::OnPaint()
 		{
 			if (m_flat_style)
 			{
-				//separator를 그릴 때 가로좌표를 rItem.right로 그려주면 그 위치는 맨 우측으로 스크롤했을때 화면에 그려지지 않는다.
-				//-2를 해줘야 딱 맞게 표시된다. 물론 이 보정을 해줌으로써 커서변경, 실제 항목들의 우측 잘림 위치 등 약간의 오차는 있지만 거의 구분되지 않는다.
-				//오히려 맨 우측으로 스크롤 했는데도 분리기호가 화면에 표시되지 않는 불편함이 더 크다.
-				//그리고 더블클릭 시 자동 너비 조정기능이 간혹 반응이 없을때가 있는데 이 조정 후 덜한듯한 느낌이다. 이는 좀 더 테스트해봐야 한다.
+				//separator를 rItem.right에 그리면 맨 우측으로 스크롤했을 때 화면에 나오지 않는다.
+				//RECT의 right는 배타적 경계(그 픽셀은 이미 컬럼 밖)이므로 right는 항상 1픽셀 바깥이고,
+				//마지막 컬럼의 right가 client 우측과 일치하는 순간 클리핑되어 사라진다. 컬럼 안쪽 마지막 픽셀은 right - 1이다.
+				//20260723 by claude. 예전엔 -2로 당겨뒀는데 이는 1픽셀 과보정이었다. -1로 하면
+				//CSCListCtrl이 그리는 세로 gridline(itemRect.right - 1)과 x가 정확히 일치하고,
+				//가로스크롤바가 없는 상태에서도 마지막 구분자가 보이며, 창을 줄여 구분자가 가려지는 시점에 가로스크롤바가 나타난다.
+				//20260723 by claude. 예전엔 crSunkenDark(= get_color(m_cr_back, -48), 방향 고정) 로 그려서
+				//m_cr_separator 가 계산만 되고 쓰이지 않았다. 구분선 색의 보관처는 m_cr_separator 다.
 				if (m_use_header_separator)
-					draw_line(g, rItem.right - 2, rItem.top + 2, rItem.right - 2, rItem.bottom - 2, crSunkenDark);
+					draw_line(g, rItem.right - 1, rItem.top + 2, rItem.right - 1, rItem.bottom - 2, m_cr_separator);
 			}
 			else
 			{
@@ -328,16 +332,19 @@ void CSCHeaderCtrl::set_color(Gdiplus::Color cr_text, Gdiplus::Color cr_back, Gd
 	if (cr_text.GetValue() != Gdiplus::Color::Transparent)
 		m_cr_text = cr_text;
 
+	//20260723 by claude. 구분선은 헤더 배경에서 파생하므로 배경이 바뀌면 같이 갱신한다.
+	//(cr_separator 를 명시로 넘기면 아래에서 덮어쓰므로 순서가 중요하다.)
 	if (cr_back.GetValue() != Gdiplus::Color::Transparent)
-		m_cr_back = cr_back;
-
-	if (m_cr_separator.GetA() == 0)
 	{
-		if (get_gray_value(m_cr_back) < 128)
-			m_cr_separator = get_color(m_cr_back, 32);
-		else
-			m_cr_separator = get_color(m_cr_back, -32);
+		m_cr_back = cr_back;
+		m_cr_separator = get_weak_color(m_cr_back, 32);
 	}
+
+	//20260723 by claude. 예전엔 파라미터 cr_separator 를 쓰지 않고 m_cr_separator.GetA() == 0 을 검사했는데,
+	//m_cr_separator 는 선언 초기값도 생성자 대입값도 불투명이라 그 분기가 실행되는 경로가 없었다(= 인자가 무시됨).
+	//다른 인자들과 동일하게 Transparent 면 유지, 아니면 대입하는 규칙으로 통일한다.
+	if (cr_separator.GetValue() != Gdiplus::Color::Transparent)
+		m_cr_separator = cr_separator;
 
 	if (!m_hWnd)
 		return;
@@ -357,6 +364,9 @@ void CSCHeaderCtrl::set_text_color(Gdiplus::Color cr_text)
 void CSCHeaderCtrl::set_back_color(Gdiplus::Color crBack)
 {
 	m_cr_back = crBack;
+	//20260723 by claude. set_color() 와 동일하게 구분선도 새 배경에서 다시 파생. 이 경로로만 배경을 바꾸면
+	//구분선이 이전 배경 기준으로 남아 대비가 어긋난다.
+	m_cr_separator = get_weak_color(m_cr_back, 32);
 
 	if (!m_hWnd)
 		return;

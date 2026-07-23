@@ -333,11 +333,12 @@ COLORREF		get_complementary_color(COLORREF cr_color, COLORREF cr_back);
 //어떤 배경색과 확연히 구분되는 컬러를 보색으로 하면 128, 128, 128과 같은 색상의 보색 역시 동일한 색이 되므로 구분되지 않는다.
 COLORREF		get_distinct_color(COLORREF cr);
 COLORREF		get_distinct_bw_color(COLORREF cr);
+
+//get_distinct_bw_color()와는 달리 hue를 180도 이동시킨 색상을 리턴한다.
+Gdiplus::Color	get_distinct_color(Gdiplus::Color cr);
 //보색과는 달리 alpha까지 고려한 밝기에 따라 black or white를 리턴한다.
 //어떤 배경색과 확연히 구분되는 컬러를 보색으로 하면 128, 128, 128과 같은 색상의 보색 역시 동일한 색이 되므로 구분되지 않는다.
 Gdiplus::Color	get_distinct_bw_color(Gdiplus::Color cr);
-//get_distinct_bw_color()와는 달리 hue를 180도 이동시킨 색상을 리턴한다.
-Gdiplus::Color	get_distinct_color(Gdiplus::Color cr);
 
 //rgb 평균값 리턴
 uint8_t			get_gray_value(uint8_t r, uint8_t g, uint8_t b);
@@ -557,6 +558,7 @@ public:
 		cr_border_active			= src.cr_border_active;
 		cr_border_inactive			= src.cr_border_inactive;
 		cr_separator				= src.cr_separator;
+		cr_gridlines				= src.cr_gridlines;
 
 		cr_title_text				= src.cr_title_text;
 		cr_title_back_active		= src.cr_title_back_active;
@@ -625,6 +627,11 @@ public:
 
 	//CSCMenu separator / 컨트롤 내부 분리선 — cr_border_inactive 보다 약간 얕음. theme 별 정의.
 	Gdiplus::Color	cr_separator;
+
+	//20260723 by claude. 리스트 격자선. 테마별로 정의하지 않고 set_color_theme 말미에서
+	//get_weak_color(cr_back, 16) 으로 일괄 파생한다 — 격자는 내용을 구분만 하면 되므로
+	//cr_separator(30) 보다 더 옅어야 하고, 어떤 테마에서도 배경에서 한 톤만 떨어지면 충분하다.
+	Gdiplus::Color	cr_gridlines;
 
 	//caption이 없는 dialog based에서 사용
 	Gdiplus::Color	cr_title_text;

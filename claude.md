@@ -608,7 +608,11 @@ non-empty 결과가 있으면 **편집 시작 전에** 사용자에게 통지:
 1. 프로젝트 안의 CP949(또는 BOM 없는 UTF-8) 한글 소스를 **UTF-8 BOM 으로 변환** (한글·CRLF 보존, 하위폴더 포함). → 이후 Read 가 깨끗한 UTF-8 을 보고, Write 가 U+FFFD 를 만들 수 없음.
 2. `.editorconfig` 가 없으면 생성 (VS save 시 BOM 유지).
 
-건드리는 파일은 **non-ASCII 가 든 BOM 없는 소스뿐** — 이미 UTF-8 BOM / 순수 ASCII / UTF-16(`.rc`,`resource.h`) / 빌드 산출물(`x64`,`Debug`,`Release` 등)은 스킵하므로 diff 가 불필요하게 부풀지 않는다. 멱등 — 변환된 프로젝트는 다음 세션부터 스킵.
+**대상 확장자 (2026-07-23 확장)**: 소스 `.cpp .h .hpp .c .cc .cxx .inl .ipp` + **VS 프로젝트 파일 `.vcxproj .vcxproj.filters .vcxproj.user .vcxitems .vcxitems.filters .sln .props .targets`**. 프로젝트 파일은 확장자가 아니라 *파일명 suffix* 로 매칭한다(`.user`/`.filters`/`.props` 단독 확장자는 너무 느슨). 이 확장자들을 넣은 이유는 §2B.3 의 SCColorTable 사고 — `.filters` 가 목록에 없어 10일간 깨진 채 방치됐다.
+
+**권위 있는 스크립트는 `D:\1.Projects_C++\Common\hooks\ensure-cpp-encoding.ps1`** (git 동기화, 방식 C). 아래 §방식 A 에 인용된 스크립트 본문은 *설명용 스냅샷* 이므로 최신 확장자 목록과 다를 수 있다. 훅을 고칠 때는 Common 의 실제 파일을 고친다.
+
+건드리는 파일은 **non-ASCII 가 든 BOM 없는 소스/프로젝트 파일뿐** — 이미 UTF-8 BOM / 순수 ASCII / UTF-16(`.rc`,`resource.h`) / 빌드 산출물(`x64`,`Debug`,`Release` 등)은 스킵하므로 diff 가 불필요하게 부풀지 않는다. 멱등 — 변환된 프로젝트는 다음 세션부터 스킵. (allowlist 방식이라 `.png/.lib/.dll` 등 바이너리는 절대 건드리지 않는다.)
 
 **한계 — 컴파일 플래그는 훅에 넣지 않는다**: `/source-charset:utf-8` 은 소스가 *전부* UTF-8 일 때만 안전하다. 부모 폴더(`D:\1.Projects_C++`)에 두면 아직 CP949 가 남은 형제 프로젝트가 컴파일 시점에 깨진다. 따라서 컴파일 플래그(`/source-charset:utf-8 /execution-charset:.949`)는 소스를 UTF-8 로 정리한 프로젝트의 `.vcxproj` 또는 그 프로젝트 루트 `Directory.Build.props` 에만 개별 적용.
 
@@ -789,6 +793,24 @@ exit 0
 - 각 개발자가 그 repo 를 처음 열 때 Claude Code 가 프로젝트 `.claude/settings.json` 의 훅 실행을 신뢰할지 한 번 확인할 수 있다 (정상 — 승인하면 이후 자동).
 - 상대 경로 `.claude/hooks/...` 는 훅 실행 시 cwd(프로젝트 루트) 기준. 혹시 해석이 안 되는 환경이면 절대 경로 대신 스크립트 첫 줄에서 stdin 의 `cwd` 로 재구성하는 방식 A 스크립트가 이미 그 cwd 를 쓰므로, command 의 `-File` 경로만 맞으면 된다.
 - 한국어 개발자가 아닌 팀원(CP949 소스를 안 만드는)에게도 무해 — non-ASCII 없는 파일은 스킵하므로 아무것도 바꾸지 않는다.
+
+## 2B.3 파일 쓰기 시 인코딩 명시 — ANSI 기본값 cmdlet 금지 (강제, 최우선)
+
+§2B.2 의 훅은 **세션 시작 시점의 그물**이다. 세션 *도중* 깨뜨리고 그 세션 안에서 커밋하면 훅은 원천적으로 못 막는다. 손상을 *만들지 않는 것* 이 1차 방어이고, 훅은 2차다.
+
+**절대 금지 — 한국어 Windows 에서 파일을 CP949 로 떨어뜨리는 경로:**
+- `Set-Content` / `Add-Content` **인코딩 인자 없이** — Windows PowerShell 5.1 에서 **시스템 ANSI 코드페이지(ko-KR = CP949)** 로 쓴다. 한글이 든 UTF-8 파일을 읽어 이걸로 되쓰면 그 순간 CP949 로 재인코딩 + BOM 소실.
+- `Out-File` / `>` / `>>` 인코딩 인자 없이 — 환경에 따라 UTF-8(BOM) 또는 ANSI. **믿지 말 것.**
+- 텍스트로 읽어서 텍스트로 되쓰는 모든 왕복 — 원본 인코딩·BOM 이 보존된다는 보장이 없다.
+
+**필수 — 셋 중 하나:**
+1. **바이트 그대로**: `[IO.File]::ReadAllBytes` / `WriteAllBytes`. 인코딩 판단이 필요 없으면 이게 최선.
+2. **인코딩 명시**: `[IO.File]::WriteAllText($p, $text, (New-Object Text.UTF8Encoding($true)))` — `$true` = BOM 포함. cmdlet 을 써야 하면 `-Encoding utf8` 을 반드시 붙인다(단 PS 5.1 의 `utf8` 은 BOM 포함).
+3. **Edit/Write 도구 사용** — UTF-8 로 쓴다. 단 BOM 보존은 보장되지 않으므로 §2B 의 사후 검사는 그대로 적용.
+
+**사후 검사 (강제)**: `.cpp/.h` 뿐 아니라 **`.vcxproj` / `.vcxproj.filters` / `.sln` / `.props` / `.targets`** 를 쓴 직후에도 첫 3바이트가 `EF BB BF` 인지 확인한다. 이 파일들은 XML 선언이 `encoding="utf-8"` 이라 CP949 바이트면 VS 가 무조건 U+FFFD 로 디코딩하고, **필터명은 손으로 복원할 방법이 없다**(솔루션 탐색기에 `???? ????` 로만 보임).
+
+**Why (2026-07-13 SCColorTable 사고, 2026-07-23 원인 규명):** `SCColorTable.vcxproj.filters` 가 커밋 `d6f7336(2026-07-13 18:01:20)` 에서 깨졌다. 병합 커밋인데 **두 부모(`e416146`, `8d2f313`) 모두 UTF-8 BOM** 이었고 결과만 CP949 + BOM 소실 — git 은 재인코딩을 하지 않으므로, 충돌 해소 과정에서 *무언가가 텍스트로 읽어 ANSI 로 되쓴* 것이 확정적이다. 같은 커밋에서 `SCColorTable.cpp` 도 수정됐지만 멀쩡했는데, 이유는 단 하나 — **`.cpp` 는 훅 확장자 목록에 있었고 `.filters` 는 없었다.** "소스 파일 / 헤더 파일 / 리소스 파일" 세 필터명이 10일간 깨진 채로 방치됐다. 사용자 지적 — *"이따위로 한글 깨뜨린게 한두번이 아닌데."* 훅 확장자는 그 뒤 확장했지만(§2B.2), 애초에 ANSI 로 쓰지 않았으면 발생하지 않았을 사고다.
 
 ## 2E. `PreTranslateMessage` 반환값 — 클래스 역할에 따라 다름
 

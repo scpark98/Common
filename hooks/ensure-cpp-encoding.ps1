@@ -3,9 +3,9 @@
 # Two protections, applied at session start BEFORE Claude reads/edits anything:
 #   1. Drop a root .editorconfig (charset=utf-8-bom) if missing, so VS in Korean locale
 #      stops re-encoding/BOM-dropping sources on save (Common/claude.md 2B.1 Step 0).
-#   2. Convert every CP949 (or BOM-less UTF-8) source that contains non-ASCII bytes to
-#      UTF-8 BOM. Doing this up front means Claude's later Read sees clean UTF-8 (correct
-#      old_string) and its Write can't re-encode CP949 into U+FFFD.
+#   2. Convert every CP949 (or BOM-less UTF-8) source *and VS project file* that contains
+#      non-ASCII bytes to UTF-8 BOM. Doing this up front means Claude's later Read sees
+#      clean UTF-8 (correct old_string) and its Write can't re-encode CP949 into U+FFFD.
 #
 # Only touches files that actually need it:
 #   - UTF-8 BOM  -> skip (already safe)
@@ -32,7 +32,7 @@ if (-not (Test-Path -LiteralPath $proj)) { exit 0 }
 
 # Only act on Visual Studio C++ projects/solutions. cwd may be a *solution folder*
 # whose .vcxproj files live in per-project subfolders (e.g. nFTDServer\, nFTDClient\),
-# so a root .sln counts too, and .vcxproj is searched recursively (depth-limited) —
+# so a root .sln counts too, and .vcxproj is searched recursively (depth-limited) --
 # not just directly in cwd. (Without this, solution-folder cwds were skipped entirely.)
 $vcx = @(Get-ChildItem -LiteralPath $proj -Filter *.vcxproj -File -ErrorAction SilentlyContinue)
 $sln = @(Get-ChildItem -LiteralPath $proj -Filter *.sln -File -ErrorAction SilentlyContinue)
@@ -60,6 +60,10 @@ indent_style = tab
 tab_width = 4
 insert_final_newline = true
 
+[*.{vcxproj,filters,user,vcxitems,props,targets,sln}]
+charset = utf-8-bom
+end_of_line = crlf
+
 [*.{rc,rc2}]
 charset = utf-16le
 end_of_line = crlf
@@ -73,12 +77,28 @@ end_of_line = crlf
 }
 
 # --- 2. Convert CP949 / BOM-less sources to UTF-8 BOM -------------------------
-# C/C++ sources ONLY. Allowlist (NOT denylist) so binaries (.png/.lib/.dll/.ico/.exe...)
+# C/C++ sources + VS project files ONLY. Allowlist (NOT denylist) so binaries (.png/.lib/.dll/.ico/.exe...)
 # are never CP949-misdecoded and destroyed. Text docs (.md/.txt/.log/.csv/.ini/.xml/.html)
 # are intentionally NOT here: a BOM breaks them -- notably claude.md, whose first line
 # `@../Common/claude.md` (import directive) stops resolving with a leading BOM. .rc/.rc2
 # stay UTF-16 (VS-managed); BOM-hostile text (.bat/.cmd/.sh/.json/.yaml) excluded too.
 $exts = @('.cpp', '.h', '.hpp', '.c', '.cc', '.cxx', '.inl', '.ipp')
+
+#20260723 by claude. VS project/solution files. Matched by full-name suffix rather than by
+# extension, because the bare extensions ('.user', '.filters', '.props') are too loose to
+# claim on their own -- only the real MSBuild set qualifies.
+# These MUST be covered: VS itself writes them as UTF-8 BOM, and .vcxproj/.filters carry
+# encoding="utf-8" in their XML declaration, so CP949 bytes are ALWAYS a defect -- VS
+# decodes per the declaration, every Korean filter name becomes U+FFFD, and Solution
+# Explorer shows "???? ????" with no way to recover the names by hand.
+# Real case: SCColorTable.vcxproj.filters at commit d6f7336 (2026-07-13 18:01:20). BOTH
+# merge parents were UTF-8 BOM; the merge result was CP949 with the BOM dropped, i.e. some
+# tool decoded the text and rewrote it with the system ANSI codepage (the PowerShell
+# Set-Content / Out-File default on ko-KR). SCColorTable.cpp was rewritten in that SAME
+# commit and survived -- purely because .cpp was on this allowlist and .filters was not.
+$projSuffixes = @('.vcxproj', '.vcxproj.filters', '.vcxproj.user',
+                  '.vcxitems', '.vcxitems.filters', '.sln', '.props', '.targets')
+
 $skipDirs = @('\x64\', '\win32\', '\debug\', '\release\', '\.vs\', '\ipch\', '\obj\')
 # Headers that are #include'd by a .rc must keep an RC-friendly encoding. rc.exe chokes
 # when such a Korean .h is converted to UTF-8 BOM (e.g. a stray doxygen '@' surfaced as
@@ -91,7 +111,12 @@ $cp949 = [Text.Encoding]::GetEncoding(949)
 $converted = 0
 
 $files = Get-ChildItem -LiteralPath $proj -Recurse -File -ErrorAction SilentlyContinue |
-    Where-Object { $exts -contains $_.Extension.ToLower() }
+    Where-Object {
+        if ($exts -contains $_.Extension.ToLower()) { return $true }
+        $n = $_.Name.ToLower()
+        foreach ($s in $projSuffixes) { if ($n.EndsWith($s)) { return $true } }
+        return $false
+    }
 
 foreach ($f in $files) {
     $low = $f.FullName.ToLower()

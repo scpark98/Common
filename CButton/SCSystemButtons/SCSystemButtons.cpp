@@ -229,18 +229,13 @@ void CSCSystemButtons::OnPaint()
 		else
 		{
 			Gdiplus::Pen pen(m_theme.cr_title_text, 1.0f);
-			Gdiplus::Pen pen_pin(Gdiplus::Color(45, 122, 190), 17.0f);
-			//비활성(미고정) pin 의 회색: get_weak_color(cr_title_back_inactive, 48) 는 배경 톤을 절대 offset 이동해
-			//저대비 테마에선 surface 와 비슷해져 안 보일 수 있었다. 글리프의 자연색(cr_title_text)을 surface(cr_back)
-			//쪽으로 대비 비례 blend 해 muted glyph 로 — 어떤 테마에서도 배경에 묻히지 않는다. (basis 변경, 시각 확인 권장.)
-			Gdiplus::Pen pen_pin_gray(get_color(m_theme.cr_title_text, m_theme.cr_back, 0.45), 17.0f);
-			Gdiplus::SolidBrush br_back(m_theme.cr_back);
-			Gdiplus::SolidBrush br_pin(Gdiplus::Color(255, 255, 255, 255));
+			//20260724 by claude. 토글 트랙(타원) = title back 대비색 — get_weak_color auto(밝으면 어둡게/어두우면 밝게).
+			//예전엔 on 트랙이 Color(45,122,190) 파랑 고정이라 royalblue 등 파란 타이틀바에서 묻혔다.
+			//on/off 트랙 색은 동일하고, 상태 구분은 내부 원의 위치(왼=off / 오=on)로만 한다.
+			Gdiplus::Pen pen_pin(get_weak_color(m_theme.cr_title_back_active, 48), 17.0f);
 
 			pen_pin.SetStartCap(Gdiplus::LineCapRound);
 			pen_pin.SetEndCap(Gdiplus::LineCapRound);
-			pen_pin_gray.SetStartCap(Gdiplus::LineCapRound);
-			pen_pin_gray.SetEndCap(Gdiplus::LineCapRound);
 
 			CPoint cp = m_button[i].r.CenterPoint();
 
@@ -296,8 +291,10 @@ void CSCSystemButtons::OnPaint()
 				//m_parent_maximized 는 호출자 (TitleDlg::set_floating_mode 등) 가 명시적으로 갱신 —
 				//IsZoomed 자체 체크는 self-styled fullscreen 미감지라 신뢰 X.
 				int y_off = m_parent_maximized ? 0 : -1;
-				g.DrawLine(on_top ? &pen_pin : &pen_pin_gray,
+				g.DrawLine(&pen_pin,
 					cp.x - 7, cp.y + y_off, cp.x + 7, cp.y + y_off);
+				//20260724 by claude. 스위치 노브(원) — on 은 title back 과 동일(타이틀바와 일체감), off 는 완전 무채색(get_gray_color: title back 과 같은 명도의 회색).
+				Gdiplus::SolidBrush br_pin(on_top ? m_theme.cr_title_back_active : get_gray_color(m_theme.cr_title_back_active));
 				g.FillEllipse(&br_pin,
 					cp.x + (on_top ? 1 : -11), cp.y + y_off - 5, 10, 10);
 			}

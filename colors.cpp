@@ -1211,27 +1211,9 @@ namespace
 		{ CSCColorTheme::color_theme_helpu,				_T("helpu") },
 		{ CSCColorTheme::color_theme_pcanypro,			_T("pcanypro") },
 		{ CSCColorTheme::color_theme_zenburn,			_T("zenburn") },
-		{ CSCColorTheme::color_theme_bespin,			_T("bespin") },
-		{ CSCColorTheme::color_theme_black_board,		_T("black_board") },
-		{ CSCColorTheme::color_theme_choco,				_T("choco") },
 		{ CSCColorTheme::color_theme_danslerush_dark,	_T("danslerush_dark") },
-		{ CSCColorTheme::color_theme_dark_mode_default,	_T("dark_mode_default") },
 		{ CSCColorTheme::color_theme_deep_black,		_T("deep_black") },
-		{ CSCColorTheme::color_theme_hello_kitty,		_T("hello_kitty") },
-		{ CSCColorTheme::color_theme_hot_fudge_sundae,	_T("hot_fudge_sundae") },
-		{ CSCColorTheme::color_theme_khaki,				_T("khaki") },
-		{ CSCColorTheme::color_theme_mono_industrial,	_T("mono_industrial") },
-		{ CSCColorTheme::color_theme_monokai,			_T("monokai") },
-		{ CSCColorTheme::color_theme_mossy_lawn,		_T("mossy_lawn") },
-		{ CSCColorTheme::color_theme_navajo,			_T("navajo") },
 		{ CSCColorTheme::color_theme_obsidian,			_T("obsidian") },
-		{ CSCColorTheme::color_theme_plastic_code_wrap,	_T("plastic_code_wrap") },
-		{ CSCColorTheme::color_theme_ruby_blue,			_T("ruby_blue") },
-		{ CSCColorTheme::color_theme_solarized_light,	_T("solarized_light") },
-		{ CSCColorTheme::color_theme_solarized,			_T("solarized") },
-		{ CSCColorTheme::color_theme_twilight,			_T("twilight") },
-		{ CSCColorTheme::color_theme_vibrant_ink,		_T("vibrant_ink") },
-		{ CSCColorTheme::color_theme_vim_dark_blue,		_T("vim_dark_blue") },
 		{ CSCColorTheme::color_theme_claude,			_T("claude") },
 		{ CSCColorTheme::color_theme_seed_claude,		_T("seed_claude") },
 		{ CSCColorTheme::color_theme_figma,				_T("figma") },
@@ -1336,14 +1318,14 @@ static Gdiplus::Color auto_progress_color(const Gdiplus::Color& cr_back)
 	return get_color(cr_back, offset);
 }
 
-void CSCColorTheme::set_theme_from_editor_palette(Gdiplus::Color bg, Gdiplus::Color fg, Gdiplus::Color sel_bg,
-								Gdiplus::Color header_fg, Gdiplus::Color header_bg)
+void CSCColorTheme::set_theme_from_editor_palette(Gdiplus::Color back, Gdiplus::Color fore, Gdiplus::Color back_selected,
+								Gdiplus::Color header_fore, Gdiplus::Color header_back)
 {
 	//본문
-	cr_back			= bg;
-	cr_parent_back	= bg;
-	cr_text			= fg;
-	cr_text_hover	= fg;
+	cr_back			= back;
+	cr_parent_back	= back;
+	cr_text			= fore;
+	cr_text_hover	= fore;
 	//cr_text 와 cr_back 의 RGB 보간(ratio=0.35) → cr_text 쪽에 가까운 dim 색.
 	//ratio 가 작을수록 cr_back 에 가깝고(흐림→ 안 보임), 클수록 cr_text 와 구분 안 됨. 0.35 = 가독 유지 + 값/라벨 hierarchy 확보.
 	//get_weak_color(fg, 100) 같이 *fg 절대 거리 이동* 방식은 fg/bg 간격을 무시해 일부 테마에서 너무 dim / 너무 진함.
@@ -1351,62 +1333,62 @@ void CSCColorTheme::set_theme_from_editor_palette(Gdiplus::Color bg, Gdiplus::Co
 	cr_disabled_text = cr_text_dim;
 
 	//edit 본문 = 에디터 본문. import 테마는 dark IDE 류라 흰 카드 baseline 대신 에디터색 그대로 쓴다.
-	cr_edit_back	= bg;
-	cr_edit_text	= fg;
+	cr_edit_back	= back;
+	cr_edit_text	= fore;
 
 	//선택 — 선택 배경색의 luma 로 본문색을 흑/백 자동 (NPP 의 fgColor=000000 잠금값은 신뢰 불가).
-	cr_back_selected			= sel_bg;
-	cr_text_selected			= (get_luminance(sel_bg) < 128) ? Gdiplus::Color::White : Gdiplus::Color::Black;
-	//20260724 by claude. 포커스 없는(inactive) 선택 배경 — 예전엔 get_gray_color(sel_bg)로 accent 를 통째 회색화해,
+	cr_back_selected			= back_selected;
+	cr_text_selected			= (get_luminance(back_selected) < 128) ? Gdiplus::Color::White : Gdiplus::Color::Black;
+	//20260724 by claude. 포커스 없는(inactive) 선택 배경 — 예전엔 get_gray_color(back_selected)로 accent 를 통째 회색화해,
 	//accent 가 진하면(rust orange 등) 중간 회색이 되어 배경 위에서 강하게 튀었다(seed_claude 지적).
 	//배경에 accent 를 15% 만 섞어(get_color ratio=0.15) 채도는 크게 낮추되 accent 색조가 아주 옅게 배어나게 한다
 	//— "배경과 아주 유사하되 선택된 게 표시나는 정도". 완전 무채색은 warm 한 claude 류 테마와 안 어울려 accent hue 를 미량 남긴다.
-	//글자색은 이 옅은 배경에 맞춰 본문색(fg) 우선 산출. (ratio 를 키우면 색조↑, 줄이면 무채에 가까워짐.)
-	cr_back_selected_inactive	= get_color(bg, sel_bg, 0.15);
-	cr_text_selected_inactive	= get_readable_text_color(cr_back_selected_inactive, fg);
-	cr_back_dropHilited			= sel_bg;
+	//글자색은 이 옅은 배경에 맞춰 본문색(fore) 우선 산출. (ratio 를 키우면 색조↑, 줄이면 무채에 가까워짐.)
+	cr_back_selected_inactive	= get_color(back, back_selected, 0.15);
+	cr_text_selected_inactive	= get_readable_text_color(cr_back_selected_inactive, fore);
+	cr_back_dropHilited			= back_selected;
 	cr_text_dropHilited			= cr_text_selected;
 
 	//hover = 본문↔선택 사이, 교차행 = 본문 한 톤
-	cr_back_hover		= get_color(bg, sel_bg, 0.4);
-	cr_back_alternate	= get_weak_color(bg, 10);
+	cr_back_hover		= get_color(back, back_selected, 0.4);
+	cr_back_alternate	= get_weak_color(back, 10);
 
 	//타이틀바 = 본문 한 톤 시프트(get_weak_color auto: dark→lighter / light→darker). 버튼이 이 위에 얹힘.
-	cr_title_back_active	= get_weak_color(bg, 24);
+	cr_title_back_active	= get_weak_color(back, 24);
 	cr_title_back_inactive	= cr_title_back_active;
-	cr_title_text			= fg;
+	cr_title_text			= fore;
 	cr_sys_buttons_hover_back = get_color(cr_title_back_active, 24);
 	cr_sys_buttons_down_back  = get_color(cr_title_back_active, -24);
 
-	//버튼 — 전 테마 동일 규칙 (face = title_inactive, border = 본문 대비색이라 face≈bg 여도 윤곽 유지)
+	//버튼 — 전 테마 동일 규칙 (face = title_inactive, border = 본문 대비색이라 face≈back 여도 윤곽 유지)
 	cr_button_back		= cr_title_back_inactive;
 	cr_button_text		= cr_title_text;
-	cr_button_border	= get_weak_color(bg, 40);
+	cr_button_border	= get_weak_color(back, 40);
 
 	//accent(선택색) = focus / selected border (progress 는 자동 산출로 분리 — 아래 참조)
-	cr_border_active			= sel_bg;
-	cr_selected_border			= sel_bg;
+	cr_border_active			= back_selected;
+	cr_selected_border			= back_selected;
 	cr_selected_border_inactive	= cr_back_selected_inactive;
-	cr_border_inactive			= get_weak_color(bg, 56);
-	cr_separator				= get_weak_color(bg, 30);
-	cr_gridlines				= get_weak_color(bg, 16);
+	cr_border_inactive			= get_weak_color(back, 56);
+	cr_separator				= get_weak_color(back, 30);
+	cr_gridlines				= get_weak_color(back, 16);
 
 	//list 헤더 = 에디터의 line-number margin(gutter) 색
-	cr_header_back	= header_bg;
-	cr_header_text	= header_fg;
+	cr_header_back	= header_back;
+	cr_header_text	= header_fore;
 
 	cr_percentage_bar.clear();
-	cr_percentage_bar.push_back(get_weak_color(bg, 32));
+	cr_percentage_bar.push_back(get_weak_color(back, 32));
 	//20260724 by claude. progress bar 색은 set_color_theme 말미의 자동 산출에 맡긴다(비선택 바=cr_back, 선택 바=cr_back_selected
-	//기준으로 각각 대비 확보). 예전엔 cr_progress_active = sel_bg 로 잡아, 포커스 없는 선택 행에서 배경(get_gray_color(sel_bg))과
-	//바(sel_bg)가 거의 같은 색이 되어 바가 안 보였다(mono_industrial/obsidian/solarized 등 import 테마 공통 증상).
+	//기준으로 각각 대비 확보). 예전엔 cr_progress_active = back_selected 로 잡아, 포커스 없는 선택 행에서 배경(get_gray_color(back_selected))과
+	//바(back_selected)가 거의 같은 색이 되어 바가 안 보였다(mono_industrial/obsidian/solarized 등 import 테마 공통 증상).
 }
 
-void CSCColorTheme::set_theme_from_seed(Gdiplus::Color bg, Gdiplus::Color fg, Gdiplus::Color accent)
+void CSCColorTheme::set_theme_from_seed(Gdiplus::Color back, Gdiplus::Color fore, Gdiplus::Color accent)
 {
-	//header 2색(fg 텍스트 / bg 한 톤 시프트)은 bg·fg 에서 자동 파생 — 그래서 seed 는 3색이면 충분하다.
-	//selected/border/progress 는 editor_palette 가 accent(=sel_bg)에서 파생한다.
-	set_theme_from_editor_palette(bg, fg, accent, fg, get_weak_color(bg, 24));
+	//header 2색(fore 텍스트 / back 한 톤 시프트)은 back·fore 에서 자동 파생 — 그래서 seed 는 3색이면 충분하다.
+	//selected/border/progress 는 editor_palette 가 accent(=back_selected)에서 파생한다.
+	set_theme_from_editor_palette(back, fore, accent, fore, get_weak_color(back, 24));
 
 	//브랜드 primary 버튼 = accent solid (getdesign.md 류의 button-primary 와 동일 개념). 글자는 accent 위에서 흑/백 자동.
 	//editor_palette 는 버튼을 무채(title 계열)로 두지만, seed 는 accent 를 버튼까지 확장해 '한 강조색' 이 일관되게 흐르게 한다.
@@ -2522,71 +2504,18 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			break;
 
 		//--- Notepad++ GlobalStyles 추출 import 테마 (2026-05-24). 인자: 본문 bg, fg, 선택 bg, gutter fg, gutter bg ---
+		//20260724 by claude. 다수 import 테마 제거 — 쓸만한 4종만 남김(사용자 결정). 제거분 값은 git 이력에 보존.
 		case color_theme_zenburn:
 			set_theme_from_editor_palette(gRGB(0x3F,0x3F,0x3F), gRGB(0xDC,0xDC,0xCC), gRGB(0x58,0x58,0x58), gRGB(0x8A,0x8A,0x8A), gRGB(0x0C,0x0C,0x0C));
-			break;
-		case color_theme_bespin:
-			set_theme_from_editor_palette(gRGB(0x2A,0x21,0x1C), gRGB(0xBD,0xAE,0x9D), gRGB(0x83,0x67,0x5A), gRGB(0xE5,0xC1,0x38), gRGB(0x4C,0x4A,0x41));
-			break;
-		case color_theme_black_board:
-			set_theme_from_editor_palette(gRGB(0x0C,0x10,0x21), gRGB(0xF8,0xF8,0xF8), gRGB(0x25,0x3B,0x76), gRGB(0xEE,0xEE,0xEC), gRGB(0x2E,0x34,0x36));
-			break;
-		case color_theme_choco:
-			set_theme_from_editor_palette(gRGB(0x1A,0x0F,0x0B), gRGB(0xC3,0xBE,0x98), gRGB(0x37,0x20,0x17), gRGB(0xEE,0xEE,0xEC), gRGB(0x2E,0x34,0x36));
 			break;
 		case color_theme_danslerush_dark:
 			set_theme_from_editor_palette(gRGB(0x2E,0x2E,0x2E), gRGB(0xC7,0xC7,0xC7), gRGB(0x4D,0x4D,0x4D), gRGB(0x8F,0x8F,0x8F), gRGB(0x36,0x36,0x36));
 			break;
-		case color_theme_dark_mode_default:
-			set_theme_from_editor_palette(gRGB(0x3F,0x3F,0x3F), gRGB(0xDC,0xDC,0xCC), gRGB(0x58,0x58,0x58), gRGB(0x8A,0x8A,0x8A), gRGB(0x0C,0x0C,0x0C));
-			break;
 		case color_theme_deep_black:
 			set_theme_from_editor_palette(gRGB(0x00,0x00,0x00), gRGB(0xFF,0xFF,0xFF), gRGB(0x66,0x99,0xCC), gRGB(0xC0,0xC0,0xC0), gRGB(0x33,0x33,0x33));
 			break;
-		case color_theme_hello_kitty:
-			set_theme_from_editor_palette(gRGB(0xFF,0xB0,0xFF), gRGB(0x00,0x00,0x00), gRGB(0xFF,0xD5,0xFF), gRGB(0xFF,0xFF,0xFF), gRGB(0xFF,0x80,0xFF));
-			break;
-		case color_theme_hot_fudge_sundae:
-			set_theme_from_editor_palette(gRGB(0x2B,0x0F,0x01), gRGB(0xB7,0x97,0x5D), gRGB(0x58,0x58,0x58), gRGB(0x8B,0x64,0x2B), gRGB(0x43,0x25,0x0B));
-			break;
-		case color_theme_khaki:
-			set_theme_from_editor_palette(gRGB(0xD7,0xD7,0xAF), gRGB(0x5F,0x5F,0x00), gRGB(0xD7,0xFF,0x87), gRGB(0x5F,0x5F,0x00), gRGB(0xAF,0xAF,0x87));
-			break;
-		case color_theme_mono_industrial:
-			set_theme_from_editor_palette(gRGB(0x22,0x2C,0x28), gRGB(0xFF,0xFF,0xFF), gRGB(0x91,0x99,0x94), gRGB(0xEE,0xEE,0xEC), gRGB(0x2E,0x34,0x36));
-			break;
-		case color_theme_monokai:
-			set_theme_from_editor_palette(gRGB(0x27,0x28,0x22), gRGB(0xF8,0xF8,0xF2), gRGB(0x49,0x48,0x3E), gRGB(0xEE,0xEE,0xEC), gRGB(0x2E,0x34,0x36));
-			break;
-		case color_theme_mossy_lawn:
-			set_theme_from_editor_palette(gRGB(0x58,0x69,0x3D), gRGB(0xF2,0xC4,0x76), gRGB(0x8B,0x67,0x33), gRGB(0x60,0x3D,0x13), gRGB(0x7E,0x8A,0x28));
-			break;
-		case color_theme_navajo:
-			set_theme_from_editor_palette(gRGB(0xBA,0x9C,0x80), gRGB(0x00,0x00,0x00), gRGB(0xBC,0xBC,0xBC), gRGB(0x00,0x00,0x00), gRGB(0x80,0x80,0x80));
-			break;
 		case color_theme_obsidian:
 			set_theme_from_editor_palette(gRGB(0x29,0x31,0x34), gRGB(0xE0,0xE2,0xE4), gRGB(0x40,0x4E,0x51), gRGB(0x81,0x96,0x9A), gRGB(0x3F,0x4B,0x4E));
-			break;
-		case color_theme_plastic_code_wrap:
-			set_theme_from_editor_palette(gRGB(0x0B,0x16,0x1D), gRGB(0xF8,0xF8,0xF8), gRGB(0x16,0x2E,0x3D), gRGB(0xEE,0xEE,0xEC), gRGB(0x2E,0x34,0x36));
-			break;
-		case color_theme_ruby_blue:
-			set_theme_from_editor_palette(gRGB(0x11,0x24,0x35), gRGB(0xFF,0xFF,0xFF), gRGB(0x00,0x00,0xFF), gRGB(0xFF,0xFF,0xFF), gRGB(0x1F,0x46,0x61));
-			break;
-		case color_theme_solarized_light:
-			set_theme_from_editor_palette(gRGB(0xFD,0xF6,0xE3), gRGB(0x65,0x7B,0x83), gRGB(0x07,0x36,0x42), gRGB(0x93,0xA1,0xA1), gRGB(0xEE,0xE8,0xD5));
-			break;
-		case color_theme_solarized:
-			set_theme_from_editor_palette(gRGB(0x00,0x2B,0x36), gRGB(0x83,0x94,0x96), gRGB(0xEE,0xE8,0xD5), gRGB(0x58,0x6E,0x75), gRGB(0x07,0x36,0x42));
-			break;
-		case color_theme_twilight:
-			set_theme_from_editor_palette(gRGB(0x14,0x14,0x14), gRGB(0xF8,0xF8,0xF8), gRGB(0x3E,0x3E,0x3E), gRGB(0xEE,0xEE,0xEC), gRGB(0x2E,0x34,0x36));
-			break;
-		case color_theme_vibrant_ink:
-			set_theme_from_editor_palette(gRGB(0x00,0x00,0x00), gRGB(0xFF,0xFF,0xFF), gRGB(0x66,0x99,0xCC), gRGB(0xE4,0xE4,0xE4), gRGB(0x33,0x33,0x33));
-			break;
-		case color_theme_vim_dark_blue:
-			set_theme_from_editor_palette(gRGB(0x00,0x00,0x40), gRGB(0xFF,0xFF,0xBF), gRGB(0x20,0x50,0xD0), gRGB(0xFF,0xFF,0xFF), gRGB(0x00,0x00,0x40));
 			break;
 
 

@@ -894,11 +894,12 @@ public:
 
 		if (!exactly)
 		{
-			//alpha가 255면 완전히 해당 색상과 일치하지만 255가 아니라면 near라고 표시해줘야 한다.
-			if (distance == 0.0f && cr.GetA() == 255)
+			//20260724 by claude. 이름 판정은 RGB만 본다 — ARGB(0,255,255,255)처럼 알파만 다른 값도 White다.
+			//알파는 이름이 아니라 호출측의 ARGB/RGBA 표기가 전달한다. (기존에는 알파가 255가 아니면 near로 빠졌다.)
+			if (distance == 0.0)
 				return color_name;
-			else
-				return "near : " + color_name;
+
+			return "near : " + color_name;
 		}
 
 		return "Unknown Color";

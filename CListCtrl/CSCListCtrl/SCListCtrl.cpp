@@ -537,13 +537,19 @@ void CSCListCtrl::draw_row(CDC* pDC, int iItem, const CRect& row_bounds)
 			int cy = r.CenterPoint().y;
 			r.top = cy + (double)m_lf.lfHeight / 1.8;		//나누는 값이 커지면 바그래프의 높이가 낮아진다.
 			r.bottom = cy - (double)m_lf.lfHeight / 1.8;	//m_lf.lfHeight가 음수이므로 -,+가 아니라 +,-인 점에 주의
+			r.bottom += 1;		//20260724 by claude. 바 높이가 텍스트 높이와 거의 같아 답답해 보여 1px 키운다.
 
 			double d = _ttof(m_list_db[iItem].text[iSubItem]);
 			d /= 100.0;
 			Clamp(d, 0.0, 1.0);
 
 			r.right = r.left + (double)(r.Width()) * d;
-			pDC->FillSolidRect(r, m_theme.cr_progress_active.ToCOLORREF());
+
+			//20260724 by claude. 선택 행(배경이 cr_back_selected)은 선택 배경에서 산출된 selected 바 색을 쓴다.
+			//두 색 모두 테마 정의 시점에 각자의 배경과 대비나게 채워지므로, 여기선 draw 타임 계산 없이 멤버만 고른다.
+			Gdiplus::Color cr_bar = (crBack.GetValue() == m_theme.cr_back_selected.GetValue())
+									? m_theme.cr_progress_active_selected : m_theme.cr_progress_active;
+			pDC->FillSolidRect(r, cr_bar.ToCOLORREF());
 
 			//20231102 CSCSliderCtrl에서와 동일하게 progress 경과 위치에 따라 왼쪽과 오른쪽을 각각 다른 색으로 표현하고자
 			//아래 코드를 사용했으나 텍스트가 전혀 출력되지 않는다.
@@ -573,8 +579,8 @@ void CSCListCtrl::draw_row(CDC* pDC, int iItem, const CRect& row_bounds)
 					if (cr_cell_back.GetValue() == listctrlex_unused_color.GetValue())
 						cr_cell_back = (m_use_alternate_back_color && (iItem % 2)) ? m_theme.cr_back_alternate : m_theme.cr_back;
 
-					Gdiplus::Color cr_left  = get_readable_text_color(m_theme.cr_progress_active, cr_cell_back);		//바 위 — 배경은 바 색
-					Gdiplus::Color cr_right = get_readable_text_color(cr_cell_back, m_theme.cr_progress_active);		//바 밖 — 배경은 셀 배경
+					Gdiplus::Color cr_left  = get_readable_text_color(cr_bar, cr_cell_back);		//바 위 — 배경은 실제 바 색(선택/비선택 반영)
+					Gdiplus::Color cr_right = get_readable_text_color(cr_cell_back, cr_bar);		//바 밖 — 배경은 셀 배경
 					if (m_list_db[iItem].crText[iSubItem].GetValue() != listctrlex_unused_color.GetValue())
 						cr_left = cr_right = m_list_db[iItem].crText[iSubItem];
 

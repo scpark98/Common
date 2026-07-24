@@ -565,6 +565,8 @@ void CSCThemeDlg::set_color_theme(int theme, bool invalidate)
 			reconstruct_titlebar_font();
 			break;
 		case CSCColorTheme::color_theme_claude:
+		case CSCColorTheme::color_theme_seed_claude:		//20260724 by claude. seed 재현판 — claude 와 동일 titlebar 처리로 정확 비교.
+		case CSCColorTheme::color_theme_figma:				//20260724 by claude. seed 로 만든 light 브랜드 테마 — 동일 titlebar 처리.
 			m_titlebar_lf.lfWeight = (m_titlebar_bold ? FW_BOLD : FW_NORMAL);
 			m_titlebar_lf.lfHeight = get_pixel_size_from_font_size(m_hWnd, 10);
 			reconstruct_titlebar_font();

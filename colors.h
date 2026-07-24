@@ -278,10 +278,22 @@ Gdiplus::Color	get_ratio_color(Gdiplus::Color cr, float ratio);
 Gdiplus::Color	get_lightened_color(Gdiplus::Color cr, double t);
 
 //테마 강도(intensity) 보간. 중성색(흰색) 기준으로 cr 의 편차를 level 배로 조절한다.
-//level=1.0 → cr 그대로, 0.0 → 흰색(편차 0), 0.8 → 편차 80%(20% 옅게), >1.0 → 편차 확대(더 진하게).
-//알파 보존. get_ratio_color 와 달리 *흰색* 기준이라 dark 테마를 옅게 하면 "덜 어두워진다"(밝아짐).
-//CSCColorTheme::set_theme_level 이 모든 색에 일괄 적용해, 유사 톤 테마(dark_gray_medium 등)를
-//따로 추가하지 않고 한 테마의 강도만 조절하는 데 쓴다.
+//흰색(255)을 고정점으로 삼아 각 채널을 흰색에서 얼마나 떨어뜨릴지 level 배율로 조절한다.
+//채널 계산식: new = 255 + (v - 255) * level  ("흰색으로부터의 거리" 를 level 배).
+//  level=1.0 → cr 그대로              (거리 100%)
+//  level=0.0 → 흰색                   (거리 0% — 완전히 흰색으로 수렴)
+//  level=0.8 → 흰색 쪽으로 20% 당김   (거리 80% — 20% 옅게)
+//  level=1.2 → 흰색에서 20% 더 멀리   (거리 120% — 20% 진하게, 채널은 0/255 에서 클램프)
+//알파는 보존한다.
+//
+//구체 예 — dark 테마의 cr_back = (37,37,38):
+//  level=0.8 → 255+(37-255)*0.8 = 255-174 = 81  → (81,81,81)   덜 어두운 회색(밝아짐)
+//  level=1.2 → 255+(37-255)*1.2 = 255-262 = -7  → 0            → (0,0,0)  더 어두워짐(검정 클램프)
+//흰색 (255,255,255) 은 편차가 0 이라 어떤 level 에도 그대로 흰색 — 밝은 배경 테마는 강도 조절 영향이 작다.
+//
+//get_ratio_color(두 색 사이 보간) 와 달리 *흰색* 이 기준점이라, dark 테마를 옅게 하면 검정이 아니라
+//흰색 쪽으로 당겨져 "덜 어두워진다". CSCColorTheme::set_theme_level 이 모든 색 필드에 이 함수를 일괄
+//적용해, 유사 톤 테마(dark_gray_medium 등)를 새로 추가하지 않고 한 테마의 강도만 슬라이더처럼 조절한다.
 Gdiplus::Color	get_leveled_color(Gdiplus::Color cr, float level);
 
 //컬러 이름으로 Gdiplus::Color를 리턴한다. 대소문자를 구분하지 않으며 이름이 없으면 검정색을 리턴한다.
@@ -436,6 +448,9 @@ public:
 		color_theme_white,				//기존 윈도우의 바탕색을 dlg의 3DFACE가 아닌 white로 함
 		color_theme_gray,
 		color_theme_dark_gray,
+		//20260724 by claude. seed 생성기 프로토타입 — bg/text/accent 3색만 주면 나머지 40여 필드를 파생한다.
+		//콤보에서 dark_gray 바로 뒤에 놓아 up/down 으로 손짠 dark_gray 와 즉시 비교. set_theme_from_seed 참조.
+		color_theme_seed_dark,			//dark_gray 를 3색으로 재현 : bg #404040 + text #C0C0C0 + accent #303030(무채 선택)
 		color_theme_dark,
 		color_theme_linkmemine,
 		color_theme_linkmemine_origin,	//LMMLoginManager renewal 이전의 origin Agent UI (dark slate bg + light blue 버튼 + cyan accent)
@@ -471,6 +486,10 @@ public:
 
 		//브랜드 테마지만 enum 끝에 추가 — 중간 삽입 시 뒤따르는 인덱스가 밀려 저장된 테마 번호가 깨진다.
 		color_theme_claude,				//Claude.ai (Anthropic) chrome — warm cream bg + rust orange 버튼
+		//20260724 by claude. seed 생성기 프로토타입(유채 accent 판) — claude 를 3색으로 재현. 콤보에서 claude 바로 뒤.
+		color_theme_seed_claude,		//claude 재현 : bg #FAF7F2 + text #3F3A33 + accent #B45309(rust orange)
+		//20260724 by claude. seed 3색만으로 만든 신규 브랜드 테마 — Figma. bg 흰색 + text #1E1E1E + accent Figma blue #0D99FF.
+		color_theme_figma,
 
 		color_theme_sepia,				//세피아 — 빛바랜 종이/사진 톤 (따뜻한 크림 배경 + 갈색 글자)
 		color_theme_windows,			//현재 윈도우 테마의 시스템 색(GetSysColor)을 그대로 반영. default 는 curated 기본 룩.
@@ -518,6 +537,14 @@ public:
 	//흰 카드 baseline 을 적용하지 않는다 — cr_edit_back/text = bg/fg.
 	void	set_theme_from_editor_palette(Gdiplus::Color bg, Gdiplus::Color fg, Gdiplus::Color sel_bg,
 										Gdiplus::Color header_fg, Gdiplus::Color header_bg);
+
+	//20260724 by claude. seed 생성기 프로토타입 — 3색(배경/본문/강조)만으로 테마 전체를 파생한다.
+	//  bg     : 배경. light/dark 는 이 색의 luma 로 자동 판정 → 파생 방향(밝게/어둡게)이 뒤집힌다.
+	//  fg     : 본문 글자. dim/disabled/title/header 텍스트가 여기서 파생.
+	//  accent : 강조색(선택 배경 · focus/selected border · primary 버튼). progress 바는 말미 자동 산출.
+	//편의상 검증된 set_theme_from_editor_palette 를 재사용한다(header 2색은 bg/fg 에서 자동) — "5색 중 2색은
+	//사실 파생 가능" 을 그대로 보여준다. 그 위에 브랜드 primary 버튼만 accent solid 로 얹는다.
+	void	set_theme_from_seed(Gdiplus::Color bg, Gdiplus::Color fg, Gdiplus::Color accent);
 
 	//호출자가 set_color_theme(int) 후 cr_back 등 일부 필드를 수정한 테마를 그대로 다른 객체에 전달할 때 사용.
 	//operator= 와 달리 m_parent / m_cur_theme 은 *수신측 본인 것을 유지* 하여
@@ -584,6 +611,7 @@ public:
 		cr_header_back				= src.cr_header_back;
 		cr_percentage_bar			= src.cr_percentage_bar;
 		cr_progress_active					= src.cr_progress_active;
+		cr_progress_active_selected			= src.cr_progress_active_selected;
 
 		cr_success					= src.cr_success;
 		cr_info						= src.cr_info;
@@ -660,7 +688,13 @@ public:
 	Gdiplus::Color	cr_header_text;
 	Gdiplus::Color	cr_header_back;
 	std::deque<Gdiplus::Color> cr_percentage_bar;	//percentage bar graph color
-	Gdiplus::Color	cr_progress_active;					//progress bar
+	Gdiplus::Color	cr_progress_active;					//progress bar (비선택 행 — cr_back 위)
+	//20260724 by claude. 선택된 행의 progress bar 색. 선택 행은 배경이 cr_back_selected 로 칠해지므로
+	//cr_progress_active(=cr_back 기준) 를 그대로 쓰면 배경과 같은 색이 되어 바가 사라지는 테마가 있다
+	//(cr_progress_active == cr_back_selected 인 테마들). 둘 다 기본값 Transparent(=미지정) 이면
+	//set_color_theme 말미에서 각자의 배경(cr_back / cr_back_selected)과 대비나게 자동 산출한다.
+	//테마가 명시적으로 색을 넣으면 그 색을 그대로 쓴다.
+	Gdiplus::Color	cr_progress_active_selected;
 	//Gdiplus::Color	cr_progress_text;				//progress text
 
 	//로그, 상태등의 텍스트	표시용 컬러. 컬러 테마마다 약간씩 다를 수 있으므로

@@ -1202,6 +1202,7 @@ namespace
 		{ CSCColorTheme::color_theme_white,				_T("white") },
 		{ CSCColorTheme::color_theme_gray,				_T("gray") },
 		{ CSCColorTheme::color_theme_dark_gray,			_T("dark_gray") },
+		{ CSCColorTheme::color_theme_seed_dark,			_T("seed_dark") },
 		{ CSCColorTheme::color_theme_dark,				_T("dark") },
 		{ CSCColorTheme::color_theme_linkmemine,		_T("linkmemine") },
 		{ CSCColorTheme::color_theme_linkmemine_origin,	_T("linkmemine_origin") },
@@ -1232,6 +1233,8 @@ namespace
 		{ CSCColorTheme::color_theme_vibrant_ink,		_T("vibrant_ink") },
 		{ CSCColorTheme::color_theme_vim_dark_blue,		_T("vim_dark_blue") },
 		{ CSCColorTheme::color_theme_claude,			_T("claude") },
+		{ CSCColorTheme::color_theme_seed_claude,		_T("seed_claude") },
+		{ CSCColorTheme::color_theme_figma,				_T("figma") },
 		{ CSCColorTheme::color_theme_sepia,				_T("sepia") },
 		{ CSCColorTheme::color_theme_windows,			_T("windows") },
 		{ CSCColorTheme::color_theme_claude00,			_T("claude00") },
@@ -1247,6 +1250,7 @@ namespace
 	};
 
 	//테마 추가 시 enum 과 테이블 양쪽을 갱신하지 않으면 컴파일 타임에 잡힌다.
+	//(seed_dark/seed_claude 는 중간 삽입이라 테이블 마지막 항목은 여전히 claude09 — 개수만 +2.)
 	static_assert(_countof(g_sc_theme_table) == CSCColorTheme::color_theme_claude09 + 1,
 				  "g_sc_theme_table 개수가 SC_COLOR_THEMES(default..claude09) 와 어긋남");
 }
@@ -1323,6 +1327,15 @@ static Gdiplus::Color compute_text_dim(const Gdiplus::Color& cr_text, const Gdip
 	return dim;	// 마지막 시도 — cr_text 자체가 cr_back 과 거의 같은 저대비 테마
 }
 
+//20260724 by claude. 테마가 progress bar 색을 명시하지 않았을 때(Transparent) 배경에서 자동 산출.
+//배경이 어두우면 밝게, 밝으면 어둡게 한 톤 이동(dark 테마가 손으로 쓰던 get_color(cr_back, 96) 관례와 동일).
+//대비를 수치로 보장하진 않는다 — 테마색은 대개 명시되고, 이 자동값은 미지정 테마의 '보이기만 하면 되는' 기본값이다.
+static Gdiplus::Color auto_progress_color(const Gdiplus::Color& cr_back)
+{
+	int offset = (get_luminance(cr_back) < 128) ? +96 : -96;
+	return get_color(cr_back, offset);
+}
+
 void CSCColorTheme::set_theme_from_editor_palette(Gdiplus::Color bg, Gdiplus::Color fg, Gdiplus::Color sel_bg,
 								Gdiplus::Color header_fg, Gdiplus::Color header_bg)
 {
@@ -1344,8 +1357,13 @@ void CSCColorTheme::set_theme_from_editor_palette(Gdiplus::Color bg, Gdiplus::Co
 	//선택 — 선택 배경색의 luma 로 본문색을 흑/백 자동 (NPP 의 fgColor=000000 잠금값은 신뢰 불가).
 	cr_back_selected			= sel_bg;
 	cr_text_selected			= (get_luminance(sel_bg) < 128) ? Gdiplus::Color::White : Gdiplus::Color::Black;
-	cr_text_selected_inactive	= cr_text_selected;
-	cr_back_selected_inactive	= get_gray_color(sel_bg);
+	//20260724 by claude. 포커스 없는(inactive) 선택 배경 — 예전엔 get_gray_color(sel_bg)로 accent 를 통째 회색화해,
+	//accent 가 진하면(rust orange 등) 중간 회색이 되어 배경 위에서 강하게 튀었다(seed_claude 지적).
+	//배경에 accent 를 15% 만 섞어(get_color ratio=0.15) 채도는 크게 낮추되 accent 색조가 아주 옅게 배어나게 한다
+	//— "배경과 아주 유사하되 선택된 게 표시나는 정도". 완전 무채색은 warm 한 claude 류 테마와 안 어울려 accent hue 를 미량 남긴다.
+	//글자색은 이 옅은 배경에 맞춰 본문색(fg) 우선 산출. (ratio 를 키우면 색조↑, 줄이면 무채에 가까워짐.)
+	cr_back_selected_inactive	= get_color(bg, sel_bg, 0.15);
+	cr_text_selected_inactive	= get_readable_text_color(cr_back_selected_inactive, fg);
 	cr_back_dropHilited			= sel_bg;
 	cr_text_dropHilited			= cr_text_selected;
 
@@ -1365,7 +1383,7 @@ void CSCColorTheme::set_theme_from_editor_palette(Gdiplus::Color bg, Gdiplus::Co
 	cr_button_text		= cr_title_text;
 	cr_button_border	= get_weak_color(bg, 40);
 
-	//accent(선택색) = focus / selected border / progress
+	//accent(선택색) = focus / selected border (progress 는 자동 산출로 분리 — 아래 참조)
 	cr_border_active			= sel_bg;
 	cr_selected_border			= sel_bg;
 	cr_selected_border_inactive	= cr_back_selected_inactive;
@@ -1379,7 +1397,22 @@ void CSCColorTheme::set_theme_from_editor_palette(Gdiplus::Color bg, Gdiplus::Co
 
 	cr_percentage_bar.clear();
 	cr_percentage_bar.push_back(get_weak_color(bg, 32));
-	cr_progress_active		= sel_bg;
+	//20260724 by claude. progress bar 색은 set_color_theme 말미의 자동 산출에 맡긴다(비선택 바=cr_back, 선택 바=cr_back_selected
+	//기준으로 각각 대비 확보). 예전엔 cr_progress_active = sel_bg 로 잡아, 포커스 없는 선택 행에서 배경(get_gray_color(sel_bg))과
+	//바(sel_bg)가 거의 같은 색이 되어 바가 안 보였다(mono_industrial/obsidian/solarized 등 import 테마 공통 증상).
+}
+
+void CSCColorTheme::set_theme_from_seed(Gdiplus::Color bg, Gdiplus::Color fg, Gdiplus::Color accent)
+{
+	//header 2색(fg 텍스트 / bg 한 톤 시프트)은 bg·fg 에서 자동 파생 — 그래서 seed 는 3색이면 충분하다.
+	//selected/border/progress 는 editor_palette 가 accent(=sel_bg)에서 파생한다.
+	set_theme_from_editor_palette(bg, fg, accent, fg, get_weak_color(bg, 24));
+
+	//브랜드 primary 버튼 = accent solid (getdesign.md 류의 button-primary 와 동일 개념). 글자는 accent 위에서 흑/백 자동.
+	//editor_palette 는 버튼을 무채(title 계열)로 두지만, seed 는 accent 를 버튼까지 확장해 '한 강조색' 이 일관되게 흐르게 한다.
+	cr_button_back		= accent;
+	cr_button_text		= get_readable_text_color(accent);
+	cr_button_border	= accent;
 }
 
 void CSCColorTheme::set_theme_level(float level)
@@ -1430,6 +1463,7 @@ void CSCColorTheme::apply_theme_level(float level)
 	cr_header_back				= get_leveled_color(cr_header_back, level);
 
 	cr_progress_active					= get_leveled_color(cr_progress_active, level);
+	cr_progress_active_selected			= get_leveled_color(cr_progress_active_selected, level);
 	for (auto& c : cr_percentage_bar)
 		c = get_leveled_color(c, level);
 }
@@ -1447,6 +1481,12 @@ void CSCColorTheme::set_color_theme(int color_theme)
 	//set_theme_from_editor_palette 가 이 baseline 을 덮는다.
 	cr_edit_back = Gdiplus::Color::White;
 	cr_edit_text = gRGB(32, 32, 32);
+
+	//20260724 by claude. progress bar 색은 미지정(Transparent) 이면 말미에서 자동 산출한다. 신설 슬롯이라
+	//대부분 case 가 값을 안 넣으므로 여기서 Transparent 로 초기화해 직전 테마 값 누수(stale)를 막고
+	//자동 산출을 트리거한다. 명시하고 싶은 테마는 case 안에서 값을 넣으면 그 색이 그대로 쓰인다.
+	cr_progress_active			= Gdiplus::Color::Transparent;
+	cr_progress_active_selected	= Gdiplus::Color::Transparent;
 
 	switch (color_theme)
 	{
@@ -1619,6 +1659,19 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_separator = gRGB(232, 226, 214);               //#E8E2D6
 			break;
 
+		//20260724 by claude. seed 생성기 프로토타입(유채 accent 판). 위 손짠 claude 의 3색(bg #FAF7F2 cream,
+		//text #3F3A33 charcoal, accent #B45309 rust orange)으로 재현 — light 는 bg luma 로 자동 판정된다.
+		//유채 accent 라 selected/border/button 이 하나의 rust 톤으로 일관되게 흐르는 걸 claude 와 나란히 비교.
+		case color_theme_seed_claude:
+			set_theme_from_seed(gRGB(0xFA, 0xF7, 0xF2), gRGB(0x3F, 0x3A, 0x33), gRGB(0xB4, 0x53, 0x09));
+			break;
+
+		//20260724 by claude. seed 3색만으로 만든 Figma 브랜드 테마 — getdesign.md/figma 의 BRAND & ACCENT 실제 값.
+		//Black #000000 (CTA·headline·body), White #FFFFFF (canvas·inverse text), Magenta Promo #FF3D8B (saturated CTA pink).
+		case color_theme_figma:
+			set_theme_from_seed(gRGB(0xFF, 0xFF, 0xFF), gRGB(0x00, 0x00, 0x00), gRGB(0xFF, 0x3D, 0x8B));
+			break;
+
 		//--------------------------------------------------------------------------------------------------
 		// claude00 ~ claude09 : Claude 가 생성한 chrome 시안 10종.
 		//   각 변형은 0.documents/screenshot/0.login before (claudeNN).png 의 픽셀 히스토그램에서 추출.
@@ -1681,7 +1734,9 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_text_dim = compute_text_dim(cr_text, cr_back);
 			cr_text_hover = gRGB(30, 30, 30);                 //hover bg = light gray → dark text
 			cr_text_selected = gRGB(30, 30, 30);
-			cr_text_selected_inactive = cr_text;
+			//20260724 by claude. 선택 배경이 밝은 회색(237)이라 포커스 없을 때(inactive)도 글자는 어두워야 한다.
+			//예전엔 cr_text 를 그대로 써(흰색) 밝은 회색 배경 위 흰 글자라 거의 안 보였다. cr_text_selected(어두운색)와 통일.
+			cr_text_selected_inactive = cr_text_selected;
 			cr_text_dropHilited = Gdiplus::Color::White;
 
 			cr_back = gRGB(30, 30, 30);
@@ -2264,6 +2319,13 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_separator = get_weak_color(cr_back, 30);
 			break;
 
+		//20260724 by claude. seed 생성기 프로토타입. 위 손짠 dark_gray 의 3색(bg #404040, text #C0C0C0,
+		//accent #303030 = dark_gray 의 무채 선택색 get_color(cr_back,-16))으로 재현 — 콤보에서 dark_gray 와
+		//나란히 up/down 하며 3색 파생이 손짠 40여 필드만큼 나오는지 눈으로 비교한다.
+		case color_theme_seed_dark:
+			set_theme_from_seed(gRGB(0x40, 0x40, 0x40), gRGB(0xC0, 0xC0, 0xC0), gRGB(0x30, 0x30, 0x30));
+			break;
+
 		case color_theme_dark :
 			cr_text					= Gdiplus::Color(255, 212, 212, 212);
 			cr_text_dim				= compute_text_dim(cr_text, cr_back);
@@ -2274,7 +2336,9 @@ void CSCColorTheme::set_color_theme(int color_theme)
 
 			cr_back					= Gdiplus::Color(255, 37, 37, 38);
 			cr_parent_back			= cr_back;
-			cr_back_selected		= Gdiplus::Color(255, 0, 120, 215);
+			//20260724 by claude. dark 테마인데 선택 배경이 RoyalBlue(0,120,215) 라 톤과 안 어울렸다.
+			//dark_gray 처럼 무채색 계열로 — cr_back 을 한 톤 밝게 한 회색(흰 cr_text_selected 와 대비 확보).
+			cr_back_selected		= get_color(cr_back, 48);
 			cr_back_selected_inactive = get_gray_color(cr_back_selected);
 			cr_back_dropHilited		= RGB2gpColor(::GetSysColor(COLOR_HIGHLIGHT));
 			cr_back_hover			= get_color(cr_back_selected, 48);
@@ -2525,6 +2589,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			set_theme_from_editor_palette(gRGB(0x00,0x00,0x40), gRGB(0xFF,0xFF,0xBF), gRGB(0x20,0x50,0xD0), gRGB(0xFF,0xFF,0xFF), gRGB(0x00,0x00,0x40));
 			break;
 
+
 		case color_theme_windows:
 			//현재 윈도우 테마의 시스템 색(GetSysColor)을 그대로 반영한다. default 는 curated Win11 룩이라
 			//테두리/선택색 등을 하드코딩하지만, 이 테마는 라이브 OS 색(accent 포함 — Win11 의 COLOR_HIGHLIGHT
@@ -2692,6 +2757,14 @@ void CSCColorTheme::set_color_theme(int color_theme)
 		check(_T("button"),	cr_button_text,		cr_button_back);
 	}
 #endif
+
+	//20260724 by claude. progress bar 색 자동 산출 — 테마가 명시하지 않은(Transparent = alpha 0) 슬롯만 채운다.
+	//비선택 바는 cr_back, 선택 바는 cr_back_selected 를 기준으로 대비나게 산출한다(선택 시 배경이 cr_back_selected 로
+	//바뀌므로 바 색도 그 배경에서 뽑아야 묻히지 않는다). apply_theme_level *앞* 에 둬서 산출값도 명시값과 똑같이 leveling 된다.
+	if (cr_progress_active.GetA() == 0)
+		cr_progress_active = auto_progress_color(cr_back);
+	if (cr_progress_active_selected.GetA() == 0)
+		cr_progress_active_selected = auto_progress_color(cr_back_selected);
 
 	//마지막으로 테마 강도 적용. 위 debug 검사는 base(정의값) 대비를 검증하고, 사용자가 조절한
 	//강도 변형은 의도적이므로 그 뒤에 일괄 스케일한다. level=1.0 이면 no-op.

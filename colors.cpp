@@ -663,6 +663,37 @@ Gdiplus::Color get_distinct_bw_color(Gdiplus::Color cr)
 	return distinct_bw_cr;
 }
 
+double get_wcag_contrast(Gdiplus::Color a, Gdiplus::Color b)
+{
+	auto rel_lum = [](const Gdiplus::Color& c) -> double {
+		auto ch = [](int v) -> double {
+			double f = v / 255.0;
+			return (f <= 0.03928) ? f / 12.92 : pow((f + 0.055) / 1.055, 2.4);
+		};
+		return 0.2126 * ch(c.GetR()) + 0.7152 * ch(c.GetG()) + 0.0722 * ch(c.GetB());
+	};
+
+	double la = rel_lum(a);
+	double lb = rel_lum(b);
+
+	if (la < lb)
+		std::swap(la, lb);
+
+	return (la + 0.05) / (lb + 0.05);
+}
+
+Gdiplus::Color get_readable_text_color(Gdiplus::Color cr_back, Gdiplus::Color cr_preferred, double min_contrast)
+{
+	if (cr_preferred.GetValue() != Gdiplus::Color::Transparent &&
+		get_wcag_contrast(cr_preferred, cr_back) >= min_contrast)
+		return cr_preferred;
+
+	//흑/백 중 실제 대비가 높은 쪽. get_distinct_bw_color 의 고정 문턱(gray>160)과 달리 중간 톤에서도 최적을 고른다
+	//(#5BA2D9 는 gray=147 이라 문턱 방식이 White 를 골라 대비 2.76 이지만, 실제 비교로는 Black 이 7.61).
+	return (get_wcag_contrast(Gdiplus::Color::Black, cr_back) >= get_wcag_contrast(Gdiplus::Color::White, cr_back))
+			? Gdiplus::Color::Black : Gdiplus::Color::White;
+}
+
 Gdiplus::Color get_distinct_color(Gdiplus::Color cr)
 {
 	float h, s, v;

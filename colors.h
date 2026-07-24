@@ -340,6 +340,20 @@ Gdiplus::Color	get_distinct_color(Gdiplus::Color cr);
 //어떤 배경색과 확연히 구분되는 컬러를 보색으로 하면 128, 128, 128과 같은 색상의 보색 역시 동일한 색이 되므로 구분되지 않는다.
 Gdiplus::Color	get_distinct_bw_color(Gdiplus::Color cr);
 
+//20260724 by claude. 두 색의 WCAG contrast ratio (1.0 = 동일, 21.0 = 흑백). 기준: 4.5 = 본문 가독(AA), 3.0 = 큰 글씨 최소.
+//8bit RGB 차이가 아니라 gamma 보정된 상대휘도로 계산하므로 실제 시각 대비와 일치한다.
+double			get_wcag_contrast(Gdiplus::Color a, Gdiplus::Color b);
+
+//20260724 by claude. cr_back 위에 얹었을 때 확실히 읽히는 글자색을 리턴한다.
+//cr_preferred(테마색 등)를 주면 그게 min_contrast 를 통과할 때만 그대로 쓰고(테마 톤 유지),
+//통과 못 하면 흑/백 중 대비가 높은 쪽으로 폴백한다. 폴백값은 어떤 cr_back 에 대해서도 4.58 이상이 보장된다
+//(흑/백 대비 곡선의 교차점이 최저이며 그 값이 4.58 — 전 색상공간 스윕으로 확인).
+//cr_preferred 를 생략하면 항상 흑/백 중 최적을 고른다.
+//주의: 대비가 목적이면 이 함수를, 색상환 반대편 색이 목적이면 get_distinct_color() 를 쓴다.
+Gdiplus::Color	get_readable_text_color(Gdiplus::Color cr_back,
+									Gdiplus::Color cr_preferred = Gdiplus::Color::Transparent,
+									double min_contrast = 4.5);
+
 //rgb 평균값 리턴
 uint8_t			get_gray_value(uint8_t r, uint8_t g, uint8_t b);
 //rgb 평균값 리턴

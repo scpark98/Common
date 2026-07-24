@@ -564,8 +564,17 @@ void CSCListCtrl::draw_row(CDC* pDC, int iItem, const CRect& row_bounds)
 					//20260713 by claude. 단, 셀에 명시 텍스트색(예: fail=Red)이 지정되면 그 색을 '양쪽 영역 모두'에 적용한다.
 					//예전엔 아래 두 패스가 색을 무조건 cr_back / cr_progress_active 로 덮어써, set_text_color 로 준 Red 가 무시됐다.
 					//특히 "fail" 같은 비-숫자는 d=0(_ttof) → r.right=r.left 라 전체가 오른쪽 영역이 되어 cr_progress_active(파랑)로만 그려졌다.
-					Gdiplus::Color cr_left  = m_theme.cr_back;			//채움 바 위 영역(기본: 배경색으로 대비)
-					Gdiplus::Color cr_right = m_theme.cr_progress_active;	//바 바깥 영역(기본: 진행 강조색)
+					//20260724 by claude. 각 영역의 글자색은 '그 영역이 실제로 깔고 앉은 배경' 에서 뽑는다.
+					//기존처럼 반대편 영역의 색을 그대로 쓰면 두 영역의 대비가 contrast(cr_back, cr_progress) 하나로 묶여
+					//그 값이 낮은 테마에선 양쪽이 동시에 안 보인다. 선택 상태에선 cr_progress_active == cr_back_selected 인
+					//테마(대입 26곳 중 14곳)에서 바 밖 글자색이 배경과 완전히 같은 색이 되어 대비 1.00 으로 사라졌다.
+					//기존 색을 1순위 후보로 넘기므로 잘 보이던 테마의 경계 색변화는 그대로 유지되고, 깨지던 조합만 흑/백 폴백된다.
+					Gdiplus::Color cr_cell_back = crBack;
+					if (cr_cell_back.GetValue() == listctrlex_unused_color.GetValue())
+						cr_cell_back = (m_use_alternate_back_color && (iItem % 2)) ? m_theme.cr_back_alternate : m_theme.cr_back;
+
+					Gdiplus::Color cr_left  = get_readable_text_color(m_theme.cr_progress_active, cr_cell_back);		//바 위 — 배경은 바 색
+					Gdiplus::Color cr_right = get_readable_text_color(cr_cell_back, m_theme.cr_progress_active);		//바 밖 — 배경은 셀 배경
 					if (m_list_db[iItem].crText[iSubItem].GetValue() != listctrlex_unused_color.GetValue())
 						cr_left = cr_right = m_list_db[iItem].crText[iSubItem];
 

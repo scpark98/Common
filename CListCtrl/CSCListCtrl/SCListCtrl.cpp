@@ -6650,8 +6650,12 @@ void CSCListCtrl::OnSetFocus(CWnd* pOldWnd)
 {
 	CListCtrl::OnSetFocus(pOldWnd);
 
-	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
 	m_has_focus = true;
+	//20260724 by claude. base OnSetFocus 는 선택 행을 native 좌표로 무효화하지만, 이 컨트롤은 native 세로스크롤이
+	//아니라 m_scroll_y(픽셀)로 그린다. 부분 스크롤 상태(최상단 행이 n px 만 보임)에선 native 무효화 rect 가 실제
+	//그려질 smooth 위치와 n 만큼 어긋나, WM_PAINT 가 겹치는 lineheight-n 만 다시 그려 선택막대가 잘려/밀려 남는다.
+	//전체 무효화로 base 의 어긋난 부분무효화를 덮어 교정한다(포커스 변경은 드물어 전체 재그리기 비용 무시 가능, 더블버퍼라 깜빡임 없음).
+	Invalidate(FALSE);
 }
 
 
@@ -6659,8 +6663,9 @@ void CSCListCtrl::OnKillFocus(CWnd* pNewWnd)
 {
 	CListCtrl::OnKillFocus(pNewWnd);
 
-	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
 	m_has_focus = false;
+	//20260724 by claude. active→inactive 전환 시에도 위(OnSetFocus)와 동일 이유로 선택막대가 부분행 높이만큼 어긋난다. 전체 무효화로 교정.
+	Invalidate(FALSE);
 }
 
 //remote일 경우는 fullpath로 해당 파일의 WIN32_FIND_DATA값을 얻어야 할 경우가 있다.
@@ -6982,6 +6987,11 @@ void CSCListCtrl::OnLButtonDown(UINT nFlags, CPoint point)
 	else
 		select_single(item);
 	SetItemState(item, LVIS_FOCUSED, LVIS_FOCUSED);
+
+	//20260724 by claude. 탐색기처럼 클릭한 항목이 부분 가려졌으면 최소 스크롤로 온전히 노출한다.
+	//모든 클릭 경로(즉시 선택 + defer 대기 + ctrl/shift 범위) 공통 지점 — hit_test 된 item 기준.
+	//ensure_visible 의 기본 가시성 판정이 '완전히 보임' 이라 부분 가려진 항목만 조정되고, 이미 온전하면 no-op.
+	ensure_visible(item, visible_minimal);
 
 	//20260707 by claude. 드래그 제스처 대기 시작(드래그 허용 리스트일 때만). OnMouseMove 가 문턱 이상 이동을 감지하면
 	//LVN_BEGINDRAG 를 합성해 OnLvnBeginDrag 로 실제 드래그를 시작한다. m_focus_anchor 는 select_* 가 이미 갱신.

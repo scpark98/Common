@@ -95,6 +95,12 @@ public:
 	bool			create(CWnd* parent, CString title = _T(""), bool as_modal = true);
 	Gdiplus::Color	get_selected_color() const { return m_sel_color; }
 
+	//20260725 by claude. DoModal 은 자체 message pump(while m_response<0)로 도는 pseudo-modal 이다. 이 루프는
+	//OK/Cancel 로만 끝나므로, 앱(메인창)이 닫힐 때 이 루프가 리턴하지 못하면 메인의 RunModalLoop 가 복귀 못 해
+	//메인·부모창·피커가 모두 닫히지 않는다. 앱의 종료 funnel(OnClose/OnCancel 등)에서 이 함수를 호출하면
+	//현재 열려 있는 modal 피커를 취소시켜 정상 종료된다.
+	static void		cancel_active_modal();
+
 	//각 앱이 색상정보를 공유할지 개별로 기억할지 설정.
 	//true이면 다른 앱에서 선택한 recent colors를 이 앱에서도 사용할 수 있다.
 	void			set_use_shared_color(bool use_shared = true);
@@ -108,6 +114,7 @@ protected:
 	bool			m_as_modal = true;
 	CWnd*			m_parent = NULL;
 	int				m_response = -1;
+	static CSCColorPicker*	s_active_modal_picker;	//20260725 by claude. 현재 DoModal 루프가 도는 피커(중첩 시 이전값 저장/복원). cancel_active_modal 대상.
 	bool			m_edit_syncing = false;	// sync_edits() 진행 중 EN_CHANGE 재진입 방지. 깜빡임 방지
 	bool			m_use_shared_color = false;	//default = false. true일 경우 HKLM 공유 위치 사용, false: HKCU 앱별 위치
 

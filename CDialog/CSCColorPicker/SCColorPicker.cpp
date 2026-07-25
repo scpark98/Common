@@ -494,8 +494,10 @@ void CSCColorPicker::sync_edits()
 		InvalidateRect(&m_r_color_name, FALSE);
 	}
 
-	// ── modeless 모드: 색상 변경 시 parent에게 알림 ──────────────────
-	if (!m_as_modal && m_initialized)
+	// ── 색상 변경 시 parent에게 알림 ─────────────────────────────────
+	//20260725 by claude. modal/modeless 구분 없이 값이 바뀌면 parent 에 통지 → 실시간 반영(요즘 UX 트렌드).
+	//색 선택은 저위험이라 확인/취소 구분·되돌림 없이 즉시 반영한다. m_initialized 로 OnInitDialog 셋업 중 통지만 억제.
+	if (m_initialized)
 	{
 		if (m_parent && ::IsWindow(m_parent->m_hWnd))
 		{
@@ -1094,6 +1096,15 @@ void CSCColorPicker::OnBnClickedCancel()
 		ShowWindow(SW_HIDE);
 }
 
+CSCColorPicker* CSCColorPicker::s_active_modal_picker = nullptr;
+
+//20260725 by claude. 앱 종료 시 열려 있는 modal 피커의 자체 pump 루프를 취소로 빠져나오게 한다(헤더 주석 참조).
+void CSCColorPicker::cancel_active_modal()
+{
+	if (s_active_modal_picker && ::IsWindow(s_active_modal_picker->GetSafeHwnd()))
+		s_active_modal_picker->m_response = IDCANCEL;
+}
+
 INT_PTR CSCColorPicker::DoModal(CWnd* parent, Gdiplus::Color cr_selected, CString title)
 {
 	//return CDialog::DoModal();
@@ -1164,10 +1175,22 @@ INT_PTR CSCColorPicker::DoModal(CWnd* parent, Gdiplus::Color cr_selected, CStrin
 	//for Modal Dialog
 	m_parent->EnableWindow(FALSE);
 
+	//20260725 by claude. 이 피커를 '현재 활성 modal' 로 등록(중첩 대비 이전값 저장). 앱 종료 시 cancel_active_modal 이 취소.
+	CSCColorPicker* prev_active = s_active_modal_picker;
+	s_active_modal_picker = this;
+
 	while (m_response < 0)
 	{
 		while (PeekMessage(&stmsg, NULL, 0, 0, PM_REMOVE))
 		{
+			//20260725 by claude. 앱 전역 종료(WM_QUIT) 감지 시 재게시 후 루프 탈출 — 형제 CSCMessageBox 와 동일한 가드.
+			if (stmsg.message == WM_QUIT)
+			{
+				::PostQuitMessage((int)stmsg.wParam);
+				m_response = IDCANCEL;
+				break;
+			}
+
 			if (!CWnd::WalkPreTranslateTree(GetSafeHwnd(), &stmsg))
 			{
 				TranslateMessage(&stmsg);
@@ -1192,6 +1215,9 @@ INT_PTR CSCColorPicker::DoModal(CWnd* parent, Gdiplus::Color cr_selected, CStrin
 		if (m_response < 0)
 			WaitMessage();
 	}
+
+	//20260725 by claude. 활성 modal 등록 해제(중첩이면 이전 피커로 복원).
+	s_active_modal_picker = prev_active;
 
 	m_parent->EnableWindow(TRUE);
 	m_parent->SetForegroundWindow();

@@ -555,13 +555,14 @@ public:
 
 		cr_text						= src.cr_text;
 		cr_text_dim					= src.cr_text_dim;
-		cr_disabled_text			= src.cr_disabled_text;
+		cr_text_disabled			= src.cr_text_disabled;
 		cr_text_hover				= src.cr_text_hover;
 		cr_text_dropHilited			= src.cr_text_dropHilited;
 		cr_text_selected			= src.cr_text_selected;
 		cr_text_selected_inactive	= src.cr_text_selected_inactive;
 
 		cr_back						= src.cr_back;
+		cr_back_disabled			= src.cr_back_disabled;
 		cr_back_hover				= src.cr_back_hover;
 		cr_back_dropHilited			= src.cr_back_dropHilited;
 		cr_back_selected			= src.cr_back_selected;
@@ -608,13 +609,17 @@ public:
 
 	Gdiplus::Color	cr_text;
 	Gdiplus::Color	cr_text_dim;					//기본 글자색보다 흐릿하게 표현되는 항목 (placeholder 등)
-	Gdiplus::Color	cr_disabled_text = Gdiplus::Color::DarkGray;	//disabled 컨트롤의 텍스트/아이콘 stroke 공용 색
+	Gdiplus::Color	cr_text_disabled = Gdiplus::Color::DarkGray;	//disabled 컨트롤의 텍스트/아이콘 stroke 공용 색 (cr_back_disabled 와 한 쌍)
 	Gdiplus::Color	cr_text_hover;
 	Gdiplus::Color	cr_text_dropHilited;
 	Gdiplus::Color	cr_text_selected;
 	Gdiplus::Color	cr_text_selected_inactive;
 
 	Gdiplus::Color	cr_back;						//BTNFACE	: for CDialog, CButton, CStatic...
+	//disabled 컨트롤의 배경색 (cr_text_disabled 와 한 쌍). 기본 Transparent = "auto":
+	//각 컨트롤이 자기 기존 기본으로 파생(CGdiButton=normal 에서 get_weak_color, CSCEdit/CSCStaticEdit=LightGray).
+	//불투명색을 지정하면 그 색을 disabled 배경으로 사용 → 테마가 무채색 gray 대신 팔레트에 맞는 색을 강제할 수 있다.
+	Gdiplus::Color	cr_back_disabled = Gdiplus::Color::Transparent;
 	Gdiplus::Color	cr_back_hover;					//= hover = over = track_select... 다양한 같은 의미가 있으나 hover로 통일하자.
 	Gdiplus::Color	cr_back_dropHilited;
 	Gdiplus::Color	cr_back_selected;

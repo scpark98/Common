@@ -1330,7 +1330,7 @@ void CSCColorTheme::set_theme_from_editor_palette(Gdiplus::Color back, Gdiplus::
 	//ratio 가 작을수록 cr_back 에 가깝고(흐림→ 안 보임), 클수록 cr_text 와 구분 안 됨. 0.35 = 가독 유지 + 값/라벨 hierarchy 확보.
 	//get_weak_color(fg, 100) 같이 *fg 절대 거리 이동* 방식은 fg/bg 간격을 무시해 일부 테마에서 너무 dim / 너무 진함.
 	cr_text_dim		= compute_text_dim(cr_text, cr_back);
-	cr_disabled_text = cr_text_dim;
+	cr_text_disabled = cr_text_dim;
 
 	//edit 본문 = 에디터 본문. import 테마는 dark IDE 류라 흰 카드 baseline 대신 에디터색 그대로 쓴다.
 	cr_edit_back	= back;
@@ -2651,7 +2651,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 	//일괄 교정하고, 향후 테마 추가 시 같은 순서 함정도 방지한다. (cr_text·cr_text_dim 은 apply_theme_level
 	//대상이 아니므로 leveling 전 base 색 기준으로 계산하는 기존 설계와도 일치.)
 	cr_text_dim			= compute_text_dim(cr_text, cr_back);
-	cr_disabled_text	= cr_text_dim;
+	cr_text_disabled	= cr_text_dim;
 
 	//selected + hover combo — selected 의 luma 방향으로 12% 만큼 black/white 와 블렌딩.
 	//(이전 공식 = cr_back→cr_back_selected delta 의 절반 가산 — light bg + dark selected 처럼 delta 가 크면

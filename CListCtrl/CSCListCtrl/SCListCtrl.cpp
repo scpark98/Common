@@ -305,6 +305,16 @@ void CSCListCtrl::draw_row(CDC* pDC, int iItem, const CRect& row_bounds)
 	//셀 루프 안에서 매번 GetExtendedStyle() 을 호출하지 않도록 행 단위로 1회만 읽는다.
 	bool		is_use_gridlines = (GetExtendedStyle() & LVS_EX_GRIDLINES);
 
+	//20260728 by claude. 행 상태(선택/drop/교차)만 반영한 배경색 — 마지막 컬럼 오른쪽 잔여 영역을 채우는 데 쓴다.
+	//셀별 override(set_back_color)는 그 셀에만 적용돼야 하므로 여기서는 배제한다.
+	Gdiplus::Color cr_row_back = m_theme.cr_back;
+	if ((m_has_focus || is_show_selection_always) && is_selected && is_full_row_selection)
+		cr_row_back = (m_has_focus ? m_theme.cr_back_selected : m_theme.cr_back_selected_inactive);
+	else if (is_drophilited)
+		cr_row_back = m_theme.cr_back_dropHilited;
+	else if (m_use_alternate_back_color && (iItem % 2))
+		cr_row_back = m_theme.cr_back_alternate;
+
 	Gdiplus::Color	crText = m_theme.cr_text;
 	Gdiplus::Color	crBack = m_theme.cr_back;
 	//Gdiplus::Graphics	g(pDC->m_hDC);
@@ -696,6 +706,19 @@ void CSCListCtrl::draw_row(CDC* pDC, int iItem, const CRect& row_bounds)
 		}
 	}
 
+	//20260728 by claude. 컬럼 폭 합이 리스트 폭보다 좁으면 마지막 컬럼 오른쪽이 빈 영역으로 남아, 교차 행 배경과 선택색이
+	//거기서 끊겨 보였다(행이 리스트 중간에서 잘린 인상). 탐색기와 동일하게 행 배경은 리스트 오른쪽 끝까지 이어지도록 채운다.
+	//가로 스크롤로 컬럼이 클라이언트보다 넓은 경우는 잔여 영역이 없어 이 분기를 타지 않는다.
+	CRect rc_client;
+	GetClientRect(rc_client);
+	int trail_left = itemRect.right;
+
+	if (trail_left < rc_client.right)
+	{
+		CRect rc_trail(trail_left, itemRect.top, rc_client.right, itemRect.bottom);
+		pDC->FillSolidRect(rc_trail, cr_row_back.ToCOLORREF());
+	}
+
 	//선택된 항목은 선택 색상보다 진한 색으로 테두리가 그려진다.
 	//Tree 와 일관 — focus 있을 때만 border. inactive 는 배경 fill (위 crBack) 만.
 	if (m_draw_selected_border && !m_in_editing && m_has_focus && is_selected)
@@ -705,6 +728,9 @@ void CSCListCtrl::draw_row(CDC* pDC, int iItem, const CRect& row_bounds)
 		rowRect.bottom = row_bounds.bottom;
 		if (!is_full_row_selection)
 			rowRect.right = rowRect.left + GetColumnWidth(0);
+		//20260728 by claude. 선택 배경이 리스트 끝까지 채워지므로 테두리도 같은 폭이어야 한다. 안 맞추면 채운 색 한가운데에 세로선이 남는다.
+		else if (rowRect.right < rc_client.right)
+			rowRect.right = rc_client.right;
 
 		//선택된 항목을 표시하는 사각형을 그릴때는 반드시 PenAlignmentInset으로 그려줘야 한다.
 		//특히 width가 2이상이면 unselect되는 항목의 선택 사각형 표시가 갱신되지 않게 되므로
@@ -734,6 +760,9 @@ void CSCListCtrl::draw_row(CDC* pDC, int iItem, const CRect& row_bounds)
 	GetSubItemRect(iItem, 0, LVIR_BOUNDS, rowRect);
 	rowRect.top    = row_bounds.top;		//20260706 by claude. Y 만 호출자 행 위치로 (native no-op / smooth 픽셀).
 	rowRect.bottom = row_bounds.bottom;
+	//20260728 by claude. 행 배경을 리스트 끝까지 채우므로 행 단위 가로선(top/bottom/격자)도 같은 폭으로 그어야 중간에서 끊기지 않는다.
+	if (rowRect.right < rc_client.right)
+		rowRect.right = rc_client.right;
 
 	if (m_draw_top_line)
 	{

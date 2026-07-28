@@ -131,6 +131,7 @@ BEGIN_MESSAGE_MAP(CSCD2ImageDlg, CDialog)
 	ON_WM_ERASEBKGND()
 	ON_WM_SIZE()
 	ON_WM_LBUTTONDOWN()
+	ON_WM_LBUTTONDBLCLK()
 	ON_WM_LBUTTONUP()
 	ON_WM_MOUSEMOVE()
 	//ON_WM_MOUSEWHEEL()
@@ -885,6 +886,20 @@ void CSCD2ImageDlg::OnLButtonDown(UINT nFlags, CPoint point)
 	}
 
 	CDialog::OnLButtonDown(nFlags, point);
+}
+
+//20260728 by claude. relay flag on 이면 부모 client 좌표로 변환해 WM_LBUTTONDBLCLK 부모 전달.
+void CSCD2ImageDlg::OnLButtonDblClk(UINT nFlags, CPoint point)
+{
+	if (m_relay_dblclk_to_parent && GetParent())
+	{
+		CPoint pt = point;
+		ClientToScreen(&pt);
+		GetParent()->ScreenToClient(&pt);
+		GetParent()->SendMessage(WM_LBUTTONDBLCLK, nFlags, MAKELPARAM(pt.x, pt.y));
+		return;
+	}
+	CDialog::OnLButtonDblClk(nFlags, point);
 }
 
 void CSCD2ImageDlg::OnLButtonUp(UINT nFlags, CPoint point)

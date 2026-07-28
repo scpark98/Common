@@ -147,6 +147,10 @@ public:
 		message_lbuttondown,
 	};
 
+	//20260728 by claude. true 이면 이 dlg 위의 더블클릭을 부모 client 좌표로 변환해
+	//부모에게 WM_LBUTTONDBLCLK 로 relay. 스냅샷 몽타주의 셀 hit-test 를 부모에서 하기 위한 opt-in.
+	void			set_relay_dblclk_to_parent(bool on) { m_relay_dblclk_to_parent = on; }
+
 	//레지스트리에 저장된 recent file 정보가 있다면 로딩한다.
 	bool			load();
 
@@ -317,6 +321,7 @@ protected:
 	//기본값 false (simple_mode = true 와 동일 상태). ASee 처럼 set_simple_mode(false) 호출하면 모두 true.
 	bool					m_enable_pan          = false;
 	bool					m_enable_zoom_wheel   = false;
+	bool					m_relay_dblclk_to_parent = false;	//20260728 by claude. 셀 hit-test 를 부모에서 하도록 dblclk relay.
 	bool					m_enable_roi          = false;
 	bool					m_enable_dropper      = false;
 	bool					m_enable_drop         = false;
@@ -451,6 +456,7 @@ public:
 	afx_msg BOOL OnEraseBkgnd(CDC* pDC);
 	afx_msg void OnSize(UINT nType, int cx, int cy);
 	afx_msg void OnLButtonDown(UINT nFlags, CPoint point);
+	afx_msg void OnLButtonDblClk(UINT nFlags, CPoint point);
 	afx_msg void OnLButtonUp(UINT nFlags, CPoint point);
 	afx_msg void OnMouseMove(UINT nFlags, CPoint point);
 	//afx_msg BOOL OnMouseWheel(UINT nFlags, short zDelta, CPoint pt);

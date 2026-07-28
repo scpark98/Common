@@ -292,6 +292,12 @@ void CSCListCtrl::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 
 void CSCListCtrl::draw_row(CDC* pDC, int iItem, const CRect& row_bounds)
 {
+	//20260728 by claude. m_list_db 접근 전 범위 확인. DrawItem 경로에는 같은 가드가 있으나 OnPaint 의 픽셀 페인트
+	//경로에는 없었다. 그 루프는 total=size() 를 한 번 읽고 도는데, 도는 동안 항목이 줄어들면(다른 스레드의 refill,
+	//팬텀 행 등) m_list_db[iItem] 이 deque OOB 로 죽는다. 두 경로가 공유하는 이 진입점에서 한 번만 막는다.
+	if (iItem < 0 || iItem >= (int)m_list_db.size())
+		return;
+
 	int			iSubItem;
 	CRect		rowRect;
 	CRect		itemRect;

@@ -406,6 +406,10 @@ void CSCListCtrl::draw_row(CDC* pDC, int iItem, const CRect& row_bounds)
 			}
 		}
 
+		//20260728 by claude. disabled 상태에서는 셀 텍스트를 테마의 disabled 색으로(테마별로 회색이 아닐 수 있다).
+		if (!IsWindowEnabled())
+			crText = m_theme.cr_text_disabled;
+
 		//선택 항목의 텍스트 색상은 무조건 컬러 스킴을 따르는게 아니라
 		//지정된 색이 있다면 그 색을 우선으로 해야 한다.
 		//if (m_list_db[iItem].crText[iSubItem].GetValue() != listctrlex_unused_color.GetValue())

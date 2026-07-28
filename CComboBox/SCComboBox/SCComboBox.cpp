@@ -116,9 +116,6 @@ void CSCComboBox::DrawItem(LPDRAWITEMSTRUCT lpDrawItemStruct)
 			CSCComboBoxColor* cr = (CSCComboBoxColor*)GetItemData(lpDrawItemStruct->itemID);
 			if (cr && (cr->cr_text.GetValue() != m_theme.cr_text.GetValue()) && (cr->cr_text.GetValue() != Gdiplus::Color::Transparent))
 				cr_text = cr->cr_text.ToCOLORREF();
-
-			if (!IsWindowEnabled())
-				cr_text = get_gray_color(cr_text);
 		}
 
 		//selected/hover 시 cr_back 만 바꾸고 cr_text 변경을 누락하면 dark bg + dark text 가독성 ↓.
@@ -133,6 +130,11 @@ void CSCComboBox::DrawItem(LPDRAWITEMSTRUCT lpDrawItemStruct)
 			cr_back = m_theme.cr_back_hover.ToCOLORREF();
 			cr_text = m_theme.cr_text_hover.ToCOLORREF();
 		}
+
+		//20260728 by claude. disabled 상태 텍스트 색 — 테마의 disabled 색(배경 쪽으로 흐려진 색). 이전 get_gray_color 는
+		//명도를 보존해 검은 글자가 그대로 검게 남아(무채색화만) 회색으로 보이지 않았다. selected/hover 보다 최종 우선.
+		if (!IsWindowEnabled())
+			cr_text = m_theme.cr_text_disabled.ToCOLORREF();
 
 		dc.SetBkMode(TRANSPARENT);
 		dc.FillSolidRect(rItem, cr_back);

@@ -4473,6 +4473,13 @@ void CSCTreeCtrl::OnNMCustomDraw(NMHDR* pNMHDR, LRESULT* pResult)
 				}
 			}
 
+			//20260728 by claude. disabled 상태에서는 텍스트를 테마의 disabled 색으로(테마별로 회색이 아닐 수 있다). 상태/스타일색보다 최종 우선.
+			if (!IsWindowEnabled())
+			{
+				crText = m_theme.cr_text_disabled;
+				crTextNormal = m_theme.cr_text_disabled;
+			}
+
 			//1. row fill.
 			//   V scrollbar visible 시에만 우측 m_scrollbar.get_width() reserve. hide 시 풀폭. m_v_visible_state 는 sync_scrollbar 가 정한 stable cache 라 paint cycle stale 안전.
 			CRect rcClient;

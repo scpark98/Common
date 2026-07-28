@@ -110,6 +110,10 @@ public:
 
 	void			set_draw_line(bool draw) { m_draw_line = draw; }
 
+	//20260728 by claude. 완료 스텝 thumb 안에 그리는 체크 표시 색. 기본 흰색.
+	//thumb 배경이 밝은 테마색이면 흰 체크가 묻히거나, 같은 배경 위 버튼 텍스트색과 톤이 어긋나므로 맞출 수 있게 열어둔다.
+	void			set_check_color(Gdiplus::Color cr) { m_cr_check = cr; Invalidate(); }
+
 	void			set_back_color(Gdiplus::Color cr) { m_cr_back = cr; }
 	void			set_color_line_active(Gdiplus::Color cr) { m_cr_line_active = cr; }
 	void			set_color_line_inactive(Gdiplus::Color cr) { m_cr_line_inactive = cr; }
@@ -137,8 +141,15 @@ protected:
 	Gdiplus::Color	m_cr_thumb_inactive = Gdiplus::Color::Gray;
 
 	Gdiplus::Color	m_cr_thumb_outline = Gdiplus::Color::RoyalBlue;
+	//완료 스텝의 체크 표시 색. set_check_color 로 변경.
+	Gdiplus::Color	m_cr_check = Gdiplus::Color::White;
 	Gdiplus::Color	m_cr_line_active = Gdiplus::Color::RoyalBlue;
 	Gdiplus::Color	m_cr_line_inactive = Gdiplus::Color::LightGray;
+
+	//20260728 by claude. index 스텝의 thumb 색(진행 상태 + set_thumb_color 개별 지정 반영).
+	Gdiplus::Color	get_thumb_color(int index);
+	//index 스텝에서 나가는 연결선의 색. 진행 중인 스텝의 나가는 선은 아직 지나지 않은 구간이라 thumb 색과 규칙이 다르다.
+	Gdiplus::Color	get_line_color(int index);
 
 //font
 	LOGFONT			m_lf;

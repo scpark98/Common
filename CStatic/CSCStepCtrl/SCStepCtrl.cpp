@@ -63,31 +63,26 @@ void CSCStepCtrl::OnPaint()
 	{
 		int thumb_style = m_thumb_style;
 
-		Gdiplus::Color cr_thumb = m_cr_thumb_active;
+		Gdiplus::Color cr_thumb = get_thumb_color(i);
 		Gdiplus::Color cr_text = m_cr_text_active;
 		Gdiplus::Color cr_line = m_cr_line_active;
 
 		if (i > m_pos)
 		{
-			cr_thumb = m_cr_thumb_inactive;
 			cr_text = m_cr_text_inactive;
 			cr_line = m_cr_line_inactive;
 		}
 		else if (i == m_pos)
 		{
-			cr_thumb = m_cr_thumb_current;
 			cr_text = m_cr_text_current;
 		}
 
-		//thumb_style, thumb 색상, text의 색상을 별도로 지정한 위치라면 그 설정대로 그려준다.
+		//thumb_style, text의 색상을 별도로 지정한 위치라면 그 설정대로 그려준다.
 		if (m_step[i].thumb_style != thumb_style_none)
 			thumb_style = m_step[i].thumb_style;
 
 		if (m_step[i].cr_text.GetValue() != Gdiplus::Color::Transparent)
 			cr_text = m_step[i].cr_text;
-
-		if (m_step[i].cr_thumb.GetValue() != Gdiplus::Color::Transparent)
-			cr_thumb = m_step[i].cr_thumb;
 
 
 		if (m_step[i].r.IsRectEmpty())
@@ -110,8 +105,10 @@ void CSCStepCtrl::OnPaint()
 		//pos 미만은 파란색 원에 체크 표시를
 		if (i < m_pos)
 		{
-			draw_line(g, m_step[i].r.CenterPoint().x - 3, m_step[i].r.CenterPoint().y - 0, m_step[i].r.CenterPoint().x - 1, m_step[i].r.CenterPoint().y + 2, Gdiplus::Color::White, 1.0f);
-			draw_line(g, m_step[i].r.CenterPoint().x - 1, m_step[i].r.CenterPoint().y + 2, m_step[i].r.CenterPoint().x + 3, m_step[i].r.CenterPoint().y - 2, Gdiplus::Color::White, 1.0f);
+			//20260728 by claude. 체크 표시 굵기 1.0 -> 1.8. 1.0 은 thumb(18px) 안에서 너무 가늘어 잘 안 보였다.
+			//짧은 왼쪽 획은 굵어지면서 상대적으로 더 짧아 보여 시작점을 left/top 으로 1px 씩 늘렸다.
+			draw_line(g, m_step[i].r.CenterPoint().x - 4, m_step[i].r.CenterPoint().y - 1, m_step[i].r.CenterPoint().x - 1, m_step[i].r.CenterPoint().y + 2, m_cr_check, 1.8f);
+			draw_line(g, m_step[i].r.CenterPoint().x - 1, m_step[i].r.CenterPoint().y + 2, m_step[i].r.CenterPoint().x + 3, m_step[i].r.CenterPoint().y - 2, m_cr_check, 1.8f);
 		}
 		else if (i == m_pos)
 		{
@@ -123,7 +120,8 @@ void CSCStepCtrl::OnPaint()
 			else
 				g.FillEllipse(&Gdiplus::SolidBrush(Gdiplus::Color::White), CRect_to_gpRect(rthumb_small));
 
-			rthumb_small.DeflateRect(2, 2);
+			//20260728 by claude. 안쪽 채움 원을 한 변당 1px 더 줄인다(지름 -2). 흰 원은 그대로.
+			rthumb_small.DeflateRect(3, 3);
 			if (thumb_style == thumb_style_rect)
 				//g.FillRectangle(&Gdiplus::SolidBrush(cr_thumb), CRect_to_gpRect(rthumb_small));
 				draw_rect(g, rthumb_small, Gdiplus::Color::Transparent, cr_thumb);
@@ -189,7 +187,10 @@ void CSCStepCtrl::OnPaint()
 		//각 스텝 사이의 라인을 그려준다.
 		if (i > 0)
 		{
-			Gdiplus::Pen pen_line(cr_thumb, 1.7f);
+			//20260728 by claude. 연결선은 "이전 스텝에서 나가는 선"이므로 이전 스텝 기준으로 색을 정한다.
+			//예전엔 이번 스텝(i)의 색으로 그려서, 마지막 스텝이 실패로 빨간색이면 거기까지 정상 진행했던
+			//직전 구간의 선까지 빨갛게 보였다(실패는 그 스텝에서 났는데 오는 길이 실패로 표시됨).
+			Gdiplus::Pen pen_line(get_line_color(i - 1), 1.7f);
 
 			if (m_horz)
 			{
@@ -207,6 +208,39 @@ void CSCStepCtrl::OnPaint()
 			}
 		}
 	}
+}
+
+//20260728 by claude. index 스텝에서 "나가는" 연결선의 색.
+//thumb 색과 규칙이 하나 다르다 — 진행 중(index == m_pos)인 스텝의 나가는 선은 아직 지나지 않은 구간이므로 비활성색이다.
+//(thumb 색을 그대로 쓰면 현재 항목보다 한 칸 앞선 선까지 진행색으로 그려진다.)
+Gdiplus::Color CSCStepCtrl::get_line_color(int index)
+{
+	if (index < 0 || index >= (int)m_step.size())
+		return m_cr_thumb_inactive;
+
+	//개별 지정(set_thumb_color)이 있으면 그 색 — 실패한 스텝에서 나가는 선은 실패색으로 이어진다.
+	if (m_step[index].cr_thumb.GetValue() != Gdiplus::Color::Transparent)
+		return m_step[index].cr_thumb;
+
+	return (index < m_pos) ? m_cr_thumb_active : m_cr_thumb_inactive;
+}
+
+Gdiplus::Color CSCStepCtrl::get_thumb_color(int index)
+{
+	if (index < 0 || index >= (int)m_step.size())
+		return m_cr_thumb_inactive;
+
+	//개별 지정(set_thumb_color)이 있으면 진행 상태보다 우선한다.
+	if (m_step[index].cr_thumb.GetValue() != Gdiplus::Color::Transparent)
+		return m_step[index].cr_thumb;
+
+	if (index > m_pos)
+		return m_cr_thumb_inactive;
+
+	if (index == m_pos)
+		return m_cr_thumb_current;
+
+	return m_cr_thumb_active;
 }
 
 void CSCStepCtrl::reconstruct_font()

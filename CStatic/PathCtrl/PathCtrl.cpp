@@ -42,6 +42,7 @@ CPathCtrl::~CPathCtrl()
 BEGIN_MESSAGE_MAP(CPathCtrl, CStatic)
 	ON_WM_PAINT()
 	ON_WM_ERASEBKGND()
+	ON_WM_ENABLE()
 	ON_WM_LBUTTONDOWN()
 	ON_WM_LBUTTONUP()
 	ON_WM_MOUSEMOVE()
@@ -227,6 +228,13 @@ BOOL CPathCtrl::PreTranslateMessage(MSG* pMsg)
 }
 
 
+void CPathCtrl::OnEnable(BOOL bEnable)
+{
+	//20260728 by claude. enable/disable 시 커스텀 OnPaint 를 강제한다. 없으면 기본 CStatic WM_ENABLE 처리가
+	//컨트롤을 지운 뒤 재그리기가 걸리지 않아, resize(OnSize) 전까지 컨트롤이 화면에서 사라진다(SCStatic::OnEnable 과 동일 패턴).
+	Invalidate(FALSE);
+}
+
 void CPathCtrl::OnPaint()
 {
 	CPaintDC dc1(this); // device context for painting
@@ -255,6 +263,8 @@ void CPathCtrl::OnPaint()
 
 	int		i;
 	CFont*	pOldFont = dc.SelectObject(&m_font);
+	//20260728 by claude. disabled 시 텍스트·chevron 을 테마 disabled 색으로, hover/선택 강조는 끈다.
+	bool	is_disabled = !IsWindowEnabled();
 	//down/hover 색상 매핑 — m_crDown/m_crOver 시절의 RGB 값과 동일한 theme 필드 사용:
 	//  m_crOver     (229,243,255) == cr_back_hover
 	//  m_crOverBorder(204,232,255) == cr_back_selected (light blue fill 과 동일 톤)
@@ -320,7 +330,7 @@ void CPathCtrl::OnPaint()
 
 		rArrow = rt;
 
-		if (i == m_index)
+		if (!is_disabled && i == m_index)
 		{
 			//현재 over 또는 down 상태인 셀을 특정색의 사각형으로 표시.
 			//단, 0번의 경우는 화살표 영역만 사각형을 그려준다.
@@ -350,7 +360,9 @@ void CPathCtrl::OnPaint()
 		rt.left += 5;
 
 		//활성 세그먼트(i==m_index)는 강조 배경 위에 그려지므로 그 상태색으로 — down=cr_text_selected, hover=cr_text_hover (CSCTreeCtrl 와 동일 규칙).
-		dc.SetTextColor((i == m_index ? (m_down ? m_theme.cr_text_selected : m_theme.cr_text_hover) : m_theme.cr_text).ToCOLORREF());
+		//disabled 면 상태색 무시하고 테마 disabled 텍스트색.
+		dc.SetTextColor((is_disabled ? m_theme.cr_text_disabled
+			: (i == m_index ? (m_down ? m_theme.cr_text_selected : m_theme.cr_text_hover) : m_theme.cr_text)).ToCOLORREF());
 
 		if (m_path[i].ellipsis)
 		{
@@ -371,7 +383,8 @@ void CPathCtrl::OnPaint()
 			//비활성은 본래 cr_text)을 흐리게. 원색은 너무 진해 탐색기 chevron 의 옅은 톤과 다름.
 			//get_weak_color(절대 offset) 대신 get_color(glyph, cr_back, ratio) (대비 비례) — 저대비 테마에서 묻힘 방지. ratio 0.2 ≒ offset 48.
 			Gdiplus::Color cr_glyph = (i == m_index ? (m_down ? m_theme.cr_text_selected : m_theme.cr_text_hover) : m_theme.cr_text);
-			Gdiplus::Color cr_arrow = get_color(cr_glyph, m_theme.cr_back, 0.2);
+			//disabled 면 chevron 도 테마 disabled 색(추가 약화 없이 — 이미 흐린 색이라 더 약화하면 묻힘).
+			Gdiplus::Color cr_arrow = is_disabled ? m_theme.cr_text_disabled : get_color(cr_glyph, m_theme.cr_back, 0.2);
 
 			//pathctrl의 width가 좁아서 일부 노드만 표시할 경우 생략되었음을 나타내는 << 기호를 표시
 			if (i == 0 && m_start_index > 1)

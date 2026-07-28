@@ -2142,7 +2142,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_text_selected_inactive = get_color(cr_text, 32);
 			cr_text_dropHilited = Gdiplus::Color::White;
 
-			cr_back = Gdiplus::Color::White;
+			cr_back = Gdiplus::Color(250, 250, 250);
 			cr_parent_back = cr_back;
 			cr_back_selected = cr_title_back_active;
 			cr_back_selected_inactive = get_color(cr_back_selected, 160);
@@ -2190,7 +2190,7 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_text_selected_inactive = get_color(cr_text, 32);
 			cr_text_dropHilited = Gdiplus::Color::White;
 
-			cr_back = Gdiplus::Color::White;
+			cr_back = Gdiplus::Color(250, 250, 250);
 			cr_parent_back = cr_back;
 			cr_back_selected = cr_title_back_active;         //selected = logo teal
 			cr_back_selected_inactive = get_color(cr_back_selected, 160);

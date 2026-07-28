@@ -261,8 +261,6 @@ public:
 	bool		add_image(CSCGdiplusBitmap *normal, bool add_auto_state_images = true);
 	bool		add_image(Gdiplus::Bitmap *img);
 	void		use_normal_image_on_disabled(bool use = true);
-	//disabled 상태에서도 배경색을 normal 색 그대로 사용 (회색 자동변환 안 함). image 의 use_normal_image_on_disabled 와 동일 패턴.
-	void		use_normal_back_color_on_disabled(bool use = true);
 
 	CSize		get_img_size(int index = 0);
 	CSize		get_img_origin_size() { return m_sz_img_origin; }
@@ -317,6 +315,15 @@ public:
 	//3개의 색상은 지정하지만 disabled는 기본 disable color를 쓰고자 할 경우에는 Transparent로 호출한다.
 	void		set_back_color(Gdiplus::Color normal, Gdiplus::Color hover, Gdiplus::Color down, Gdiplus::Color disabled = Gdiplus::Color::Transparent);
 	void		set_hover_back_color(Gdiplus::Color hover_back);
+
+	//[Common 공통 규칙] disabled 상태의 text/back 색을 지정한다. 모든 SC/Gdi 컨트롤이 동일한 이름·의미로 제공한다.
+	//존재 이유: 색 테마가 적용된 앱에서 disabled 컨트롤이 OS 기본 무채색 gray 로 칠해지면 테마와 어긋나 보기 싫다.
+	//         그럴 때 테마에 맞는 색을 disabled 에 그대로 지정하기 위한 override.
+	//cr == Transparent(기본) : OS 기본 disabled 색(text=COLOR_GRAYTEXT, back=normal 에서 약화 파생) 사용 → 기존 동작 유지.
+	//cr 불투명색             : 그 색을 disabled 에 사용.
+	//normal/hover/down 을 먼저 세팅(set_text_color/set_back_color/set_color_theme)한 뒤 호출한다(그 setter 들이 deque 를 재구성하므로).
+	void		set_text_color_disabled(Gdiplus::Color cr = Gdiplus::Color::Transparent);
+	void		set_back_color_disabled(Gdiplus::Color cr = Gdiplus::Color::Transparent);
 
 	//text, back color를 기준으로 hover, down 색상들을 자동 설정해준다.
 	//m_use_hover = true로 자동 설정된다.
@@ -616,7 +623,6 @@ protected:
 	bool		m_draw_3D_rect = false;					//입체 느낌의 3D, 누르면 sunken. default = true;
 	CPoint		m_down_offset = CPoint(0, 0);			//눌렸을 때 그려질 위치. default는 offset=0. 이 값이 클 경우 여백이 없는 이미지라면 잘릴 수 있다.
 	bool		m_use_normal_image_on_disabled = false;	//disabled는 기본 회색으로 자동 생성하지만 그렇게 하지 않는 경우도 있을 수 있다. default = false;
-	bool		m_use_normal_back_color_on_disabled = false;	//disabled 시에도 배경색을 normal 그대로. default = false (= 회색 자동 파생).
 
 	//이미지를 사용하는 버튼이라도 자신에게 세팅된 텍스트를 표시해줘야 할 경우도 존재한다.
 	//ex. 공용 버튼 이미지를 사용하는 경우

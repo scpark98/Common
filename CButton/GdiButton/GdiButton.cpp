@@ -183,7 +183,6 @@ void CGdiButton::copy_properties(CGdiButton& dst)
 
 	dst.m_down_offset = m_down_offset;
 	dst.m_use_normal_image_on_disabled = m_use_normal_image_on_disabled;
-	dst.m_use_normal_back_color_on_disabled = m_use_normal_back_color_on_disabled;
 
 	dst.m_draw_own_text = m_draw_own_text;
 
@@ -370,20 +369,6 @@ void CGdiButton::use_normal_image_on_disabled(bool use)
 			if (!m_use_normal_image_on_disabled)
 				m_image[i]->img[3].set_matrix(&m_grayMatrix);
 		}
-	}
-}
-
-void CGdiButton::use_normal_back_color_on_disabled(bool use)
-{
-	m_use_normal_back_color_on_disabled = use;
-
-	//호출 시점에 이미 m_cr_back 이 채워져 있을 수 있어 disabled 슬롯을 즉시 갱신.
-	if (m_cr_back.size() >= 4)
-	{
-		m_cr_back[3] = use ? m_cr_back[0] : get_weak_color(m_cr_back[0], 60);
-		if (!m_border_color_user_set && m_cr_border.size() >= 4)
-			m_cr_border[3] = m_cr_back[3];
-		redraw_window();
 	}
 }
 
@@ -614,6 +599,11 @@ void CGdiButton::set_color_theme(const CSCColorTheme& theme, bool invalidate)
 	const int round = is_push ? 4 : 0;
 	set_round(round, cr_border, theme.cr_parent_back);
 
+	//20260728 by claude. disabled text/back 색을 테마 공용 슬롯에서 반영 — 무채색 gray 대신 테마색.
+	//cr_back_disabled 가 Transparent(기본)면 set_back_color_disabled 가 normal 에서 파생(기존 동작 유지).
+	set_text_color_disabled(theme.cr_text_disabled);
+	set_back_color_disabled(theme.cr_back_disabled);
+
 	if (invalidate && m_hWnd)
 		Invalidate();
 }
@@ -647,7 +637,8 @@ void CGdiButton::set_back_color(Gdiplus::Color normal, bool auto_color)
 	//normal 색상에 따라 16이라는 offset이 크거나 작게 느껴진다.
 	//disabled 색을 normal 에서 get_weak_color 로 파생 — 테마에 자연스럽게 따라감.
 	//(이전: LightGray 하드코딩 → normal 색과 무관하게 동일 회색이 되어 테마와 어긋남)
-	Gdiplus::Color cr_disabled = m_use_normal_back_color_on_disabled ? normal : get_weak_color(normal, 60);
+	//테마색으로 disabled 를 강제하려면 set_color_theme 이후 set_back_color_disabled(cr) 를 호출한다.
+	Gdiplus::Color cr_disabled = get_weak_color(normal, 60);
 	if (auto_color)
 		set_back_color(normal, get_color(normal, 16), get_color(normal, -16), cr_disabled);
 	else
@@ -674,10 +665,6 @@ void CGdiButton::set_back_color(Gdiplus::Color normal, Gdiplus::Color over, Gdip
 
 	//checkbox, radio는 disabled라도 배경색까지 바꾸진 않는다.
 	if (is_button_style(BS_CHECKBOX, BS_AUTOCHECKBOX) || (is_button_style(BS_RADIOBUTTON, BS_AUTORADIOBUTTON)))
-		disabled = normal;
-
-	//use_normal_back_color_on_disabled 가 set 되어 있으면 인자 무시하고 normal 색 사용.
-	if (m_use_normal_back_color_on_disabled)
 		disabled = normal;
 
 	m_cr_back.push_back(disabled);
@@ -732,6 +719,32 @@ void CGdiButton::set_hover_back_color(Gdiplus::Color hover_back)
 		return;
 
 	m_cr_back[1] = hover_back;
+}
+
+//20260728 by claude. [Common 공통 규칙] disabled text 색만 override. Transparent = COLOR_GRAYTEXT(기존 기본).
+void CGdiButton::set_text_color_disabled(Gdiplus::Color cr)
+{
+	if (m_cr_text.size() < 4)
+		return;
+	m_cr_text[3] = (cr.GetA() != 0) ? cr : get_sys_color(COLOR_GRAYTEXT);
+	redraw_window();
+}
+
+//20260728 by claude. [Common 공통 규칙] disabled back 색만 override. Transparent = normal 에서 약화 파생(set_back_color 의 기존 기본과 동일).
+void CGdiButton::set_back_color_disabled(Gdiplus::Color cr)
+{
+	if (m_cr_back.size() < 4)
+		return;
+	m_cr_back[3] = (cr.GetA() != 0) ? cr : get_weak_color(m_cr_back[0], 60);
+	//20260728 by claude. checkbox/radio 는 disabled 라도 배경색을 바꾸지 않는다(4-arg set_back_color 와 동일 규칙).
+	//이 규칙이 여기 없어, set_color_theme 이 호출하는 set_back_color_disabled(theme.cr_back_disabled) 가 radio 에도
+	//disabled 배경을 입히던 문제. PUSHLIKE(버튼처럼 보이는) 는 예외 — 일반 버튼처럼 disabled face 를 쓴다.
+	if ((is_button_style(BS_CHECKBOX, BS_AUTOCHECKBOX) || is_button_style(BS_RADIOBUTTON, BS_AUTORADIOBUTTON)) && !is_button_style(BS_PUSHLIKE))
+		m_cr_back[3] = m_cr_back[0];
+	//set_back_color 와 동일하게 border 를 사용자가 별도 지정하지 않았으면 back 과 동기화.
+	if (!m_border_color_user_set && m_cr_border.size() >= 4)
+		m_cr_border[3] = m_cr_back[3];
+	redraw_window();
 }
 
 //text, back color를 기준으로 hover, down 색상들을 자동 설정해준다.

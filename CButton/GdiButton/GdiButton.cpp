@@ -601,7 +601,9 @@ void CGdiButton::set_color_theme(const CSCColorTheme& theme, bool invalidate)
 
 	//20260728 by claude. disabled text/back 색을 테마 공용 슬롯에서 반영 — 무채색 gray 대신 테마색.
 	//cr_back_disabled 가 Transparent(기본)면 set_back_color_disabled 가 normal 에서 파생(기존 동작 유지).
-	set_text_color_disabled(theme.cr_text_disabled);
+	//단 사용자가 set_text_color_disabled 로 명시 지정한 버튼은 테마 전파가 그 색을 덮지 않는다(사용자 지정 우선).
+	if (!m_text_color_disabled_user_set)
+		set_text_color_disabled(theme.cr_text_disabled);
 	set_back_color_disabled(theme.cr_back_disabled);
 
 	if (invalidate && m_hWnd)
@@ -626,6 +628,11 @@ void CGdiButton::set_text_color(Gdiplus::Color normal, Gdiplus::Color over, Gdip
 
 	if (disabled.GetA() == 0)
 		disabled = get_sys_color(COLOR_GRAYTEXT);
+
+	//20260728 by claude. set_text_color_disabled 로 명시 지정된 색이 있으면 그 색을 유지한다.
+	//이 함수는 m_cr_text 를 재구성하므로 가드가 없으면 normal 색만 바꾸는 호출에도 지정색이 지워진다.
+	if (m_text_color_disabled_user_set)
+		disabled = m_cr_text_disabled_override;
 
 	m_cr_text.push_back(disabled);
 
@@ -726,6 +733,10 @@ void CGdiButton::set_text_color_disabled(Gdiplus::Color cr)
 {
 	if (m_cr_text.size() < 4)
 		return;
+	//20260728 by claude. 지정색을 별도 멤버에도 보관 — 이후 set_text_color 가 deque 를 재구성해도 이 색이 유지된다.
+	//Transparent(기본 인자) 로 호출하면 override 해제 → 기본(COLOR_GRAYTEXT) 산출로 복귀.
+	m_text_color_disabled_user_set = (cr.GetA() != 0);
+	m_cr_text_disabled_override = cr;
 	m_cr_text[3] = (cr.GetA() != 0) ? cr : get_sys_color(COLOR_GRAYTEXT);
 	redraw_window();
 }

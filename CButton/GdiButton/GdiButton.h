@@ -591,6 +591,13 @@ protected:
 	std::deque <Gdiplus::Color>	m_cr_back;		//투명 PNG라도 배경색을 설정했다면 배경색이 그려진다.
 	std::deque <Gdiplus::Color> m_cr_border;	//border의 색상은 기본적으로 m_cr_back과 동일하게 세팅되지만 개별 설정도 가능하다.
 	bool		m_border_color_user_set = false;	//set_border_color/set_round(cr_border!=Transparent) 호출 시 true. set_back_color 가 m_cr_border 를 덮어쓰지 않도록 보호.
+
+	//20260728 by claude. disabled 텍스트색 사용자 override — CSCStaticEdit 의 m_text_color_disabled_user_set 과 동일 규칙.
+	//set_text_color(normal[,...]) 은 deque 를 재구성하며 disabled 슬롯을 COLOR_GRAYTEXT 로 되돌리므로, 가드가 없으면
+	//"disabled 색 지정 → 이후 normal 색만 변경" 순서에서 지정색이 조용히 사라진다(테마 확정 후 색을 다시 칠하는 dlg 에서 빈발).
+	//set_text_color_disabled(Transparent) 로 호출하면 해제되어 기본 산출로 돌아간다.
+	bool			m_text_color_disabled_user_set = false;
+	Gdiplus::Color	m_cr_text_disabled_override = Gdiplus::Color::Transparent;
 	bool		m_auto_color = true;				//set_color_theme 적용 시 hover/down 색 자동 산출 여부. set_auto_color 로 변경.
 
 	//int			m_width = 0;

@@ -164,10 +164,11 @@ public:
     bool		    is_readonly() const { return m_readonly; }
     //readonly일 때 윈도우 기본색인 gray로 표시할 것인지, 특정색을 사용할 지, transparent라면 m_cr_back을 사용하게 된다.
     void			set_use_default_readonly_color(bool use_default_readonly_color = true, Gdiplus::Color cr_back_readonly = Gdiplus::Color::Transparent);
-    //disabled 일 때 윈도우 기본 disabled 회색(LightGray)을 쓸 것인지, 지정한 색을 쓸 것인지.
-    //readonly 와 달리 disabled 는 enabled 상태와 시각 구분이 필요하므로 별도 배경색(m_cr_back_disabled)을 보관한다.
-    //cr_back_disabled 가 Transparent 이면 값 유지(이전에 세팅해둔 색 그대로).
-    void			set_use_default_disabled_color(bool use_default_disabled_color = true, Gdiplus::Color cr_back_disabled = Gdiplus::Color::Transparent);
+    //[Common 공통 규칙] disabled text/back 색. 값은 m_theme.cr_text_disabled / cr_back_disabled 에 저장된다.
+    //Transparent(기본) = 기존 기본(text=테마 cr_text_disabled 값, back=LightGray) 사용, 불투명색 = 그 색.
+    //readonly 와 달리 disabled 는 enabled 상태와 시각 구분이 필요하므로 테마색으로 override 하는 용도.
+    void			set_text_color_disabled(Gdiplus::Color cr = Gdiplus::Color::Transparent);
+    void			set_back_color_disabled(Gdiplus::Color cr = Gdiplus::Color::Transparent);
 
 
     //mask_char 기본 = U+25CF BLACK CIRCLE (●). '*' 는 typography 관례상 superscript 위치(x-height 위)에
@@ -297,8 +298,14 @@ private:
     // ── 옵션 ──
     bool		m_readonly   = false;
     bool        m_use_default_readonly_color = true;
-    bool        m_use_default_disabled_color = true;
-    Gdiplus::Color m_cr_back_disabled = Gdiplus::Color::LightGray;   // draw_background 의 기존 하드코딩 값 이관
+    //20260728 by claude. disabled 본문 텍스트색 사용자 override. set_text_color_disabled 가 호출되면 m_text_color_disabled_user_set=true,
+    //그 색을 m_cr_text_disabled_override 에 보관. 미호출(기본)이면 시스템 COLOR_GRAYTEXT(네이티브 CSCEdit 과 동일).
+    //m_theme.cr_text_disabled(테마 전파값)와 별개로 보관 — 전파(copy_colors_from)가 사용자 지정색을 덮어쓰지 않게 하기 위함.
+    bool			m_text_color_disabled_user_set = false;
+    Gdiplus::Color	m_cr_text_disabled_override = Gdiplus::Color::Transparent;
+    //disabled 색 헬퍼. text: 세터 호출됐으면 override 색, 아니면 시스템 GRAYTEXT. back: m_theme.cr_back_disabled(Transparent 면 LightGray).
+    Gdiplus::Color	get_text_color_disabled() const { return m_text_color_disabled_user_set ? m_cr_text_disabled_override : get_sys_color(COLOR_GRAYTEXT); }
+    Gdiplus::Color	get_back_color_disabled() const { return (m_theme.cr_back_disabled.GetA() != 0) ? m_theme.cr_back_disabled : Gdiplus::Color::LightGray; }
     bool		m_password   = false;
     TCHAR		m_mask_char  = (TCHAR)0x25CF;	//U+25CF BLACK CIRCLE (●) — set_password_mode 주석 참조
     int			m_limit_text = 0;      // 0 = 제한 없음

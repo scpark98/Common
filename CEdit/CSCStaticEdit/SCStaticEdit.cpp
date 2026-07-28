@@ -353,11 +353,18 @@ void CSCStaticEdit::set_use_default_readonly_color(bool use_default, Gdiplus::Co
 	Invalidate();
 }
 
-void CSCStaticEdit::set_use_default_disabled_color(bool use_default, Gdiplus::Color cr_back_disabled)
+void CSCStaticEdit::set_text_color_disabled(Gdiplus::Color cr)
 {
-	m_use_default_disabled_color = use_default;
-	if (cr_back_disabled.GetValue() != Gdiplus::Color::Transparent)
-		m_cr_back_disabled = cr_back_disabled;
+	//20260728 by claude. Transparent(기본 인자) = 기본색(시스템 GRAYTEXT)으로 리셋, 불투명색 = 그 색으로 명시 지정.
+	//값은 별도 멤버에 보관 — 테마 전파(copy_colors_from)가 사용자 지정색을 덮어쓰지 않게 하기 위함.
+	m_text_color_disabled_user_set = (cr.GetA() != 0);
+	m_cr_text_disabled_override = cr;
+	Invalidate();
+}
+
+void CSCStaticEdit::set_back_color_disabled(Gdiplus::Color cr)
+{
+	m_theme.cr_back_disabled = cr;
 	Invalidate();
 }
 
@@ -1216,10 +1223,10 @@ void CSCStaticEdit::OnPaint()
 // ──────────────────────────────────────────────────────────
 void CSCStaticEdit::draw_background(Gdiplus::Graphics& g, const CRect& rc)
 {
-	// disabled : 기본 LightGray. set_use_default_disabled_color(false, cr) 로 테마 색 지정 가능.
+	// disabled : get_back_color_disabled() = m_theme.cr_back_disabled(Transparent 면 LightGray). set_back_color_disabled(cr) 로 테마색 지정.
 	// readonly + use_default_readonly_color : 표준 다이얼로그 배경(COLOR_3DFACE) 그대로.
 	Gdiplus::Color cr_back =
-		!IsWindowEnabled()                                       ? (m_use_default_disabled_color ? Gdiplus::Color::LightGray : m_cr_back_disabled) :
+		!IsWindowEnabled()                                       ? get_back_color_disabled()           :
 		(m_readonly && m_use_default_readonly_color)             ? get_sys_color(COLOR_3DFACE)         :
 		                                                           m_theme.cr_back;
 
@@ -1338,7 +1345,10 @@ void CSCStaticEdit::draw_text(Gdiplus::Graphics& g, const CRect& rc_text)
 
 	if (display.IsEmpty()) return;
 
-	Gdiplus::Color cr_text = IsWindowEnabled() ? m_theme.cr_text : m_theme.cr_disabled_text;
+	//20260728 by claude. disabled 본문 텍스트 = get_text_color_disabled(). 기본은 시스템 COLOR_GRAYTEXT(네이티브 CSCEdit 과 동일 —
+	//네이티브 disabled edit 은 WM_CTLCOLOR 텍스트색을 무시하고 항상 GRAYTEXT 로 그림, 빨강 테스트로 확인). set_text_color_disabled 로
+	//명시 지정한 경우에만 그 색. (사용자 지시 2026-07-28 — 기본은 CSCEdit 과 동일, 명시 지정 시 그 색 존중)
+	Gdiplus::Color cr_text = IsWindowEnabled() ? m_theme.cr_text : get_text_color_disabled();
 
 	// 텍스트는 GDI(TextOut)로 렌더링 ? 측정(GetTextExtent)과 픽셀 단위로 완벽 일치.
 	// (GDI+ MeasureString/DrawString 조합은 측정-렌더링 간 서브픽셀 오차가 있어

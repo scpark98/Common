@@ -18,15 +18,12 @@ CSCEdit::CSCEdit()
 	: m_rect_NCbottom(0, 0, 0, 0)
 	, m_rect_NCtop(0, 0, 0, 0)
 {
-	m_cr_text_disabled.SetFromCOLORREF(::GetSysColor(COLOR_GRAYTEXT));
-	//m_cr_back_disabled.SetFromCOLORREF(GetSysColor(COLOR_3DSHADOW));
-
 	m_cr_button_back = Gdiplus::Color(0, 255, 0);
 	m_cr_button_back_hover = Gdiplus::Color(64, 255, 64);
 	m_cr_button_back_down = Gdiplus::Color(0, 192, 0);
 
 	m_br_back.CreateSolidBrush(m_theme.cr_back.ToCOLORREF());
-	m_br_back_disabled.CreateSolidBrush(m_cr_back_disabled.ToCOLORREF());
+	m_br_back_disabled.CreateSolidBrush(get_back_color_disabled().ToCOLORREF());
 
 	m_auto_resize_font = false;
 	m_auto_resize_ratio = 0.5;
@@ -307,17 +304,17 @@ void CSCEdit::set_back_color(Gdiplus::Color crColor)
 	RedrawWindow();
 }
 
-void CSCEdit::set_text_color_disabled(Gdiplus::Color cr_text_disabled)
+void CSCEdit::set_text_color_disabled(Gdiplus::Color cr)
 {
-	m_cr_text_disabled = cr_text_disabled;
+	m_theme.cr_text_disabled = cr;
 	RedrawWindow();
 }
 
-void CSCEdit::set_back_color_disabled(Gdiplus::Color cr_back_disabled)
+void CSCEdit::set_back_color_disabled(Gdiplus::Color cr)
 {
-	m_cr_back_disabled = cr_back_disabled;
+	m_theme.cr_back_disabled = cr;
 	m_br_back_disabled.DeleteObject();
-	m_br_back_disabled.CreateSolidBrush(m_cr_back_disabled.ToCOLORREF());
+	m_br_back_disabled.CreateSolidBrush(get_back_color_disabled().ToCOLORREF());
 	RedrawWindow();
 }
 
@@ -379,20 +376,20 @@ HBRUSH CSCEdit::CtlColor(CDC* pDC, UINT nCtlColor)
 		}
 		else
 		{
-			pDC->SetBkColor(m_cr_back_disabled.ToCOLORREF());
+			pDC->SetBkColor(get_back_color_disabled().ToCOLORREF());
 			m_br_back_disabled.DeleteObject();
-			m_br_back_disabled.CreateSolidBrush(m_cr_back_disabled.ToCOLORREF());
+			m_br_back_disabled.CreateSolidBrush(get_back_color_disabled().ToCOLORREF());
 			hbr = (HBRUSH)m_br_back_disabled;
 		}
 	}
 	else if (!IsWindowEnabled())// || nCtlColor == CTLCOLOR_STATIC)
 	{
-		pDC->SetTextColor(m_cr_text_disabled.ToCOLORREF());
-		pDC->SetBkColor(m_cr_back_disabled.ToCOLORREF());
+		pDC->SetTextColor(get_text_color_disabled().ToCOLORREF());
+		pDC->SetBkColor(get_back_color_disabled().ToCOLORREF());
 		m_br_back.DeleteObject();
 		m_br_back.CreateSolidBrush(m_theme.cr_back.ToCOLORREF());
 		m_br_back_disabled.DeleteObject();
-		m_br_back_disabled.CreateSolidBrush(m_cr_back_disabled.ToCOLORREF());
+		m_br_back_disabled.CreateSolidBrush(get_back_color_disabled().ToCOLORREF());
 		hbr = (HBRUSH)m_br_back_disabled;
 	}
 	else
@@ -408,7 +405,9 @@ HBRUSH CSCEdit::CtlColor(CDC* pDC, UINT nCtlColor)
 	}
 
 	//ExcludeClipRect()를 해주지 않으면 텍스트 출력 영역에 의해 테두리가 지워진다.
-	if (m_draw_border)
+	//20260728 by claude. disabled 시엔 border 를 그리지 않으므로(OnEraseBkgnd) 제외도 하지 않는다 — 제외하면 border 링이
+	//네이티브 채움에서 빠져 밑의 프레임이 left/top 에 비친다.
+	if (m_draw_border && IsWindowEnabled())
 	{
 		ExcludeClipRect(pDC->m_hDC, rc.left, rc.top, rc.left + m_border_width, rc.bottom);		//left
 		ExcludeClipRect(pDC->m_hDC, rc.left, rc.top, rc.right, rc.top + m_border_width);		//top
@@ -886,7 +885,7 @@ BOOL CSCEdit::OnEraseBkgnd(CDC* pDC)
 
 	if (!IsWindowEnabled())
 	{
-		cr_back = m_cr_back_disabled;// gRGB(192, 192, 192);
+		cr_back = get_back_color_disabled();// gRGB(192, 192, 192);
 	}
 	else if (GetStyle() & ES_READONLY)
 	{
@@ -940,7 +939,9 @@ BOOL CSCEdit::OnEraseBkgnd(CDC* pDC)
 	}
 	*/
 	//m_draw_border이면 m_cr_border 색상으로 그리지만 false이면 그리지 않는다.
-	draw_rect(g, rc, m_draw_border ? cr_border : Gdiplus::Color::Transparent, cr_back, m_border_width);
+	//20260728 by claude. disabled 상태에서는 CSCStaticEdit 과 동일하게 border 를 그리지 않는다.
+	bool draw_border = m_draw_border && IsWindowEnabled();
+	draw_rect(g, rc, draw_border ? cr_border : Gdiplus::Color::Transparent, cr_back, m_border_width);
 	//draw_round_rect(&g, CRect_to_gpRect(rc), (m_draw_border ? m_cr_border : Gdiplus::Color::Transparent), cr_back, rc.Height()/2, m_border_width);
 
 	//pDC->SetBkMode(TRANSPARENT);

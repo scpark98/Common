@@ -146,9 +146,10 @@ public:
 	void				set_text_color(Gdiplus::Color cr_text); // This Function is to set the Color for the Text.
 	Gdiplus::Color		get_back_color() { return m_theme.cr_back; }
 	void				set_back_color(Gdiplus::Color cr_back); // This Function is to set the BackGround Color for the Text and the Edit Box.
-	//아직 set_text_color_disabled()는 효과가 적용되고 있지 않다. 수정 필요.
-	void				set_text_color_disabled(Gdiplus::Color cr_text_disabled);
-	void				set_back_color_disabled(Gdiplus::Color cr_back_disabled);
+	//[Common 공통 규칙] disabled text/back 색. 값은 m_theme.cr_text_disabled / cr_back_disabled 에 저장된다.
+	//Transparent(기본) = 각 컨트롤 기존 기본(text=테마 cr_text_disabled 값, back=LightGray) 사용, 불투명색 = 그 색.
+	void				set_text_color_disabled(Gdiplus::Color cr = Gdiplus::Color::Transparent);
+	void				set_back_color_disabled(Gdiplus::Color cr = Gdiplus::Color::Transparent);
 
 	//read only일 때 배경색을 변경할 수 있다. 파라미터를 주지 않으면 윈도우 기본 readonly 배경색(COLOR_3DFACE)으로 설정된다.
 	void				set_back_color_readonly(Gdiplus::Color cr_back_readonly = get_sys_color(COLOR_3DFACE));
@@ -259,8 +260,9 @@ protected:
 
 	//Gdiplus::Color	m_cr_text;
 	//Gdiplus::Color	m_cr_back;
-	Gdiplus::Color		m_cr_text_disabled;	//배경은 변경되나 text색상은 COLOR_GREYTEXT로 고정된듯하다. 현재로는 변경 불가.
-	Gdiplus::Color		m_cr_back_disabled = Gdiplus::Color::LightGray;	//간혹 disabled일때 윈도우 기본 회색이 아닌 특정색으로 표현해야 할 필요가 있다.
+	//disabled 색은 m_theme.cr_text_disabled / cr_back_disabled 에 저장(Common 공통). 아래 헬퍼로 sentinel(Transparent) 해석.
+	Gdiplus::Color		get_text_color_disabled() const { return (m_theme.cr_text_disabled.GetA() != 0) ? m_theme.cr_text_disabled : get_sys_color(COLOR_GRAYTEXT); }
+	Gdiplus::Color		get_back_color_disabled() const { return (m_theme.cr_back_disabled.GetA() != 0) ? m_theme.cr_back_disabled : Gdiplus::Color::LightGray; }
 
 	//readonly일 때 m_cr_back_readonly를 사용할 지 지정된 배경인 m_cr_back을 사용할 지.
 	//때로는 readonly일 때도 m_cr_back으로 표현해야 하는 경우도 있다.

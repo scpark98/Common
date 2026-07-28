@@ -105,6 +105,14 @@ public:
 protected:
 	CWnd*			m_message_target = nullptr;
 
+	//20260728 by claude. 스크롤 대상 컨트롤(owner)이 disabled 인가. 리스트/트리는 스크롤바를 자기 자식이
+	//아닌 host 에 두는 경우가 있어 컨트롤 disable 이 스크롤바 자식으로 전파되지 않는다. 입력/호버를 이 값으로 가드.
+	bool			is_owner_enabled() const
+	{
+		CWnd* owner = m_message_target ? m_message_target : GetParent();
+		return !owner || owner->IsWindowEnabled();
+	}
+
 	ORIENTATION		m_orient = vertical;
 
 	//모델

@@ -347,6 +347,12 @@ void CSCScrollbar::emit(int msg)
 
 void CSCScrollbar::OnLButtonDown(UINT nFlags, CPoint point)
 {
+	//20260728 by claude. owner(스크롤 대상 컨트롤)가 disabled 면 스크롤바 입력을 무시한다.
+	//리스트는 스크롤바를 자기 자식이 아닌 host(우측 NC 띠)에 두어, 리스트를 EnableWindow(FALSE) 해도
+	//스크롤바 자식이 disable 되지 않아 계속 반응하던 문제.
+	if (!is_owner_enabled())
+		return;
+
 	SCROLL_PART part = hit_test(point);
 	if (part == part_none)
 		return;
@@ -389,6 +395,10 @@ void CSCScrollbar::OnLButtonDown(UINT nFlags, CPoint point)
 
 void CSCScrollbar::OnMouseMove(UINT nFlags, CPoint point)
 {
+	//20260728 by claude. owner 가 disabled 면 hover(두께 확장·하이라이트)도 반응하지 않는다.
+	if (!is_owner_enabled())
+		return;
+
 	if (!m_tracking_leave)
 	{
 		TRACKMOUSEEVENT tme = { sizeof(TRACKMOUSEEVENT), TME_LEAVE, m_hWnd, 0 };

@@ -26,6 +26,7 @@ CSCSystemButtons::~CSCSystemButtons()
 BEGIN_MESSAGE_MAP(CSCSystemButtons, CButton)
 	ON_WM_PAINT()
 	ON_WM_ERASEBKGND()
+	ON_WM_ENABLE()
 	ON_WM_LBUTTONDOWN()
 	ON_WM_LBUTTONUP()
 	ON_WM_MOUSEMOVE()
@@ -171,6 +172,13 @@ int CSCSystemButtons::get_button_index(CPoint pt)
 	}
 
 	return -1;
+}
+
+void CSCSystemButtons::OnEnable(BOOL bEnable)
+{
+	//20260728 by claude. 기본 CButton::OnEnable 은 disable 순간 버튼의 window text("CSCSystemButtons")를
+	//네이티브로 잠깐 그려 라벨이 번쩍인다. 기본 처리를 건너뛰고 우리 OnPaint 로만 다시 그린다(SCStatic::OnEnable 과 동일 패턴).
+	Invalidate(FALSE);
 }
 
 void CSCSystemButtons::OnPaint()

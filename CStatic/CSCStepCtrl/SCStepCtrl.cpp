@@ -109,9 +109,34 @@ void CSCStepCtrl::OnPaint()
 			Gdiplus::Color cr_check = get_check_color(cr_thumb);
 
 			//20260728 by claude. 체크 표시 굵기 1.0 -> 1.8. 1.0 은 thumb(18px) 안에서 너무 가늘어 잘 안 보였다.
-			//짧은 왼쪽 획은 굵어지면서 상대적으로 더 짧아 보여 시작점을 left/top 으로 1px 씩 늘렸다.
-			draw_line(g, m_step[i].r.CenterPoint().x - 4, m_step[i].r.CenterPoint().y - 1, m_step[i].r.CenterPoint().x - 1, m_step[i].r.CenterPoint().y + 2, cr_check, 1.8f);
-			draw_line(g, m_step[i].r.CenterPoint().x - 1, m_step[i].r.CenterPoint().y + 2, m_step[i].r.CenterPoint().x + 3, m_step[i].r.CenterPoint().y - 2, cr_check, 1.8f);
+			//20260729 by claude. 중심 정렬 보정. 이전에는 획 두 개를 따로 그렸고 좌표가 (-4,-1) (-1,+2) (+3,-2) 라
+			//가로 잉크 범위가 [-4, +3] 이어서 중심이 0.5px 왼쪽이었다. 게다가 두 선을 따로 그리면 꼭짓점에서
+			//이음(join)이 생기지 않아 아래쪽 모서리에 홈이 남고, 그만큼 아래가 얇아 보여 표시가 위로 치우쳐 보였다.
+			//
+			//(1) 한 폴리라인으로 그려 꼭짓점을 이어준다.
+			//(2) 좌표를 중심 기준으로 x [-3.5, +3.5] 로 잡아 가로를 대칭으로 만든다.
+			//    가로 폭 7 을 정수 좌표로는 대칭 배치할 수 없어 0.5 단위를 쓴다(draw_line 은 int 라 못 쓴다).
+			//(3) cap / join 을 round 로 둔다. 이러면 잉크가 경로 경계에서 전 방향으로 굵기의 절반만큼 균일하게
+			//    번지므로, 경로가 대칭이면 실제 잉크도 대칭이 된다(flat cap + miter join 은 방향마다
+			//    번지는 양이 달라 다시 치우친다).
+			//세로는 기하학적 중심(y [-2, +2])보다 0.5px 아래로 둔다 — 체크는 위쪽 끝 두 개가 벌어지고 아래는
+			//꼭짓점 하나로 모이는 모양이라 기하 중심에 놓으면 눈에는 위로 떠 보인다. 시각 보정값이다.
+			const float cx = (float)m_step[i].r.CenterPoint().x;
+			const float cy = (float)m_step[i].r.CenterPoint().y + 0.5f;
+
+			Gdiplus::PointF pt_check[3] =
+			{
+				Gdiplus::PointF(cx - 3.5f, cy - 1.0f),		//왼쪽 끝
+				Gdiplus::PointF(cx - 0.5f, cy + 2.0f),		//꼭짓점
+				Gdiplus::PointF(cx + 3.5f, cy - 2.0f),		//오른쪽 끝
+			};
+
+			Gdiplus::Pen pen_check(cr_check, 1.8f);
+			pen_check.SetStartCap(Gdiplus::LineCapRound);
+			pen_check.SetEndCap(Gdiplus::LineCapRound);
+			pen_check.SetLineJoin(Gdiplus::LineJoinRound);
+
+			g.DrawLines(&pen_check, pt_check, 3);
 		}
 		else if (i == m_pos)
 		{

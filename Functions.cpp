@@ -13510,19 +13510,33 @@ CString run_process(CString exePath, bool wait_process_exit, bool return_after_f
 	//외부 실행파일일 경우는 result string이 없으므로 이 코드를 실행하면 안된다.
 	if (!is_gui_app)
 	{
-		for (;;)
+		//20260729 by claude. 읽은 바이트를 먼저 모으고 마지막에 한 번만 변환한다. 기존 코드의 결함 두 가지:
+		//(1) 10240 바이트 버퍼에 10240 바이트를 요청해 NUL 자리가 없는데 `result += chBuf` 는 NUL 까지 읽는다
+		//    → 읽기가 꽉 차면 스택을 넘어 읽는다. tasklist(출력 22KB) 처럼 큰 명령은 실제로 꽉 찬 읽기가 난다.
+		//(2) 청크마다 개별 변환해 멀티바이트 문자가 청크 경계에 걸치면 그 글자가 깨진다.
+		//읽은 dwRead 바이트만 정확히 append 하므로 (1)이, 전체를 모아 한 번에 변환하므로 (2)가 사라진다.
+		//변환 코드페이지는 기존 동작(CString += const char* = CP_ACP) 을 그대로 유지한다.
+		std::string bytes;
+		char chBuf[10240];
+		DWORD dwRead = 0;
+
+		while (ReadFile(hChildStdoutRd, chBuf, sizeof(chBuf), &dwRead, NULL) && dwRead > 0)
 		{
-			DWORD dwRead;
-			char chBuf[10240] = { 0, };
+			bytes.append(chBuf, dwRead);
 
-			bool done = !ReadFile(hChildStdoutRd, chBuf, 10240, &dwRead, NULL) || dwRead == 0;
-
-			if (done)
-				break;
-
-			result += chBuf;
 			if (return_after_first_read)
 				break;
+		}
+
+		if (!bytes.empty())
+		{
+			int wlen = MultiByteToWideChar(CP_ACP, 0, bytes.data(), (int)bytes.size(), NULL, 0);
+			if (wlen > 0)
+			{
+				std::vector<wchar_t> wbuf(wlen);
+				MultiByteToWideChar(CP_ACP, 0, bytes.data(), (int)bytes.size(), wbuf.data(), wlen);
+				result = CString(wbuf.data(), wlen);
+			}
 		}
 	}
 
@@ -13598,15 +13612,49 @@ CString run_command(CString cmd, DWORD timeout_ms /*= INFINITE*/)
 	CloseHandle(pi.hThread);
 	CloseHandle(pi.hProcess);
 
-	//콘솔 출력은 OEM 코드페이지다. 전체 바이트를 모은 뒤 한 번에 변환해야
-	//멀티바이트 문자가 청크 경계에서 잘리지 않는다(한글 깨짐 방지).
+	//20260729 by claude. 일부 명령(wevtutil 의 이벤트 텍스트 등)은 출력 중간에 NUL 바이트를 섞어 내보낸다.
+	//그대로 두면 변환 결과 CString 안에 U+0000 이 남고, 이 문자열을 %s 로 찍는 쪽에서 거기서 잘린다
+	//(실제로 check_result.txt 가 이벤트 로그 중간에서 끊겼다). 텍스트로서 의미가 없으므로 제거한다.
+	{
+		std::string filtered;
+		filtered.reserve(bytes.size());
+
+		for (size_t i = 0; i < bytes.size(); i++)
+		{
+			if (bytes[i] != '\0')
+				filtered += bytes[i];
+		}
+
+		bytes.swap(filtered);
+	}
+
+	//콘솔 출력은 전체 바이트를 모은 뒤 한 번에 변환해야 멀티바이트 문자가 청크 경계에서 잘리지 않는다.
+	//코드페이지는 대개 OEM 이지만 netsh 처럼 UTF-8 로 내보내는 명령도 있어(실측: netsh advfirewall / winhttp
+	//한글 출력이 통째로 깨졌다) 고정하면 안 된다. 유효한 UTF-8 이면서 비ASCII 바이트를 포함할 때만 UTF-8 로 본다.
+	//CP949 한글은 UTF-8 로 유효하지 않아(0xB0 대 lead 바이트가 UTF-8 에선 continuation) OEM 으로 정확히 떨어지고,
+	//순수 ASCII 는 어느 코드페이지로 읽어도 결과가 같다.
+	UINT code_page = CP_OEMCP;
+
+	bool has_non_ascii = false;
+	for (size_t i = 0; i < bytes.size(); i++)
+	{
+		if ((unsigned char)bytes[i] >= 0x80)
+		{
+			has_non_ascii = true;
+			break;
+		}
+	}
+
+	if (has_non_ascii && MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, bytes.data(), (int)bytes.size(), NULL, 0) > 0)
+		code_page = CP_UTF8;
+
 	if (!bytes.empty())
 	{
-		int wlen = MultiByteToWideChar(CP_OEMCP, 0, bytes.data(), (int)bytes.size(), NULL, 0);
+		int wlen = MultiByteToWideChar(code_page, 0, bytes.data(), (int)bytes.size(), NULL, 0);
 		if (wlen > 0)
 		{
 			std::vector<wchar_t> wbuf(wlen);
-			MultiByteToWideChar(CP_OEMCP, 0, bytes.data(), (int)bytes.size(), wbuf.data(), wlen);
+			MultiByteToWideChar(code_page, 0, bytes.data(), (int)bytes.size(), wbuf.data(), wlen);
 			result = CString(wbuf.data(), wlen);
 		}
 	}

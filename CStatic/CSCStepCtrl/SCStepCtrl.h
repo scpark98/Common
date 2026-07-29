@@ -110,9 +110,19 @@ public:
 
 	void			set_draw_line(bool draw) { m_draw_line = draw; }
 
-	//20260728 by claude. 완료 스텝 thumb 안에 그리는 체크 표시 색. 기본 흰색.
-	//thumb 배경이 밝은 테마색이면 흰 체크가 묻히거나, 같은 배경 위 버튼 텍스트색과 톤이 어긋나므로 맞출 수 있게 열어둔다.
-	void			set_check_color(Gdiplus::Color cr) { m_cr_check = cr; Invalidate(); }
+	//20260729 by claude. 완료 스텝 thumb 안에 그리는 체크 표시 색.
+	//기본값 Transparent 는 "자동" 을 뜻하며, 그 스텝의 채움색보다 64 어두운 색을 쓴다(get_check_color).
+	//흰 체크는 제품 테마마다 채움색 대비가 제각각이라 어울리는 테마가 한정된다.
+	void			set_check_color(Gdiplus::Color cr) { m_cr_check = cr; m_check_color_user_set = (cr.GetValue() != Gdiplus::Color::Transparent); Invalidate(); }
+
+	//자동 파생 시 채움색과 벌릴 WCAG 대비비. 기본 4.5 = 본문 가독(AA) 기준.
+	//3.0 으로 낮추면 은은해지고, 7.0(AAA) 이면 거의 흑/백에 가깝게 벌어진다.
+	void			set_check_contrast(double ratio) { m_check_contrast = ratio; Invalidate(); }
+
+	//20260729 by claude. 테마 accent 한 색에서 완료 / 진행 중 / 대기 색을 모두 파생시킨다.
+	//제품별 빌드 구성마다 테마가 달라(anysupport teal-blue, helpu teal, linkmemine navy/orange ...)
+	//개별 색을 직접 지정하면 한 제품에서만 어울리는 배색이 된다.
+	void			set_color_theme(const CSCColorTheme& theme, bool invalidate = true);
 
 	void			set_back_color(Gdiplus::Color cr) { m_cr_back = cr; }
 	void			set_color_line_active(Gdiplus::Color cr) { m_cr_line_active = cr; }
@@ -141,8 +151,10 @@ protected:
 	Gdiplus::Color	m_cr_thumb_inactive = Gdiplus::Color::Gray;
 
 	Gdiplus::Color	m_cr_thumb_outline = Gdiplus::Color::RoyalBlue;
-	//완료 스텝의 체크 표시 색. set_check_color 로 변경.
-	Gdiplus::Color	m_cr_check = Gdiplus::Color::White;
+	//완료 스텝의 체크 표시 색. Transparent 면 채움색에서 자동 파생. set_check_color 로 고정.
+	Gdiplus::Color	m_cr_check = Gdiplus::Color::Transparent;
+	bool			m_check_color_user_set = false;
+	double			m_check_contrast = 4.5;
 	Gdiplus::Color	m_cr_line_active = Gdiplus::Color::RoyalBlue;
 	Gdiplus::Color	m_cr_line_inactive = Gdiplus::Color::LightGray;
 
@@ -150,6 +162,13 @@ protected:
 	Gdiplus::Color	get_thumb_color(int index);
 	//index 스텝에서 나가는 연결선의 색. 진행 중인 스텝의 나가는 선은 아직 지나지 않은 구간이라 thumb 색과 규칙이 다르다.
 	Gdiplus::Color	get_line_color(int index);
+
+	//20260729 by claude. cr 보다 offset 만큼 어두운 색. 단 이미 어두운 색은 검정에 묻히므로 방향을 뒤집어 밝게 한다.
+	//기준을 128(get_weak_color) 이 아니라 96 으로 둔 것은, anysupport accent(#309AC0, luma 127) 처럼
+	//중간 밝기 accent 까지는 "더 어둡게" 가 의도한 결과이기 때문이다.
+	static Gdiplus::Color get_deep_color(Gdiplus::Color cr, int offset = 64);
+	//채움색 cr_thumb 위에 그릴 체크 표시 색.
+	Gdiplus::Color	get_check_color(Gdiplus::Color cr_thumb);
 
 //font
 	LOGFONT			m_lf;

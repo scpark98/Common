@@ -102,23 +102,28 @@ void CSCStepCtrl::OnPaint()
 		else
 			g.FillEllipse(&Gdiplus::SolidBrush(cr_thumb), CRect_to_gpRect(m_step[i].r));
 
-		//pos 미만은 파란색 원에 체크 표시를
+		//pos 미만은 채워진 원에 체크 표시를
 		if (i < m_pos)
 		{
+			//20260729 by claude. 체크 색은 그 스텝의 채움색에서 파생한다 — 실패로 개별 지정된 스텝이면 그 색 기준.
+			Gdiplus::Color cr_check = get_check_color(cr_thumb);
+
 			//20260728 by claude. 체크 표시 굵기 1.0 -> 1.8. 1.0 은 thumb(18px) 안에서 너무 가늘어 잘 안 보였다.
 			//짧은 왼쪽 획은 굵어지면서 상대적으로 더 짧아 보여 시작점을 left/top 으로 1px 씩 늘렸다.
-			draw_line(g, m_step[i].r.CenterPoint().x - 4, m_step[i].r.CenterPoint().y - 1, m_step[i].r.CenterPoint().x - 1, m_step[i].r.CenterPoint().y + 2, m_cr_check, 1.8f);
-			draw_line(g, m_step[i].r.CenterPoint().x - 1, m_step[i].r.CenterPoint().y + 2, m_step[i].r.CenterPoint().x + 3, m_step[i].r.CenterPoint().y - 2, m_cr_check, 1.8f);
+			draw_line(g, m_step[i].r.CenterPoint().x - 4, m_step[i].r.CenterPoint().y - 1, m_step[i].r.CenterPoint().x - 1, m_step[i].r.CenterPoint().y + 2, cr_check, 1.8f);
+			draw_line(g, m_step[i].r.CenterPoint().x - 1, m_step[i].r.CenterPoint().y + 2, m_step[i].r.CenterPoint().x + 3, m_step[i].r.CenterPoint().y - 2, cr_check, 1.8f);
 		}
 		else if (i == m_pos)
 		{
 			CRect rthumb_small = m_step[i].r;
 
+			//20260729 by claude. 링 안쪽 여백은 흰색 고정이 아니라 컨트롤 배경색이어야 한다.
+			//흰색으로 두면 배경이 흰색이 아닌 테마(본문 250, dark 테마 등)에서 흰 고리가 도드라진다.
 			rthumb_small.DeflateRect(2, 2);
 			if (thumb_style == thumb_style_rect)
-				g.FillRectangle(&Gdiplus::SolidBrush(Gdiplus::Color::White), CRect_to_gpRect(rthumb_small));
+				g.FillRectangle(&Gdiplus::SolidBrush(m_cr_back), CRect_to_gpRect(rthumb_small));
 			else
-				g.FillEllipse(&Gdiplus::SolidBrush(Gdiplus::Color::White), CRect_to_gpRect(rthumb_small));
+				g.FillEllipse(&Gdiplus::SolidBrush(m_cr_back), CRect_to_gpRect(rthumb_small));
 
 			//20260728 by claude. 안쪽 채움 원을 한 변당 1px 더 줄인다(지름 -2). 흰 원은 그대로.
 			rthumb_small.DeflateRect(3, 3);
@@ -135,11 +140,12 @@ void CSCStepCtrl::OnPaint()
 		{
 			CRect rthumb_small = m_step[i].r;
 
+			//대기 스텝은 1px 테두리만 남긴다. 안쪽은 위와 같은 이유로 컨트롤 배경색.
 			rthumb_small.DeflateRect(1, 1);
 			if (thumb_style == thumb_style_rect)
-				g.FillRectangle(&Gdiplus::SolidBrush(Gdiplus::Color::White), CRect_to_gpRect(rthumb_small));
+				g.FillRectangle(&Gdiplus::SolidBrush(m_cr_back), CRect_to_gpRect(rthumb_small));
 			else
-				g.FillEllipse(&Gdiplus::SolidBrush(Gdiplus::Color::White), CRect_to_gpRect(rthumb_small));
+				g.FillEllipse(&Gdiplus::SolidBrush(m_cr_back), CRect_to_gpRect(rthumb_small));
 		}
 
 		//draw text
@@ -223,6 +229,68 @@ Gdiplus::Color CSCStepCtrl::get_line_color(int index)
 		return m_step[index].cr_thumb;
 
 	return (index < m_pos) ? m_cr_thumb_active : m_cr_thumb_inactive;
+}
+
+//20260729 by claude. cr 보다 offset 만큼 어두운 색. 이미 어두운 색은 검정에 묻히므로 방향을 뒤집는다.
+//분기 기준을 get_weak_color 의 128 이 아니라 96 으로 낮춘 이유 — anysupport accent(#309AC0)의 luma 가
+//127 이라 128 기준이면 "더 밝게" 로 넘어가 의도(어둡게)와 반대가 된다.
+Gdiplus::Color CSCStepCtrl::get_deep_color(Gdiplus::Color cr, int offset)
+{
+	return get_color(cr, (get_luminance(cr) >= 96) ? -offset : offset);
+}
+
+//완료 스텝 채움색 위에 그릴 체크 표시 색.
+//20260729 by claude. 고정 offset(-64) 은 채움색에 따라 실제 대비가 들쭉날쭉하다 — helpu accent(#20B2AE)
+//기준으로 2.2:1 밖에 안 나와 18px 원 안의 1.8px 획이 묻혔다. 그래서 offset 이 아니라 목표 대비비를 정하고
+//거기 도달할 때까지 단계적으로 벌린다. 밝기 조절은 hue 가 틀어지지 않는 방식으로 —
+//어둡게는 곱셈(검정 쪽은 채널 포화가 없음), 밝게는 HSL 의 L 만 흰색 쪽으로 이동.
+Gdiplus::Color CSCStepCtrl::get_check_color(Gdiplus::Color cr_thumb)
+{
+	if (m_check_color_user_set)
+		return m_cr_check;
+
+	const bool darken = (get_luminance(cr_thumb) >= 96);
+	Gdiplus::Color cr = cr_thumb;
+
+	for (int i = 1; i <= 20; i++)
+	{
+		cr = darken ? get_ratio_color(cr_thumb, 1.0f - 0.05f * i)
+					: get_lightened_color(cr_thumb, 0.05 * i);
+
+		if (get_wcag_contrast(cr_thumb, cr) >= m_check_contrast)
+			break;
+	}
+
+	return cr;
+}
+
+//테마 accent 한 색에서 전체 배색을 파생시킨다. 사용하는 색은 accent / accent_deep / 테마 회색 / 테마 본문색 4 개뿐이다.
+//  대기    : 테마 회색 테두리만            (아직 지나지 않음)
+//  진행 중 : accent_deep 링 + 안쪽 점      (가장 진해 시선이 여기 머문다)
+//  완료    : accent 채움 + accent_deep 체크 (체크가 진행 중 색과 같은 톤이라 단계가 이어져 보인다)
+void CSCStepCtrl::set_color_theme(const CSCColorTheme& theme, bool invalidate)
+{
+	//accent 는 테마가 명시한 버튼색을 우선한다 — 같은 화면의 버튼과 같은 색이어야 배색이 흩어지지 않는다.
+	//미지정(alpha 0)인 테마는 타이틀바 배경색이 사실상의 accent 다.
+	Gdiplus::Color accent = (theme.cr_button_back.GetA() != 0) ? theme.cr_button_back : theme.cr_title_back_active;
+	Gdiplus::Color accent_deep = get_deep_color(accent);
+
+	m_cr_back = theme.cr_back;
+
+	m_cr_thumb_active = accent;
+	m_cr_thumb_current = accent_deep;
+	m_cr_thumb_inactive = theme.cr_border_inactive;
+	m_cr_thumb_outline = accent;
+
+	m_cr_line_active = accent;
+	m_cr_line_inactive = theme.cr_border_inactive;
+
+	m_cr_text_active = theme.cr_text;
+	m_cr_text_current = accent_deep;
+	m_cr_text_inactive = theme.cr_text_dim;
+
+	if (invalidate && GetSafeHwnd())
+		Invalidate();
 }
 
 Gdiplus::Color CSCStepCtrl::get_thumb_color(int index)
@@ -319,8 +387,9 @@ void CSCStepCtrl::set_text_color(int index, Gdiplus::Color cr_active, Gdiplus::C
 	{
 		m_cr_text_active = cr_active;
 
+		//20260729 by claude. m_cr_thumb_current 에 넣던 복붙 오류 수정 — 텍스트 setter 이므로 텍스트 색이어야 한다.
 		if (cr_current.GetValue() != Gdiplus::Color::Transparent)
-			m_cr_thumb_current = cr_current;
+			m_cr_text_current = cr_current;
 
 		for (int i = 0; i < m_step.size(); i++)
 		{

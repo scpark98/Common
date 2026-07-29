@@ -1259,7 +1259,9 @@ void CSCStatic::adjust_back_image()
 	{
 		//애니 gif 는 OnPaint 가 draw_gif_current_frame() 으로 그리는데 이 함수는 draw_mode 를 받지 않고
 		//m_ani_sx/sy/width/height 를 그대로 쓴다. 그래서 배치 계산을 여기서 미리 해 넣어준다.
-		m_img_back.set_ani_rect(m_img_back.calc_rect(rc, m_img_back_draw_mode));
+		//move_gif 의 CRect 오버로드는 항상 비율을 유지하므로 draw_mode 를 반영하려면 4 인자 버전을 써야 한다.
+		CRect r = m_img_back.calc_rect(rc, m_img_back_draw_mode);
+		m_img_back.move_gif(r.left, r.top, r.Width(), r.Height());
 	}
 	else if (m_img_back_draw_mode == CSCGdiplusBitmap::draw_mode_stretch)
 	{

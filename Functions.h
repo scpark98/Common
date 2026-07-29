@@ -374,7 +374,12 @@ enum RATIO_RECT_ATTACH
 	attach_bottom	= 0x00000008,	//0001 0000
 };
 
+// svg 는 SC_USE_SVG 를 켠 프로젝트에서만 목록/스캔 대상에 포함(미지원 프로젝트는 svg 가 목록에 뜨지 않음).
+#ifdef SC_USE_SVG
 #define		FILE_EXTENSION_IMAGE			_T("bmp;jpg;jpeg;png;webp;gif;yuv;jfif;avif;svg")
+#else
+#define		FILE_EXTENSION_IMAGE			_T("bmp;jpg;jpeg;png;webp;gif;yuv;jfif;avif")
+#endif
 #define		FILE_EXTENSION_SOUND			_T("mp3;m4a;wav")
 #define		FILE_EXTENSION_VIDEO			_T("avi;mpg;mp4;mpeg;mkv;mov;wmv;wma;asf;ts;m2ts;3gp")
 #define		FILE_EXTENSION_MEDIA			CString(FILE_EXTENSION_VIDEO) + _T(";") + CString(FILE_EXTENSION_IMAGE) + _T(";") + CString(FILE_EXTENSION_SOUND)

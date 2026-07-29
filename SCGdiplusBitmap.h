@@ -586,6 +586,12 @@ public:
 	int				set_ani_width(int dpwidth) { m_ani_width = dpwidth; return m_ani_width; }
 	int				set_ani_height(int dpheight) { m_ani_height = dpheight; return m_ani_height; }
 
+	//20260729 by claude. 애니 gif 재생 영역을 위치까지 한 번에 지정한다.
+	//set_ani_width/height 만으로는 좌상단이 set_animation 때 잡힌 값에 고정되어, 비율 유지(draw_mode_zoom)처럼
+	//대상 영역보다 작게 그릴 때 가운데 정렬이 되지 않는다.
+	//calc_rect(target, draw_mode) 결과를 그대로 넣으면 그 모드대로 재생된다.
+	void			set_ani_rect(CRect r) { m_ani_sx = r.left; m_ani_sy = r.top; m_ani_width = r.Width(); m_ani_height = r.Height(); }
+
 	void			save_multi_image();// std::vector<Gdiplus::Bitmap*>& dqBitmap);
 
 	bool			create_png_hglobal(HGLOBAL* outHGlobal);

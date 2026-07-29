@@ -328,6 +328,15 @@ public:
 	//m_fit_to_back_image = false이면 컨트롤이 resize될 때 이미지도 resize된다.
 	bool			m_fit_to_back_image = false;
 
+	//20260729 by claude. 배경 이미지를 컨트롤에 맞출 때의 그리기 방식. CSCGdiplusBitmap::GDIP_DRAW_MODE 값을 그대로 쓴다.
+	//기본값 draw_mode_zoom : 원본 비율을 지켜 컨트롤 안에 최대 크기로 맞추고 가운데 정렬한다(정지 이미지·애니 gif 공통).
+	//CSCGdiplusBitmap 의 draw()/calc_rect() 기본값도 draw_mode_zoom 이라 그쪽과 맞춘 것이다.
+	//draw_mode_stretch 로 바꾸면 컨트롤에 꽉 채워 늘린다 — 원본과 비율이 다르면 일그러진다.
+	void			set_back_image_draw_mode(int draw_mode);
+	int				m_img_back_draw_mode = CSCGdiplusBitmap::draw_mode_zoom;
+	//컨트롤 크기 / draw_mode 에 맞춰 배경 이미지 출력 영역을 다시 잡는다.
+	void			adjust_back_image();
+
 	int				m_round = 0;				//round rect
 	void			set_round(int round, Gdiplus::Color cr_border = Gdiplus::Color::Transparent, Gdiplus::Color gcr_parent_back = Gdiplus::Color::Transparent);
 

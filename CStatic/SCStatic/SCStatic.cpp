@@ -332,10 +332,17 @@ void CSCStatic::OnPaint()
 		*/
 	}
 	
+	//20260729 by claude. 배경 이미지는 draw_mode 에 따라 클라이언트 전체를 덮지 않는다(zoom / original / original_center).
+	//남는 자리에 이전 내용이 그대로 남아 letterbox 로 보이므로 이미지를 그리기 전에 배경색으로 먼저 칠한다.
+	//stretch 는 어차피 전부 덮이지만 메모리 DC 의 FillSolidRect 한 번이라 분기할 이유가 없다.
+	//round / transparent 는 위에서 이미 cr_parent_back 으로 칠했으므로 건너뛴다.
+	if (m_img_back.is_valid() && m_round == 0 && !m_transparent)
+		dc.FillSolidRect(rc, m_theme.cr_back.ToCOLORREF());
+
 	if (m_img_back.is_valid() && !m_img_back.is_animated_gif())
 	{
 		// 배경 그림을 그린다.
-		m_img_back.draw(g, rc, CSCGdiplusBitmap::draw_mode_stretch);
+		m_img_back.draw(g, rc, m_img_back_draw_mode);
 		//m_img_back.save(_T("d:\\copy.png"));
 	}
 	else if (m_img_back.is_valid() && m_img_back.is_animated_gif())
@@ -1164,6 +1171,11 @@ void CSCStatic::set_back_image(CString type, UINT nIDBack, Gdiplus::Color cr_bac
 
 	if (m_img_back.is_animated_gif())
 		m_img_back.set_animation(m_hWnd, CRect(), true);
+
+	//20260729 by claude. 애니 gif 워커는 매 프레임 "재생 영역만" InvalidateRect 한다(SCGdiplusBitmap.cpp:3698).
+	//CPaintDC 는 무효 영역으로 클리핑되므로 그 바깥(비율 유지 시 생기는 여백)은 영영 다시 그려지지 않는다.
+	//여기서 전체를 무효화하지 않으면 이미지가 붙기 전 상태가 여백에 그대로 남는다.
+	Invalidate();
 }
 
 void CSCStatic::set_back_image(CSCGdiplusBitmap& img, Gdiplus::Color cr_back)
@@ -1175,6 +1187,9 @@ void CSCStatic::set_back_image(CSCGdiplusBitmap& img, Gdiplus::Color cr_back)
 
 	if (m_img_back.is_animated_gif())
 		m_img_back.set_animation(m_hWnd, CRect(), false);
+
+	//전체 무효화가 필요한 이유는 위 오버로드 주석 참고.
+	Invalidate();
 }
 
 //배경 이미지를 좌우대칭하는데 만약 animated gif라면 역재생처럼 동작시킬 수 있다.
@@ -1222,24 +1237,45 @@ void CSCStatic::fit_to_back_image(bool fit_to_image)
 		return;
 
 	if (fit_to_image)
-	{
 		SetWindowPos(NULL, 0, 0, m_img_back.width, m_img_back.height, SWP_NOMOVE | SWP_NOZORDER);
-	}
 	else
-	{
-		CRect rc;
-		GetClientRect(rc);
+		adjust_back_image();
 
-		if (m_img_back.is_animated_gif())
-		{
-			m_img_back.set_ani_width(rc.Width());
-			m_img_back.set_ani_height(rc.Height());
-		}
-		else
-		{
-			m_img_back.resize(rc.Width(), rc.Height());
-		}
+	//배치가 바뀌었으므로 전체를 다시 그린다. 애니 gif 는 워커가 재생 영역만 무효화하므로 여백이 갱신되지 않는다.
+	Invalidate();
+}
+
+//20260729 by claude. 컨트롤 크기와 m_img_back_draw_mode 에 맞춰 배경 이미지 출력 영역을 다시 잡는다.
+//fit_to_back_image(false) 와 OnSize 가 같은 계산을 중복하고 있어 한 곳으로 모았다.
+void CSCStatic::adjust_back_image()
+{
+	if (!m_img_back.is_valid() || m_fit_to_back_image)
+		return;
+
+	CRect rc;
+	GetClientRect(rc);
+
+	if (m_img_back.is_animated_gif())
+	{
+		//애니 gif 는 OnPaint 가 draw_gif_current_frame() 으로 그리는데 이 함수는 draw_mode 를 받지 않고
+		//m_ani_sx/sy/width/height 를 그대로 쓴다. 그래서 배치 계산을 여기서 미리 해 넣어준다.
+		m_img_back.set_ani_rect(m_img_back.calc_rect(rc, m_img_back_draw_mode));
 	}
+	else if (m_img_back_draw_mode == CSCGdiplusBitmap::draw_mode_stretch)
+	{
+		//stretch 일 때만 원본을 실제로 줄여둔다(매 페인트마다 확대/축소하지 않기 위한 기존 최적화).
+		//resize() 는 파괴적이라 여기서 줄여버리면 원본 비율 정보가 사라진다 — 비율을 써야 하는 나머지 모드는
+		//원본을 그대로 두고 OnPaint 의 draw(g, rc, m_img_back_draw_mode) 가 배치를 계산하게 한다.
+		m_img_back.resize(rc.Width(), rc.Height());
+	}
+}
+
+void CSCStatic::set_back_image_draw_mode(int draw_mode)
+{
+	m_img_back_draw_mode = draw_mode;
+
+	adjust_back_image();
+	Invalidate();
 }
 
 BOOL CSCStatic::OnEraseBkgnd(CDC* pDC) 
@@ -1897,17 +1933,9 @@ void CSCStatic::OnSize(UINT nType, int cx, int cy)
 			get_auto_font_size(this, rc, m_text, &m_lf);
 			reconstruct_font();
 		}
-		else if (m_img_back.is_valid() && !m_fit_to_back_image)
+		else
 		{
-			if (m_img_back.is_animated_gif())
-			{
-				m_img_back.set_ani_width(rc.Width());
-				m_img_back.set_ani_height(rc.Height());
-			}
-			else
-			{
-				m_img_back.resize(rc.Width(), rc.Height());
-			}
+			adjust_back_image();
 		}
 
 		//단락 모드 — 새 client 크기로 layout 재계산. rebuild_layout 가 Invalidate 도 호출.

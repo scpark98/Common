@@ -44,6 +44,11 @@
 
 #include "../../Functions.h"
 #include "../../thread/CSCThread/SCThread.h"
+// SVG 지원은 opt-in. SC_USE_SVG 를 정의한 프로젝트만 lunasvg 의존을 끌어온다.
+// (미정의 프로젝트는 include 경로·벤더 소스·매크로 없이 이 헤더를 그대로 쓸 수 있다.)
+#ifdef SC_USE_SVG
+#include "../../SCSvg.h"
+#endif
 
 using namespace Microsoft::WRL;
 
@@ -116,7 +121,20 @@ public:
 	HRESULT					load(IWICImagingFactory2* WICfactory, ID2D1DeviceContext* d2context, UINT resource_id, CString type = _T("PNG"), bool auto_play = true);
 
 	//load from raw data
-	HRESULT					load(IWICImagingFactory2* WICfactory, ID2D1DeviceContext* d2context, void* data, int width, int height, int channel);
+	//is_svg_raster: SVG 재래스터 결과를 실을 때만 true. 이 경우 m_svg(파싱된 문서)를 지우지 않는다.
+	//(일반 raw 로드는 이전 SVG 상태를 지워 get_width 등이 stale 논리크기를 반환하지 않도록 한다.)
+	HRESULT					load(IWICImagingFactory2* WICfactory, ID2D1DeviceContext* d2context, void* data, int width, int height, int channel, bool is_svg_raster = false);
+
+	//SVG 지원(lunasvg). load(path) 에서 확장자가 svg 면 이 경로로 분기한다.
+	//논리 크기(자연 크기)는 고정 유지하고, 표시 배율이 커지면 ensure_svg_raster() 로 백킹 비트맵만 재래스터화한다.
+	//is_svg() 는 SVG 미지원 빌드에서도 항상 존재해야(호출부 컴파일) 하므로 #else 에서 false 를 반환한다.
+#ifdef SC_USE_SVG
+	bool					is_svg() const { return m_svg.is_valid(); }
+	//표시 픽셀 크기(target)에 맞춰 필요 시 재래스터화. 논리 크기는 불변이라 상위 zoom 수식에 영향 없음.
+	HRESULT					ensure_svg_raster(int target_w, int target_h);
+#else
+	bool					is_svg() const { return false; }
+#endif
 
 	//must call when the parent window was resized
 	//HRESULT					on_resize(ID2D1DeviceContext* d2context, IDXGISwapChain* swapchain, int cx, int cy);
@@ -317,6 +335,18 @@ protected:
 
 
 	HRESULT					load(IWICImagingFactory2* WICfactory, ID2D1DeviceContext* d2context, IWICBitmapDecoder* pDecoder, bool auto_play = true, bool first_frame_only = false);
+
+	//SVG(lunasvg) — 파싱된 문서와 논리 크기. 논리 크기는 자연 크기(고정)로, 백킹 래스터 해상도와 분리한다.
+	//SC_USE_SVG 미정의 빌드에선 이 멤버들이 없어 lunasvg 의존이 완전히 사라진다.
+#ifdef SC_USE_SVG
+	sc_svg					m_svg;
+	float					m_svg_logical_w = 0.0f;   //get_width/height 가 반환하는 안정적 논리 크기(zoom 수식 기준).
+	float					m_svg_logical_h = 0.0f;
+	int						m_svg_raster_w = 0;       //현재 백킹 비트맵(m_img[0]) 의 래스터 픽셀 크기.
+	int						m_svg_raster_h = 0;
+	HRESULT					load_svg(IWICImagingFactory2* WICfactory, ID2D1DeviceContext* d2context, CString path);
+	HRESULT					rasterize_svg(IWICImagingFactory2* WICfactory, ID2D1DeviceContext* d2context, int w, int h);
+#endif
 
 	D2D1_BITMAP_INTERPOLATION_MODE m_interpolation_mode = D2D1_BITMAP_INTERPOLATION_MODE_LINEAR;
 

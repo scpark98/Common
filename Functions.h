@@ -374,7 +374,7 @@ enum RATIO_RECT_ATTACH
 	attach_bottom	= 0x00000008,	//0001 0000
 };
 
-#define		FILE_EXTENSION_IMAGE			_T("bmp;jpg;jpeg;png;webp;gif;yuv;jfif;avif")
+#define		FILE_EXTENSION_IMAGE			_T("bmp;jpg;jpeg;png;webp;gif;yuv;jfif;avif;svg")
 #define		FILE_EXTENSION_SOUND			_T("mp3;m4a;wav")
 #define		FILE_EXTENSION_VIDEO			_T("avi;mpg;mp4;mpeg;mkv;mov;wmv;wma;asf;ts;m2ts;3gp")
 #define		FILE_EXTENSION_MEDIA			CString(FILE_EXTENSION_VIDEO) + _T(";") + CString(FILE_EXTENSION_IMAGE) + _T(";") + CString(FILE_EXTENSION_SOUND)

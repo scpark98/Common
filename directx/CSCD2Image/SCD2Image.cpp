@@ -231,6 +231,13 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 	if (!d2context)
 		return S_FALSE;
 
+	// SVG 는 WIC 코덱이 없으므로 lunasvg 로 래스터화하는 별도 경로로 분기.
+	// SC_USE_SVG 미정의 빌드에선 이 분기가 없어 svg 파일은 아래 WIC 경로에서 실패(미지원)한다.
+#ifdef SC_USE_SVG
+	if (get_part(path, fn_ext).MakeLower() == _T("svg"))
+		return load_svg(pWICFactory, d2context, path);
+#endif
+
 	/*
 	HRESULT hr = pWICFactory->CreateDecoderFromFilename(
 		path,
@@ -292,7 +299,7 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 }
 
 //load from raw data
-HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d2context, void* data, int width, int height, int channel)
+HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d2context, void* data, int width, int height, int channel, bool is_svg_raster)
 {
 	HRESULT	hr = S_FALSE;
 
@@ -303,6 +310,15 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 	m_img.clear();
 	m_frame_delay.clear();
 	m_img_origin_for_back_transparency.Reset();
+
+	// SVG 재래스터(is_svg_raster=true)가 아니면, 이 raw 로드로 이전 SVG 문서를 해제한다.
+	// (재래스터 시엔 m_svg 를 유지해야 이후 zoom 에서 다시 렌더할 수 있다.)
+#ifdef SC_USE_SVG
+	if (!is_svg_raster)
+		m_svg.clear();
+#else
+	(void)is_svg_raster;   // SVG 미지원 빌드에선 미사용.
+#endif
 
 	//get_alpha_pixel_count() 가 m_data 를 스캔하므로 raw-data load 경로에서도 m_data 를 채워둔다.
 	//4채널 입력만 복사 (다른 채널은 alpha 채널 없음 → 카운트 0 이라 zigzag 무관).
@@ -757,6 +773,9 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 	m_frame_index = 0;
 	m_img.clear();
 	m_frame_delay.clear();
+#ifdef SC_USE_SVG
+	m_svg.clear();   // 일반(WIC) 디코드 경로 → 이전에 로드한 SVG 상태 해제.
+#endif
 
 	D2D1_SIZE_U img_size = { 0, 0 };
 	UINT frame_count = 1;
@@ -1990,6 +2009,13 @@ ID2D1Bitmap1* CSCD2Image::get_frame_img(int index)
 
 float CSCD2Image::get_width()
 {
+	// SVG 는 논리(자연) 크기를 반환 — 백킹 래스터 해상도가 zoom 에 따라 바뀌어도
+	// get_width 는 불변이라 상위 zoom/좌표 수식이 흔들리지 않는다.
+#ifdef SC_USE_SVG
+	if (is_svg() && m_svg_logical_w > 0.0f)
+		return m_svg_logical_w;
+#endif
+
 	if (m_img.size() == 0 || m_frame_index < 0 || m_frame_index >= m_img.size())
 		return 0.0f;
 
@@ -2004,6 +2030,11 @@ float CSCD2Image::get_width()
 
 float CSCD2Image::get_height()
 {
+#ifdef SC_USE_SVG
+	if (is_svg() && m_svg_logical_h > 0.0f)
+		return m_svg_logical_h;
+#endif
+
 	if (m_img.size() == 0 || m_frame_index < 0 || m_frame_index >= m_img.size())
 		return 0.0f;
 
@@ -2018,12 +2049,84 @@ float CSCD2Image::get_height()
 
 D2D1_SIZE_F CSCD2Image::get_size()
 {
+#ifdef SC_USE_SVG
+	if (is_svg() && m_svg_logical_w > 0.0f && m_svg_logical_h > 0.0f)
+		return D2D1::SizeF(m_svg_logical_w, m_svg_logical_h);
+#endif
+
 	if (m_img.size() == 0 || m_frame_index < 0 || m_frame_index >= m_img.size())
 		return D2D1::SizeF();
 
 	D2D1_SIZE_F sz = m_img[m_frame_index]->GetSize();
 	return sz;
 }
+
+// ── SVG(lunasvg) 지원 ──────────────────────────────────────
+// SC_USE_SVG 미정의 빌드에선 이 구현들이 통째로 빠지고, 헤더의 선언·멤버도 없어 lunasvg 의존이 사라진다.
+#ifdef SC_USE_SVG
+HRESULT CSCD2Image::load_svg(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d2context, CString path)
+{
+	m_filename = path;
+
+	if (!m_svg.load(path))
+		return S_FALSE;
+
+	// 논리 크기 = SVG 자연 크기(고정). get_width/height 가 이 값을 반환해 zoom 수식이 안정된다.
+	m_svg_logical_w = m_svg.natural_width();
+	m_svg_logical_h = m_svg.natural_height();
+
+	// width/height 속성 없이 viewBox 만 있거나 자연 크기가 0 인 SVG 대비 fallback.
+	if (m_svg_logical_w <= 0.0f || m_svg_logical_h <= 0.0f)
+	{
+		m_svg_logical_w = 512.0f;
+		m_svg_logical_h = 512.0f;
+	}
+
+	// 최초 백킹 래스터: 논리 크기 그대로 1회. 이후 표시 배율이 커지면 OnPaint 에서 ensure_svg_raster() 로 재래스터.
+	return rasterize_svg(pWICFactory, d2context,
+		(int)(m_svg_logical_w + 0.5f), (int)(m_svg_logical_h + 0.5f));
+}
+
+HRESULT CSCD2Image::rasterize_svg(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d2context, int w, int h)
+{
+	if (!m_svg.is_valid() || w <= 0 || h <= 0)
+		return S_FALSE;
+
+	std::vector<uint8_t> bgra;
+	if (!m_svg.render(w, h, bgra))
+		return S_FALSE;
+
+	// 기존 raw-data 로더로 ID2D1Bitmap1 생성(straight BGRA, channel 4). is_svg_raster=true 로 m_svg 보존.
+	HRESULT hr = load(pWICFactory, d2context, bgra.data(), w, h, 4, /*is_svg_raster*/ true);
+	if (SUCCEEDED(hr))
+	{
+		m_svg_raster_w = w;
+		m_svg_raster_h = h;
+	}
+	return hr;
+}
+
+HRESULT CSCD2Image::ensure_svg_raster(int target_w, int target_h)
+{
+	if (!is_svg() || target_w <= 0 || target_h <= 0)
+		return S_FALSE;
+
+	// 과도한 메모리/시간 방지 상한.
+	const int MAXDIM = 8192;
+	int w = target_w < MAXDIM ? target_w : MAXDIM;
+	int h = target_h < MAXDIM ? target_h : MAXDIM;
+
+	// 축소는 기존 고해상도 비트맵 다운스케일로 충분(재래스터 불필요).
+	if (w <= m_svg_raster_w && h <= m_svg_raster_h)
+		return S_FALSE;
+
+	// 확대라도 현재 래스터 대비 1.5배 미만이면 재래스터 생략(잦은 재생성 억제).
+	if (w < (int)(m_svg_raster_w * 1.5f) && h < (int)(m_svg_raster_h * 1.5f))
+		return S_FALSE;
+
+	return rasterize_svg(m_pWICFactory, m_d2dc, w, h);
+}
+#endif // SC_USE_SVG
 
 float CSCD2Image::get_ratio()
 {

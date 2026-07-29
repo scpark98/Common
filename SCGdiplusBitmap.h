@@ -196,6 +196,11 @@ public:
 	bool			load(UINT id);
 	bool			load_icon(UINT id, int size = 32);
 	bool			load_webp(CString sfile);
+	//SVG(lunasvg) 파일을 long_side 픽셀(긴 변 기준, 자연 비율 유지)로 래스터화해 로드. 썸네일 등 고정 크기용.
+	//SC_USE_SVG 정의 프로젝트에서만 제공(그 외엔 lunasvg 의존 없음).
+#ifdef SC_USE_SVG
+	bool			load_svg(CString sfile, int long_side = 256);
+#endif
 	//in-memory PNG/JPEG byte buffer 로부터 로드. registry binary round-trip 등에 사용.
 	bool			load_from_buffer(const BYTE* data, UINT size);
 	//packed DIB (BITMAPINFOHEADER + pixel rows) 으로부터 ARGB Bitmap 생성.

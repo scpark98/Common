@@ -250,6 +250,14 @@ void CSCD2ImageDlg::OnPaint()
 		m_r_display = make_rect(sx, sy, nw, nh);
 	}
 
+	//SVG 는 벡터이므로 표시 픽셀 크기에 맞춰 백킹 비트맵을 재래스터화해 확대해도 선명하게 유지한다.
+	//논리 크기(get_width/height)는 불변이므로 위의 m_r_display / m_zoom 계산에는 영향이 없다.
+	//SC_USE_SVG 미정의 빌드엔 ensure_svg_raster 가 없으므로 호출부째 게이트한다.
+#ifdef SC_USE_SVG
+	if (m_images[0].is_svg())
+		m_images[0].ensure_svg_raster(m_r_display.Width(), m_r_display.Height());
+#endif
+
 	//실제 이미지를 그려준다. 투명 이미지인 경우는 배경에 지그재그 패턴을 그려준 후에 실제 이미지를 그려준다.
 	//또한 격자 패턴이 모든 경우에 동일한 격자부터 시작되도록 하기 위해 그 시작 위치를 m_r_display의 left, top 위치로 이동시켜 그려줘야 한다.
 	//브러시 타일링은 기본적으로 0, 0에서 시작되므로 이를 해주지 않으면 그려지는 모양이 창의 위치에 따라 달라진다.

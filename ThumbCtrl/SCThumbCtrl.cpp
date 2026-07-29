@@ -508,6 +508,14 @@ int CSCThumbCtrl::insert(int index, CString full_path, CString title, bool key_t
 		if (m_thumb[index].img->load_webp(full_path) == false)
 			return -1;
 	}
+#ifdef SC_USE_SVG
+	else if (get_part(full_path, fn_ext).CompareNoCase(_T("svg")) == 0)
+	{
+		//SVG 는 GDI+ 로 디코드 불가 → lunasvg 로 썸네일 크기 래스터화.
+		if (m_thumb[index].img->load_svg(full_path, MAX_TILE_SIZE) == false)
+			return -1;
+	}
+#endif
 	else
 	{
 		if (m_thumb[index].img->load(full_path) == false)

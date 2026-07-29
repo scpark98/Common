@@ -1,6 +1,11 @@
 ﻿#include "SCGdiplusBitmap.h"
 #include "Functions.h"
 #include "MemoryDC.h"
+// SVG 지원은 opt-in. SC_USE_SVG 정의 프로젝트에서만 lunasvg 의존을 끌어온다.
+#ifdef SC_USE_SVG
+#include "SCSvg.h"
+#include <vector>
+#endif
 
 #include <thread>
 #include <afxcmn.h>
@@ -548,6 +553,64 @@ typedef Gdiplus::GpStatus WINGDIPAPI GdipCreateBitmapFromWicBitmapFunc(
 inline Gdiplus::Bitmap* BitmapFromGpBitmap(Gdiplus::GpBitmap* native) {
 	return reinterpret_cast<Gdiplus::Bitmap*>(native);
 }
+
+#ifdef SC_USE_SVG
+bool CSCGdiplusBitmap::load_svg(CString sfile, int long_side)
+{
+	sc_svg svg;
+	if (!svg.load(CStringW(sfile)))
+		return false;
+
+	// 자연 비율을 유지한 채 긴 변을 long_side 로 맞춰 래스터 크기 산정. 자연 크기가 없으면 정사각 fallback.
+	float nw = svg.natural_width();
+	float nh = svg.natural_height();
+	if (nw <= 0.0f || nh <= 0.0f)
+	{
+		nw = nh = (float)long_side;
+	}
+
+	int w, h;
+	if (nw >= nh)
+	{
+		w = long_side;
+		h = (int)(long_side * nh / nw + 0.5f);
+	}
+	else
+	{
+		h = long_side;
+		w = (int)(long_side * nw / nh + 0.5f);
+	}
+	if (w < 1) w = 1;
+	if (h < 1) h = 1;
+
+	std::vector<uint8_t> bgra;   // straight BGRA (channel 4)
+	if (!svg.render(w, h, bgra))
+		return false;
+
+	release();
+
+	// GDI+ 가 픽셀 메모리를 소유하도록 빈 32bppARGB 비트맵을 만들고 LockBits 로 복사해 넣는다.
+	// (scan0 생성자로 만든 wrap 을 Clone 하면 외부 bgra 버퍼를 참조하는 비트맵이 나올 수 있어
+	//  함수 종료로 벡터가 해제되면 dangling → DrawImage 시 access violation. 실제로 그 크래시를 겪음.)
+	m_pBitmap = new Gdiplus::Bitmap(w, h, PixelFormat32bppARGB);
+	if (!m_pBitmap || m_pBitmap->GetLastStatus() != Gdiplus::Ok)
+		return false;
+
+	Gdiplus::Rect		lock_rect(0, 0, w, h);
+	Gdiplus::BitmapData	bd;
+	if (m_pBitmap->LockBits(&lock_rect, Gdiplus::ImageLockModeWrite, PixelFormat32bppARGB, &bd) != Gdiplus::Ok)
+		return false;
+
+	uint8_t* base = (uint8_t*)bd.Scan0;   // Scan0 는 항상 row 0. stride 부호 무관하게 base + y*stride = row y.
+	for (int y = 0; y < h; ++y)
+		memcpy(base + (INT_PTR)y * bd.Stride, bgra.data() + (size_t)y * w * 4, (size_t)w * 4);
+
+	m_pBitmap->UnlockBits(&bd);
+
+	resolution();   // width/height/channel/stride 갱신
+	return true;
+}
+#endif // SC_USE_SVG
 
 bool CSCGdiplusBitmap::load_webp(CString sfile)
 {

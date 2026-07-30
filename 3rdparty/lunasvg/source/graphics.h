@@ -419,6 +419,9 @@ private:
 
 class FontFaceCache {
 public:
+    // Local addition (not upstream): free the process-global font cache at shutdown
+    // so on-demand registered faces are released instead of leaking until exit.
+    ~FontFaceCache();
     bool addFontFace(const std::string& family, bool bold, bool italic, const FontFace& face);
     FontFace getFontFace(const std::string& family, bool bold, bool italic) const;
 

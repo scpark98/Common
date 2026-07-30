@@ -2082,9 +2082,59 @@ HRESULT CSCD2Image::load_svg(IWICImagingFactory2* pWICFactory, ID2D1DeviceContex
 		m_svg_logical_h = 512.0f;
 	}
 
-	// 최초 백킹 래스터: 논리 크기 그대로 1회. 이후 표시 배율이 커지면 OnPaint 에서 ensure_svg_raster() 로 재래스터.
-	return rasterize_svg(pWICFactory, d2context,
-		(int)(m_svg_logical_w + 0.5f), (int)(m_svg_logical_h + 0.5f));
+	const int lw = (int)(m_svg_logical_w + 0.5f);
+	const int lh = (int)(m_svg_logical_h + 0.5f);
+
+	// 애니메이션 SVG(SMIL) → 논리 크기로 프레임 시퀀스를 굽고 GIF 와 동일 경로로 재생.
+	// (확대 시 재래스터는 하지 않음 — 프레임은 GIF 처럼 D2D 스케일. ensure_svg_raster 는 아래에서 가드.)
+	if (m_svg.is_animated())
+	{
+		// 애니메이션 베이킹 해상도 상한 — 프레임마다 lunasvg 재파싱·래스터가 픽셀 수에 비례해
+		// 비싸므로 long-side 를 캡한다(움직이는 그림이라 소프트닝 무해, 표시는 D2D 업스케일).
+		const int MAX_ANIM_DIM = 768;
+		int aw = lw, ah = lh;
+		if (aw > MAX_ANIM_DIM || ah > MAX_ANIM_DIM)
+		{
+			double s = (double)MAX_ANIM_DIM / (aw > ah ? aw : ah);
+			aw = (int)(aw * s + 0.5); if (aw < 1) aw = 1;
+			ah = (int)(ah * s + 0.5); if (ah < 1) ah = 1;
+		}
+
+		std::vector<std::vector<uint8_t>> frames;
+		std::vector<int>                  delays;
+		if (m_svg.build_frames(aw, ah, frames, delays) && frames.size() >= 2)
+		{
+			m_img.clear();
+			m_frame_delay.clear();
+			m_frame_index = 0;
+
+			HRESULT hr = S_OK;
+			for (size_t i = 0; i < frames.size(); ++i)
+			{
+				hr = add_frame_from_raw(pWICFactory, d2context, frames[i].data(), aw, ah, 4, delays[i]);
+				if (FAILED(hr))
+					break;
+			}
+			if (SUCCEEDED(hr) && m_img.size() >= 2)
+			{
+				m_svg_raster_w = aw;
+				m_svg_raster_h = ah;
+				// 애니메이션은 재래스터 없이 프레임(aw×ah)으로 고정 재생되므로 자연 크기 =
+				// 프레임 크기로 맞춘다. get_width/height/get_size 가 이 값을 반환해 m_data
+				// (aw×ah) 를 훑는 get_alpha_pixel_count 등과 크기가 일치(OOB 방지).
+				m_svg_logical_w = (float)aw;
+				m_svg_logical_h = (float)ah;
+				if (m_img[0])
+					extract_raw_data_from_bitmap(d2context, m_img[0].Get(), &m_data);
+				play();                 // total_frame>1 → thread_animation 구동(GIF 와 동일)
+				return S_OK;
+			}
+			// 굽기 실패 → 정적 경로로 폴백(아래 rasterize_svg 가 m_img 재구성).
+		}
+	}
+
+	// 정적: 최초 백킹 래스터 1회. 이후 표시 배율이 커지면 OnPaint 에서 ensure_svg_raster() 로 재래스터.
+	return rasterize_svg(pWICFactory, d2context, lw, lh);
 }
 
 HRESULT CSCD2Image::rasterize_svg(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d2context, int w, int h)
@@ -2109,6 +2159,11 @@ HRESULT CSCD2Image::rasterize_svg(IWICImagingFactory2* pWICFactory, ID2D1DeviceC
 HRESULT CSCD2Image::ensure_svg_raster(int target_w, int target_h)
 {
 	if (!is_svg() || target_w <= 0 || target_h <= 0)
+		return S_FALSE;
+
+	// 애니메이션 SVG 는 다중 프레임(m_img[0..N])으로 구워져 있으므로 단일 재래스터 금지
+	// (rasterize_svg → load() 가 프레임 deque 를 파괴한다).
+	if (m_svg.is_animated())
 		return S_FALSE;
 
 	// 과도한 메모리/시간 방지 상한.

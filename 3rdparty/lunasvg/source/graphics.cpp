@@ -459,6 +459,13 @@ FontFaceCache::FontFaceCache()
 #endif
 }
 
+// Local addition (not upstream): the singleton is a function-local static, so this
+// runs at process exit and releases all registered font faces + loaded font data.
+FontFaceCache::~FontFaceCache()
+{
+    plutovg_font_face_cache_destroy(m_cache);
+}
+
 FontFaceCache* fontFaceCache()
 {
     static FontFaceCache cache;

@@ -11,6 +11,8 @@
 #include <cmath>
 #include <cstdio>
 #include <algorithm>
+#include <thread>
+#include <atomic>
 
 #include <Windows.h>
 #include <dwrite.h>
@@ -549,7 +551,68 @@ namespace anim
 		std::vector<std::string>          raw_stops;   // 원본 문자열(이산/폴백용)
 		std::vector<std::vector<double>>  stops;       // 수치 파싱(색=[r,g,b,a])
 		std::vector<double>               keytimes;    // 0..1, size==raw_stops 또는 empty
+
+		//20260731 by claude. attributeName="d"/"points" 애니메이션 보간용 부가 정보.
+		//stops 에는 숫자만, path_cmds/path_ncounts 에 커맨드 시퀀스와 커맨드당 숫자 개수 저장.
+		//모든 stop 의 (path_cmds[i], path_ncounts[i]) 가 동일할 때만 interp_ok=true → 숫자만 lerp.
+		//시퀀스 다르면 SMIL 규격상 보간 불가 → discrete 폴백.
+		bool                              is_path_data = false;   // attr == "d"
+		bool                              is_points    = false;   // attr == "points"
+		std::vector<std::vector<char>>    path_cmds;               // stop 별 커맨드 시퀀스(points 는 pseudo 'P')
+		std::vector<std::vector<size_t>>  path_ncounts;            // stop 별 커맨드마다 딸린 숫자 개수
 	};
+
+	//20260731 by claude. SVG path "d" / polyline "points" 를 (cmds, nums, ncounts) 로 파싱.
+	//"M10,20 C1,2,3,4,5,6 Z" → cmds=['M','C','Z'], nums=[10,20,1,2,3,4,5,6], ncounts=[2,6,0].
+	//반환 false 면 파싱 실패(호출부는 discrete 폴백).
+	bool parse_path_d(const std::string& s,
+					  std::vector<char>& cmds,
+					  std::vector<double>& nums,
+					  std::vector<size_t>& ncounts)
+	{
+		cmds.clear();
+		nums.clear();
+		ncounts.clear();
+
+		const char* p   = s.c_str();
+		const char* end = p + s.size();
+		size_t cur_count = 0;
+		bool   have_cmd  = false;
+
+		while (p < end)
+		{
+			while (p < end && (std::isspace((unsigned char)*p) || *p == ','))
+				++p;
+			if (p >= end) break;
+
+			unsigned char ch = (unsigned char)*p;
+			if (std::isalpha(ch))
+			{
+				if (have_cmd)
+					ncounts.push_back(cur_count);
+				cmds.push_back((char)ch);
+				cur_count = 0;
+				have_cmd  = true;
+				++p;
+			}
+			else if (std::isdigit(ch) || ch == '.' || ch == '-' || ch == '+')
+			{
+				if (!have_cmd) return false;
+				char* e = nullptr;
+				double v = std::strtod(p, &e);
+				if (e == p) return false;
+				nums.push_back(v);
+				++cur_count;
+				p = e;
+			}
+			else
+			{
+				++p;   // 알 수 없는 문자는 스킵(관대)
+			}
+		}
+		if (have_cmd) ncounts.push_back(cur_count);
+		return !cmds.empty();
+	}
 
 	std::string format_vec(const animation& a, const std::vector<double>& v)
 	{
@@ -561,6 +624,27 @@ namespace anim
 		}
 		if (a.is_transform)
 			return a.transform_type + "(" + join_nums(v) + ")";
+		//20260731 by claude. path/points: path_cmds[0] + ncounts[0] 로 재조립. 모든 stop 이 같은 시퀀스임이 parse_anim 에서 보장.
+		if ((a.is_path_data || a.is_points) && !a.path_cmds.empty())
+		{
+			std::string s;
+			size_t idx = 0;
+			for (size_t k = 0; k < a.path_cmds[0].size(); ++k)
+			{
+				if (a.is_path_data)
+				{
+					if (!s.empty()) s += ' ';
+					s += a.path_cmds[0][k];
+				}
+				for (size_t j = 0; j < a.path_ncounts[0][k]; ++j)
+				{
+					if (idx >= v.size()) break;
+					if (!s.empty()) s += ' ';
+					s += num_to_str(v[idx++]);
+				}
+			}
+			return s;
+		}
 		return join_nums(v);
 	}
 	std::string out_index(const animation& a, size_t i)
@@ -699,8 +783,11 @@ namespace anim
 		// 보간 가능 여부 분류
 		static const std::set<std::string> color_attrs =
 			{ "fill","stroke","stop-color","flood-color","lighting-color","color" };
+		//20260731 by claude. "d","points" 는 아래 path 분기에서 처리(커맨드 시퀀스 동일 시 숫자만 lerp).
+		//discrete_attrs 는 순수 이산 attr 만 (수치 보간이 개념적으로 불가능한 것).
 		static const std::set<std::string> discrete_attrs =
-			{ "d","points","visibility","display","transform-origin" };
+			{ "visibility","display","transform-origin" };
+		static const std::set<std::string> path_data_attrs = { "d", "points" };
 
 		a.is_color = color_attrs.count(a.attr) > 0;
 
@@ -708,6 +795,51 @@ namespace anim
 		{
 			if (!a.is_set) a.discrete = true;
 			a.interp_ok = false;                    // raw 이산 사용
+		}
+		//20260731 by claude. path d / polyline points: 각 stop 을 (cmds, nums, ncounts) 로 파싱.
+		//모든 stop 이 같은 커맨드 시퀀스 + 카운트면 숫자만 lerp(interp_ok=true), 아니면 discrete 폴백.
+		//SMIL 규격도 path 보간은 이 조건을 요구.
+		else if (path_data_attrs.count(a.attr) > 0)
+		{
+			a.is_path_data = (a.attr == "d");
+			a.is_points    = (a.attr == "points");
+			a.interp_ok    = true;
+			for (const auto& s : raws)
+			{
+				std::vector<char>   cmds;
+				std::vector<double> nums;
+				std::vector<size_t> ncnt;
+				if (a.is_points)
+				{
+					// points 는 커맨드 없이 x,y 페어. pseudo 커맨드 'P' 하나로 통일.
+					nums = parse_num_list(s);
+					if (nums.empty()) { a.interp_ok = false; break; }
+					cmds.push_back('P');
+					ncnt.push_back(nums.size());
+				}
+				else
+				{
+					if (!parse_path_d(s, cmds, nums, ncnt)) { a.interp_ok = false; break; }
+				}
+				if (!a.path_cmds.empty() && (cmds != a.path_cmds[0] || ncnt != a.path_ncounts[0]))
+				{
+					a.interp_ok = false;   // 시퀀스 불일치 → 보간 불가
+					break;
+				}
+				a.path_cmds.push_back(std::move(cmds));
+				a.path_ncounts.push_back(std::move(ncnt));
+				a.stops.push_back(std::move(nums));
+			}
+			if (!a.interp_ok)
+			{
+				// discrete 폴백: raw 문자열 그대로 이산 재생.
+				a.discrete = true;
+				a.stops.clear();
+				a.path_cmds.clear();
+				a.path_ncounts.clear();
+				a.is_path_data = false;
+				a.is_points    = false;
+			}
 		}
 		else if (a.is_color)
 		{
@@ -906,19 +1038,177 @@ bool sc_svg::build_frames_stream(int w, int h, int fps, double budget_ms,
 	return true;
 }
 
+//20260731 by claude. 화면 표시용 병렬 베이킹.
+//stage 1(순차): pugi doc 를 mutate 해 N개 프레임 SVG 문자열을 생성. doc 공유 mutate 는 스레드 안전 X 라 순차 필수.
+//stage 2(병렬): 각 워커가 자기 프레임의 svg 문자열로 lunasvg::Document 를 새로 파싱하고 renderToBitmap → un-premultiply.
+//병렬 안전 근거: 서로 다른 Document 인스턴스 → renderToBitmap 은 자기 m_rootElement 만 mutate.
+//폰트 캐시(plutovg_font_face_cache_t) 는 내부 CRITICAL_SECTION 으로 자체 보호(plutovg-font.c:521,652 등).
+//프레임 0 은 순차로 굽고 실측(frame_ms) → 병렬 예산 반영해 N 을 상향(순차 대비 fps 복원).
 bool sc_svg::build_frames(int w, int h,
 						  std::vector<std::vector<uint8_t>>& frames,
 						  std::vector<int>& delays_ms) const
 {
 	frames.clear();
 	delays_ms.clear();
-	build_frames_stream(w, h, 25, 1500.0,
-		[&](int, int, const std::vector<uint8_t>& bgra, int delay_ms)
+
+	if (m_svg_data.empty() || w <= 0 || h <= 0)
+		return false;
+
+	pugi::xml_document doc;
+	if (!doc.load_buffer(m_svg_data.data(), m_svg_data.size()))
+		return false;
+	std::vector<anim::animation> anims;
+	anim::collect(doc, doc, anims);
+	if (anims.empty())
+		return false;
+
+	// 전체 주기 T — build_frames_stream 과 동일한 산정/클램프.
+	double T = 0.0;
+	for (const auto& a : anims)
+	{
+		double cyc = a.is_set ? a.begin
+				   : (a.indefinite ? (a.begin + a.dur) : (a.begin + a.dur * a.repeat));
+		if (cyc > T) T = cyc;
+	}
+	if (T <= 1e-6)
+		return false;
+	if (T < 0.2)  T = 0.2;
+	if (T > 30.0) T = 30.0;
+
+	// 애니메이션이 건드리는 (대상,속성)의 원본 값 스냅샷. 프레임마다 이것으로 복원 후 t 값을 주입.
+	struct base_val { bool had; std::string val; };
+	std::map<pugi::xml_node, std::map<std::string, base_val>> base;
+	for (const auto& a : anims)
+	{
+		auto& m = base[a.target];
+		if (m.find(a.attr) == m.end())
 		{
-			frames.push_back(bgra);
-			delays_ms.push_back(delay_ms);
-			return true;
-		});
+			pugi::xml_attribute at = a.target.attribute(utf8_to_wide(a.attr).c_str());
+			base_val bv;
+			bv.had = (bool)at;
+			bv.val = at ? wide_to_utf8(at.value()) : std::string();
+			m[a.attr] = bv;
+		}
+	}
+
+	// stage 1: 시각 t 의 SVG 문자열 생성. doc 를 공유 mutate 하므로 반드시 순차.
+	auto make_svg_at = [&](double t) -> std::string
+	{
+		for (auto& np : base)
+		{
+			pugi::xml_node node = np.first;
+			for (auto& ap : np.second)
+			{
+				if (ap.second.had)
+					anim::set_attr(node, ap.first, ap.second.val);
+				else
+				{
+					pugi::xml_attribute ex = node.attribute(utf8_to_wide(ap.first).c_str());
+					if (ex) node.remove_attribute(ex);
+				}
+			}
+		}
+		std::map<pugi::xml_node, std::string> xf;
+		for (const auto& a : anims)
+		{
+			std::string val;
+			if (!anim::sample(a, t, val))
+				continue;
+			if (a.is_transform)
+			{
+				std::string& s = xf[a.target];
+				if (!s.empty()) s += ' ';
+				s += val;
+			}
+			else
+			{
+				anim::set_attr(a.target, a.attr, val);
+			}
+		}
+		for (auto& kv : xf)
+			anim::set_attr(kv.first, "transform", kv.second);
+
+		std::ostringstream ss;
+		doc.save(ss, L"", pugi::format_raw);
+		return ss.str();
+	};
+
+	// stage 2: SVG 문자열 → 새 Document → renderToBitmap → un-premul. 프레임 로컬이라 스레드 안전.
+	auto render_svg = [w, h](const std::string& svg, std::vector<uint8_t>& out)
+	{
+		out.clear();
+		auto sub = lunasvg::Document::loadFromData(svg.data(), svg.size());
+		if (sub)
+		{
+			lunasvg::Bitmap bmp = sub->renderToBitmap(w, h, 0x00000000);
+			unpremultiply_to_bgra(bmp, out);
+		}
+		if (out.empty())
+			out.assign((size_t)w * h * 4, 0);       // 실패 프레임은 투명
+	};
+
+	// 프레임 0 을 순차로 굽고 실측. 텍스트 있는 SVG 는 이 순차 굽기에서 폰트 캐시가 예열된다.
+	std::string svg0 = make_svg_at(0.0);
+	std::vector<uint8_t> frame0;
+	LARGE_INTEGER freq, c0, c1;
+	QueryPerformanceFrequency(&freq);
+	QueryPerformanceCounter(&c0);
+	render_svg(svg0, frame0);
+	QueryPerformanceCounter(&c1);
+	const double frame_ms = (double)(c1.QuadPart - c0.QuadPart) * 1000.0 / (double)freq.QuadPart;
+
+	// 워커 수 P — 하드웨어 병렬성 상한. 지나친 스레드 생성 오버헤드 억제.
+	unsigned int P = std::thread::hardware_concurrency();
+	if (P < 2) P = 2;
+	if (P > 8) P = 8;
+
+	// N 결정. 병렬 P 배 처리량을 예산에 반영해 순차 버전 대비 fps 를 복원한다.
+	const int    fps       = 25;
+	const double budget_ms = 1500.0;
+	int n_ideal  = (int)std::lround(T * (double)fps);
+	if (n_ideal < 2) n_ideal = 2;
+	int n_budget = (int)((double)P * budget_ms / (frame_ms > 0.5 ? frame_ms : 0.5)) + 1;
+	if (n_budget < 2) n_budget = 2;
+	int N = (n_ideal < n_budget) ? n_ideal : n_budget;
+	if (N > 150) N = 150;
+	if (N < 2)   N = 2;
+
+	// delay = T/N (총 재생시간 = T 유지).
+	const int delay = (int)std::lround(T * 1000.0 / (double)N);
+
+	// 나머지 프레임 SVG 문자열 순차 생성. doc mutate 는 여기서 완결 → stage 2 이후 doc 는 안 건드림.
+	std::vector<std::string> svgs((size_t)N);
+	svgs[0] = std::move(svg0);
+	for (int i = 1; i < N; ++i)
+		svgs[i] = make_svg_at((double)i * T / (double)N);
+
+	// 결과 슬롯 사전 할당. 워커는 자기 인덱스 슬롯에만 쓴다(다른 슬롯 접근 없음).
+	frames.assign((size_t)N, std::vector<uint8_t>());
+	frames[0] = std::move(frame0);
+	delays_ms.assign((size_t)N, delay);
+
+	// 병렬 렌더 (프레임 1..N-1). 인덱스는 atomic fetch_add 로 work-stealing.
+	if (N > 1)
+	{
+		std::atomic<int> next_idx(1);
+		std::vector<std::thread> workers;
+		workers.reserve(P);
+		for (unsigned int wi = 0; wi < P; ++wi)
+		{
+			workers.emplace_back([&]()
+			{
+				while (true)
+				{
+					int i = next_idx.fetch_add(1);
+					if (i >= N) break;
+					render_svg(svgs[i], frames[i]);
+				}
+			});
+		}
+		for (auto& th : workers)
+			th.join();
+	}
+
 	return frames.size() >= 2;
 }
 

@@ -210,7 +210,7 @@ void CImageShapeWnd::resize(int w, int h, double fx, double fy)
 
 	SetWindowPos(NULL, 0, 0, nw, nh, SWP_NOMOVE | SWP_NOZORDER);
 
-	//if (m_img.is_animated_gif() && m_gif_frames.size())
+	//if (m_img.is_animated_image() && m_gif_frames.size())
 	//	render(m_gif_frames[0]);
 	//else
 	//	render(&m_img);
@@ -224,7 +224,7 @@ void CImageShapeWnd::play()
 	if (m_run_thread_animate)
 		return;
 
-	if (m_img.is_animated_gif())
+	if (m_img.is_animated_image())
 	{
 		std::thread t(&CImageShapeWnd::thread_animate, this);
 		t.detach();
@@ -237,7 +237,7 @@ void CImageShapeWnd::play()
 
 void CImageShapeWnd::set_pos(int pos)
 {
-	if (m_img.is_empty() || !m_img.is_animated_gif())
+	if (m_img.is_empty() || !m_img.is_animated_image())
 		return;
 
 	if (m_run_thread_animate)
@@ -253,7 +253,7 @@ void CImageShapeWnd::set_pos(int pos)
 
 void CImageShapeWnd::set_pos(double dpos)
 {
-	if (m_img.is_empty() || !m_img.is_animated_gif())
+	if (m_img.is_empty() || !m_img.is_animated_image())
 		return;
 
 	if (dpos < 0.0 || dpos > 1.0)

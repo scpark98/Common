@@ -348,6 +348,17 @@ protected:
 	HRESULT					rasterize_svg(IWICImagingFactory2* WICfactory, ID2D1DeviceContext* d2context, int w, int h);
 #endif
 
+#ifndef SCD2IMAGE_NO_WEBP
+	//libwebp(WebPAnimDecoder)로 webp 를 직접 디코드 — WIC webp 코덱(별도 설치)에 비의존.
+	//정적/애니메이션 모두 프레임 시퀀스로 로드(애니메이션은 GIF 처럼 재생). 실패 시 호출부가 WIC 로 폴백.
+	HRESULT					load_webp(IWICImagingFactory2* WICfactory, ID2D1DeviceContext* d2context, CString path, bool auto_play = true);
+#endif
+#ifdef SC_USE_APNG
+	//APNG 를 공용 디코더(sc_apng, libpng)로 프레임 로드해 GIF/webp 와 동일 경로로 재생.
+	//정적 png(acTL 없음)면 S_FALSE 를 돌려 호출부가 기존 WIC 경로로 처리하게 한다.
+	HRESULT					load_apng(IWICImagingFactory2* WICfactory, ID2D1DeviceContext* d2context, CString path, bool auto_play = true);
+#endif
+
 	D2D1_BITMAP_INTERPOLATION_MODE m_interpolation_mode = D2D1_BITMAP_INTERPOLATION_MODE_LINEAR;
 
 //animated gif

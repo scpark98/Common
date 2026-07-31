@@ -14,6 +14,12 @@
 
 #include "../../SCGdiplusBitmap.h"
 
+// APNG(애니메이션 PNG) 디코드 공용 모듈. SC_USE_APNG 정의 + Common/SCApng.cpp + 벤더 libpng/zlib 소스가
+// 프로젝트 빌드에 포함돼야 한다(x64/Win32 무관, 소스 정적 컴파일).
+#ifdef SC_USE_APNG
+#include "../../SCApng.h"
+#endif
+
 #pragma comment(lib, "dxguid.lib")
 #pragma comment(lib, "Windowscodecs.lib")
 #pragma comment(lib, "d2d1.lib")
@@ -236,6 +242,31 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 #ifdef SC_USE_SVG
 	if (get_part(path, fn_ext).MakeLower() == _T("svg"))
 		return load_svg(pWICFactory, d2context, path);
+#endif
+
+	// webp 는 WIC 코덱(별도 설치)이 무손실+알파+애니메이션 조합을 못 여는 경우가 있어,
+	// 이미 링크된 libwebp 로 직접 디코드한다(정적/애니메이션 모두). 실패 시 아래 WIC 로 폴백.
+#ifndef SCD2IMAGE_NO_WEBP
+	if (get_part(path, fn_ext).MakeLower() == _T("webp"))
+	{
+		HRESULT hrw = load_webp(pWICFactory, d2context, path, auto_play);
+		if (SUCCEEDED(hrw))
+			return hrw;
+	}
+#endif
+
+	// PNG/APNG: GDI+/WIC 는 APNG 애니를 못 그리므로(첫 프레임 정적) libpng 로 직접 디코드한다.
+	// load_apng 은 acTL 이 없으면(정적 png) S_FALSE 를 돌려주고, 그 경우 아래 WIC 경로로 폴백한다.
+#ifdef SC_USE_APNG
+	{
+		CString ext_png = get_part(path, fn_ext).MakeLower();
+		if (ext_png == _T("png") || ext_png == _T("apng"))
+		{
+			HRESULT hra = load_apng(pWICFactory, d2context, path, auto_play);
+			if (hra == S_OK)   // 애니 APNG 성공만 단락. S_FALSE(정적 png)는 WIC 로.
+				return hra;
+		}
+	}
 #endif
 
 	/*
@@ -2182,6 +2213,147 @@ HRESULT CSCD2Image::ensure_svg_raster(int target_w, int target_h)
 	return rasterize_svg(m_pWICFactory, m_d2dc, w, h);
 }
 #endif // SC_USE_SVG
+
+#ifndef SCD2IMAGE_NO_WEBP
+// libwebp(WebPAnimDecoder)로 webp 를 직접 디코드. 정적 webp 는 1프레임, 애니메이션 webp 는
+// 다중 프레임으로 로드하고 GIF 와 동일 경로(add_frame_from_raw + play)로 재생한다.
+// WebPAnimDecoder 는 정적/애니메이션 모두 처리하며, 각 프레임을 "완전히 재구성된 캔버스"로 준다
+// (disposal/blend 를 내부 처리) → add_frame_from_raw 에 그대로 넣으면 된다.
+HRESULT CSCD2Image::load_webp(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d2context, CString path, bool auto_play)
+{
+	m_filename = path;
+
+	ULONGLONG file_size = get_file_size(path);
+	if (file_size == 0)
+		return S_FALSE;
+
+	std::vector<uint8_t> data((size_t)file_size);
+	if (!read_raw(path, data.data(), file_size))
+		return S_FALSE;
+
+	WebPData wd;
+	wd.bytes = data.data();
+	wd.size  = (size_t)file_size;
+
+	WebPAnimDecoderOptions opt;
+	if (!WebPAnimDecoderOptionsInit(&opt))
+		return S_FALSE;
+	opt.color_mode  = MODE_BGRA;   // straight BGRA — add_frame_from_raw(channel 4) 가 기대하는 포맷
+	opt.use_threads = 1;
+
+	WebPAnimDecoder* dec = WebPAnimDecoderNew(&wd, &opt);
+	if (!dec)
+		return S_FALSE;
+
+	WebPAnimInfo info;
+	if (!WebPAnimDecoderGetInfo(dec, &info) || info.canvas_width == 0 || info.canvas_height == 0)
+	{
+		WebPAnimDecoderDelete(dec);
+		return S_FALSE;
+	}
+
+	const int w = (int)info.canvas_width;
+	const int h = (int)info.canvas_height;
+
+	m_ani_thread.stop();
+	m_img.clear();
+	m_frame_delay.clear();
+	m_frame_index = 0;
+
+	HRESULT hr = S_OK;
+	int prev_ts = 0;
+	while (WebPAnimDecoderHasMoreFrames(dec))
+	{
+		uint8_t* buf = nullptr;
+		int ts = 0;   // 프레임 "종료" 타임스탬프(ms, 누적)
+		if (!WebPAnimDecoderGetNext(dec, &buf, &ts) || !buf)
+		{
+			hr = S_FALSE;
+			break;
+		}
+		int delay = ts - prev_ts;
+		if (delay <= 0) delay = 100;   // 정적/무효 delay 방어
+		prev_ts = ts;
+
+		// buf 는 다음 GetNext 까지만 유효하나 add_frame_from_raw 가 즉시 복사한다.
+		hr = add_frame_from_raw(pWICFactory, d2context, buf, w, h, 4, delay);
+		if (FAILED(hr))
+			break;
+	}
+
+	WebPAnimDecoderDelete(dec);
+
+	if (FAILED(hr))
+		return hr;
+	if (m_img.empty())
+		return S_FALSE;
+
+	if (m_img[0])
+		extract_raw_data_from_bitmap(d2context, m_img[0].Get(), &m_data);
+
+	if (m_img.size() > 1 && auto_play)
+		play();
+
+	return S_OK;
+}
+#endif // SCD2IMAGE_NO_WEBP
+
+#ifdef SC_USE_APNG
+// APNG 파일을 공용 디코더(sc_apng)로 프레임 로드해 GIF/webp 와 동일 경로(add_frame_from_raw + play)로 재생.
+// 정적 png(acTL 없음)면 S_FALSE 를 돌려 호출부가 기존 WIC 경로로 처리하게 한다.
+HRESULT CSCD2Image::load_apng(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d2context, CString path, bool auto_play)
+{
+	m_filename = path;
+
+	ULONGLONG file_size = get_file_size(path);
+	if (file_size == 0)
+		return S_FALSE;
+	std::vector<uint8_t> data((size_t)file_size);
+	if (!read_raw(path, data.data(), file_size))
+		return S_FALSE;
+
+	// acTL 청크(IDAT 앞)가 있어야 APNG(애니). 없으면 정적 png → 호출부 WIC 경로로 폴백.
+	bool has_actl = false;
+	for (size_t i = 0; i + 4 <= data.size(); ++i)
+	{
+		if (data[i] == 'I' && data[i+1] == 'D' && data[i+2] == 'A' && data[i+3] == 'T') break;
+		if (data[i] == 'a' && data[i+1] == 'c' && data[i+2] == 'T' && data[i+3] == 'L') { has_actl = true; break; }
+	}
+	if (!has_actl)
+		return S_FALSE;
+
+	int W = 0, H = 0;
+	std::vector<std::vector<uint8_t>> frames;
+	std::vector<int> delays;
+	if (!sc_apng::decode(data.data(), data.size(), W, H, frames, delays) || frames.empty())
+		return S_FALSE;
+
+	m_ani_thread.stop();
+	m_img.clear();
+	m_frame_delay.clear();
+	m_frame_index = 0;
+
+	HRESULT hr = S_OK;
+	for (size_t i = 0; i < frames.size(); ++i)
+	{
+		hr = add_frame_from_raw(pWICFactory, d2context, frames[i].data(), W, H, 4, delays[i]);
+		if (FAILED(hr))
+			break;
+	}
+	if (FAILED(hr))
+		return hr;
+	if (m_img.empty())
+		return S_FALSE;
+
+	if (m_img[0])
+		extract_raw_data_from_bitmap(d2context, m_img[0].Get(), &m_data);
+
+	if (m_img.size() > 1 && auto_play)
+		play();
+
+	return S_OK;
+}
+#endif // SC_USE_APNG
 
 float CSCD2Image::get_ratio()
 {

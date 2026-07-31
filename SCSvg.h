@@ -10,6 +10,7 @@
 #include <memory>
 #include <cstdint>
 #include <string>
+#include <functional>
 
 namespace lunasvg { class Document; }
 
@@ -53,12 +54,51 @@ public:
 	// 애니메이션을 w x h 로 프레임 시퀀스로 굽는다. 각 frames[i] 는 straight BGRA(w*h*4),
 	// delays_ms[i] 는 해당 프레임 표시 시간(ms). 성공 시 true 이고 프레임 수 >= 2.
 	// 애니메이션이 없거나 구울 수 없으면 false(호출부는 정적 render 로 폴백).
+	// (화면 표시용) 첫 프레임 실측 비용을 총 예산(1500ms)에 맞춰 프레임 수를 적응 감축한다.
 	bool build_frames(int w, int h,
 					  std::vector<std::vector<uint8_t>>& frames,
 					  std::vector<int>& delays_ms) const;
+
+	// 프레임을 한 장 굽는 즉시 sink 로 넘기는 스트리밍 베이커(export 처럼 프레임이 많아
+	// 전부 메모리에 담기 부담스러운 경우용). sink(idx, total, bgra(straight, w*h*4), delay_ms).
+	// sink 가 false 를 반환하면 즉시 중단(취소)하고 false 를 리턴한다.
+	//   fps       : 목표 프레임/초.
+	//   budget_ms : > 0 이면 첫 프레임 실측으로 프레임 수를 이 예산에 맞춰 감축(화면용).
+	//               <= 0 이면 예산 캡 없이 round(T*fps) 프레임을 굽는다(export 용, 부드러움 우선).
+	// 정상적으로 N(>=2) 프레임을 모두 sink 로 넘겼으면 true.
+	bool build_frames_stream(int w, int h, int fps, double budget_ms,
+		const std::function<bool(int idx, int total,
+								 const std::vector<uint8_t>& bgra,
+								 int delay_ms)>& sink) const;
 
 private:
 	std::unique_ptr<lunasvg::Document> m_doc;
 	std::string                        m_svg_data;   // 원본 SVG 바이트(프레임 베이킹 재파싱용)
 	bool                               m_animated = false;
 };
+
+// ── SVG 애니메이션 → 애니메이션 GIF 내보내기 ──────────────────────────
+// svg_path 를 새 sc_svg 로 파싱(호출자 표시용 인스턴스와 상태 공유 없음 → 워커 스레드 안전)해
+// 프레임을 스트리밍으로 굽고, WIC(GUID_ContainerFormatGif)로 무한 루프 애니메이션 GIF 를 쓴다.
+//   out_gif_path : 출력 GIF 경로. null/빈문자열이면 svg_path 와 같은 폴더·같은 이름 + ".gif".
+//   out_w/out_h  : <= 0 이면 SVG 자연 크기.
+//   fps          : GIF 부드러움. GIF delay 최소 단위가 2cs(=50fps)라 내부에서 [1,50] 로 클램프.
+//   progress     : progress(cur, total). false 반환 시 취소(부분 파일 삭제). null 허용.
+// GIF 는 알파(1비트)의 안티에일리어스 경계가 지저분하므로, 각 프레임을 흰 배경 위에 합성해
+// 불투명 GIF 로 낸다(브라우저에서 흰 페이지에 얹혀 보이는 것과 동일). 성공 시 true.
+bool export_svg_to_animated_gif(const wchar_t* svg_path,
+								const wchar_t* out_gif_path,
+								int out_w, int out_h, int fps,
+								std::function<bool(int cur, int total)> progress);
+
+// SVG 애니메이션을 애니메이션 WebP 로 내보낸다(libwebp WebPAnimEncoder, x64 전용).
+// GIF 와 달리 24비트 풀컬러 + 8비트 알파를 보존하므로 디더/밴딩/256색·1비트 투명 제약이 없다.
+//   out_webp_path : null/빈문자열이면 svg_path 와 같은 폴더·같은 이름 + ".webp".
+//   out_w/out_h   : <= 0 이면 SVG 자연 크기.
+//   fps           : 프레임/초(1 이상). WebP delay 는 ms 단위라 GIF 같은 2cs 하한 없음.
+//   progress      : progress(cur, total). false 반환 시 취소(부분 파일 삭제). null 허용.
+// 무한 루프. 무손실(lossless) 인코딩. 성공 시 true. (x64 아닌 빌드에서는 항상 false 스텁.)
+bool export_svg_to_animated_webp(const wchar_t* svg_path,
+								 const wchar_t* out_webp_path,
+								 int out_w, int out_h, int fps,
+								 std::function<bool(int cur, int total)> progress);

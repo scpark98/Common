@@ -64,6 +64,7 @@
 #include <stdint.h>	//for uint8_t in vs2015
 #include <algorithm>
 #include <vector>
+#include <deque>
 #include <memory>
 #include <cmath>
 
@@ -196,6 +197,19 @@ public:
 	bool			load(UINT id);
 	bool			load_icon(UINT id, int size = 32);
 	bool			load_webp(CString sfile);
+#ifdef SC_USE_WEBP
+	//애니메이션 WebP 를 libwebp(WebPAnimDecoder)로 전체 프레임 디코드해 m_ani_frames 로 보관한다.
+	//GDI+ 는 webp 를 못 다루므로(GIF 처럼 다중프레임 Bitmap 불가) 프레임을 개별 Gdiplus::Bitmap 으로
+	//풀어 두고, 기존 gif 재생 경로(thread_ani/draw_ani_frame)가 이 프레임을 그리게 한다.
+	//성공 시 m_pBitmap=프레임0(정적 쿼리·그리기용), m_frame_count=프레임수. 리소스/파일 공용.
+	bool			load_webp_from_memory(const uint8_t* data, size_t size);
+#endif
+#ifdef SC_USE_APNG
+	//애니메이션 PNG(APNG)를 libpng 로 디코드해 프레임을 합성(fcTL offset + dispose/blend)하여
+	//m_ani_frames 로 보관한다(webp 와 동일한 제네릭 프레임 재생 경로 공유). 정적 png 도 1프레임으로 로드.
+	//성공 시 m_pBitmap=프레임0, m_frame_count=프레임수. 리소스/파일 공용.
+	bool			load_apng_from_memory(const uint8_t* data, size_t size);
+#endif
 	//SVG(lunasvg) 파일을 long_side 픽셀(긴 변 기준, 자연 비율 유지)로 래스터화해 로드. 썸네일 등 고정 크기용.
 	//SC_USE_SVG 정의 프로젝트에서만 제공(그 외엔 lunasvg 의존 없음).
 #ifdef SC_USE_SVG
@@ -214,8 +228,8 @@ public:
 	//일반적으로는 특정 dlg에서 gif를 로딩하여 CSCGdiplusBitmap 자체에서 바로 재생하도록 하면 편하지만
 	//ASee.exe와 같이 roi 설정, 기타 child ctrl들이 존재하여 그들과의 간섭이 문제가 될 경우는 CSCGdiplusBitmap에서 재생시키지 않고
 	//CSCImageDlg에서 직접 재생시켜야 하는 경우도 있다.
-	void			set_gif_play_itself(bool play_itself = true) { m_gif_play_in_this = play_itself; }
-	bool			is_gif_play_itself() { return m_gif_play_in_this; }
+	void			set_ani_play_itself(bool play_itself = true) { m_ani_play_in_this = play_itself; }
+	bool			is_ani_play_itself() { return m_ani_play_in_this; }
 
 	Gdiplus::Bitmap* CreateARGBBitmapFromDIB(const DIBSECTION& dib);
 
@@ -544,6 +558,13 @@ public:
 	//m_frame_delay도 m_property_item에 속해있는데 뭔가 추가적으로 frame_delay를 얻어오기 위해서는 별도로 malloc을 해야하는 듯하다.
 	//일단 해당 항목은 별도 변수로 구해서 사용한다.
 	Gdiplus::PropertyItem* m_frame_delay = NULL;
+
+	// ── 애니메이션 WebP 프레임(GDI+ 는 webp 미지원 → libwebp 로 디코드해 여기 보관) ──
+	// m_frame_count>1 이면 is_animated_image()가 true 가 되어 CSCStatic 등 기존 gif 재생 경로를 그대로 탄다.
+	// (멤버는 무조건 선언 — libwebp 타입이 없어 안전. 실제 디코드는 SC_USE_WEBP 에서만.)
+	std::deque<Gdiplus::Bitmap*> m_ani_frames;   // 소유. release 에서 삭제.
+	std::deque<int>              m_ani_delays;    // 프레임별 표시시간(ms)
+	bool                         m_is_raster_anim = false;
 	//PropertyTagFrameDelay property에서 gif frame delay 정보를 추출하여 m_frame_delay에 저장한다.
 	bool			get_frame_delay();
 
@@ -553,7 +574,7 @@ public:
 	//m_property_item을 이용해서 간단히 추출하는 것이 좋을듯하다.
 
 
-	bool			is_animated_gif() { return (is_valid() && (m_frame_count > 1)); }
+	bool			is_animated_image() { return (is_valid() && (m_frame_count > 1)); }
 	int				get_frame_count() { return m_frame_count; }
 	//parenthWnd 내의 지정된 영역에 표시. 투명효과는 지원되지 않는다.
 	//parent에 관계없이 투명하게 표시할 경우는 CImageShapeWnd를 사용.
@@ -561,21 +582,21 @@ public:
 	//void	set_animation(HWND parenthWnd, int x, int y, float ratio = 1.0f, bool start = true);
 	//ratio를 유지하여 r안에 표시한다.
 	void			set_animation(HWND parenthWnd, CRect r, bool start = true);
-	void			move_gif(int x = 0, int y = 0, int w = 0, int h = 0);
-	void			move_gif(CRect r);
-	void			set_gif_back_color(COLORREF cr) { m_cr_back.SetFromCOLORREF(cr); }
-	void			set_gif_back_color(Gdiplus::Color cr) { m_cr_back = cr; }
-	void			play_gif();
+	void			move_ani(int x = 0, int y = 0, int w = 0, int h = 0);
+	void			move_ani(CRect r);
+	void			set_ani_back_color(COLORREF cr) { m_cr_back.SetFromCOLORREF(cr); }
+	void			set_ani_back_color(Gdiplus::Color cr) { m_cr_back = cr; }
+	void			play_ani();
 	//pos위치로 이동한 후 일시정지한다. -1이면 pause <-> play를 토글한다.
-	void			pause_gif(int pos = -1);
+	void			pause_ani(int pos = -1);
 	//animation thread가 종료되고 화면에도 더 이상 표시되지 않는다. 만약 그대로 멈추길 원한다면 pause_animation()을 호출한다.
-	void			stop_gif();
+	void			stop_ani();
 	//현재 선택된 gif 프레임을 그린다(alpha 배경+mirror 포함). CSCStatic::OnPaint 가 UI 스레드에서 호출한다.
 	//워커는 프레임 전진 + InvalidateRect 만 하고 그리기는 이 함수(OnPaint 경유)로 일원화 → 깜빡임/ cross-thread GDI 제거.
-	void			draw_gif_current_frame(Gdiplus::Graphics& g);
+	void			draw_ani_frame(Gdiplus::Graphics& g);
 	void			goto_frame(int pos, bool pause = false);			//지정 프레임으로 이동
 	void			goto_frame_percent(int pos, bool pause = false);	//지정 % 위치의 프레임으로 이동
-	void			set_gif_mirror(bool is_mirror = true) { m_is_gif_mirror = is_mirror; }
+	void			set_ani_mirror(bool is_mirror = true) { m_is_ani_mirror = is_mirror; }
 
 	//gif 프레임 이미지들을 지정된 폴더에 저장
 	bool			save_gif_frames(CString folder);
@@ -622,7 +643,7 @@ protected:
 
 //animatedGif
 	bool			m_paused = false;
-	bool			m_gif_play_in_this = true;	//gif 재생코드를 이 클래스에서 자체 실행할 지, parent에서 직접 실행할 지
+	bool			m_ani_play_in_this = true;	//gif 재생코드를 이 클래스에서 자체 실행할 지, parent에서 직접 실행할 지
 
 	//ani gif 표시 윈도우
 	HWND			m_target_hwnd;
@@ -634,10 +655,10 @@ protected:
 	int				m_ani_height;
 	Gdiplus::Color	m_cr_back = Gdiplus::Color::Transparent;
 	CSCAniThread	m_ani_thread;	//gif 애니 워커(관리형, 복사 안전 홀더). stop()이 join 하므로 정지 후 잔존 스레드가 없다.
-	bool			m_is_gif_mirror = false;
+	bool			m_is_ani_mirror = false;
 
 	void			check_animate_gif();
-	void			thread_gif_animation(CSCThread& th);
+	void			thread_ani(CSCThread& th);
 	void			goto_gif_frame(int frame);
 };
 

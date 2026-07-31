@@ -339,7 +339,7 @@ CString CSCLog::write(int log_level, TCHAR* func, int line, LPCTSTR format, ...)
 			{
 				_ftprintf(m_fp, _T("%s\n"), result);
 #ifdef _DEBUG
-				TRACE(_T("%s\n"), result);
+				//TRACE(_T("%s\n"), result);
 #endif
 				fflush(m_fp);
 			}

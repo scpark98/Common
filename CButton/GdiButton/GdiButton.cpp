@@ -746,15 +746,19 @@ void CGdiButton::set_back_color_disabled(Gdiplus::Color cr)
 {
 	if (m_cr_back.size() < 4)
 		return;
+
 	m_cr_back[3] = (cr.GetA() != 0) ? cr : get_weak_color(m_cr_back[0], 60);
+
 	//20260728 by claude. checkbox/radio 는 disabled 라도 배경색을 바꾸지 않는다(4-arg set_back_color 와 동일 규칙).
 	//이 규칙이 여기 없어, set_color_theme 이 호출하는 set_back_color_disabled(theme.cr_back_disabled) 가 radio 에도
 	//disabled 배경을 입히던 문제. PUSHLIKE(버튼처럼 보이는) 는 예외 — 일반 버튼처럼 disabled face 를 쓴다.
 	if ((is_button_style(BS_CHECKBOX, BS_AUTOCHECKBOX) || is_button_style(BS_RADIOBUTTON, BS_AUTORADIOBUTTON)) && !is_button_style(BS_PUSHLIKE))
 		m_cr_back[3] = m_cr_back[0];
-	//set_back_color 와 동일하게 border 를 사용자가 별도 지정하지 않았으면 back 과 동기화.
+
+	//set_back_color와 동일하게 border를 사용자가 별도 지정하지 않았으면 back 과 동기화.
 	if (!m_border_color_user_set && m_cr_border.size() >= 4)
 		m_cr_border[3] = m_cr_back[3];
+
 	redraw_window();
 }
 

@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <!--
+    APNG(애니메이션 PNG) 지원 일괄 설정 속성 시트.
+    프로젝트 .vcxproj 에 아래 한 줄만 Import 하면 APNG 지원이 켜진다(CommonLib.props 와 동일 방식):
+        <Import Project="$(CommonLibDir)\3rdparty\apng.props" />
+    (CommonLib.props 를 먼저 Import 해 $(CommonLibDir) 가 정의돼 있어야 한다. Import 위치는
+     Microsoft.Cpp.targets 직전 권장.)
+
+    적용 내용:
+      - SC_USE_APNG 전처리기 정의
+      - libpng(lpng1658)/zlib include dir 추가
+      - 공용 디코더 Common\SCApng.cpp + libpng 15 + zlib 15 소스 컴파일(PCH 미사용, libpng/zlib 는 SDL 해제)
+    libpng/zlib 는 소스로 컴파일되므로 각 프로젝트의 CRT(/MD·/MDd·/MT)에 자동으로 맞는다(별도 .lib 불필요).
+  -->
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <PreprocessorDefinitions>SC_USE_APNG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(CommonLibDir)\3rdparty\lpng1658;$(CommonLibDir)\3rdparty\zlib-1.3.2;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="$(CommonLibDir)\SCApng.cpp"><PrecompiledHeader>NotUsing</PrecompiledHeader></ClCompile>
+    <ClCompile Include="$(CommonLibDir)\3rdparty\lpng1658\png.c"><PrecompiledHeader>NotUsing</PrecompiledHeader><SDLCheck>false</SDLCheck></ClCompile>
+    <ClCompile Include="$(CommonLibDir)\3rdparty\lpng1658\pngerror.c"><PrecompiledHeader>NotUsing</PrecompiledHeader><SDLCheck>false</SDLCheck></ClCompile>
+    <ClCompile Include="$(CommonLibDir)\3rdparty\lpng1658\pngget.c"><PrecompiledHeader>NotUsing</PrecompiledHeader><SDLCheck>false</SDLCheck></ClCompile>
+    <ClCompile Include="$(CommonLibDir)\3rdparty\lpng1658\pngmem.c"><PrecompiledHeader>NotUsing</PrecompiledHeader><SDLCheck>false</SDLCheck></ClCompile>
+    <ClCompile Include="$(CommonLibDir)\3rdparty\lpng1658\pngpread.c"><PrecompiledHeader>NotUsing</PrecompiledHeader><SDLCheck>false</SDLCheck></ClCompile>
+    <ClCompile Include="$(CommonLibDir)\3rdparty\lpng1658\pngread.c"><PrecompiledHeader>NotUsing</PrecompiledHeader><SDLCheck>false</SDLCheck></ClCompile>
+    <ClCompile Include="$(CommonLibDir)\3rdparty\lpng1658\pngrio.c"><PrecompiledHeader>NotUsing</PrecompiledHeader><SDLCheck>false</SDLCheck></ClCompile>
+    <ClCompile Include="$(CommonLibDir)\3rdparty\lpng1658\pngrtran.c"><PrecompiledHeader>NotUsing</PrecompiledHeader><SDLCheck>false</SDLCheck></ClCompile>
+    <ClCompile Include="$(CommonLibDir)\3rdparty\lpng1658\pngrutil.c"><PrecompiledHeader>NotUsing</PrecompiledHeader><SDLCheck>false</SDLCheck></ClCompile>
+    <ClCompile Include="$(CommonLibDir)\3rdparty\lpng1658\pngset.c"><PrecompiledHeader>NotUsing</PrecompiledHeader><SDLCheck>false</SDLCheck></ClCompile>
+    <ClCompile Include="$(CommonLibDir)\3rdparty\lpng1658\pngtrans.c"><PrecompiledHeader>NotUsing</PrecompiledHeader><SDLCheck>false</SDLCheck></ClCompile>
+    <ClCompile Include="$(CommonLibDir)\3rdparty\lpng1658\pngwio.c"><PrecompiledHeader>NotUsing</PrecompiledHeader><SDLCheck>false</SDLCheck></ClCompile>
+    <ClCompile Include="$(CommonLibDir)\3rdparty\lpng1658\pngwrite.c"><PrecompiledHeader>NotUsing</PrecompiledHeader><SDLCheck>false</SDLCheck></ClCompile>
+    <ClCompile Include="$(CommonLibDir)\3rdparty\lpng1658\pngwtran.c"><PrecompiledHeader>NotUsing</PrecompiledHeader><SDLCheck>false</SDLCheck></ClCompile>
+    <ClCompile Include="$(CommonLibDir)\3rdparty\lpng1658\pngwutil.c"><PrecompiledHeader>NotUsing</PrecompiledHeader><SDLCheck>false</SDLCheck></ClCompile>
+    <ClCompile Include="$(CommonLibDir)\3rdparty\zlib-1.3.2\adler32.c"><PrecompiledHeader>NotUsing</PrecompiledHeader><SDLCheck>false</SDLCheck></ClCompile>
+    <ClCompile Include="$(CommonLibDir)\3rdparty\zlib-1.3.2\compress.c"><PrecompiledHeader>NotUsing</PrecompiledHeader><SDLCheck>false</SDLCheck></ClCompile>
+    <ClCompile Include="$(CommonLibDir)\3rdparty\zlib-1.3.2\crc32.c"><PrecompiledHeader>NotUsing</PrecompiledHeader><SDLCheck>false</SDLCheck></ClCompile>
+    <ClCompile Include="$(CommonLibDir)\3rdparty\zlib-1.3.2\deflate.c"><PrecompiledHeader>NotUsing</PrecompiledHeader><SDLCheck>false</SDLCheck></ClCompile>
+    <ClCompile Include="$(CommonLibDir)\3rdparty\zlib-1.3.2\gzclose.c"><PrecompiledHeader>NotUsing</PrecompiledHeader><SDLCheck>false</SDLCheck></ClCompile>
+    <ClCompile Include="$(CommonLibDir)\3rdparty\zlib-1.3.2\gzlib.c"><PrecompiledHeader>NotUsing</PrecompiledHeader><SDLCheck>false</SDLCheck></ClCompile>
+    <ClCompile Include="$(CommonLibDir)\3rdparty\zlib-1.3.2\gzread.c"><PrecompiledHeader>NotUsing</PrecompiledHeader><SDLCheck>false</SDLCheck></ClCompile>
+    <ClCompile Include="$(CommonLibDir)\3rdparty\zlib-1.3.2\gzwrite.c"><PrecompiledHeader>NotUsing</PrecompiledHeader><SDLCheck>false</SDLCheck></ClCompile>
+    <ClCompile Include="$(CommonLibDir)\3rdparty\zlib-1.3.2\infback.c"><PrecompiledHeader>NotUsing</PrecompiledHeader><SDLCheck>false</SDLCheck></ClCompile>
+    <ClCompile Include="$(CommonLibDir)\3rdparty\zlib-1.3.2\inffast.c"><PrecompiledHeader>NotUsing</PrecompiledHeader><SDLCheck>false</SDLCheck></ClCompile>
+    <ClCompile Include="$(CommonLibDir)\3rdparty\zlib-1.3.2\inflate.c"><PrecompiledHeader>NotUsing</PrecompiledHeader><SDLCheck>false</SDLCheck></ClCompile>
+    <ClCompile Include="$(CommonLibDir)\3rdparty\zlib-1.3.2\inftrees.c"><PrecompiledHeader>NotUsing</PrecompiledHeader><SDLCheck>false</SDLCheck></ClCompile>
+    <ClCompile Include="$(CommonLibDir)\3rdparty\zlib-1.3.2\trees.c"><PrecompiledHeader>NotUsing</PrecompiledHeader><SDLCheck>false</SDLCheck></ClCompile>
+    <ClCompile Include="$(CommonLibDir)\3rdparty\zlib-1.3.2\uncompr.c"><PrecompiledHeader>NotUsing</PrecompiledHeader><SDLCheck>false</SDLCheck></ClCompile>
+    <ClCompile Include="$(CommonLibDir)\3rdparty\zlib-1.3.2\zutil.c"><PrecompiledHeader>NotUsing</PrecompiledHeader><SDLCheck>false</SDLCheck></ClCompile>
+  </ItemGroup>
+</Project>

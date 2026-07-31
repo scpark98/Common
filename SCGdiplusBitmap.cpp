@@ -960,16 +960,33 @@ bool CSCGdiplusBitmap::load(CString sType, UINT id)
 #endif
 
 #ifdef SC_USE_APNG
-	// APNG 리소스: GDI+ 는 PNG 애니를 못 그리므로 libpng 로 디코드·합성. 정적 png 도 1프레임 로드.
-	// .rc 에는 apng 파일을 커스텀 타입 "APNG" 로 등록(예: IDR_XXX  APNG  "xxx.png").
-	if (sType == _T("apng"))
+	// PNG/APNG 리소스: VS 리소스 편집기는 .png 를 (GIF 처럼 BITMAP 으로 디코드하지 않고) "PNG" 타입
+	// 원본 바이트로 넣으므로 APNG(acTL/fdAT) 애니 데이터가 그대로 보존된다(편집기 미리보기가 1프레임인
+	// 것은 표시상일 뿐). 여기서 바이트를 읽어 acTL 이 있으면 libpng 로 애니 디코드, 없으면 아래 GDI+
+	// 정적 경로로 폴백. 즉 .bin 리네임 없이 그냥 png 로 등록하면 된다.
+	//   - load(_T("PNG"),  id) : 표준 "PNG" 리소스(그냥 등록) → APNG 자동 감지 재생, 정적이면 GDI+.
+	//   - load(_T("APNG"), id) : 커스텀 "APNG" 타입(예전 .bin+GIF 방식과 동일하게 쓰고 싶을 때).
+	if (sType == _T("apng") || sType == _T("png"))
 	{
+		LPCTSTR res_type = (sType == _T("apng")) ? _T("APNG") : _T("PNG");
 		std::vector<uint8_t> bytes;
-		if (!sc_get_resource_bytes(id, _T("APNG"), bytes) ||
-			!load_apng_from_memory(bytes.data(), bytes.size()))
-			return false;
-		m_filename = _T("resource_image.apng");
-		return true;
+		bool has_actl = false;
+		if (sc_get_resource_bytes(id, res_type, bytes))
+		{
+			for (size_t i = 0; i + 4 <= bytes.size(); ++i)
+			{
+				if (bytes[i]=='I' && bytes[i+1]=='D' && bytes[i+2]=='A' && bytes[i+3]=='T') break;
+				if (bytes[i]=='a' && bytes[i+1]=='c' && bytes[i+2]=='T' && bytes[i+3]=='L') { has_actl = true; break; }
+			}
+			if (has_actl && load_apng_from_memory(bytes.data(), bytes.size()))
+			{
+				m_filename = _T("resource_image.") + sType;
+				return true;
+			}
+		}
+		if (sType == _T("apng"))
+			return false;   // 커스텀 APNG 타입인데 애니 아님/실패 → 정적이면 "PNG" 로 등록 권장
+		// sType=="png" 이고 정적 → 아래 GDI+ "PNG" 경로로 폴백.
 	}
 #endif
 

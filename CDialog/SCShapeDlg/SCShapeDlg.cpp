@@ -584,7 +584,7 @@ void CSCShapeDlg::set_image(CWnd* parent, CSCGdiplusBitmap* img, bool deep_copy)
 	SetWindowPos(NULL, 0, 0, m_img.width, m_img.height, SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
 
 	//단일 이미지인지 gif인지에 따라 별도 처리
-	if (m_img.is_animated_gif())
+	if (m_img.is_animated_image())
 	{
 		gif_play();
 	}
@@ -603,7 +603,7 @@ void CSCShapeDlg::save(CString path)
 bool CSCShapeDlg::load(CWnd* parent, UINT id)
 {
 	//현재 이미지가 animateGif이고 play중이라면 일단 멈춘다.
-	if (m_img.is_animated_gif() && !m_thread_animation.is_stopped())
+	if (m_img.is_animated_image() && !m_thread_animation.is_stopped())
 	{
 		TRACE(_T("stop current gif...\n"));
 		m_thread_animation.stop();
@@ -619,7 +619,7 @@ bool CSCShapeDlg::load(CWnd* parent, UINT id)
 bool CSCShapeDlg::load(CWnd* parent, CString sType, UINT id)
 {
 	//현재 이미지가 animateGif이고 play중이라면 일단 멈춘다.
-	if (m_img.is_animated_gif() && !m_thread_animation.is_stopped())
+	if (m_img.is_animated_image() && !m_thread_animation.is_stopped())
 	{
 		TRACE(_T("stop current gif...\n"));
 		m_thread_animation.stop();
@@ -637,7 +637,7 @@ bool CSCShapeDlg::load(CWnd* parent, CString sType, UINT id)
 bool CSCShapeDlg::load(CWnd* parent, CString sFile)
 {
 	//현재 이미지가 animateGif이고 play중이라면 일단 멈춘다.
-	if (m_img.is_animated_gif() && !m_thread_animation.is_stopped())
+	if (m_img.is_animated_image() && !m_thread_animation.is_stopped())
 	{
 		TRACE(_T("stop current gif...\n"));
 		m_thread_animation.stop();
@@ -663,7 +663,7 @@ void CSCShapeDlg::set_alpha(int alpha)
 {
 	m_alpha = alpha;
 
-	if (!m_img.is_animated_gif())
+	if (!m_img.is_animated_image())
 		render(m_img.m_pBitmap);
 }
 

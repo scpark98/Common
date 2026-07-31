@@ -10,6 +10,21 @@
 #include <thread>
 #include <afxcmn.h>
 
+// 애니메이션 WebP 지원은 opt-in. SC_USE_WEBP 정의 + webp include/lib dir 설정 프로젝트에서만
+// libwebp 의존을 끌어온다(x64 전용 lib). GDI+ 는 webp 를 못 다루므로 libwebp 로 프레임 디코드.
+#ifdef SC_USE_WEBP
+#include <decode.h>
+#include <demux.h>
+#pragma comment(lib, "libwebp.lib")
+#pragma comment(lib, "libwebpdemux.lib")
+#endif
+
+// 애니메이션 PNG(APNG). 벤더링된 libpng(APNG 지원) + zlib 를 소스로 정적 컴파일하므로 별도 lib pragma 불필요.
+// x64/Win32 무관(소스 빌드). GDI+ 는 APNG 애니를 못 다루므로 libpng 로 프레임을 디코드·합성한다.
+#ifdef SC_USE_APNG
+#include "SCApng.h"
+#endif
+
 #include "image_processing/fast_gaussian_blur/fast_gaussian_blur_template.h"
 
 static CGdiplusDummyForInitialization gdi_dummy_for_gdi_initialization;
@@ -762,6 +777,165 @@ bool CSCGdiplusBitmap::load(UINT id)
 	return load(_T("PNG"), id);
 }
 
+#if defined(SC_USE_WEBP) || defined(SC_USE_APNG)
+// 리소스(id, type)의 원시 바이트를 out 으로 복사(webp/apng 공용). GetImageFromResource 의 FindResource 경로와 동일.
+static bool sc_get_resource_bytes(UINT id, LPCTSTR type, std::vector<uint8_t>& out)
+{
+	HRSRC h = FindResource(NULL, MAKEINTRESOURCE(id), type);
+	if (!h)
+		return false;
+	HINSTANCE inst = AfxGetApp()->m_hInstance;
+	DWORD sz = SizeofResource(inst, h);
+	HGLOBAL g = LoadResource(inst, h);
+	if (sz == 0 || !g)
+		return false;
+	const void* p = LockResource(g);
+	if (!p)
+		return false;
+	out.assign((const uint8_t*)p, (const uint8_t*)p + sz);
+	return true;
+}
+#endif
+
+#ifdef SC_USE_WEBP
+bool CSCGdiplusBitmap::load_webp_from_memory(const uint8_t* data, size_t size)
+{
+	if (!data || size == 0)
+		return false;
+
+	WebPData wd;
+	wd.bytes = data;
+	wd.size  = size;
+
+	WebPAnimDecoderOptions opt;
+	if (!WebPAnimDecoderOptionsInit(&opt))
+		return false;
+	opt.color_mode  = MODE_BGRA;   // GDI+ PixelFormat32bppARGB 의 메모리 바이트순서(BGRA, straight) 와 일치
+	opt.use_threads = 1;
+
+	WebPAnimDecoder* dec = WebPAnimDecoderNew(&wd, &opt);
+	if (!dec)
+		return false;
+
+	WebPAnimInfo info;
+	if (!WebPAnimDecoderGetInfo(dec, &info) || info.canvas_width == 0 || info.canvas_height == 0)
+	{
+		WebPAnimDecoderDelete(dec);
+		return false;
+	}
+
+	const int w = (int)info.canvas_width;
+	const int h = (int)info.canvas_height;
+
+	// 이전 프레임 정리(방어적).
+	for (auto* p : m_ani_frames) delete p;
+	m_ani_frames.clear();
+	m_ani_delays.clear();
+
+	int prev_ts = 0;
+	while (WebPAnimDecoderHasMoreFrames(dec))
+	{
+		uint8_t* buf = nullptr;
+		int ts = 0;   // 프레임 "종료" 타임스탬프(ms, 누적)
+		if (!WebPAnimDecoderGetNext(dec, &buf, &ts) || !buf)
+			break;
+		int delay = ts - prev_ts;
+		if (delay <= 0) delay = 100;
+		prev_ts = ts;
+
+		// buf 는 straight BGRA 캔버스(다음 GetNext 까지만 유효). GDI+ 는 scan0(외부 메모리)로 만든
+		// Bitmap 을 Clone 해도 픽셀을 딥카피하지 않고 원본 버퍼를 참조하는 경우가 있어(→ buf 해제 시
+		// dangling → DrawImage 크래시), 새 Bitmap 에 LockBits 로 픽셀을 명시 복사해 완전히 소유시킨다.
+		Gdiplus::Bitmap* frame = new Gdiplus::Bitmap(w, h, PixelFormat32bppARGB);
+		Gdiplus::BitmapData bd;
+		Gdiplus::Rect rc(0, 0, w, h);
+		if (frame->LockBits(&rc, Gdiplus::ImageLockModeWrite, PixelFormat32bppARGB, &bd) != Gdiplus::Ok)
+		{
+			delete frame;
+			break;
+		}
+		for (int y = 0; y < h; ++y)
+			memcpy((BYTE*)bd.Scan0 + (size_t)y * bd.Stride, buf + (size_t)y * w * 4, (size_t)w * 4);
+		frame->UnlockBits(&bd);
+
+		m_ani_frames.push_back(frame);
+		m_ani_delays.push_back(delay);
+	}
+
+	WebPAnimDecoderDelete(dec);
+
+	if (m_ani_frames.empty())
+		return false;
+
+	// m_pBitmap = 프레임0 사본(정적 쿼리·비애니 그리기용). deque 와 소유 분리 → release 이중삭제 방지.
+	SAFE_DELETE(m_pBitmap);
+	m_pBitmap = m_ani_frames.front()->Clone(0, 0, w, h, PixelFormat32bppARGB);
+
+	// resolution() 이 내부에서 check_animate_gif() 를 호출해 m_frame_count 를 m_pBitmap 의
+	// 프레임수(=1)로 덮으므로, 먼저 resolution() 을 부르고 그 뒤에 webp 프레임수로 교정한다.
+	resolution();
+
+	m_frame_count  = (int)m_ani_frames.size();
+	m_frame_index  = 0;
+	m_is_raster_anim = (m_frame_count > 1);
+	return true;
+}
+#endif // SC_USE_WEBP
+
+#ifdef SC_USE_APNG
+namespace
+{
+	// BGRA(straight) 버퍼(w×h) → 소유 Gdiplus::Bitmap (LockBits 복사).
+	Gdiplus::Bitmap* apng_make_bitmap(const uint8_t* bgra, int w, int h)
+	{
+		Gdiplus::Bitmap* bmp = new Gdiplus::Bitmap(w, h, PixelFormat32bppARGB);
+		Gdiplus::BitmapData bd; Gdiplus::Rect rc(0, 0, w, h);
+		if (bmp->LockBits(&rc, Gdiplus::ImageLockModeWrite, PixelFormat32bppARGB, &bd) != Gdiplus::Ok)
+		{
+			delete bmp; return nullptr;
+		}
+		for (int y = 0; y < h; ++y)
+			memcpy((BYTE*)bd.Scan0 + (size_t)y * bd.Stride, bgra + (size_t)y * w * 4, (size_t)w * 4);
+		bmp->UnlockBits(&bd);
+		return bmp;
+	}
+}
+
+// 공용 디코더 sc_apng::decode 로 프레임(straight BGRA)을 얻어 Gdiplus::Bitmap deque 로 감싼다.
+bool CSCGdiplusBitmap::load_apng_from_memory(const uint8_t* data, size_t size)
+{
+	int W = 0, H = 0;
+	std::vector<std::vector<uint8_t>> frames;
+	std::vector<int> delays;
+	if (!sc_apng::decode(data, size, W, H, frames, delays) || frames.empty())
+		return false;
+
+	for (auto* p : m_ani_frames) delete p;
+	m_ani_frames.clear(); m_ani_delays.clear();
+
+	for (size_t i = 0; i < frames.size(); ++i)
+	{
+		Gdiplus::Bitmap* bmp = apng_make_bitmap(frames[i].data(), W, H);
+		if (!bmp)
+		{
+			for (auto* p : m_ani_frames) delete p;
+			m_ani_frames.clear(); m_ani_delays.clear();
+			return false;
+		}
+		m_ani_frames.push_back(bmp);
+		m_ani_delays.push_back(delays[i]);
+	}
+
+	SAFE_DELETE(m_pBitmap);
+	m_pBitmap = m_ani_frames.front()->Clone(0, 0, W, H, PixelFormat32bppARGB);
+	resolution();
+	m_frame_count  = (int)m_ani_frames.size();
+	m_frame_index  = 0;
+	m_is_raster_anim = (m_frame_count > 1);
+	return true;
+}
+#endif // SC_USE_APNG
+
 bool CSCGdiplusBitmap::load(CString sType, UINT id)
 {
 	release();
@@ -770,6 +944,51 @@ bool CSCGdiplusBitmap::load(CString sType, UINT id)
 		return false;
 
 	sType.MakeLower();
+
+#ifdef SC_USE_WEBP
+	// webp 리소스: GDI+ 로 못 여므로 리소스 바이트를 libwebp 로 디코드(정적/애니메이션 모두).
+	// .rc 에는 webp 파일을 커스텀 타입 "WEBP" 로 등록(예: IDR_XXX  WEBP  "xxx.webp").
+	if (sType == _T("webp"))
+	{
+		std::vector<uint8_t> bytes;
+		if (!sc_get_resource_bytes(id, _T("WEBP"), bytes) ||
+			!load_webp_from_memory(bytes.data(), bytes.size()))
+			return false;
+		m_filename = _T("resource_image.webp");
+		return true;   // load_webp_from_memory 가 m_pBitmap/frame/resolution 설정 완료
+	}
+#endif
+
+#ifdef SC_USE_APNG
+	// PNG/APNG 리소스: VS 리소스 편집기는 .png 를 (GIF 처럼 BITMAP 으로 디코드하지 않고) "PNG" 타입
+	// 원본 바이트로 넣으므로 APNG(acTL/fdAT) 애니 데이터가 그대로 보존된다(편집기 미리보기가 1프레임인
+	// 것은 표시상일 뿐). 여기서 바이트를 읽어 acTL 이 있으면 libpng 로 애니 디코드, 없으면 아래 GDI+
+	// 정적 경로로 폴백. 즉 .bin 리네임 없이 그냥 png 로 등록하면 된다.
+	//   - load(_T("PNG"),  id) : 표준 "PNG" 리소스(그냥 등록) → APNG 자동 감지 재생, 정적이면 GDI+.
+	//   - load(_T("APNG"), id) : 커스텀 "APNG" 타입(예전 .bin+GIF 방식과 동일하게 쓰고 싶을 때).
+	if (sType == _T("apng") || sType == _T("png"))
+	{
+		LPCTSTR res_type = (sType == _T("apng")) ? _T("APNG") : _T("PNG");
+		std::vector<uint8_t> bytes;
+		bool has_actl = false;
+		if (sc_get_resource_bytes(id, res_type, bytes))
+		{
+			for (size_t i = 0; i + 4 <= bytes.size(); ++i)
+			{
+				if (bytes[i]=='I' && bytes[i+1]=='D' && bytes[i+2]=='A' && bytes[i+3]=='T') break;
+				if (bytes[i]=='a' && bytes[i+1]=='c' && bytes[i+2]=='T' && bytes[i+3]=='L') { has_actl = true; break; }
+			}
+			if (has_actl && load_apng_from_memory(bytes.data(), bytes.size()))
+			{
+				m_filename = _T("resource_image.") + sType;
+				return true;
+			}
+		}
+		if (sType == _T("apng"))
+			return false;   // 커스텀 APNG 타입인데 애니 아님/실패 → 정적이면 "PNG" 로 등록 권장
+		// sType=="png" 이고 정적 → 아래 GDI+ "PNG" 경로로 폴백.
+	}
+#endif
 
 	if (sType == _T("png") || sType == _T("jpg") || sType == _T("gif"))
 	{
@@ -1041,6 +1260,12 @@ void CSCGdiplusBitmap::release()
 
 	SAFE_DELETE(m_pBitmap);
 	SAFE_DELETE(m_pOrigin);
+
+	// 애니 webp 프레임 정리. (m_frame_count 는 다음 load 의 resolution()→check_animate_gif 가 재설정.)
+	for (auto* p : m_ani_frames) delete p;
+	m_ani_frames.clear();
+	m_ani_delays.clear();
+	m_is_raster_anim = false;
 
 	if (m_property_item != NULL)
 	{
@@ -2282,7 +2507,7 @@ void CSCGdiplusBitmap::replace_color(Gdiplus::Color src, Gdiplus::Color dst)
 void CSCGdiplusBitmap::set_back_color(Gdiplus::Color cr_back)
 {
 	m_cr_back = cr_back;
-	if (is_animated_gif())
+	if (is_animated_image())
 		return;
 
 	Gdiplus::Bitmap* result = new Gdiplus::Bitmap(width, height);
@@ -3592,9 +3817,16 @@ int CSCGdiplusBitmap::get_total_duration()
 
 	long total_duration = 0;
 
-	for (size_t i = 0; i < m_frame_count; i++)
+	// webp 는 자체 delay deque, gif 는 PropertyTagFrameDelay(단위 10ms).
+	if (m_is_raster_anim)
 	{
-		total_duration += ((long*)m_frame_delay->value)[i] * 10;
+		for (size_t i = 0; i < m_ani_delays.size(); i++)
+			total_duration += m_ani_delays[i];
+	}
+	else
+	{
+		for (int i = 0; i < m_frame_count; i++)
+			total_duration += ((long*)m_frame_delay->value)[i] * 10;
 	}
 
 	return (int)total_duration;
@@ -3614,7 +3846,7 @@ void CSCGdiplusBitmap::set_animation(HWND hWnd, int x, int y, int w, int h, bool
 	m_paused = !auto_play;
 
 	if (auto_play)
-		play_gif();
+		play_ani();
 }
 
 void CSCGdiplusBitmap::set_animation(HWND hWnd, CRect r, bool start)
@@ -3627,7 +3859,7 @@ void CSCGdiplusBitmap::set_animation(HWND hWnd, CRect r, bool start)
 }
 
 
-void CSCGdiplusBitmap::move_gif(int x, int y, int w, int h)
+void CSCGdiplusBitmap::move_ani(int x, int y, int w, int h)
 {
 	m_ani_sx = x;
 	m_ani_sy = y;
@@ -3635,15 +3867,15 @@ void CSCGdiplusBitmap::move_gif(int x, int y, int w, int h)
 	m_ani_height = (h == 0 ? height : h);
 }
 
-void CSCGdiplusBitmap::move_gif(CRect r)
+void CSCGdiplusBitmap::move_ani(CRect r)
 {
 	CRect fit = get_ratio_rect(CRect(r.left, r.top, r.left + r.Width(), r.top + r.Height()), width, height);
-	move_gif(fit.left, fit.top, fit.Width(), fit.Height());
+	move_ani(fit.left, fit.top, fit.Width(), fit.Height());
 }
 
-void CSCGdiplusBitmap::play_gif()
+void CSCGdiplusBitmap::play_ani()
 {
-	if (!m_gif_play_in_this)
+	if (!m_ani_play_in_this)
 		return;
 
 	//이미 재생 중이면 pause<->play 토글(기존 동작 유지).
@@ -3658,18 +3890,23 @@ void CSCGdiplusBitmap::play_gif()
 
 	m_paused = false;
 
-	GUID   pageGuid = Gdiplus::FrameDimensionTime;
 	m_frame_index = 0;
-	m_pBitmap->SelectActiveFrame(&pageGuid, m_frame_index);
+	// webp 는 m_pBitmap 이 단일프레임(프레임0 사본)이라 다중프레임 API(SelectActiveFrame)를 부르면
+	// GDI+ 가 크래시한다. webp 프레임은 draw_ani_frame 이 m_ani_frames 에서 그리므로 여기선 스킵.
+	if (!m_is_raster_anim)
+	{
+		GUID   pageGuid = Gdiplus::FrameDimensionTime;
+		m_pBitmap->SelectActiveFrame(&pageGuid, m_frame_index);
+	}
 
 	//관리형 스레드로 구동. 워커는 타이밍/프레임 전진만 하고 실제 그리기는 invoke_ui 로 UI 스레드에서 실행한다.
-	m_ani_thread.start([this](CSCThread& th) { thread_gif_animation(th); });
+	m_ani_thread.start([this](CSCThread& th) { thread_ani(th); });
 }
 
 //pos위치로 이동한 후 일시정지한다. -1이면 pause <-> play를 토글한다.
-void CSCGdiplusBitmap::pause_gif(int pos)
+void CSCGdiplusBitmap::pause_ani(int pos)
 {
-	if (!m_gif_play_in_this)
+	if (!m_ani_play_in_this)
 		return;
 
 	if (m_frame_count < 2 || !m_ani_thread.is_running())
@@ -3691,7 +3928,7 @@ void CSCGdiplusBitmap::pause_gif(int pos)
 	}
 }
 
-void CSCGdiplusBitmap::stop_gif()
+void CSCGdiplusBitmap::stop_ani()
 {
 	if (m_frame_count < 2)
 		return;
@@ -3716,7 +3953,7 @@ void CSCGdiplusBitmap::goto_frame(int pos, bool pause)
 	m_frame_index = pos;
 	m_paused = pause;
 
-	//프레임 선택은 그리는 OnPaint(draw_gif_current_frame) 가 하므로 여기선 인덱스만 바꾸고 무효화만 한다.
+	//프레임 선택은 그리는 OnPaint(draw_ani_frame) 가 하므로 여기선 인덱스만 바꾸고 무효화만 한다.
 	//erase=FALSE — OnPaint 가 double-buffer 로 배경+프레임을 다시 그려 깜빡임 없음(예전 TRUE 는 지웠다가 다시 그려 깜빡였다).
 	RECT r;
 	r.left = m_ani_sx;
@@ -3736,7 +3973,7 @@ void CSCGdiplusBitmap::goto_frame_percent(int pos, bool pause)
 //gif 애니 워커(CSCThread). 실제 GDI 그리기는 워커에서 하지 않는다 — 프레임 인덱스만 전진시키고 그 영역을 InvalidateRect 하여
 //UI 스레드의 CSCStatic::OnPaint 가 현재 프레임을 그리게 한다. 완료/리사이즈/expose 등 어떤 WM_PAINT 에도 OnPaint 가 프레임을
 //다시 그려 깜빡임이 없고, SelectActiveFrame(m_pBitmap 변경)+DrawImage 가 OnPaint(UI 스레드)에서만 일어나 data race 도 없다.
-void CSCGdiplusBitmap::thread_gif_animation(CSCThread& th)
+void CSCGdiplusBitmap::thread_ani(CSCThread& th)
 {
 	if (m_frame_count < 2)
 		return;
@@ -3764,7 +4001,12 @@ void CSCGdiplusBitmap::thread_gif_animation(CSCThread& th)
 
 		long t1 = clock();
 		long display_delay = t1 - t0;
-		long delay = ((long*)m_frame_delay->value)[m_frame_index] * 10;
+		// webp 는 자체 delay deque, gif 는 PropertyTagFrameDelay(단위 10ms).
+		long delay;
+		if (m_is_raster_anim && m_frame_index < (int)m_ani_delays.size())
+			delay = m_ani_delays[m_frame_index];
+		else
+			delay = ((long*)m_frame_delay->value)[m_frame_index] * 10;
 
 		if (delay > display_delay)
 			th.sleep_for(std::chrono::milliseconds(delay - display_delay));
@@ -3774,13 +4016,29 @@ void CSCGdiplusBitmap::thread_gif_animation(CSCThread& th)
 
 //현재 선택된 gif 프레임을 주어진 Graphics 에 그린다(alpha 배경 fill + mirror 포함). CSCStatic::OnPaint(UI 스레드)가 호출.
 //SelectActiveFrame 이 m_pBitmap 을 변경하므로 반드시 UI 스레드에서만 호출한다(워커는 호출하지 않음 → data race 없음).
-void CSCGdiplusBitmap::draw_gif_current_frame(Gdiplus::Graphics& g)
+void CSCGdiplusBitmap::draw_ani_frame(Gdiplus::Graphics& g)
 {
-	if (m_frame_count < 2 || m_pBitmap == NULL)
+	if (m_frame_count < 2)
 		return;
 
-	GUID pageGuid = Gdiplus::FrameDimensionTime;
-	m_pBitmap->SelectActiveFrame(&pageGuid, m_frame_index);
+	// 현재 프레임 소스: 애니 webp 는 프레임 deque, 그 외(gif)는 m_pBitmap 의 활성 프레임(SelectActiveFrame).
+	Gdiplus::Bitmap* src = NULL;
+	if (m_is_raster_anim)
+	{
+		if (m_frame_index < 0 || m_frame_index >= (int)m_ani_frames.size())
+			return;
+		src = m_ani_frames[m_frame_index];
+	}
+	else
+	{
+		if (m_pBitmap == NULL)
+			return;
+		GUID pageGuid = Gdiplus::FrameDimensionTime;
+		m_pBitmap->SelectActiveFrame(&pageGuid, m_frame_index);
+		src = m_pBitmap;
+	}
+	if (src == NULL)
+		return;
 
 	CRect r(m_ani_sx, m_ani_sy, m_ani_sx + m_ani_width, m_ani_sy + m_ani_height);
 
@@ -3798,17 +4056,17 @@ void CSCGdiplusBitmap::draw_gif_current_frame(Gdiplus::Graphics& g)
 		}
 	}
 
-	//mirror 시 m_pBitmap 을 직접 mirror 하면 gif 프레임 정보가 사라지므로 clone 을 mirror 해서 그린다.
-	Gdiplus::Bitmap* pBitmap = m_pBitmap;
-	if (m_is_gif_mirror)
+	//mirror 시 프레임 원본을 직접 mirror 하면 프레임 정보가 훼손되므로 clone 을 mirror 해서 그린다.
+	Gdiplus::Bitmap* pBitmap = src;
+	if (m_is_ani_mirror)
 	{
-		pBitmap = m_pBitmap->Clone(0, 0, m_pBitmap->GetWidth(), m_pBitmap->GetHeight(), m_pBitmap->GetPixelFormat());
+		pBitmap = src->Clone(0, 0, src->GetWidth(), src->GetHeight(), src->GetPixelFormat());
 		pBitmap->RotateFlip(Gdiplus::RotateNoneFlipX);
 	}
 
 	g.DrawImage(pBitmap, m_ani_sx, m_ani_sy, m_ani_width, m_ani_height);
 
-	if (pBitmap != m_pBitmap)
+	if (pBitmap != src)
 		SAFE_DELETE(pBitmap);
 }
 

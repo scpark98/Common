@@ -189,11 +189,11 @@ public:
 	void			set_zigzag_color(Gdiplus::Color cr_back, Gdiplus::Color cr_fore);
 
 //animated gif 관련 public member
-	void			play_gif();
+	void			play_ani();
 	//pos위치로 이동한 후 일시정지한다. -1이면 pause <-> play를 토글한다.
-	void			pause_gif(int pos = 0);
+	void			pause_ani(int pos = 0);
 	//animation thread가 종료되고 화면에도 더 이상 표시되지 않는다. 만약 그대로 멈추길 원한다면 pause_animation()을 호출한다.
-	void			stop_gif();
+	void			stop_ani();
 	void			goto_frame(int pos, bool pause = false);			//지정 프레임으로 이동
 	void			goto_frame_percent(int pos, bool pause = false);	//지정 % 위치의 프레임으로 이동
 
@@ -290,8 +290,8 @@ protected:
 	CRect			m_r_gif;
 	bool			m_run_thread_animation = false;
 	bool			m_thread_animation_terminated = true;
-	bool			m_is_gif_mirror = false;
-	void			thread_gif_animation();
+	bool			m_is_ani_mirror = false;
+	void			thread_ani();
 
 	CSCSliderCtrl	m_slider_gif;
 	LRESULT			on_message_from_CSCSliderCtrl(WPARAM wParam, LPARAM lParam);

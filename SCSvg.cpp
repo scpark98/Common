@@ -14,8 +14,19 @@
 
 #include <Windows.h>
 #include <dwrite.h>
+#include <wincodec.h>      // 애니메이션 GIF 인코딩(WIC)
 #include <wrl/client.h>
 #pragma comment(lib, "dwrite.lib")
+#pragma comment(lib, "windowscodecs.lib")
+
+// 애니메이션 WebP 인코딩(libwebp, x64 전용 lib). include dir/lib dir 는 vcxproj 에 이미 설정됨.
+#ifdef _WIN64
+#include <fstream>
+#include <encode.h>
+#include <mux.h>
+#pragma comment(lib, "libwebp.lib")
+#pragma comment(lib, "libwebpmux.lib")
+#endif
 
 // 벤더링된 lunasvg (정적 링크). LUNASVG_BUILD_STATIC 은 프로젝트 전역 정의.
 #include "lunasvg.h"
@@ -750,13 +761,10 @@ namespace anim
 }
 }
 
-bool sc_svg::build_frames(int w, int h,
-						  std::vector<std::vector<uint8_t>>& frames,
-						  std::vector<int>& delays_ms) const
+bool sc_svg::build_frames_stream(int w, int h, int fps, double budget_ms,
+	const std::function<bool(int, int, const std::vector<uint8_t>&, int)>& sink) const
 {
-	frames.clear();
-	delays_ms.clear();
-	if (m_svg_data.empty() || w <= 0 || h <= 0)
+	if (m_svg_data.empty() || w <= 0 || h <= 0 || !sink)
 		return false;
 
 	// DOM 을 1회만 파싱하고, 프레임마다 애니메이션 속성만 갱신한다(프레임별 재파싱 제거).
@@ -778,8 +786,9 @@ bool sc_svg::build_frames(int w, int h,
 	}
 	if (T <= 1e-6)
 		return false;
-	if (T < 0.2) T = 0.2;
-	if (T > 8.0) T = 8.0;                        // 상한(무한 루프/과대 주기 방지)
+	if (T < 0.2)  T = 0.2;
+	if (T > 30.0) T = 30.0;                      // 상한(과대 주기 방지). 흔한 10~15s 루프는 온전히 굽는다.
+												 // (예전 8s 클램프가 dur=10s SVG 의 뒤 2s(끝 패널 등장)를 잘라 버그였음)
 
 	// 애니메이션이 건드리는 (대상,속성)의 base(원본) 값 스냅샷. 프레임마다 이걸로 복원 후
 	// t 시점 값을 주입한다 → 비활성 애니메이션 속성이 이전 프레임 값으로 남는 잔상 방지.
@@ -798,8 +807,8 @@ bool sc_svg::build_frames(int w, int h,
 		}
 	}
 
-	// 한 프레임을 굽는다: base 복원 → t 값 주입 → 직렬화 → lunasvg 래스터 → frames 에 push.
-	auto bake = [&](double t)
+	// 한 프레임을 굽는다: base 복원 → t 값 주입 → 직렬화 → lunasvg 래스터 → out(straight BGRA).
+	auto bake_to = [&](double t, std::vector<uint8_t>& out)
 	{
 		for (auto& np : base)
 		{
@@ -841,44 +850,367 @@ bool sc_svg::build_frames(int w, int h,
 		doc.save(ss, L"", pugi::format_raw);
 		std::string svg = ss.str();
 
-		std::vector<uint8_t> bgra;
+		out.clear();
 		auto sub = lunasvg::Document::loadFromData(svg.data(), svg.size());
 		if (sub)
 		{
 			lunasvg::Bitmap bmp = sub->renderToBitmap(w, h, 0x00000000);
-			unpremultiply_to_bgra(bmp, bgra);
+			unpremultiply_to_bgra(bmp, out);
 		}
-		if (bgra.empty())
-			bgra.assign((size_t)w * h * 4, 0);      // 실패 프레임은 투명으로
-		frames.push_back(std::move(bgra));
+		if (out.empty())
+			out.assign((size_t)w * h * 4, 0);       // 실패 프레임은 투명으로
 	};
 
-	// 프레임 0 을 굽고 실제 비용을 측정 → 총 베이킹 예산에 맞춰 프레임 수 N 을 적응 결정.
-	// (무거운 SVG 는 lunasvg 재파싱·래스터가 프레임당 비싸므로 N 을 줄여 로딩 시간을 상한한다.)
+	// 프레임 0 을 굽고 실제 비용을 측정.
+	std::vector<uint8_t> buf;
 	LARGE_INTEGER freq, c0, c1;
 	QueryPerformanceFrequency(&freq);
 	QueryPerformanceCounter(&c0);
-	bake(0.0);
+	bake_to(0.0, buf);
 	QueryPerformanceCounter(&c1);
 	const double frame_ms = (double)(c1.QuadPart - c0.QuadPart) * 1000.0 / (double)freq.QuadPart;
 
-	int n_ideal = (int)std::lround(T * 25.0);       // 목표 25fps
+	int f = fps; if (f < 1) f = 1;
+	int n_ideal = (int)std::lround(T * (double)f);
 	if (n_ideal < 2) n_ideal = 2;
 
-	const double budget_ms = 1500.0;                // 총 베이킹 예산(첫 프레임 포함)
-	int n_budget = (int)(budget_ms / (frame_ms > 0.5 ? frame_ms : 0.5)) + 1;
-	if (n_budget < 2) n_budget = 2;
+	int N;
+	if (budget_ms > 0.0)
+	{
+		// 화면 표시용: 무거운 SVG 는 프레임당 비싸므로 총 예산에 맞춰 프레임 수를 감축.
+		int n_budget = (int)(budget_ms / (frame_ms > 0.5 ? frame_ms : 0.5)) + 1;
+		if (n_budget < 2) n_budget = 2;
+		N = (n_ideal < n_budget) ? n_ideal : n_budget;
+		if (N > 150) N = 150;
+	}
+	else
+	{
+		// export 용: 예산 캡 없이 round(T*fps). 상한만 둔다(8s*50fps=400 여유).
+		N = n_ideal;
+		if (N > 600) N = 600;
+	}
+	if (N < 2) N = 2;
 
-	int N = (n_ideal < n_budget) ? n_ideal : n_budget;
-	if (N < 2)   N = 2;
-	if (N > 150) N = 150;
-
-	// 나머지(1..N-1)를 T 균등 샘플로. delay 는 T/N 로 보정해 총 재생시간=T 유지.
-	for (int i = 1; i < N; ++i)
-		bake((double)i * T / (double)N);
-
+	// delay 는 T/N 로 보정해 총 재생시간=T 유지.
 	const int delay = (int)std::lround(T * 1000.0 / (double)N);
-	delays_ms.assign(frames.size(), delay);
 
+	// 프레임 0 은 이미 buf 에 있음 → 곧바로 sink.
+	if (!sink(0, N, buf, delay))
+		return false;
+	for (int i = 1; i < N; ++i)
+	{
+		bake_to((double)i * T / (double)N, buf);
+		if (!sink(i, N, buf, delay))
+			return false;
+	}
+	return true;
+}
+
+bool sc_svg::build_frames(int w, int h,
+						  std::vector<std::vector<uint8_t>>& frames,
+						  std::vector<int>& delays_ms) const
+{
+	frames.clear();
+	delays_ms.clear();
+	build_frames_stream(w, h, 25, 1500.0,
+		[&](int, int, const std::vector<uint8_t>& bgra, int delay_ms)
+		{
+			frames.push_back(bgra);
+			delays_ms.push_back(delay_ms);
+			return true;
+		});
 	return frames.size() >= 2;
+}
+
+// ── SVG 애니메이션 → 애니메이션 GIF 내보내기(WIC) ────────────────────────────
+// GIF 는 1비트 투명(반투명 없음)만 지원한다. straight BGRA 의 알파를 임계로 이진화해
+// 팔레트의 투명 엔트리로 매핑하고, 프레임 메타데이터(TransparencyFlag/Index + Disposal=2)
+// 로 투명을 보존한다. 안티에일리어스 경계의 반투명은 완전 투명/불투명으로 이진화되므로
+// 경계가 다소 거칠 수 있다(포맷 한계). 매끈한 불투명이 필요하면 향후 배경색 합성 옵션 추가.
+
+bool export_svg_to_animated_gif(const wchar_t* svg_path,
+								const wchar_t* out_gif_path,
+								int out_w, int out_h, int fps,
+								std::function<bool(int cur, int total)> progress)
+{
+	if (!svg_path || !*svg_path)
+		return false;
+
+	// 출력 경로: 지정되면 그대로, 아니면 svg 와 같은 폴더·같은 이름 + .gif
+	std::wstring gif;
+	if (out_gif_path && *out_gif_path)
+	{
+		gif = out_gif_path;
+	}
+	else
+	{
+		gif = svg_path;
+		size_t dot = gif.find_last_of(L'.');
+		size_t sep = gif.find_last_of(L"\\/");
+		if (dot != std::wstring::npos && (sep == std::wstring::npos || dot > sep))
+			gif.erase(dot);
+		gif += L".gif";
+	}
+
+	// 워커 스레드 안전: 표시용 인스턴스와 상태 공유 없이 새로 파싱.
+	sc_svg svg;
+	if (!svg.load(svg_path) || !svg.is_animated())
+		return false;
+
+	int w = (out_w > 0) ? out_w : (int)std::lround(svg.natural_width());
+	int h = (out_h > 0) ? out_h : (int)std::lround(svg.natural_height());
+	if (w < 1) w = 512;
+	if (h < 1) h = 512;
+
+	int f = fps; if (f < 1) f = 1; if (f > 50) f = 50;   // GIF delay 최소 2cs → 실효 50fps 상한
+
+	// COM(워커 스레드). 이미 초기화돼 있으면(S_FALSE) 짝 맞춰 Uninit, 모드 충돌이면 그대로 사용.
+	HRESULT hrco = ::CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+	const bool need_uninit = SUCCEEDED(hrco);
+
+	bool ok = false;
+	{
+		ComPtr<IWICImagingFactory> factory;
+		ComPtr<IWICStream>         stream;
+		ComPtr<IWICBitmapEncoder>  encoder;
+
+		HRESULT hr = ::CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER,
+										IID_PPV_ARGS(&factory));
+		if (SUCCEEDED(hr)) hr = factory->CreateStream(&stream);
+		if (SUCCEEDED(hr)) hr = stream->InitializeFromFilename(gif.c_str(), GENERIC_WRITE);
+		if (SUCCEEDED(hr)) hr = factory->CreateEncoder(GUID_ContainerFormatGif, nullptr, &encoder);
+		if (SUCCEEDED(hr)) hr = encoder->Initialize(stream.Get(), WICBitmapEncoderNoCache);
+
+		// 전역 메타데이터: NETSCAPE2.0 application extension → 무한 루프.
+		if (SUCCEEDED(hr))
+		{
+			ComPtr<IWICMetadataQueryWriter> gw;
+			if (SUCCEEDED(encoder->GetMetadataQueryWriter(&gw)))
+			{
+				PROPVARIANT app;  app.vt = VT_UI1 | VT_VECTOR;
+				app.caub.cElems = 11; app.caub.pElems = (UCHAR*)"NETSCAPE2.0";
+				gw->SetMetadataByName(L"/appext/Application", &app);
+
+				UCHAR loopbytes[] = { 3, 1, 0, 0, 0 };   // block=3, id=1, loop=0(무한), 종료
+				PROPVARIANT dat;  dat.vt = VT_UI1 | VT_VECTOR;
+				dat.caub.cElems = 5; dat.caub.pElems = loopbytes;
+				gw->SetMetadataByName(L"/appext/Data", &dat);
+				// pElems 는 리터럴/스택 → PropVariantClear 호출 안 함.
+			}
+		}
+
+		if (SUCCEEDED(hr))
+		{
+			bool cancelled = false, frame_err = false;
+
+			svg.build_frames_stream(w, h, f, 0.0,
+				[&](int idx, int total, const std::vector<uint8_t>& bgra, int delay_ms) -> bool
+				{
+					// straight BGRA(알파 유지) 복사 → WIC 소스.
+					std::vector<uint8_t> px = bgra;
+
+					ComPtr<IWICBitmap> src;
+					HRESULT fh = factory->CreateBitmapFromMemory(
+						w, h, GUID_WICPixelFormat32bppBGRA, w * 4,
+						(UINT)px.size(), px.data(), &src);
+
+					// 팔레트: 255 색 + 투명 엔트리 1개(fAddTransparentColor=TRUE).
+					ComPtr<IWICPalette> pal;
+					if (SUCCEEDED(fh)) fh = factory->CreatePalette(&pal);
+					if (SUCCEEDED(fh)) fh = pal->InitializeFromBitmap(src.Get(), 255, TRUE);
+
+					// 투명 인덱스(알파 0 엔트리)를 찾아 프레임 메타데이터에 지정한다.
+					int trans_idx = -1;
+					if (SUCCEEDED(fh))
+					{
+						UINT cc = 0; pal->GetColorCount(&cc);
+						if (cc > 0)
+						{
+							std::vector<WICColor> cols(cc);
+							UINT got = 0;
+							if (SUCCEEDED(pal->GetColors(cc, cols.data(), &got)))
+								for (UINT i = 0; i < got; ++i)
+									if ((cols[i] >> 24) == 0) { trans_idx = (int)i; break; }
+						}
+					}
+
+					// alphaThresholdPercent=50: 알파가 낮은 픽셀은 위 투명색으로 매핑된다.
+					// 디더링 None: 아이콘/일러스트 SVG 는 평면 색이라 error-diffusion 이 매끈한
+					// 면에 점 노이즈를 뿌린다(작게 낼수록 도드라짐). nearest-color 로 깨끗하게.
+					// (그라데이션은 약간 밴딩될 수 있으나 점 노이즈보다 자연스럽다.)
+					ComPtr<IWICFormatConverter> conv;
+					if (SUCCEEDED(fh)) fh = factory->CreateFormatConverter(&conv);
+					if (SUCCEEDED(fh)) fh = conv->Initialize(src.Get(),
+						GUID_WICPixelFormat8bppIndexed, WICBitmapDitherTypeNone,
+						pal.Get(), 50.0, WICBitmapPaletteTypeCustom);
+
+					ComPtr<IWICBitmapFrameEncode> frame;
+					ComPtr<IPropertyBag2>         propbag;
+					if (SUCCEEDED(fh)) fh = encoder->CreateNewFrame(&frame, &propbag);
+					if (SUCCEEDED(fh)) fh = frame->Initialize(propbag.Get());
+					if (SUCCEEDED(fh)) fh = frame->SetSize(w, h);
+					if (SUCCEEDED(fh))
+					{
+						WICPixelFormatGUID pf = GUID_WICPixelFormat8bppIndexed;
+						fh = frame->SetPixelFormat(&pf);
+					}
+					if (SUCCEEDED(fh)) fh = frame->SetPalette(pal.Get());
+
+					// 프레임 메타데이터: delay(centisecond), disposal.
+					if (SUCCEEDED(fh))
+					{
+						ComPtr<IWICMetadataQueryWriter> fw;
+						if (SUCCEEDED(frame->GetMetadataQueryWriter(&fw)))
+						{
+							int cs = (int)std::lround(delay_ms / 10.0);
+							if (cs < 2) cs = 2;                 // 2cs 미만은 뷰어가 10cs 로 뭉갬
+							PROPVARIANT d; d.vt = VT_UI2; d.uiVal = (USHORT)cs;
+							fw->SetMetadataByName(L"/grctlext/Delay", &d);
+							// disposal 2 = restore to background: 다음 프레임 전 투명 배경으로
+							// 복원 → 투명 영역이 이전 프레임을 덮지 않아 잔상 없음.
+							PROPVARIANT dp; dp.vt = VT_UI1; dp.bVal = 2;
+							fw->SetMetadataByName(L"/grctlext/Disposal", &dp);
+							if (trans_idx >= 0)
+							{
+								PROPVARIANT tf; tf.vt = VT_BOOL; tf.boolVal = VARIANT_TRUE;
+								fw->SetMetadataByName(L"/grctlext/TransparencyFlag", &tf);
+								PROPVARIANT ti; ti.vt = VT_UI1; ti.bVal = (BYTE)trans_idx;
+								fw->SetMetadataByName(L"/grctlext/TransparentColorIndex", &ti);
+							}
+						}
+					}
+
+					if (SUCCEEDED(fh)) fh = frame->WriteSource(conv.Get(), nullptr);
+					if (SUCCEEDED(fh)) fh = frame->Commit();
+
+					if (FAILED(fh)) { frame_err = true; return false; }
+
+					if (progress && !progress(idx + 1, total)) { cancelled = true; return false; }
+					return true;
+				});
+
+			if (!frame_err && !cancelled)
+				ok = SUCCEEDED(encoder->Commit());
+		}
+	}   // ComPtr 들 여기서 Release(스트림이 파일 핸들을 놓음) → 실패 시 파일 삭제 가능
+
+	if (!ok)
+		::DeleteFileW(gif.c_str());   // 취소/실패 시 부분 파일 제거
+
+	if (need_uninit)
+		::CoUninitialize();
+
+	return ok;
+}
+
+// ── SVG 애니메이션 → 애니메이션 WebP 내보내기(libwebp) ──────────────────────
+bool export_svg_to_animated_webp(const wchar_t* svg_path,
+								 const wchar_t* out_webp_path,
+								 int out_w, int out_h, int fps,
+								 std::function<bool(int cur, int total)> progress)
+{
+#ifndef _WIN64
+	(void)svg_path; (void)out_webp_path; (void)out_w; (void)out_h; (void)fps; (void)progress;
+	return false;   // libwebp lib 은 x64 전용
+#else
+	if (!svg_path || !*svg_path)
+		return false;
+
+	// 출력 경로: 지정되면 그대로, 아니면 svg 와 같은 폴더·같은 이름 + .webp
+	std::wstring webp;
+	if (out_webp_path && *out_webp_path)
+	{
+		webp = out_webp_path;
+	}
+	else
+	{
+		webp = svg_path;
+		size_t dot = webp.find_last_of(L'.');
+		size_t sep = webp.find_last_of(L"\\/");
+		if (dot != std::wstring::npos && (sep == std::wstring::npos || dot > sep))
+			webp.erase(dot);
+		webp += L".webp";
+	}
+
+	sc_svg svg;
+	if (!svg.load(svg_path) || !svg.is_animated())
+		return false;
+
+	int w = (out_w > 0) ? out_w : (int)std::lround(svg.natural_width());
+	int h = (out_h > 0) ? out_h : (int)std::lround(svg.natural_height());
+	if (w < 1) w = 512;
+	if (h < 1) h = 512;
+
+	int f = fps; if (f < 1) f = 1;
+
+	WebPAnimEncoderOptions enc_options;
+	if (!WebPAnimEncoderOptionsInit(&enc_options))
+		return false;
+	enc_options.anim_params.loop_count = 0;      // 무한 루프
+
+	WebPAnimEncoder* enc = WebPAnimEncoderNew(w, h, &enc_options);
+	if (!enc)
+		return false;
+
+	WebPConfig config;
+	if (!WebPConfigInit(&config)) { WebPAnimEncoderDelete(enc); return false; }
+	config.lossless = 1;        // 무손실(알파·풀컬러 보존, 디더/밴딩 없음)
+	config.quality  = 90.0f;    // lossless 에서는 압축 노력(높을수록 작고 느림)
+	config.method   = 4;
+	if (!WebPValidateConfig(&config)) { WebPAnimEncoderDelete(enc); return false; }
+
+	bool cancelled = false, frame_err = false;
+	int  timestamp = 0;         // 각 프레임의 시작 시각(ms), 누적
+
+	svg.build_frames_stream(w, h, f, 0.0,
+		[&](int idx, int total, const std::vector<uint8_t>& bgra, int delay_ms) -> bool
+		{
+			WebPPicture pic;
+			if (!WebPPictureInit(&pic)) { frame_err = true; return false; }
+			pic.use_argb = 1;   // lossless 는 argb 입력 필요
+			pic.width  = w;
+			pic.height = h;
+			// 프레임은 straight BGRA — WebP 가 기대하는 포맷 그대로.
+			if (!WebPPictureImportBGRA(&pic, bgra.data(), w * 4)) { frame_err = true; return false; }
+
+			if (!WebPAnimEncoderAdd(enc, &pic, timestamp, &config))
+			{
+				WebPPictureFree(&pic);
+				frame_err = true;
+				return false;
+			}
+			WebPPictureFree(&pic);
+			timestamp += delay_ms;
+
+			if (progress && !progress(idx + 1, total)) { cancelled = true; return false; }
+			return true;
+		});
+
+	bool ok = false;
+	if (!frame_err && !cancelled)
+	{
+		// 마지막 프레임 duration 반영을 위해 NULL 프레임을 총 재생시간(timestamp)에 add.
+		if (WebPAnimEncoderAdd(enc, nullptr, timestamp, nullptr))
+		{
+			WebPData data; WebPDataInit(&data);
+			if (WebPAnimEncoderAssemble(enc, &data) && data.bytes && data.size)
+			{
+				std::ofstream ofs(webp.c_str(), std::ios::binary);
+				if (ofs)
+				{
+					ofs.write((const char*)data.bytes, (std::streamsize)data.size);
+					ok = (bool)ofs;
+				}
+			}
+			WebPDataClear(&data);
+		}
+	}
+
+	WebPAnimEncoderDelete(enc);
+
+	if (!ok)
+		::DeleteFileW(webp.c_str());   // 취소/실패 시 부분 파일 제거
+
+	return ok;
+#endif
 }

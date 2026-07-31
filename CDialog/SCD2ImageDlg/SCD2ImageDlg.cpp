@@ -570,9 +570,9 @@ bool CSCD2ImageDlg::load(CString sFile, bool load_thumbs, bool auto_play)
 		
 		//원래 CSCGdiplusBitmap은 animated gif를 로딩하면 set_animation() 함수를 호출하여 자체 재생되는 기능을 포함한다.
 		//하지만 CSCD2ImageDlg에서는 roi 설정, 다른 child ctrl들과의 충돌등이 있으므로 이 클래스에서 직접 재생한다.
-		//m_images[0].set_gif_play_itself(false);
+		//m_images[0].set_ani_play_itself(false);
 
-		//std::thread t(&CSCD2ImageDlg::thread_gif_animation, this);
+		//std::thread t(&CSCD2ImageDlg::thread_ani, this);
 		//t.detach();
 	}
 	else

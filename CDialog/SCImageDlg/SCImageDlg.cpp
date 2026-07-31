@@ -20,7 +20,7 @@ CSCImageDlg::CSCImageDlg(CWnd* parent)
 
 CSCImageDlg::~CSCImageDlg()
 {
-	stop_gif();
+	stop_ani();
 }
 
 bool CSCImageDlg::create(CWnd* parent, int x, int y, int cx, int cy)
@@ -118,7 +118,7 @@ void CSCImageDlg::OnPaint()
 
 
 	//수정 필요. gif도 stretch mode에 따라 꽉차게 또는 원래 크기로 표시한다. 아직 미구현이며 현재는 zoom 표시됨.	
-	//if (m_img.is_valid() && m_img.is_animated_gif())
+	//if (m_img.is_valid() && m_img.is_animated_image())
 	//{
 	//	CRect r = get_ratio_rect(rc, m_img.width, m_img.height, 0, false);
 	//	CRgn rgn_rc;
@@ -388,9 +388,9 @@ BOOL CSCImageDlg::PreTranslateMessage(MSG* pMsg)
 				m_thumb.stop_loading();
 				return FALSE;
 			case VK_SPACE :
-				if (m_img[0].is_animated_gif())
+				if (m_img[0].is_animated_image())
 				{
-					pause_gif(-1);
+					pause_ani(-1);
 					return TRUE;
 				}
 				break;
@@ -476,7 +476,7 @@ bool CSCImageDlg::load()
 bool CSCImageDlg::load(CString sFile, bool load_thumbs)
 {
 	//다른 이미지를 로딩하기 전에 이전 이미지가 animated gif였다면 재생하는 thread를 중지시켜야 한다.
-	stop_gif();
+	stop_ani();
 
 	AfxGetApp()->WriteProfileString(_T("setting\\CSCImageDlg"), _T("recent file"), sFile);
 
@@ -487,7 +487,7 @@ bool CSCImageDlg::load(CString sFile, bool load_thumbs)
 
 	bool res = m_img[0].load(sFile);
 
-	if (m_img[0].is_animated_gif())
+	if (m_img[0].is_animated_image())
 	{
 		CRect rc;
 		GetClientRect(rc);
@@ -498,9 +498,9 @@ bool CSCImageDlg::load(CString sFile, bool load_thumbs)
 		
 		//원래 CSCGdiplusBitmap은 animated gif를 로딩하면 set_animation() 함수를 호출하여 자체 재생되는 기능을 포함한다.
 		//하지만 CSCImageDlg에서는 roi 설정, 다른 child ctrl들과의 충돌등이 있으므로 이 클래스에서 직접 재생한다.
-		m_img[0].set_gif_play_itself(false);
+		m_img[0].set_ani_play_itself(false);
 
-		std::thread t(&CSCImageDlg::thread_gif_animation, this);
+		std::thread t(&CSCImageDlg::thread_ani, this);
 		t.detach();
 	}
 	else
@@ -592,7 +592,7 @@ bool CSCImageDlg::copy_to_clipboard(int type)
 
 bool CSCImageDlg::paste_from_clipboard()
 {
-	stop_gif();
+	stop_ani();
 
 	if (m_img[0].paste_from_clipboard())
 	{
@@ -688,9 +688,9 @@ void CSCImageDlg::OnSize(UINT nType, int cx, int cy)
 
 	m_thumb.MoveWindow(rc);
 
-	if (m_img[0].is_animated_gif())
+	if (m_img[0].is_animated_image())
 	{
-		m_img[0].move_gif(rc);
+		m_img[0].move_ani(rc);
 		m_slider_gif.MoveWindow(rc.left + 8, rc.bottom - 8 - GIF_SLIDER_HEIGHT, GIF_SLIDER_WIDTH, GIF_SLIDER_HEIGHT);
 	}
 
@@ -1118,9 +1118,9 @@ LRESULT CSCImageDlg::on_message_from_CSCSliderCtrl(WPARAM wParam, LPARAM lParam)
 }
 
 //pos위치로 이동한 후 일시정지한다. -1이면 pause <-> play를 토글한다.
-void CSCImageDlg::pause_gif(int pos)
+void CSCImageDlg::pause_ani(int pos)
 {
-	if (m_img[0].is_gif_play_itself())
+	if (m_img[0].is_ani_play_itself())
 		return;
 
 	if (m_img[0].get_frame_count() < 2 || !m_run_thread_animation)
@@ -1146,7 +1146,7 @@ void CSCImageDlg::pause_gif(int pos)
 	}
 }
 
-void CSCImageDlg::stop_gif()
+void CSCImageDlg::stop_ani()
 {
 	if (m_img.size() == 0)
 		return;
@@ -1197,7 +1197,7 @@ void CSCImageDlg::goto_frame_percent(int pos, bool pause)
 	goto_frame((int)dpos, pause);
 }
 
-void CSCImageDlg::thread_gif_animation()
+void CSCImageDlg::thread_ani()
 {
 	if (m_img[0].get_frame_count() < 2)
 		return;
@@ -1360,7 +1360,7 @@ void CSCImageDlg::set_view_mode(int view_mode)
 
 	m_thumb.select_item(m_filename);
 	m_static_pixel.ShowWindow(m_show_thumb || !m_show_pixel ? SW_HIDE : SW_SHOW);
-	m_slider_gif.ShowWindow(m_show_thumb || !m_img[0].is_animated_gif() ? SW_HIDE : SW_SHOW);
+	m_slider_gif.ShowWindow(m_show_thumb || !m_img[0].is_animated_image() ? SW_HIDE : SW_SHOW);
 	m_thumb.ShowWindow(m_show_thumb ? SW_SHOW : SW_HIDE);
 
 	if (m_show_thumb)
@@ -1369,7 +1369,7 @@ void CSCImageDlg::set_view_mode(int view_mode)
 
 void CSCImageDlg::display_image(CString filepath, bool scan_folder)
 {
-	stop_gif();
+	stop_ani();
 
 	m_mutex.lock();
 	m_files.clear();
@@ -1409,7 +1409,7 @@ void CSCImageDlg::display_image(int index, bool scan_folder)
 
 	//animated gif를 재생중이었다면 stop시켜야 한다.
 	//그렇지 않으면 m_img.clear(), m_img.pop_front()에서 에러가 발생한다.
-	stop_gif();
+	stop_ani();
 
 	//next image
 	if (index == -1)
@@ -1478,12 +1478,12 @@ void CSCImageDlg::display_image(int index, bool scan_folder)
 	//미리 버퍼링 된 이미지가 있다면 화면만 갱신하면 된다.
 	//단, animated gif인 경우는 바로 재생까지 시켜줘야 하므로 load()를 다시 호출해줘야 한다.
 	m_mutex.lock();
-	if (m_img.size() == 0 || m_img[0].is_empty() || m_img[0].is_animated_gif())
+	if (m_img.size() == 0 || m_img[0].is_empty() || m_img[0].is_animated_image())
 		load(m_files[m_index], folder != recent_folder);
 	m_mutex.unlock();
 
 	m_filename = m_img[0].get_filename();
-	if (!m_img[0].is_animated_gif())
+	if (!m_img[0].is_animated_image())
 		m_slider_gif.ShowWindow(SW_HIDE);
 
 	build_image_info_str();

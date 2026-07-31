@@ -429,8 +429,8 @@ protected:
 	//CRect			m_r_gif;
 	//bool			m_run_thread_animation = false;
 	//bool			m_thread_animation_terminated = true;
-	//bool			m_is_gif_mirror = false;
-	//void			thread_gif_animation();
+	//bool			m_is_ani_mirror = false;
+	//void			thread_ani();
 
 	CSCSliderCtrl	m_slider_gif;
 	LRESULT			on_message_from_CSCSliderCtrl(WPARAM wParam, LPARAM lParam);

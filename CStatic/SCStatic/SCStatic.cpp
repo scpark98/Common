@@ -339,17 +339,17 @@ void CSCStatic::OnPaint()
 	if (m_img_back.is_valid() && m_round == 0 && !m_transparent)
 		dc.FillSolidRect(rc, m_theme.cr_back.ToCOLORREF());
 
-	if (m_img_back.is_valid() && !m_img_back.is_animated_gif())
+	if (m_img_back.is_valid() && !m_img_back.is_animated_image())
 	{
 		// 배경 그림을 그린다.
 		m_img_back.draw(g, rc, m_img_back_draw_mode);
 		//m_img_back.save(_T("d:\\copy.png"));
 	}
-	else if (m_img_back.is_valid() && m_img_back.is_animated_gif())
+	else if (m_img_back.is_valid() && m_img_back.is_animated_image())
 	{
 		//애니 gif: 현재 프레임을 여기(UI 스레드 OnPaint)에서 그린다. 워커는 프레임 전진 + InvalidateRect 만 하므로
 		//완료/리사이즈/expose 등 어떤 WM_PAINT 에도 프레임이 다시 그려져 깜빡임이 없다.
-		m_img_back.draw_gif_current_frame(g);
+		m_img_back.draw_ani_frame(g);
 	}
 	else
 	{
@@ -1169,7 +1169,7 @@ void CSCStatic::set_back_image(CString type, UINT nIDBack, Gdiplus::Color cr_bac
 	//m_transparent = true;
 	m_img_back.set_back_color(m_theme.cr_back);
 
-	if (m_img_back.is_animated_gif())
+	if (m_img_back.is_animated_image())
 		m_img_back.set_animation(m_hWnd, CRect(), true);
 
 	//20260729 by claude. 애니 gif 워커는 매 프레임 "재생 영역만" InvalidateRect 한다(SCGdiplusBitmap.cpp:3698).
@@ -1185,7 +1185,7 @@ void CSCStatic::set_back_image(CSCGdiplusBitmap& img, Gdiplus::Color cr_back)
 	//m_transparent = true;
 	m_img_back.set_back_color(m_theme.cr_back);
 
-	if (m_img_back.is_animated_gif())
+	if (m_img_back.is_animated_image())
 		m_img_back.set_animation(m_hWnd, CRect(), false);
 
 	//전체 무효화가 필요한 이유는 위 오버로드 주석 참고.
@@ -1195,36 +1195,36 @@ void CSCStatic::set_back_image(CSCGdiplusBitmap& img, Gdiplus::Color cr_back)
 //배경 이미지를 좌우대칭하는데 만약 animated gif라면 역재생처럼 동작시킬 수 있다.
 void CSCStatic::set_back_image_mirror(bool is_mirror)
 {
-	if (m_img_back.is_animated_gif())
-		m_img_back.set_gif_mirror(is_mirror);
+	if (m_img_back.is_animated_image())
+		m_img_back.set_ani_mirror(is_mirror);
 	else
 		m_img_back.mirror();
 }
 
-void CSCStatic::play_gif()
+void CSCStatic::play_ani()
 {
-	if (!m_img_back.is_animated_gif())
+	if (!m_img_back.is_animated_image())
 		return;
 
-	m_img_back.play_gif();
+	m_img_back.play_ani();
 }
 
 //pos위치로 이동한 후 일시정지한다. -1이면 pause <-> play를 토글한다.
-void CSCStatic::pause_gif(int pos)
+void CSCStatic::pause_ani(int pos)
 {
-	if (!m_img_back.is_animated_gif())
+	if (!m_img_back.is_animated_image())
 		return;
 
-	m_img_back.pause_gif(pos);
+	m_img_back.pause_ani(pos);
 }
 
 //animation thread가 종료되고 화면에도 더 이상 표시되지 않는다. 만약 그대로 멈추길 원한다면 pause_animation()을 호출한다.
-void CSCStatic::stop_gif()
+void CSCStatic::stop_ani()
 {
-	if (!m_img_back.is_animated_gif())
+	if (!m_img_back.is_animated_image())
 		return;
 
-	m_img_back.stop_gif();
+	m_img_back.stop_ani();
 }
 
 
@@ -1255,13 +1255,13 @@ void CSCStatic::adjust_back_image()
 	CRect rc;
 	GetClientRect(rc);
 
-	if (m_img_back.is_animated_gif())
+	if (m_img_back.is_animated_image())
 	{
-		//애니 gif 는 OnPaint 가 draw_gif_current_frame() 으로 그리는데 이 함수는 draw_mode 를 받지 않고
+		//애니 gif 는 OnPaint 가 draw_ani_frame() 으로 그리는데 이 함수는 draw_mode 를 받지 않고
 		//m_ani_sx/sy/width/height 를 그대로 쓴다. 그래서 배치 계산을 여기서 미리 해 넣어준다.
-		//move_gif 의 CRect 오버로드는 항상 비율을 유지하므로 draw_mode 를 반영하려면 4 인자 버전을 써야 한다.
+		//move_ani 의 CRect 오버로드는 항상 비율을 유지하므로 draw_mode 를 반영하려면 4 인자 버전을 써야 한다.
 		CRect r = m_img_back.calc_rect(rc, m_img_back_draw_mode);
-		m_img_back.move_gif(r.left, r.top, r.Width(), r.Height());
+		m_img_back.move_ani(r.left, r.top, r.Width(), r.Height());
 	}
 	else if (m_img_back_draw_mode == CSCGdiplusBitmap::draw_mode_stretch)
 	{
@@ -2117,10 +2117,10 @@ void CSCStatic::OnDestroy()
 {
 	//gif 애니메이션 스레드는 m_target_hwnd 로 "직접" 그린다(WM_PAINT 아님). 따라서 HWND 파괴 전에 반드시 정지시켜야 한다.
 	//정지하지 않으면 창이 닫힌 뒤에도 스레드가 죽은 DC(CMemoryDC)로 그리다 CDC::LPtoDP ASSERT/크래시가 난다.
-	//(WM_DESTROY 시점엔 m_hWnd 가 아직 유효하므로 여기서 stop_gif() 하면 스레드가 안전하게 종료된다. 소멸자에서만
+	//(WM_DESTROY 시점엔 m_hWnd 가 아직 유효하므로 여기서 stop_ani() 하면 스레드가 안전하게 종료된다. 소멸자에서만
 	// 멈추면 이미 HWND 가 파괴된 뒤라 늦다.)
-	if (m_img_back.is_animated_gif())
-		m_img_back.stop_gif();
+	if (m_img_back.is_animated_image())
+		m_img_back.stop_ani();
 
 	CStatic::OnDestroy();
 

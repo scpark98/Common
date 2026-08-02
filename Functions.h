@@ -546,13 +546,15 @@ struct	NETWORK_INFO
 	int			get_process_running_count(CString processname);
 	bool		is_running(CString processname);
 
-	//processname의 audio session이 실제로 active 상태인지 (= 소리 출력 중) 검사.
+	//processnames 중 하나라도 audio session이 실제로 active 상태인지 (= 소리 출력 중) 검사.
 	//PotPlayer 같은 미디어 플레이어가 *재생 중* 인지 *일시정지/정지/미디어 없음* 인지 구분할 때 사용.
 	//- 같은 이름의 프로세스가 여러 개면 그 중 하나라도 active 면 true.
 	//- 프로세스가 실행조차 안 됐으면 false.
 	//- 무음 트랙 재생 중인 경우는 inactive 로 잡힐 수 있으나 PotPlayer 등 일반 미디어 재생에는 충분.
-	bool		is_process_audio_active(CString processname);
-	
+	//20260802 by claude. 프로세스 스냅샷과 오디오 세션 열거는 이름 개수와 무관하게 각각 1회만 수행한다.
+	//ex. is_process_audio_active({ _T("a.exe"), _T("b.exe") })
+	bool		is_process_audio_active(const std::deque<CString>& processnames);
+
 	//fullpath 와 정확히 같은 실행 경로의 모든 프로세스 인스턴스를 종료한다.
 	//다른 경로의 동명 exe(예: 다른 제품의 LMMAgent.exe)에는 영향 없음.
 	//return value : >0=killed count, 0=매칭 없음 또는 종료 실패, -1=snapshot 실패

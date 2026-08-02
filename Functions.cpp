@@ -13069,12 +13069,12 @@ bool is_running(CString processname)
 //(3) GetProcessId() 가 매칭되는 session 의 IAudioMeterInformation::GetPeakValue() 가 0 이상인지 확인.
 //AudioSessionState 는 active->inactive 전이에 수십초 grace period 가 있어 일시정지에 즉각 반응 못 함.
 //peak value 는 audio render 가 멈추는 즉시 0 이 되어 일시정지/정지에 즉각 반응.
-bool is_process_audio_active(CString processname)
+bool is_process_audio_active(const std::deque<CString>& processnames)
 {
-	if (processname.IsEmpty())
+	if (processnames.empty())
 		return false;
 
-	//1) processname 과 매칭되는 PID 수집.
+	//1) processnames 중 하나와 매칭되는 PID 수집. 스냅샷은 이름 개수와 무관하게 1회.
 	std::set<DWORD> target_pids;
 	HANDLE hSnap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
 	if (hSnap == INVALID_HANDLE_VALUE)
@@ -13087,8 +13087,17 @@ bool is_process_audio_active(CString processname)
 	{
 		do
 		{
-			if (_tcsicmp(pe32.szExeFile, processname) == 0)
-				target_pids.insert(pe32.th32ProcessID);
+			for (const auto& name : processnames)
+			{
+				if (name.IsEmpty())
+					continue;
+
+				if (_tcsicmp(pe32.szExeFile, name) == 0)
+				{
+					target_pids.insert(pe32.th32ProcessID);
+					break;
+				}
+			}
 		} while (Process32Next(hSnap, &pe32));
 	}
 	CloseHandle(hSnap);

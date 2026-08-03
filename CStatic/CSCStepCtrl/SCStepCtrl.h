@@ -67,19 +67,24 @@ public:
 	CSCStepCtrl();
 	virtual ~CSCStepCtrl();
 
-	void			set_style(bool is_horz, int thumb_style = thumb_style_circle) { m_horz = is_horz; m_thumb_style = thumb_style; }
+	//20260803 by claude. 아래 setter 들은 그려지는 내용을 바꾸면서도 Invalidate 를 하지 않았다.
+	//같은 클래스의 set_pos / step / set_thumb_size / set_check_color 는 하고 있어 규약이 어긋나 있었고,
+	//KoinoCheckTool 에서 set_step_count + set_text 만 부른 뒤 화면이 갱신되지 않아 스텝이 통째로 안 보였다.
+	//(그 전까지는 우연히 뒤따라 호출되던 set_color_theme 의 Invalidate 가 이를 대신하고 있었다.)
+	//HWND 가 없는 시점에 Invalidate 를 부르면 MFC 가 ASSERT 하므로 set_color_theme 과 동일하게 가드한다.
+	void			set_style(bool is_horz, int thumb_style = thumb_style_circle) { m_horz = is_horz; m_thumb_style = thumb_style; if (GetSafeHwnd()) Invalidate(); }
 
 	//총 단계 수
-	void			set_step_count(int count) { m_pos = -1; m_step.resize(count); }
+	void			set_step_count(int count) { m_pos = -1; m_step.resize(count); if (GetSafeHwnd()) Invalidate(); }
 	int				get_step_count() { return m_step.size(); }
 
 	//index < 0이면 모든 thumb에 적용.
 	void			set_thumb_style(int index, int style);
 
 	//l, t, r, b의 margin. 가로형일 경우 텍스트가 충분히 표시되도록 좌우 여백을 줘야 한다.
-	void			set_margin(int left, int top, int right, int bottom) { m_margin = CRect(left, top, right, bottom); }
+	void			set_margin(int left, int top, int right, int bottom) { m_margin = CRect(left, top, right, bottom); if (GetSafeHwnd()) Invalidate(); }
 	//step과 텍스트 간격
-	void			set_gap_to_text(int gap) { m_gap_to_text = gap; }
+	void			set_gap_to_text(int gap) { m_gap_to_text = gap; if (GetSafeHwnd()) Invalidate(); }
 
 	int				get_pos() { return m_pos; }
 	void			set_pos(int pos) { m_pos = pos; Invalidate(); }
@@ -94,6 +99,9 @@ public:
 
 		for (int i = 0; i < n; i++)
 			m_step[i].text = texts[i];
+
+		if (GetSafeHwnd())
+			Invalidate();
 	}
 
 	//thumb와 text의 색상을 모두 변경한다. cr_current가 투명이면 m_cr_text_current, m_cr_thumb_current 값은 변경하지 않는다.

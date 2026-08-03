@@ -371,6 +371,11 @@ void CSCStepCtrl::set_text(int index, CString text, Gdiplus::Color cr)
 
 	if (cr.GetValue() != Gdiplus::Color::Transparent)
 		m_step[index].cr_text = cr;
+
+	//20260803 by claude. 루프로 전 스텝을 채워도 실제 그리기는 메시지 루프에서 한 번만 일어나므로
+	//무효 영역이 누적될 뿐 비용 문제는 없다. 자세한 경위는 .h 의 set_step_count 주석 참고.
+	if (GetSafeHwnd())
+		Invalidate();
 }
 
 //thumb와 text의 색상을 모두 변경한다.
@@ -401,6 +406,9 @@ void CSCStepCtrl::set_thumb_color(int index, Gdiplus::Color cr_active, Gdiplus::
 	{
 		m_step[index].cr_thumb = cr_active;
 	}
+
+	if (GetSafeHwnd())
+		Invalidate();
 }
 
 void CSCStepCtrl::set_text_color(int index, Gdiplus::Color cr_active, Gdiplus::Color cr_current)
@@ -425,6 +433,9 @@ void CSCStepCtrl::set_text_color(int index, Gdiplus::Color cr_active, Gdiplus::C
 	{
 		m_step[index].cr_text = cr_active;
 	}
+
+	if (GetSafeHwnd())
+		Invalidate();
 }
 
 //특정 step의 thumb와 text의 색상을 리셋시키고 기본색을 사용하게 한다.

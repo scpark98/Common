@@ -81,7 +81,7 @@ BEGIN_MESSAGE_MAP(CSCListCtrl, CListCtrl)
 	ON_NOTIFY_REFLECT_EX(LVN_ITEMCHANGED, &CSCListCtrl::OnLvnItemchanged)
 	ON_WM_CONTEXTMENU()
 	ON_NOTIFY_REFLECT_EX(NM_RCLICK, &CSCListCtrl::OnNMRClick)
-	ON_COMMAND_RANGE(menu_select_all, menu_unselect_all, &CSCListCtrl::OnPopupMenu)
+	ON_COMMAND_RANGE(menu_select_all, menu_copy, &CSCListCtrl::OnPopupMenu)
 	ON_WM_MOUSEHOVER()
 	ON_WM_MOUSELEAVE()
 	ON_WM_SETFOCUS()
@@ -1926,10 +1926,12 @@ BOOL CSCListCtrl::PreTranslateMessage(MSG* pMsg)
 									select_item(-1);
 								}
 								break;
-			case 'C'		:	if (!m_in_editing && GetKeyState(VK_CONTROL) & 0x8000)
+								//20260803 by claude. 예전에는 MessageBeep 만 하고 클립보드는 건드리지 않는 스텁이었다.
+								//선택된 행이 없으면 아무것도 하지 않고 부모에게 넘긴다 — 상위에서 Ctrl+C 를
+								//다른 용도로 쓸 여지를 막지 않기 위함이다.
+			case 'C'		:	if (!m_in_editing && (GetKeyState(VK_CONTROL) & 0x8000) && GetSelectedCount() > 0)
 								{
-									//CopyToClipboard(_T("|"));
-									MessageBeep(MB_ICONINFORMATION);
+									copy_selected_to_clipboard();
 									return true;
 								}
 								break;
@@ -6629,11 +6631,16 @@ void CSCListCtrl::OnContextMenu(CWnd* /*pWnd*/, CPoint point)
 		return;
 	}
 
-	//자체 내장 메뉴 — 파일 개념이 없는 범용 리스트이므로 범용 항목(모두 선택 / 선택 해제)만 제공.
+	//자체 내장 메뉴 — 파일 개념이 없는 범용 리스트이므로 범용 항목만 제공.
+	//컬럼 폭 자동 맞춤 / 정렬 초기화 / 컬럼 표시·숨김은 검토했으나 제외했다.
+	//폭 맞춤은 헤더 구분자 더블클릭으로 이미 되고, 나머지 둘은 리스트마다 의미가 달라 범용 항목이 아니다.
 	CMenu menu;
 	menu.CreatePopupMenu();
+	menu.AppendMenu(MF_STRING, menu_copy, _T("복사(&C)\tCtrl+C"));
+	menu.AppendMenu(MF_SEPARATOR);
 	menu.AppendMenu(MF_STRING, menu_select_all, _T("모두 선택(&A)\tCtrl+A"));
 	menu.AppendMenu(MF_STRING, menu_unselect_all, _T("선택 해제(&U)"));
+	menu.EnableMenuItem(menu_copy, MF_BYCOMMAND | (GetSelectedCount() > 0 ? MF_ENABLED : MF_GRAYED));
 	menu.EnableMenuItem(menu_select_all, MF_BYCOMMAND | (GetItemCount() > 0 ? MF_ENABLED : MF_GRAYED));
 	menu.EnableMenuItem(menu_unselect_all, MF_BYCOMMAND | (GetSelectedCount() > 0 ? MF_ENABLED : MF_GRAYED));
 	menu.TrackPopupMenu(TPM_LEFTALIGN | TPM_RIGHTBUTTON, point.x, point.y, this);
@@ -6645,7 +6652,42 @@ void CSCListCtrl::OnPopupMenu(UINT nID)
 	{
 	case menu_select_all:	select_item(-1, true, false, false); break;	//SetItemState(-1) 은 전체 항목에 적용됨
 	case menu_unselect_all:	select_item(-1, false, false, false); break;
+	case menu_copy:			copy_selected_to_clipboard(); break;
 	}
+}
+
+//20260803 by claude. 선택된 행을 행=CRLF, 컬럼=구분자로 이어 붙인다.
+//다중 선택 리스트(LVS_SINGLESEL 없음)면 선택된 항목이 모두 담긴다.
+//get_selected_items 가 GetFirstSelectedItemPosition/GetNextSelectedItem 으로 인덱스 오름차순 열거하므로
+//결과 순서는 화면에 보이는 순서와 같다.
+CString CSCListCtrl::get_selected_text(LPCTSTR column_separator)
+{
+	std::deque<int> rows;
+	get_selected_items(&rows);
+
+	CString result;
+	int column_count = get_column_count();
+
+	for (int row : rows)
+	{
+		for (int col = 0; col < column_count; col++)
+		{
+			if (col > 0)
+				result += column_separator;
+
+			result += get_text(row, col);
+		}
+
+		//메모장·엑셀 모두 CRLF 를 행 구분으로 본다. \n 만 넣으면 메모장에서 한 줄로 붙는다.
+		result += _T("\r\n");
+	}
+
+	return result;
+}
+
+bool CSCListCtrl::copy_selected_to_clipboard()
+{
+	return copy_to_clipboard(GetSafeHwnd(), get_selected_text());
 }
 
 

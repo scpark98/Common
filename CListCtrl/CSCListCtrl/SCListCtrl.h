@@ -480,6 +480,13 @@ public:
 	//선택된 항목들의 목록을 dq에 담는다. shelllist에서만 사용되며 cFileName은 이미 전체경로를 가지고 있다.
 	int			get_selected_items(std::deque<WIN32_FIND_DATA>* dq);
 
+	//20260803 by claude. 선택 모드. 다중(false)이면 클릭 정책이 탐색기와 같아진다 —
+	//plain=단일, ctrl=토글, shift=범위, ctrl+shift=범위 추가, 빈 공간 드래그=마퀴.
+	//이 컨트롤은 native 선택을 쓰지 않고 클릭 시점에 GetStyle() 을 읽어 직접 처리하므로
+	//(OnLButtonDown 의 multi 판정) 생성 후 변경해도 즉시 반영된다 — native listview 는 그렇지 않다.
+	void		set_single_selection(bool single = true) { ModifyStyle(single ? 0 : LVS_SINGLESEL, single ? LVS_SINGLESEL : 0); }
+	bool		is_single_selection() const { return (GetStyle() & LVS_SINGLESEL) != 0; }
+
 	//index = -1 : 전체선택
 	void		select_item(int index, bool select = true, bool after_unselect = false, bool insure_visible = true);
 	void		unselect_selected_item();
@@ -1023,10 +1030,12 @@ protected:
 	//true=자체 내장 컨텍스트 메뉴 표시, false=parent(OnContextMenu)로 위임. default = true
 	bool			m_use_own_context_menu = true;
 	//자체 내장 메뉴 command id. 범용 컨트롤이므로 파일 개념 없는 범용 항목만 제공.
+	//ON_COMMAND_RANGE(menu_select_all, menu_copy) 로 묶여 있으므로 항목 추가는 반드시 맨 뒤에.
 	enum CVTLISTCTRLEX_POPUP_MENU
 	{
 		menu_select_all = WM_USER + 1600,
 		menu_unselect_all,
+		menu_copy,
 	};
 	afx_msg void	OnPopupMenu(UINT nID);
 
@@ -1034,6 +1043,13 @@ protected:
 	DECLARE_MESSAGE_MAP()
 public:
 	void			set_use_own_context_menu(bool use = true) { m_use_own_context_menu = use; }
+
+	//20260803 by claude. 선택된 행을 텍스트로 반환. 컬럼 구분자 기본값이 탭인 것은
+	//엑셀·스프레드시트에 붙여넣을 때 셀이 나뉘는 사실상의 표준이기 때문이다. 선택이 없으면 빈 문자열.
+	CString			get_selected_text(LPCTSTR column_separator = _T("\t"));
+	//위 문자열을 클립보드에 넣는다. Ctrl+C 와 컨텍스트 메뉴 "복사" 가 함께 사용.
+	bool			copy_selected_to_clipboard();
+
 	afx_msg void OnLvnGetdispinfo(NMHDR *pNMHDR, LRESULT *pResult);
 	afx_msg void OnLvnOdfinditem(NMHDR *pNMHDR, LRESULT *pResult);
 	afx_msg void OnLvnOdcachehint(NMHDR *pNMHDR, LRESULT *pResult);

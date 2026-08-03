@@ -2096,7 +2096,9 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_text_selected_inactive = get_color(cr_text, 32);
 			cr_text_dropHilited = Gdiplus::Color::White;
 
-			cr_back = Gdiplus::Color::White;
+			//20260803 by claude. 255 -> 250. 5366b32(07-28)에서 anysupport / helpu 만 250 으로 내려
+			//제품 테마 5 개가 250 셋 · 255 둘로 갈려 있었다. linkmemine 도 250 이므로 여기에 맞춘다.
+			cr_back = gRGB(250, 250, 250);
 			cr_parent_back = cr_back;
 			cr_back_selected = cr_title_back_active;
 			cr_back_selected_inactive = get_color(cr_back_selected, 160);
@@ -2235,7 +2237,9 @@ void CSCColorTheme::set_color_theme(int color_theme)
 			cr_text_selected_inactive = get_color(cr_text, 32);
 			cr_text_dropHilited = Gdiplus::Color::White;
 
-			cr_back = Gdiplus::Color::White;
+			//20260803 by claude. 255 -> 250. 5366b32(07-28)에서 anysupport / helpu 만 250 으로 내려
+			//제품 테마 5 개가 250 셋 · 255 둘로 갈려 있었다. linkmemine 도 250 이므로 여기에 맞춘다.
+			cr_back = gRGB(250, 250, 250);
 			cr_parent_back = cr_back;
 			cr_back_selected = cr_title_back_active;
 			cr_back_selected_inactive = get_color(cr_back_selected, 160);

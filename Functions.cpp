@@ -3161,15 +3161,6 @@ void request_url(CRequestUrlParams* params, bool check_server_reachable)
 {
 	long t0 = clock();
 
-	// 빠른 연결 가능 여부 사전 체크 (2초 내)
-	// is_server_reachable()은 매 요청마다 별도의 TCP 소켓을 열고 닫는 단점이 있다.
-	if (check_server_reachable && !is_server_reachable(params->ip, params->port, 2000))
-	{
-		params->status = ERROR_HOST_UNREACHABLE;
-		params->result = _T("서버에 연결할 수 없습니다.");
-		return;
-	}
-
 	//ip에 http://인지 https://인지가 명시되어 있다면 이는 명확하므로
 	//이를 판단하여 params->is_https값을 재설정한다.
 	//포트번호로 https를 판별하는 것은 한계가 있으므로 ip에 명시하든, params->is_https에 정확히 명시하여 사용한다.
@@ -3190,6 +3181,15 @@ void request_url(CRequestUrlParams* params, bool check_server_reachable)
 		parse_url(params->full_url, params->ip, params->port, params->sub_url, params->is_https);
 	}
 
+	//포트가 0보다 작으면 기본 포트를 사용한다.
+	if (params->port <= 0)
+	{
+		if (params->is_https)
+			params->port = 443;
+		else
+			params->port = 80;
+	}
+
 	//sub_url의 맨 앞에는 반드시 '/'가 붙어있어야 한다.
 	if (params->sub_url[0] != '/')
 		params->sub_url = _T("/") + params->sub_url;
@@ -3197,6 +3197,19 @@ void request_url(CRequestUrlParams* params, bool check_server_reachable)
 	params->full_url.Format(_T("%s%s:%d%s"),
 			(params->is_https ? _T("https://") : _T("http://")),
 			params->ip, params->port, params->sub_url);
+
+	//도달성 검사보다 위 정규화가 먼저 와야 한다.
+	//정규화가 아래에 있던 시절에는 서버가 죽어 있으면 여기서 그냥 return 해버려서
+	//호출자가 params->sub_url / full_url 을 정규화되지 않은 채로 돌려받았다.
+	//또 full_url 만 채워 호출한 경우 파싱 전이라 ip 가 비어 있어 도달성 검사 자체가 무의미했다.
+	// 빠른 연결 가능 여부 사전 체크 (2초 내)
+	// is_server_reachable()은 매 요청마다 별도의 TCP 소켓을 열고 닫는 단점이 있다.
+	if (check_server_reachable && !is_server_reachable(params->ip, params->port, 2000))
+	{
+		params->status = ERROR_HOST_UNREACHABLE;
+		params->result = _T("서버에 연결할 수 없습니다.");
+		return;
+	}
 
 	bool ret;
 	CString str;
@@ -3209,16 +3222,6 @@ void request_url(CRequestUrlParams* params, bool check_server_reachable)
 		params->status = -1;
 		TRACE(_T("result = %s\n"), params->result);
 		return;
-	}
-
-
-	//포트가 0보다 작으면 기본 포트를 사용한다.
-	if (params->port <= 0)
-	{
-		if (params->is_https)
-			params->port = 443;
-		else
-			params->port = 80;
 	}
 
 	if (params->verb.IsEmpty())
@@ -16603,20 +16606,21 @@ CString	get_error_str(DWORD dwError)
 			//for ERROR_INTERNET_TIMEOUT(12002), then use wininet.dll.
 			GetModuleHandle(_T("wininet.dll")),
 			dwError, 0, (LPTSTR)&lpBuffer, 0, NULL);
+
+		result = CString(lpBuffer);
+		LocalFree(lpBuffer);
 	}
 	else
 	{
-		std::string msg = std::system_category().message(dwError);
-		return CString(msg.c_str());
-
-		//FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
-		//	NULL,
-		//	dwError, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), lpBuffer, 0, NULL);
+		result = CString(std::system_category().message(dwError).c_str());
 	}
 
-	result.Format(_T("%s"), CString(lpBuffer));
+	//20260803 by claude. Trim 을 두 분기 뒤 한 곳으로 모았다.
+	//예전에는 system_category 분기가 Trim 전에 early return 해서 그쪽만 끝에 "\r\n" 이 남았다.
+	//FormatMessage 계열 메시지는 끝에 개행이 붙는데, v140_xp 툴셋의 STL(_Winerror_message)은 이를 제거하지 않는다
+	//(VS2019 이후 STL 은 __std_get_string_size_without_trailing_whitespace 로 제거한다 — 툴셋에 따라 동작이 갈린다).
+	//그 결과 에러 코드표를 리스트에 채우면 100 번대부터 항목마다 빈 줄이 하나씩 끼었다(12000 번대는 멀쩡).
 	result.Trim();
-	LocalFree(lpBuffer);
 
 	return result;
 }

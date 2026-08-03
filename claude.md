@@ -812,6 +812,23 @@ exit 0
 
 **Why (2026-07-13 SCColorTable 사고, 2026-07-23 원인 규명):** `SCColorTable.vcxproj.filters` 가 커밋 `d6f7336(2026-07-13 18:01:20)` 에서 깨졌다. 병합 커밋인데 **두 부모(`e416146`, `8d2f313`) 모두 UTF-8 BOM** 이었고 결과만 CP949 + BOM 소실 — git 은 재인코딩을 하지 않으므로, 충돌 해소 과정에서 *무언가가 텍스트로 읽어 ANSI 로 되쓴* 것이 확정적이다. 같은 커밋에서 `SCColorTable.cpp` 도 수정됐지만 멀쩡했는데, 이유는 단 하나 — **`.cpp` 는 훅 확장자 목록에 있었고 `.filters` 는 없었다.** "소스 파일 / 헤더 파일 / 리소스 파일" 세 필터명이 10일간 깨진 채로 방치됐다. 사용자 지적 — *"이따위로 한글 깨뜨린게 한두번이 아닌데."* 훅 확장자는 그 뒤 확장했지만(§2B.2), 애초에 ANSI 로 쓰지 않았으면 발생하지 않았을 사고다.
 
+## 2B.4 사용자에게 건네는 `.ps1` 스크립트 — UTF-8 **BOM 필수** (강제)
+
+§2B.3 은 "파일을 깨뜨리지 말 것"이고, 이건 "**실행 결과 출력이 깨지지 않게 할 것**"이다. 대상이 다르다.
+
+한국어 문구가 든 `.ps1` 을 만들어 사용자에게 실행시킬 때는 **반드시 UTF-8 BOM 으로 저장**한다.
+
+- **이유**: `powershell.exe -File` (Windows PowerShell 5.1) 은 스크립트 파일에 BOM 이 없으면 **시스템 ANSI 코드페이지(ko-KR = CP949)** 로 디코딩한다. UTF-8 로 저장된 한글이 CP949 로 읽혀 `완료` → `?꾨즺` 가 된다. 스크립트 *동작*은 정상이고 **출력 문자열만** 깨지므로, 사용자는 실패한 줄 알고 되묻게 된다.
+- **Write 도구는 BOM 을 붙이지 않는다.** `.ps1` 을 Write 로 만들었으면 그 직후 BOM 을 씌운다:
+  ```powershell
+  $t=[IO.File]::ReadAllText($f,(New-Object Text.UTF8Encoding($false)))
+  [IO.File]::WriteAllText($f,$t,(New-Object Text.UTF8Encoding($true)))
+  ```
+- **`pwsh`(PowerShell 7) 로 도망가지 말 것.** 7 은 BOM 없어도 UTF-8 로 읽지만, 이 머신에는 설치되어 있지 않다(2026-08-03 확인). 사용자가 여는 건 `powershell.exe` 다.
+- 스크립트를 넘기기 전 첫 3바이트가 `EF BB BF` 인지 확인한다.
+
+**Why (2026-08-03):** Orca 의 `--dangerously-skip-permissions` 기본 인자를 제거하는 스크립트를 Write 로 만들어(= BOM 없음) 건넸다. 정상 수행됐는데 성공 메시지가 전부 깨져 나와 사용자가 실패로 오인했다. 사용자 지적 — *"한글이 안깨지게 다음부터는 정확히 제시하라."* 재현 확인: 같은 내용을 BOM 없이/있이 저장해 `powershell -File` 로 실행 → 없으면 `?꾨즺. 諛깆뾽 寃쎈줈`, 있으면 `완료. 백업 경로`.
+
 ## 2E. `PreTranslateMessage` 반환값 — 클래스 역할에 따라 다름
 
 MFC 다이얼로그/컨트롤의 `PreTranslateMessage(MSG* pMsg)` 반환 의미:

@@ -546,6 +546,19 @@ struct	NETWORK_INFO
 	int			get_process_running_count(CString processname);
 	bool		is_running(CString processname);
 
+	//20260806 by claude. pid 프로세스의 전체 명령줄(실행파일 경로 + 인자)을 돌려준다. 실패하면 빈 문자열.
+	//호출자와 대상의 비트폭이 달라도(x64 앱이 WOW64 프로세스를 읽는 경우) 동작한다.
+	//ntdll 의 ProcessCommandLineInformation 을 쓰므로 Windows 8.1 이상에서만 값을 얻는다.
+	CString		get_process_command_line(DWORD pid);
+
+	//20260806 by claude. processname(실행파일명)으로 실행 중인 모든 프로세스의 pid 와 명령줄을 돌려준다.
+	//명령줄로 대상을 고른 뒤 그 프로세스만 종료하려면 pid 가 필요하므로 함께 돌려준다.
+	//명령줄을 읽지 못한 프로세스는 목록에서 빠지므로 개수가 실제 프로세스 수보다 적을 수 있다.
+	std::map<DWORD, CString>	get_process_command_lines(CString processname);
+
+	//20260806 by claude. pid 하나만 종료한다. 같은 이름의 다른 인스턴스는 건드리지 않는다.
+	bool		kill_process_by_pid(DWORD pid);
+
 	//processnames 중 하나라도 audio session이 실제로 active 상태인지 (= 소리 출력 중) 검사.
 	//PotPlayer 같은 미디어 플레이어가 *재생 중* 인지 *일시정지/정지/미디어 없음* 인지 구분할 때 사용.
 	//- 같은 이름의 프로세스가 여러 개면 그 중 하나라도 active 면 true.

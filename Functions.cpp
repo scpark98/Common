@@ -13173,6 +13173,104 @@ bool is_process_audio_active(const std::deque<CString>& processnames)
 	return active;
 }
 
+CString get_process_command_line(DWORD pid)
+{
+	typedef LONG (NTAPI *PFN_NtQueryInformationProcess)(HANDLE, ULONG, PVOID, ULONG, PULONG);
+
+	static PFN_NtQueryInformationProcess pfn_query =
+		(PFN_NtQueryInformationProcess)GetProcAddress(GetModuleHandle(_T("ntdll.dll")), "NtQueryInformationProcess");
+
+	if (pfn_query == NULL)
+		return _T("");
+
+	//PROCESS_QUERY_LIMITED_INFORMATION 이면 충분하다. VM_READ 까지 요구하는 PEB 직접 읽기와 달리
+	//다른 사용자 계정으로 뜬 프로세스도 대부분 열린다.
+	HANDLE process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
+
+	if (process == NULL)
+		return _T("");
+
+	CString command_line;
+
+	//ProcessCommandLineInformation(60) 은 UNICODE_STRING 헤더 + 문자열 본문을 한 버퍼에 담아준다.
+	//PEB 를 직접 읽는 방식과 달리 호출자와 대상의 비트폭이 달라도(x64 -> WOW64) 그대로 동작한다.
+	//winternl.h 를 이 파일 전체에 끌어들이지 않기 위해 필요한 필드만 지역 구조체로 둔다.
+	struct unicode_string
+	{
+		USHORT	length;
+		USHORT	maximum_length;
+		PWSTR	buffer;
+	};
+
+	ULONG size = 0;
+	pfn_query(process, 60, NULL, 0, &size);
+
+	if (size >= sizeof(unicode_string))
+	{
+		std::vector<BYTE> buffer(size);
+
+		if (pfn_query(process, 60, &buffer[0], size, &size) >= 0)
+		{
+			unicode_string* text = (unicode_string*)&buffer[0];
+
+			if (text->buffer != NULL && text->length > 0)
+				command_line = CString(text->buffer, text->length / sizeof(WCHAR));
+		}
+	}
+
+	CloseHandle(process);
+
+	return command_line;
+}
+
+bool kill_process_by_pid(DWORD pid)
+{
+	HANDLE process = OpenProcess(PROCESS_TERMINATE, FALSE, pid);
+
+	if (process == NULL)
+		return false;
+
+	bool result = (TerminateProcess(process, 0) != FALSE);
+	CloseHandle(process);
+
+	return result;
+}
+
+std::map<DWORD, CString> get_process_command_lines(CString processname)
+{
+	std::map<DWORD, CString> command_lines;
+
+	if (processname.IsEmpty())
+		return command_lines;
+
+	HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, NULL);
+
+	if (snapshot == INVALID_HANDLE_VALUE)
+		return command_lines;
+
+	PROCESSENTRY32 pe32 = { 0, };
+	pe32.dwSize = sizeof(PROCESSENTRY32);
+
+	if (Process32First(snapshot, &pe32))
+	{
+		do
+		{
+			if (processname.CompareNoCase(pe32.szExeFile) != 0)
+				continue;
+
+			CString command_line = get_process_command_line(pe32.th32ProcessID);
+
+			if (!command_line.IsEmpty())
+				command_lines[pe32.th32ProcessID] = command_line;
+
+		} while (Process32Next(snapshot, &pe32));
+	}
+
+	CloseHandle(snapshot);
+
+	return command_lines;
+}
+
 //해당 파일이 실행중인 카운트를 리턴하는 함수이며
 //fullpath를 주면 경로까지 동일해야 카운트되도록 기능을 구현했으나
 //권한문제인지 현재 PC에서는 잘 얻어오지만

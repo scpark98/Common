@@ -7298,22 +7298,24 @@ CRect draw_text(ID2D1DeviceContext* d2dc,
 				bool show_text,
 				bool show_shadow)
 {
-	IDWriteFactory*			write_factory = NULL;
-	IDWriteTextFormat*		write_format = NULL;
-	IDWriteTextLayout*		text_layout = NULL;
-	ID2D1SolidColorBrush*	text_brush = NULL;
-	ID2D1SolidColorBrush*	shadow_brush = NULL;
+	//20260807 by claude. 이전에는 raw 포인터로 받아 어느 경로에서도 Release하지 않아
+	//텍스트를 그릴 때마다 factory/format/layout/brush가 그대로 샜다. ComPtr로 바꿔 전 경로에서 해제되게 한다.
+	Microsoft::WRL::ComPtr<IDWriteFactory>			write_factory;
+	Microsoft::WRL::ComPtr<IDWriteTextFormat>		write_format;
+	Microsoft::WRL::ComPtr<IDWriteTextLayout>		text_layout;
+	Microsoft::WRL::ComPtr<ID2D1SolidColorBrush>	text_brush;
+	Microsoft::WRL::ComPtr<ID2D1SolidColorBrush>	shadow_brush;
 	DWRITE_TEXT_METRICS		tm;
 
 	text.Replace(_T("\\n"), _T("\n"));
 	d2dc->CreateSolidColorBrush(get_d2color(cr_text), &text_brush);
 	d2dc->CreateSolidColorBrush(get_d2color(cr_shadow), &shadow_brush);
 
-	HRESULT hr = DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED, __uuidof(IDWriteFactory), reinterpret_cast<IUnknown**>(&write_factory));
+	HRESULT hr = DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED, __uuidof(IDWriteFactory), reinterpret_cast<IUnknown**>(write_factory.GetAddressOf()));
 	write_factory->CreateTextFormat((CStringW)font_name, nullptr, (DWRITE_FONT_WEIGHT)font_weight, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, font_size, CStringW("ko-kr"), &write_format);
 
 	//CDC와는 다르게 뭔가 갱신할 때 write_format 생성이 실패할때가 있다.
-	if (write_format == NULL)
+	if (!write_format)
 		return CRect();
 
 	//align 설정 함수를 사용하지 않고 직접 출력 위치를 계산하기 위해 아래 코드 스킵.
@@ -7330,9 +7332,9 @@ CRect draw_text(ID2D1DeviceContext* d2dc,
 	//);
 
 	float line_spacing = 1.5f;
-	write_factory->CreateTextLayout((CStringW)text, text.GetLength(), write_format, rTarget.right - rTarget.left, rTarget.bottom - rTarget.top, &text_layout);
+	write_factory->CreateTextLayout((CStringW)text, text.GetLength(), write_format.Get(), rTarget.right - rTarget.left, rTarget.bottom - rTarget.top, &text_layout);
 
-	if (text_layout == nullptr)
+	if (!text_layout)
 		return CRect();
 
 	if (text_layout)
@@ -7383,10 +7385,10 @@ CRect draw_text(ID2D1DeviceContext* d2dc,
 
 	if (cr_back.GetA() > 0)
 	{
-		ID2D1SolidColorBrush* back_brush = NULL;
+		Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> back_brush;
 		d2dc->CreateSolidColorBrush(get_d2color(cr_back), &back_brush);
 		if (back_brush)
-			d2dc->FillRectangle(D2D1::RectF(x, y, x + tm.widthIncludingTrailingWhitespace, y + tm.height), back_brush);
+			d2dc->FillRectangle(D2D1::RectF(x, y, x + tm.widthIncludingTrailingWhitespace, y + tm.height), back_brush.Get());
 	}
 
 	if (show_shadow)
@@ -7416,7 +7418,7 @@ CRect draw_text(ID2D1DeviceContext* d2dc,
 		//textRenderTarget->DrawTextLayout(D2D1::Point2F(x, y - (lines[0].height - lines[0].baseline) * 0.5f), text_layout, shadow_brush);
 		//따라서 이를 텍스트 크기만큼의 로컬 렌더 타겟을 생성하고 원점 기준으로 그리기 방식으로 변경하고
 		//위에서는 CreateCompatibleRenderTarget()에서 그 크기를 윈도우 크기가 아닌 텍스트 크기로 생성함.
-		textRenderTarget->DrawTextLayout(D2D1::Point2F(padding, localY), text_layout, shadow_brush);
+		textRenderTarget->DrawTextLayout(D2D1::Point2F(padding, localY), text_layout.Get(), shadow_brush.Get());
 		textRenderTarget->EndDraw();
 		textRenderTarget->GetBitmap(&textBitmap);
 
@@ -7439,7 +7441,7 @@ CRect draw_text(ID2D1DeviceContext* d2dc,
 	//진짜 glyph outline 보다 가벼우면서 thin stroke (1~2px) 에서 시각적으로 동등.
 	if (stroke_width > 0.0f && cr_stroke.GetA() > 0)
 	{
-		ID2D1SolidColorBrush* stroke_brush = NULL;
+		Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> stroke_brush;
 		d2dc->CreateSolidColorBrush(get_d2color(cr_stroke), &stroke_brush);
 		if (stroke_brush)
 		{
@@ -7451,13 +7453,13 @@ CRect draw_text(ID2D1DeviceContext* d2dc,
 				{
 					if (dx == 0 && dy == 0)
 						continue;
-					d2dc->DrawTextLayout(D2D1::Point2F(tx + dx, ty + dy), text_layout, stroke_brush);
+					d2dc->DrawTextLayout(D2D1::Point2F(tx + dx, ty + dy), text_layout.Get(), stroke_brush.Get());
 				}
 		}
 	}
 
 	if (show_text)
-		d2dc->DrawTextLayout(D2D1::Point2F(x - 1, y - (lines[0].height - lines[0].baseline) * 0.5f - 1), text_layout, text_brush);
+		d2dc->DrawTextLayout(D2D1::Point2F(x - 1, y - (lines[0].height - lines[0].baseline) * 0.5f - 1), text_layout.Get(), text_brush.Get());
 
 	return text_rect;
 }
@@ -7630,7 +7632,7 @@ void draw_rect(ID2D1DeviceContext* d2dc, Gdiplus::RectF r, Gdiplus::Color cr_str
 }
 
 //lt, rt, lb, rb 의 round를 각각 줄 수 있는데 lt이외의 값들 중 그 값이 음수이면 lt와 동일한 값으로 그려진다.
-ID2D1PathGeometry* draw_rect(ID2D1DeviceContext* d2dc, D2D1_RECT_F r, Gdiplus::Color cr_stroke, Gdiplus::Color cr_fill, float thick, float round_lt, float round_rt, float round_lb, float round_rb)
+void draw_rect(ID2D1DeviceContext* d2dc, D2D1_RECT_F r, Gdiplus::Color cr_stroke, Gdiplus::Color cr_fill, float thick, float round_lt, float round_rt, float round_lb, float round_rb)
 {
 	ID2D1SolidColorBrush* br_stroke;
 	ID2D1SolidColorBrush* br_fill;
@@ -7688,7 +7690,11 @@ ID2D1PathGeometry* draw_rect(ID2D1DeviceContext* d2dc, D2D1_RECT_F r, Gdiplus::C
 
 	d2dc->DrawGeometry(rr, br_stroke, thick);
 
-	return rr;
+	//20260807 by claude. 이전에는 rr을 반환하고 브러시도 해제하지 않아 호출 1회당 COM 객체 3개가 샜다.
+	//반환값을 쓰는 호출처가 없어 void로 바꾸고 여기서 모두 해제한다.
+	rr->Release();
+	br_fill->Release();
+	br_stroke->Release();
 }
 
 ID2D1PathGeometry* create_round_path(ID2D1DeviceContext* d2dc, float left, float top, float right, float bottom, float lt, float rt, float lb, float rb)
@@ -7760,6 +7766,9 @@ ID2D1PathGeometry* create_round_path(ID2D1DeviceContext* d2dc, float left, float
 	sink->EndFigure(D2D1_FIGURE_END::D2D1_FIGURE_END_CLOSED);
 	sink->Close();
 	sink->Release();
+
+	//20260807 by claude. GetFactory()가 AddRef하므로 해제해야 한다.
+	factory->Release();
 
 	return path;
 }

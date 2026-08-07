@@ -157,6 +157,12 @@ BOOL CSCThemeDlg::OnInitDialog()
 	if (m_auto_client_layout)
 		apply_client_titlebar_layout(rc_template_client);
 
+	//20260807 by claude. 툴팁은 base 가 소유·생성하고 PreTranslateMessage 에서 relay 까지 책임진다.
+	//파생 dlg 는 OnInitDialog 에서 m_tooltip.AddTool(...) 로 내용만 등록하면 된다.
+	//TTS_ALWAYSTIP — 창이 비활성 상태여도 툴팁이 뜬다. relay 와 짝을 이뤄 disabled 컨트롤에서도 표시된다.
+	m_tooltip.Create(this, TTS_ALWAYSTIP);
+	m_tooltip.Activate(TRUE);
+
 	set_color_theme(CSCColorTheme::color_theme_default);
 	//init_shadow();
 
@@ -547,6 +553,7 @@ void CSCThemeDlg::set_color_theme(int theme, bool invalidate)
 	//int 인덱스로 부모 m_theme 를 채운 직후 — 자식 sys_buttons 에도 객체 전체를 전달해야
 	//cr_title_back_active 등 sys_buttons 가 참조하는 모든 필드가 일관되게 반영된다.
 	m_sys_buttons.set_color_theme(m_theme, invalidate);
+	m_tooltip.set_color_theme(m_theme);
 
 	//m_theme.set_color_theme(theme);에서는 cr_text, cr_back 등 일반적인 색상값들을 세팅한다.
 	//CSCThemeDlg::set_color_theme(int theme) 에서는 m_sys_buttons 등
@@ -655,6 +662,7 @@ void CSCThemeDlg::set_color_theme(const CSCColorTheme& theme, bool invalidate)
 {
 	m_theme.copy_colors_from(theme);
 	m_sys_buttons.set_color_theme(m_theme, invalidate);
+	m_tooltip.set_color_theme(m_theme);
 
 	if (m_hWnd)
 	{
@@ -732,6 +740,12 @@ BOOL CSCThemeDlg::PreTranslateMessage(MSG* pMsg)
 	{
 		TRACE(_T("keydown on CSCThemeDlg\n"));
 	}
+
+	//20260807 by claude. disabled 컨트롤은 마우스 메시지를 dispatch 받지 못하므로 컨트롤 쪽에서 relay 할 방법이 없다.
+	//dispatch 이전인 여기서 relay 해야만 disabled 상태에서도 툴팁이 뜬다.
+	//파생 dlg 가 PreTranslateMessage 를 override 하면 반드시 CSCThemeDlg::PreTranslateMessage(pMsg) 로
+	//체인해야 이 relay 가 살아있다 (파일 상단 주석의 base 호출 규칙과 동일).
+	m_tooltip.relay_message(pMsg);
 
 	return CDialogEx::PreTranslateMessage(pMsg);
 }

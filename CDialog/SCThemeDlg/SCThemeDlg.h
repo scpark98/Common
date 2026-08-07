@@ -45,6 +45,7 @@
 
 #include "../../SCGdiplusBitmap.h"
 #include "../../CButton/SCSystemButtons/SCSystemButtons.h"
+#include "../../CToolTipCtrl/CSCToolTipCtrl/SCToolTipCtrl.h"
 //#include "../../CWnd/WndShadow/WndShadow.h"
 
 // CSCThemeDlg 대화 상자
@@ -238,6 +239,12 @@ protected:
 	Gdiplus::Color		m_cr_out_of_back_img;		//배경 이미지를 zoom or origin크기로 그릴 경우 남은 영역의 색 채우기
 
 	CSCSystemButtons	m_sys_buttons;
+
+	//20260807 by claude. 파생 dlg 가 공짜로 쓰는 툴팁. base 가 OnInitDialog 에서 Create 하고 PreTranslateMessage 에서 relay 하며
+	//set_color_theme 로 테마까지 동기화한다. 파생은 OnInitDialog 에서 내용만 등록하면 된다.
+	//	m_tooltip.AddTool(&m_edit, _T("<b>제목</b><br>설명"));
+	//disabled 컨트롤 위에서도 뜬다 (relay 가 dispatch 이전 단계에서 처리하므로).
+	CSCToolTipCtrl		m_tooltip;
 
 	//IDD 리소스를 사용하지 않고 동적 생성할 경우 직접 create한다.
 	//CWnd*				m_parent = NULL;

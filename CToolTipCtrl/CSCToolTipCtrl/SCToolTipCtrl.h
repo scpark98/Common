@@ -53,6 +53,22 @@ public:
 	//모서리 둥글기(px). 0 이면 사각.
 	void			set_round(int radius);
 
+	//줄 간격 배수. 1.0 이면 폰트 기본 간격, 2.0 이면 두 배.
+	void			set_line_spacing(float spacing);
+
+	//20260807 by claude. dlg 의 PreTranslateMessage 에서 매 메시지를 그대로 넘겨준다.
+	//disabled 컨트롤은 마우스 메시지를 아예 dispatch 받지 못하므로, 컨트롤 쪽에서 relay 해봐야 소용없다.
+	//dispatch 이전인 top-level dlg 의 PreTranslateMessage 에서 relay 해야만 disabled 상태에서도 툴팁이 뜬다.
+	//Create 전(m_hWnd == NULL)이면 아무 일도 하지 않으므로 호출측에서 따로 가드하지 않아도 된다.
+	//CSCThemeDlg 파생 dlg 는 base 가 이미 호출하므로 직접 부를 필요 없다.
+	void			relay_message(MSG* pMsg);
+
+	//글자 렌더 품질을 run 단위로 자동 결정할지 여부. CSCStatic 과 같은 기준을 쓴다.
+	//on  : 크기 < 폰트별 임계 → ClearTypeGridFit(작은 글자 또렷), 크기 >= 임계 → AntiAliasGridFit(큰 글자 매끈)
+	//off : ClearTypeGridFit 로 고정
+	//AA_from_pt 는 폰트별 임계를 구하지 못했을 때 쓰는 fallback(pt).
+	void			set_auto_font_quality(bool on, int AA_from_pt = 14);
+
 protected:
 	//툴팁 창이 뜨기 직전. 여기서 크기를 확정하지 않으면 시스템이 계산한(태그를 포함한 원문 기준)
 	//엉뚱한 크기로 뜬다.
@@ -79,6 +95,12 @@ protected:
 	int				m_padding_cy = 6;
 	int				m_max_width = 420;
 	int				m_round = 4;
+	//CSCStatic 의 m_line_spacing 과 같은 기본값 — 같은 태그 문자열이 같은 모양으로 나오게 한다.
+	float			m_line_spacing = 1.2f;
+
+	//기본값은 CSCStatic 과 동일 (m_auto_font_quality = true, m_AA_from_pt = 14).
+	bool			m_auto_font_quality = true;
+	int				m_AA_from_pt = 14;
 
 	//on_show 에서 계산한 크기를 on_custom_draw 가 다시 쓰기 위해 보관한다.
 	CSize			m_sz_content;

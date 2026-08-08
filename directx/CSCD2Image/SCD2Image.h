@@ -113,6 +113,13 @@ public:
 	HRESULT					create(IWICImagingFactory2* WICfactory, ID2D1DeviceContext* d2context, int width, int height);
 	void					release();
 
+	//20260808 by claude. 동영상 프레임처럼 *같은 크기의 BGRA 데이터를 매 프레임 덮어쓰는* 용도.
+	//create_stream() 으로 비트맵을 1회만 만들고, 이후 update_from_raw() 로 픽셀만 교체한다.
+	//load()/add_frame_from_raw() 는 호출마다 WIC 변환 + 비트맵 생성을 하므로 초당 수십 회 호출에 쓰면 안 된다.
+	//data 는 32bpp BGRA, stride 는 바이트 단위 행 간격(보통 width*4).
+	HRESULT					create_stream(ID2D1DeviceContext* d2context, int width, int height);
+	HRESULT					update_from_raw(const void* data, int stride);
+
 	//load external image
 	//first_frame_only=true 면 gif/webp 등 다중 프레임도 0번 프레임만 디코딩(애니메이션 디코딩 비용 회피).
 	HRESULT					load(IWICImagingFactory2* WICfactory, ID2D1DeviceContext* d2context, CString path, bool auto_play = true, bool first_frame_only = false);

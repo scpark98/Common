@@ -151,6 +151,46 @@ HRESULT CSCD2Image::create(IWICImagingFactory2* WICfactory, ID2D1DeviceContext* 
 	return hr;
 }
 
+HRESULT CSCD2Image::create_stream(ID2D1DeviceContext* d2context, int width, int height)
+{
+	if (!d2context || width <= 0 || height <= 0)
+		return E_INVALIDARG;
+
+	m_d2dc = d2context;
+
+	//D2D1_BITMAP_OPTIONS_TARGET 을 주지 않는다. 렌더타깃 비트맵은 D3D 렌더타깃이라
+	//CopyFromMemory 경로가 느리다. 스트리밍은 셰이더 읽기 전용 텍스처가 맞다.
+	//동영상은 알파가 없으므로 IGNORE — PREMULTIPLIED 는 알파 사전곱 제약만 늘린다.
+	D2D1_BITMAP_PROPERTIES1 properties =
+		D2D1::BitmapProperties1(D2D1_BITMAP_OPTIONS_NONE,
+			D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_IGNORE));
+
+	ComPtr<ID2D1Bitmap1> img;
+	HRESULT hr = d2context->CreateBitmap(D2D1::SizeU(width, height), nullptr, 0, properties, img.GetAddressOf());
+
+	if (FAILED(hr))
+		return hr;
+
+	m_img.clear();
+	m_frame_delay.clear();
+	m_img.push_back(img);
+	m_frame_index = 0;
+	m_channel = 4;
+
+	return S_OK;
+}
+
+HRESULT CSCD2Image::update_from_raw(const void* data, int stride)
+{
+	if (!data || stride <= 0 || m_img.empty() || m_img[0] == nullptr)
+		return E_INVALIDARG;
+
+	D2D1_SIZE_U size = m_img[0]->GetPixelSize();
+	D2D1_RECT_U rect = D2D1::RectU(0, 0, size.width, size.height);
+
+	return m_img[0]->CopyFromMemory(&rect, data, (UINT32)stride);
+}
+
 HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d2context, UINT resource_id, CString type, bool auto_play)
 {
 	while (!stop())

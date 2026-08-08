@@ -5767,7 +5767,7 @@ BOOL CVtListCtrlEx::OnLvnItemchanged(NMHDR* pNMHDR, LRESULT* pResult)
 	if (pNMListView->uNewState & LVIS_SELECTED)
 		set_auto_scroll(false);
 
-	//trace(pNMListView->iItem);
+	//sctrace(pNMListView->iItem);
 
 	if (pNMListView->iItem < 0)
 		return FALSE;

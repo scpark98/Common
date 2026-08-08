@@ -15807,7 +15807,7 @@ CRect get_window_real_rect(CWnd* pWnd)
 		rw = rcFrame;
 	}
 
-	//trace(rw);
+	//sctrace(rw);
 	return rw;
 }
 

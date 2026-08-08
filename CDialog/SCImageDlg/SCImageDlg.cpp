@@ -1222,7 +1222,7 @@ void CSCImageDlg::thread_ani()
 		if (!m_run_thread_animation)
 			break;
 
-		trace(m_frame_index);
+		sctrace(m_frame_index);
 		m_slider_gif.set_pos(m_frame_index + 1);
 
 		m_frame_index++;

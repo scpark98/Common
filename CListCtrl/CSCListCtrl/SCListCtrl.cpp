@@ -6512,7 +6512,7 @@ BOOL CSCListCtrl::OnLvnItemchanged(NMHDR* pNMHDR, LRESULT* pResult)
 	//(더블버퍼 OnPaint 라 다중 SetItemState 로 여러 번 호출돼도 WM_PAINT 는 1회로 합쳐져 깜빡임 없음.)
 	Invalidate(FALSE);
 
-	//trace(pNMListView->iItem);
+	//sctrace(pNMListView->iItem);
 
 	if (pNMListView->iItem < 0)
 		return FALSE;

@@ -193,9 +193,9 @@ template<typename T> void trace_impl(const TCHAR* func, int line, const TCHAR* v
 	TRACE(_T("%s\n"), oss.str().c_str());
 }
 
-//trace(n);으로 호출하면 "n = %d\n"를 출력한다. 타입에 따라 %d, %f, %s 등이 자동으로 결정된다.
+//sctrace(n);으로 호출하면 "n = %d\n"를 출력한다. 타입에 따라 %d, %f, %s 등이 자동으로 결정된다.
 //정수, 실수, 문자열, CPoint, CRect를 지원하며 그 외 타입은 << 연산자를 오버로딩해서 지원할 수 있다.
-#define trace(n) trace_impl(__function__, __LINE__, _T(#n), n)
+#define sctrace(n) trace_impl(__function__, __LINE__, _T(#n), n)
 
 #ifdef __GNUG__
 #include <cxxabi.h>
@@ -484,8 +484,8 @@ extern		int			g_nBaudRate[MAX_BAUD_RATE];
 void printf_string(const char* psz, ...);
 void trace_output(bool only_text, TCHAR* func, int line, bool linefeed, LPCTSTR format, ...);
 
-//trace(m_input);을 호출하면 TRACE(_T("m_input = %d\n"));과 같이 동작한다.
-//template <typename T> void trace(T args)
+//sctrace(m_input);을 호출하면 TRACE(_T("m_input = %d\n"));과 같이 동작한다.
+//template <typename T> void sctrace(T args)
 //{
 //	CString name;
 //	//= VAR_TO_CSTRING(args);

@@ -731,7 +731,7 @@ void CSCThumbCtrl::set_scroll_pos(int pos)
 		pos = 0;
 
 	m_scroll_pos = pos;
-	//trace(m_scroll_pos);
+	//sctrace(m_scroll_pos);
 	//TRACE(_T("current = %d / %d\n"), m_scroll_pos, m_scroll_total);
 	m_scrollbar_trans = 0.0;
 	recalc_tile_rect();
@@ -755,7 +755,7 @@ void CSCThumbCtrl::scroll_up(bool up, int offset)
 
 	int pos = m_scroll_pos;
 
-	//trace(offset);
+	//sctrace(offset);
 	if (offset == 0)
 		pos += (up ? 1 : -1) * (m_sz_tile.cy + m_sz_gap.cy) / 4.0;
 	else

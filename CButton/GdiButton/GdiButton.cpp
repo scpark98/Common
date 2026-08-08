@@ -1177,7 +1177,7 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 	if (text == _T("add new"))
 	{
 		text = text;
-		trace(is_down);
+		sctrace(is_down);
 	}
 
 	//if (is_button_style(BS_CHECKBOX, BS_AUTOCHECKBOX, BS_RADIOBUTTON, BS_AUTORADIOBUTTON))

@@ -32,7 +32,7 @@ CSCFigure::CSCFigure()
 	json.add_member(shadow_offset_x);
 	json.add_member(shadow_offset_y);
 	//json.add_member(cr_stroke);// , stroke_alpha, stroke_width, cr_shadow, shadow_sigma, shadow_offset_x, shadow_offset_y);
-	trace(json.get_json_string());
+	sctrace(json.get_json_string());
 	//printf("%s\n", json.get_json_string());
 	int a = json.doc["type"].GetInt();
 	//std::string res = json.to_json(type, r, round, cr_fill, cr_stroke, stroke_alpha, stroke_width, cr_shadow, shadow_sigma, shadow_offset_x, shadow_offset_y);

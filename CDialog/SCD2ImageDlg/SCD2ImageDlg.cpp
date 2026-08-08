@@ -961,9 +961,9 @@ void CSCD2ImageDlg::OnLButtonUp(UINT nFlags, CPoint point)
 		{
 			//임시 변수로 옮긴 후 정수 좌표 보정을 시킨다.
 			Gdiplus::RectF img_roi;
-			//trace(m_screen_roi);
+			//sctrace(m_screen_roi);
 			get_real_coord_from_screen_coord(m_r_display, m_images[0].get_width(), m_screen_roi, &img_roi);
-			//trace(img_roi);
+			//sctrace(img_roi);
 			img_roi.X = ROUND(img_roi.X, 0);
 			img_roi.Y = ROUND(img_roi.Y, 0);
 			img_roi.Width = ROUND(img_roi.Width, 0);
@@ -971,7 +971,7 @@ void CSCD2ImageDlg::OnLButtonUp(UINT nFlags, CPoint point)
 			get_screen_coord_from_real_coord(m_r_display, m_images[0].get_width(), img_roi, &m_screen_roi);
 			get_real_coord_from_screen_coord(m_r_display, m_images[0].get_width(), m_screen_roi, &m_image_roi);
 			write_profile_value(_T("setting\\CSCD2ImageDlg"), _T("image roi"), m_image_roi);
-			//trace(m_screen_roi);
+			//sctrace(m_screen_roi);
 			rerender();
 		}
 	}
@@ -1015,7 +1015,7 @@ void CSCD2ImageDlg::OnMouseMove(UINT nFlags, CPoint point)
 			img_roi.Width = ROUND(img_roi.Width, 0);
 			img_roi.Height = ROUND(img_roi.Height, 0);
 			get_screen_coord_from_real_coord(m_r_display, m_images[0].get_width(), img_roi, &m_screen_roi);
-			trace(m_screen_roi);
+			sctrace(m_screen_roi);
 			//Ctrl키를 눌러서 roi가 그려지는 동안에는 이미지 확대/축소에 무관하게
 			//마우스 위치가 그대로 그려져야 한다.
 			//InvalidateRect(GpRectF2CRect(m_screen_roi));
@@ -1032,7 +1032,7 @@ void CSCD2ImageDlg::OnMouseMove(UINT nFlags, CPoint point)
 					//m_screen_roi.Y = point.y - m_screen_roi.Height / 2;
 					m_screen_roi.X += (point.x - m_pt_lbuttondown.x);
 					m_screen_roi.Y += (point.y - m_pt_lbuttondown.y);
-					//trace(m_screen_roi);
+					//sctrace(m_screen_roi);
 					adjust_rect_range(m_screen_roi, CRect_to_gpRectF(m_r_display));
 					break;
 				case corner_left :
@@ -1068,16 +1068,16 @@ void CSCD2ImageDlg::OnMouseMove(UINT nFlags, CPoint point)
 			m_pt_lbuttondown = point;
 
 			//Gdiplus::RectF img_roi;
-			//trace(m_screen_roi);
+			//sctrace(m_screen_roi);
 			get_real_coord_from_screen_coord(m_r_display, m_images[0].get_width(), m_screen_roi, &m_image_roi);
-			//trace(m_image_roi);
+			//sctrace(m_image_roi);
 			//Gdiplus::Rect에서는 x를 바꿔도 width는 바뀌지 않는다.
 			m_image_roi.X = ROUND(m_image_roi.X, 0);
 			m_image_roi.Y = ROUND(m_image_roi.Y, 0);
 			m_image_roi.Width = ROUND(m_image_roi.Width, 0);
 			m_image_roi.Height = ROUND(m_image_roi.Height, 0);
 			get_screen_coord_from_real_coord(m_r_display, m_images[0].get_width(), m_image_roi, &m_screen_roi);
-			//trace(m_screen_roi);
+			//sctrace(m_screen_roi);
 			rerender();
 		}
 		//이미지 이동을 위한 단순 드래그인 경우
@@ -1937,7 +1937,7 @@ void CSCD2ImageDlg::OnMouseHWheel(UINT nFlags, short zDelta, CPoint pt)
 	// 이 기능을 사용하려면 Windows Vista 이상이 있어야 합니다.
 	// _WIN32_WINNT 기호는 0x0600보다 크거나 같아야 합니다.
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
-	//trace(zDelta);
+	//sctrace(zDelta);
 	CDialog::OnMouseHWheel(nFlags, zDelta, pt);
 }
 

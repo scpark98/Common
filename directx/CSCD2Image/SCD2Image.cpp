@@ -1126,7 +1126,7 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 					if (SUCCEEDED(hr))
 					{
 						disposal = propValue.bVal;
-						//trace(disposal);
+						//sctrace(disposal);
 					}
 					PropVariantClear(&propValue);
 				}
@@ -1146,7 +1146,7 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 							if (SUCCEEDED(hr) && propValue.uiVal < actualColors)
 							{
 								transparentIndex = static_cast<int>(propValue.uiVal);
-								//trace(transparentIndex);
+								//sctrace(transparentIndex);
 							}
 						}
 					}

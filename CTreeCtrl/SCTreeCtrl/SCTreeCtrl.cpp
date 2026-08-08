@@ -589,7 +589,7 @@ void CSCTreeCtrl::OnPaint()
 
 		long t1 = getClock();
 		tTotal += (t1 - t0);
-		//trace(_T("%ld : %s\n"), t1 - t0, m_folder_list[i].folder);
+		//sctrace(_T("%ld : %s\n"), t1 - t0, m_folder_list[i].folder);
 	}
 #endif
 
@@ -1788,7 +1788,7 @@ std::deque<CSCTreeCtrlFolder> CSCTreeCtrl::iterate_tree_with_no_recursion(HTREEI
 
 		for (int i = 0; i < folders.size(); i++)
 		{
-			//trace(_T("%s\n"), folders[i]);
+			//sctrace(_T("%s\n"), folders[i]);
 
 			//"C:\\" => "로컬 디스크 (C:)"로 변경해준다.
 			if (folders[i].fullpath.Right(2) == _T(":\\"))

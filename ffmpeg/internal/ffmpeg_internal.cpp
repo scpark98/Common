@@ -6,7 +6,13 @@
 
 #include "ffmpeg_internal.h"
 #include "ffi_decoder.h"
+
+//20260808 by claude. filter_test / graph_test 는 DirectShow 소스 필터(CFFiSource)를 쓰는 진단용 함수라
+//ffi_source_filter.cpp + strmiids.lib 를 함께 링크해야 한다. DirectShow 없이 CDecoder 만 쓰는
+//프로젝트는 FFI_NO_DSHOW 를 정의해 이 둘을 제외한다. 정의하지 않으면 기존과 완전히 동일.
+#ifndef FFI_NO_DSHOW
 #include "ffi_source_filter.h"
+#endif
 
 #include "../../Functions.h"
 #include "../../log/SCLog/SCLog.h"	 //logWrite
@@ -392,6 +398,7 @@ namespace ffi
 		return 0;
 	}
 
+#ifndef FFI_NO_DSHOW
 	int filter_test(const wchar_t* utf16_path)
 	{
 		//CSource 는 COM (CUnknown 파생) — worker thread 에서 사용 시 COM init 필요.
@@ -563,4 +570,5 @@ namespace ffi
 		if (SUCCEEDED(hr_coinit)) CoUninitialize();
 		return 0;
 	}
+#endif //FFI_NO_DSHOW
 }

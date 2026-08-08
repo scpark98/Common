@@ -80,6 +80,17 @@ public:
 	//비동기 seek. UI 스레드를 막지 않는다. 직전 프레임과 검출 결과는 무효가 되므로 호출측이 정리한다.
 	void			seek(double pos_ms);
 
+	//현재 위치 기준 상대 이동. 0 ~ duration 범위로 clamp 한다.
+	void			seek_relative(double delta_ms);
+
+	//방향키 탐색 폭(ms). 좌우 방향키 = step, Ctrl + 좌우 = step_large.
+	void			set_seek_step(double step_ms, double step_large_ms) { m_seek_step_ms = step_ms; m_seek_step_large_ms = step_large_ms; }
+
+	//재생 제어 키를 처리한다. ← → = 탐색, Ctrl 조합 = 큰 폭, Space = 재생/일시정지.
+	//부모 다이얼로그가 방향키·스페이스를 먼저 가져가므로, 부모의 PreTranslateMessage
+	//에서 이 함수로 넘겨주면 된다. 처리하면 true.
+	bool			handle_key(UINT key);
+
 	void			play();
 	void			pause();
 	void			toggle_play();
@@ -125,6 +136,8 @@ protected:
 	afx_msg BOOL	OnEraseBkgnd(CDC* pDC);
 	afx_msg void	OnDestroy();
 	afx_msg void	OnLButtonDblClk(UINT nFlags, CPoint point);
+	afx_msg void	OnLButtonDown(UINT nFlags, CPoint point);
+	virtual BOOL	PreTranslateMessage(MSG* pMsg);
 	afx_msg LRESULT on_message_CSCVideoWndD2(WPARAM wParam, LPARAM lParam);
 	DECLARE_MESSAGE_MAP()
 
@@ -163,6 +176,13 @@ private:
 	std::atomic<bool>		m_thread_stop{ true };
 	std::atomic<bool>		m_playing{ false };
 	std::atomic<bool>		m_repeat{ true };
+
+	//일시정지 상태에서도 프레임 한 장은 그려야 하는 경우(탐색 직후) 세운다.
+	//실제로 한 장을 표시할 때까지 유지된다 — seek 후 디코더 큐가 찰 때까지 몇 틱 걸린다.
+	std::atomic<bool>		m_render_one{ false };
+
+	double					m_seek_step_ms = 5000.0;
+	double					m_seek_step_large_ms = 30000.0;
 
 	//UI 스레드가 밀릴 때 렌더 메시지가 큐에 쌓이지 않도록 하는 게이트.
 	std::atomic<bool>		m_render_pending{ false };

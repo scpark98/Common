@@ -13,6 +13,7 @@ BEGIN_MESSAGE_MAP(CSCVideoWndD2, CWnd)
 	ON_WM_ERASEBKGND()
 	ON_WM_DESTROY()
 	ON_WM_LBUTTONDBLCLK()
+	ON_WM_LBUTTONDOWN()
 	ON_MESSAGE(Message_CSCVideoWndD2, &CSCVideoWndD2::on_message_CSCVideoWndD2)
 END_MESSAGE_MAP()
 
@@ -149,11 +150,71 @@ void CSCVideoWndD2::seek(double pos_ms)
 
 	m_decoder->seek(pos_ms);
 	m_position_ms = pos_ms;
+
+	//일시정지 중이어도 이동한 위치의 화면은 바로 보여야 한다.
+	m_render_one = true;
+}
+
+void CSCVideoWndD2::seek_relative(double delta_ms)
+{
+	if (m_decoder == nullptr)
+		return;
+
+	double pos = m_position_ms.load() + delta_ms;
+
+	if (pos < 0.0)
+		pos = 0.0;
+
+	//끝에 정확히 붙으면 EOF 로 빠져 반복 재생이 즉시 돌아버린다. 조금 앞으로.
+	if (m_duration_ms > 0.0 && pos > m_duration_ms - 200.0)
+		pos = m_duration_ms - 200.0;
+
+	seek(pos);
+}
+
+bool CSCVideoWndD2::handle_key(UINT key)
+{
+	if (m_decoder == nullptr)
+		return false;
+
+	if (key == VK_SPACE)
+	{
+		toggle_play();
+		return true;
+	}
+
+	if (key != VK_LEFT && key != VK_RIGHT)
+		return false;
+
+	//Ctrl 조합이면 큰 폭으로.
+	double step = (GetKeyState(VK_CONTROL) & 0x8000) ? m_seek_step_large_ms : m_seek_step_ms;
+
+	seek_relative((key == VK_LEFT) ? -step : step);
+
+	return true;
+}
+
+BOOL CSCVideoWndD2::PreTranslateMessage(MSG* pMsg)
+{
+	//이 창이 포커스를 가진 경우의 경로. 부모 다이얼로그가 방향키를 먼저 가져가는
+	//경우를 대비해 handle_key() 를 public 으로 열어두었다.
+	if (pMsg->message == WM_KEYDOWN && handle_key((UINT)pMsg->wParam))
+		return TRUE;
+
+	return CWnd::PreTranslateMessage(pMsg);
 }
 
 void CSCVideoWndD2::toggle_play()
 {
 	m_playing = !m_playing.load();
+}
+
+void CSCVideoWndD2::OnLButtonDown(UINT nFlags, CPoint point)
+{
+	//클릭하면 포커스를 가져와 이후 방향키가 이 창으로 온다.
+	SetFocus();
+
+	CWnd::OnLButtonDown(nFlags, point);
 }
 
 void CSCVideoWndD2::OnLButtonDblClk(UINT nFlags, CPoint point)
@@ -305,7 +366,10 @@ void CSCVideoWndD2::pacer_thread_proc()
 		if (m_thread_stop)
 			break;
 
-		if (!m_playing)
+		//일시정지 중이라도 탐색 직후 한 장은 그려야 한다.
+		bool render_one = m_render_one.load();
+
+		if (!m_playing && !render_one)
 			continue;
 
 		AVFrame* frame = m_decoder ? m_decoder->pop_video_frame() : nullptr;
@@ -330,6 +394,11 @@ void CSCVideoWndD2::pacer_thread_proc()
 
 		m_bgra_dirty = true;
 		m_frame_count++;
+
+		//한 장을 실제로 표시했으니 해제한다. seek 후 큐가 빌 동안은 위에서 continue 되어
+		//플래그가 유지되므로, 프레임이 준비되는 즉시 정확히 한 장만 그려진다.
+		if (render_one)
+			m_render_one = false;
 
 		if (++fps_count >= 30)
 		{

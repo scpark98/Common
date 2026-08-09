@@ -19,6 +19,9 @@
 *   m_video.set_overlay_callback([this](ID2D1DeviceContext* d2dc, const D2D1_RECT_F& r) { ... });
 *   m_video.open(_T("d:\\sample.mp4"));
 *
+*   //정지 이미지도 프레임 1장짜리 영상으로 같은 경로에 태운다.
+*   m_video.open_image(cv::imread("d:\\sample.jpg"));
+*
 *   //검출 등 프레임이 필요한 작업은 별도 스레드에서
 *   cv::Mat bgra;
 *   if (m_video.get_frame(bgra)) { ... }
@@ -74,8 +77,17 @@ public:
 
 	//start_ms > 0 이면 그 위치부터 재생을 시작한다.
 	bool			open(CString path, double start_ms = 0.0);
+
+	//20260809 by claude. 정지 이미지 한 장을 "프레임 1장짜리 영상" 으로 연다. 디코더도
+	//pacer 스레드도 만들지 않을 뿐, 표시·확대축소·오버레이 좌표계·더블클릭 처리는
+	//동영상과 완전히 같은 경로를 탄다. BGR(3ch) / BGRA(4ch) / 그레이(1ch) 모두 받는다.
+	bool			open_image(const cv::Mat &image);
+
 	void			close();
-	bool			is_opened() const { return m_decoder != nullptr; }
+	bool			is_opened() const { return m_width > 0; }
+
+	//정지 이미지로 열렸는지. 재생·탐색이 의미 없고 fps/duration 이 0 인 상태다.
+	bool			is_image() const { return m_width > 0 && m_decoder == nullptr; }
 
 	//비동기 seek. UI 스레드를 막지 않는다. 직전 프레임과 검출 결과는 무효가 되므로 호출측이 정리한다.
 	void			seek(double pos_ms);
@@ -146,6 +158,9 @@ protected:
 private:
 	bool			init_d2d();
 	void			pacer_thread_proc();
+
+	//m_width x m_height 크기의 스트리밍 텍스처를 만든다. open / open_image / 디바이스 로스트 복구가 공유한다.
+	bool			create_frame_bitmap();
 
 	//디코드된 AVFrame(대개 NV12) → BGRA. sws_getCachedContext 라 포맷이 바뀌어도 자동 대응.
 	bool			convert_to_bgra(AVFrame* frame);

@@ -67,6 +67,27 @@ bool CSCVideoWndD2::init_d2d()
 	return true;
 }
 
+bool CSCVideoWndD2::create_frame_bitmap()
+{
+	//해상도 크기의 스트리밍 텍스처를 한 번만 만든다. 이후에는 픽셀만 교체한다.
+	//D2D1_BITMAP_OPTIONS_TARGET 은 주지 않는다 — 렌더타깃 비트맵은 CopyFromMemory 경로가 느리다.
+	D2D1_BITMAP_PROPERTIES1 properties =
+		D2D1::BitmapProperties1(D2D1_BITMAP_OPTIONS_NONE,
+			D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_IGNORE));
+
+	m_bitmap.Reset();
+
+	HRESULT hr = m_d2context.get_d2dc()->CreateBitmap(D2D1::SizeU(m_width, m_height), nullptr, 0, properties, m_bitmap.GetAddressOf());
+
+	if (FAILED(hr))
+	{
+		logWriteE(_T("CreateBitmap failed. hr = 0x%08X, %d x %d"), hr, m_width, m_height);
+		return false;
+	}
+
+	return true;
+}
+
 bool CSCVideoWndD2::open(CString path, double start_ms)
 {
 	close();
@@ -99,17 +120,8 @@ bool CSCVideoWndD2::open(CString path, double start_ms)
 		return false;
 	}
 
-	//동영상 해상도 크기의 스트리밍 텍스처를 한 번만 만든다. 이후에는 픽셀만 교체한다.
-	//D2D1_BITMAP_OPTIONS_TARGET 은 주지 않는다 — 렌더타깃 비트맵은 CopyFromMemory 경로가 느리다.
-	D2D1_BITMAP_PROPERTIES1 properties =
-		D2D1::BitmapProperties1(D2D1_BITMAP_OPTIONS_NONE,
-			D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_IGNORE));
-
-	m_bitmap.Reset();
-	HRESULT hr = m_d2context.get_d2dc()->CreateBitmap(D2D1::SizeU(m_width, m_height), nullptr, 0, properties, m_bitmap.GetAddressOf());
-	if (FAILED(hr))
+	if (!create_frame_bitmap())
 	{
-		logWriteE(_T("CreateBitmap failed. hr = 0x%08X, %d x %d"), hr, m_width, m_height);
 		m_decoder.reset();
 		return false;
 	}
@@ -139,6 +151,53 @@ bool CSCVideoWndD2::open(CString path, double start_ms)
 	m_thread_stop = false;
 	m_playing = true;
 	m_pacer_thread = std::thread(&CSCVideoWndD2::pacer_thread_proc, this);
+
+	return true;
+}
+
+bool CSCVideoWndD2::open_image(const cv::Mat &image)
+{
+	close();
+
+	if (image.empty())
+		return false;
+
+	if (!init_d2d())
+		return false;
+
+	m_width = image.cols;
+	m_height = image.rows;
+
+	//시간축이 없다는 뜻으로 0 을 남긴다. is_image() 와 함께 호출측이 UI 를 구분하는 근거가 된다.
+	m_fps = 0.0;
+	m_duration_ms = 0.0;
+	m_position_ms = 0.0;
+	m_hw_accel.Empty();
+
+	if (!create_frame_bitmap())
+		return false;
+
+	{
+		std::lock_guard<std::mutex> lock(m_bgra_mutex);
+
+		//디코더가 sws_scale 로 채워주는 자리를 여기서는 색공간 변환 한 번으로 대신한다.
+		//이후 get_frame() / get_frame_bgr() / render() 는 동영상과 같은 버퍼를 본다.
+		if (image.channels() == 4)
+			m_bgra = image.clone();
+		else
+			cv::cvtColor(image, m_bgra, (image.channels() == 1) ? cv::COLOR_GRAY2BGRA : cv::COLOR_BGR2BGRA);
+	}
+
+	m_bgra_dirty = true;
+	m_frame_count = 1;
+	m_play_fps = 0.0;
+
+	logWriteI(_T("image opened : %d x %d x %dch"), m_width, m_height, image.channels());
+
+	//동영상이라면 pacer 스레드가 프레임마다 하는 일 — 렌더 + 부모 통지 — 을 한 번만 한다.
+	//부모는 "프레임이 갱신됐다" 는 같은 코드로 반응하면 된다.
+	if (!m_render_pending.exchange(true))
+		PostMessage(Message_CSCVideoWndD2, (WPARAM)m_frame_count.load());
 
 	return true;
 }
@@ -206,6 +265,9 @@ BOOL CSCVideoWndD2::PreTranslateMessage(MSG* pMsg)
 
 void CSCVideoWndD2::toggle_play()
 {
+	if (m_decoder == nullptr)
+		return;
+
 	m_playing = !m_playing.load();
 }
 
@@ -256,15 +318,34 @@ void CSCVideoWndD2::close()
 
 	m_render_pending = false;
 	m_bgra_dirty = false;
+	m_render_one = false;
+
+	//20260809 by claude. 크기를 0 으로 되돌려야 is_opened() / calc_image_rect() 가
+	//닫힌 상태를 알아본다. 정지 이미지는 디코더가 없어서 이 값이 유일한 판단 근거다.
+	m_width = 0;
+	m_height = 0;
+	m_fps = 0.0;
+	m_duration_ms = 0.0;
+	m_position_ms = 0.0;
+	m_frame_count = 0;
+	m_play_fps = 0.0;
+	m_hw_accel.Empty();
 }
 
 void CSCVideoWndD2::play()
 {
+	//정지 이미지에는 재생 개념이 없다. pacer 스레드가 없어 상태만 어긋난다.
+	if (m_decoder == nullptr)
+		return;
+
 	m_playing = true;
 }
 
 void CSCVideoWndD2::pause()
 {
+	if (m_decoder == nullptr)
+		return;
+
 	m_playing = false;
 }
 
@@ -502,14 +583,13 @@ void CSCVideoWndD2::render()
 
 		m_bitmap.Reset();
 
-		if (SUCCEEDED(m_d2context.handle_device_lost()) && m_width > 0 && m_height > 0)
+		if (SUCCEEDED(m_d2context.handle_device_lost()) && m_width > 0 && m_height > 0 && create_frame_bitmap())
 		{
-			D2D1_BITMAP_PROPERTIES1 properties =
-				D2D1::BitmapProperties1(D2D1_BITMAP_OPTIONS_NONE,
-					D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_IGNORE));
-
-			m_d2context.get_d2dc()->CreateBitmap(D2D1::SizeU(m_width, m_height), nullptr, 0, properties, m_bitmap.GetAddressOf());
 			m_bgra_dirty = true;
+
+			//20260809 by claude. 복구된 비트맵을 실제로 그릴 기회를 만든다. 재생 중이라면
+			//다음 프레임에 그려지겠지만 일시정지·정지 이미지는 다음 프레임이 오지 않는다.
+			Invalidate(FALSE);
 		}
 
 		m_device_generation++;

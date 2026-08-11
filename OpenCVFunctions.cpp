@@ -1901,85 +1901,57 @@ void save2Raw( cv::Mat mat, CString sRawFilename, int dst_ch )
 	fclose( fp );
 }
 
-//너비가 4의 배수가 아닌 경우 밀림!
+//20260811 by claude. DIB 는 "픽셀 폭이 4의 배수" 가 아니라 "행 바이트 수(stride)가 4의 배수" 를 요구한다.
+//이전 구현은 픽셀 폭을 MAKE4WIDTH 로 올려놓고 cv::Mat 의 패킹된 버퍼를 그대로 넘겨서,
+//폭이 4의 배수가 아니면 행마다 어긋났다(398x376 기준 DIB 행 1200B vs Mat 행 1194B, 매 행 6B 누적).
+//정렬된 버퍼로 행을 복사하는 것 외에 방법이 없다. ROI 같은 비연속 Mat 도 이 복사로 함께 처리된다.
 HBITMAP ConvertMatToBMP (cv::Mat frame)
-{      
-	auto convertOpenCVBitDepthToBits = [](const int value)
-	{
-		auto regular = 0u;
-
-		switch (value)
-		{
-		case CV_8U:
-		case CV_8S:
-			regular = 8u;
-			break;
-
-		case CV_16U:
-		case CV_16S:
-			regular = 16u;
-			break;
-
-		case CV_32S:
-		case CV_32F:
-			regular = 32u;
-			break;
-
-		case CV_64F:
-			regular = 64u;
-			break;
-
-		default:
-			regular = 0u;
-			break;
-		}
-
-		return regular;
-	};
-
-	auto imageSize = frame.size();
-	assert(imageSize.width && "invalid size provided by frame");
-	assert(imageSize.height && "invalid size provided by frame");
-
-	if (imageSize.width && imageSize.height)
-	{
-		BITMAPINFOHEADER headerInfo;
-		ZeroMemory(&headerInfo, sizeof(headerInfo));
-
-		headerInfo.biSize     = sizeof(headerInfo);
-		headerInfo.biWidth    = MAKE4WIDTH(imageSize.width);
-		headerInfo.biHeight   = -(imageSize.height); // negative otherwise it will be upsidedown
-		headerInfo.biPlanes   = 1;// must be set to 1 as per documentation frame.channels();
-
-		const auto bits       = convertOpenCVBitDepthToBits( frame.depth() );
-		headerInfo.biBitCount = frame.channels() * bits;
-		//headerInfo.biSizeImage= sizeof(BYTE) * headerInfo.biWidth * headerInfo.biHeight * frame.channels();
-
-		BITMAPINFO bitmapInfo;
-		ZeroMemory(&bitmapInfo, sizeof(bitmapInfo));
-
-		bitmapInfo.bmiHeader              = headerInfo;
-		bitmapInfo.bmiColors->rgbBlue     = 0;
-		bitmapInfo.bmiColors->rgbGreen    = 0;
-		bitmapInfo.bmiColors->rgbRed      = 0;
-		bitmapInfo.bmiColors->rgbReserved = 0;
-
-		auto dc  = GetDC(nullptr);
-		assert(dc != nullptr && "Failure to get DC");
-		auto bmp = CreateDIBitmap(dc,
-			&headerInfo,
-			CBM_INIT,
-			frame.data,
-			&bitmapInfo,
-			DIB_RGB_COLORS);
-		assert(bmp != nullptr && "Failure creating bitmap from captured frame");
-
-		return bmp;
-	}
-	else
-	{
+{
+	if (frame.empty() || frame.depth() != CV_8U)
 		return nullptr;
-	}
+
+	//8bpp 는 팔레트가 있어야 DIB 로 성립한다. 화면 표시가 목적이므로 BGR 로 펼친다.
+	cv::Mat src;
+
+	if (frame.channels() == 1)
+		cv::cvtColor(frame, src, cv::COLOR_GRAY2BGR);
+	else
+		src = frame;
+
+	int channels = src.channels();
+
+	if (channels != 3 && channels != 4)
+		return nullptr;
+
+	int stride = (src.cols * channels + 3) & ~3;
+
+	std::vector<BYTE> buffer((size_t)stride * src.rows);
+
+	for (int y = 0; y < src.rows; y++)
+		memcpy(&buffer[(size_t)y * stride], src.ptr(y), (size_t)src.cols * channels);
+
+	BITMAPINFO bitmapInfo;
+	ZeroMemory(&bitmapInfo, sizeof(bitmapInfo));
+
+	bitmapInfo.bmiHeader.biSize			= sizeof(BITMAPINFOHEADER);
+	bitmapInfo.bmiHeader.biWidth		= src.cols;
+	bitmapInfo.bmiHeader.biHeight		= -src.rows;	//음수 = top-down. cv::Mat 과 행 순서를 맞춘다.
+	bitmapInfo.bmiHeader.biPlanes		= 1;
+	bitmapInfo.bmiHeader.biBitCount		= (WORD)(channels * 8);
+	bitmapInfo.bmiHeader.biCompression	= BI_RGB;
+	bitmapInfo.bmiHeader.biSizeImage	= (DWORD)buffer.size();
+
+	HDC dc = GetDC(NULL);
+
+	if (dc == NULL)
+		return nullptr;
+
+	HBITMAP bmp = CreateDIBitmap(dc, &bitmapInfo.bmiHeader, CBM_INIT, buffer.data(), &bitmapInfo, DIB_RGB_COLORS);
+
+	//20260811 by claude. 이전 구현은 이 DC 를 놓지 않아 호출할 때마다 GDI 핸들이 샜다.
+	ReleaseDC(NULL, dc);
+
+	return bmp;
 }
 
 void matToCImage(cv::Mat &mat, CImage &cImage)  

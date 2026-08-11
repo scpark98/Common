@@ -383,6 +383,15 @@ void CResizeCtrl::Resize(int cx, int cy)
 {
 	ASSERT (m_array);
 
+	//20260811 by claude. 최소화·절전 등으로 클라이언트가 0 이 되는 WM_SIZE 는 처리하지 않는다.
+	//이 크기로 진행하면 모든 등록 컨트롤이 0 으로 접히고, 잘라낸 음수 크기가 pending 에 남는다.
+	//pending 은 복귀 WM_SIZE 가 원래 순서대로 도착해야만 상쇄되는데,
+	//(a) 복귀 WM_SIZE 가 오지 않으면 컨트롤이 접힌 채로 남고,
+	//(b) 그 사이 부모가 컨트롤을 직접 재배치하면 복귀 시 pending 이 그 rect 에 다시 더해져 두 배로 커진다.
+	//m_size 를 갱신하지 않고 빠져나가므로 복귀 시 delta 가 0 이 되어 원래 배치가 그대로 유지된다.
+	if (cx <= 0 || cy <= 0)
+		return;
+
 	if(FALSE == m_inResize)
 	{
 		m_inResize     = TRUE;

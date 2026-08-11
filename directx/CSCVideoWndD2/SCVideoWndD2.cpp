@@ -4,6 +4,7 @@
 //#pragma comment(lib, ...) 로 자동 링크까지 한다. 프로젝트에는 lib 경로만 넣어주면 된다.
 #include "../../ffmpeg/internal/ffi_decoder.h"
 #include "../../log/SCLog/SCLog.h"
+#include "../../OpenCVFunctions.h"
 
 IMPLEMENT_DYNAMIC(CSCVideoWndD2, CWnd)
 
@@ -14,6 +15,7 @@ BEGIN_MESSAGE_MAP(CSCVideoWndD2, CWnd)
 	ON_WM_DESTROY()
 	ON_WM_LBUTTONDBLCLK()
 	ON_WM_LBUTTONDOWN()
+	ON_WM_MBUTTONDOWN()
 	ON_WM_TIMER()
 	ON_MESSAGE(Message_CSCVideoWndD2, &CSCVideoWndD2::on_message_CSCVideoWndD2)
 	ON_REGISTERED_MESSAGE(Message_CSCSliderCtrl, &CSCVideoWndD2::on_message_CSCSliderCtrl)
@@ -187,6 +189,22 @@ bool CSCVideoWndD2::open(CString path, double start_ms)
 		m_bgra = cv::Mat(m_height, m_width, CV_8UC4, cv::Scalar(0, 0, 0, 255));
 	}
 
+	//20260811 by claude. 뒤로 이동용 보관 장수를 해상도에 맞춰 정한다. 상한은 메모리 기준이라
+	//해상도가 낮으면 더 많이, 높으면 더 적게 보관한다. 4 장 미만이면 의미가 없어 그때는 끈다.
+	{
+		size_t frame_bytes = (size_t)m_width * m_height * 4;
+
+		m_step_cache_count = (frame_bytes > 0) ? (int)(step_cache_max_bytes / frame_bytes) : 0;
+
+		if (m_step_cache_count > 60)
+			m_step_cache_count = 60;
+
+		if (m_step_cache_count < 4)
+			m_step_cache_count = 0;
+
+		logWriteI(_T("step cache = %d 장 (프레임 %.1f MB)"), m_step_cache_count, frame_bytes / 1048576.0);
+	}
+
 	m_frame_count = 0;
 	m_play_fps = 0.0;
 
@@ -276,9 +294,8 @@ void CSCVideoWndD2::seek(double pos_ms)
 	//pacer 가 이 위치 이전 프레임을 흘려버리도록 목표를 남긴다.
 	m_seek_target_ms = pos_ms;
 
-	//프레임 스텝 앵커는 여기서 끊는다. 임의 위치로 뛴 뒤에는 이전 앵커가 의미 없다.
-	//step_frame() 은 이 호출 직후 앵커를 자기 목표값으로 다시 세운다.
-	m_step_anchor_ms = -1.0;
+	//보관분은 pts 로 찾으므로 seek 이 끼어도 그대로 유효하다 — 지우지 않는다.
+	//되돌아왔을 때 다시 쓰이고, 화면이 최신인지는 is_at_live_frame() 이 pts 로 판단한다.
 
 	//일시정지 중이어도 이동한 위치의 화면은 바로 보여야 한다.
 	m_render_one = true;
@@ -334,18 +351,88 @@ bool CSCVideoWndD2::handle_key(UINT key)
 	return true;
 }
 
+void CSCVideoWndD2::push_step_cache(double pts_ms)
+{
+	if (m_step_cache_count <= 0 || pts_ms < 0.0)
+		return;
+
+	//두 락을 쓰는 곳은 여기와 show_cached_frame 뿐이고 순서가 같아 교착이 없다.
+	std::lock_guard<std::mutex> lock_bgra(m_bgra_mutex);
+
+	if (m_bgra.empty())
+		return;
+
+	std::lock_guard<std::mutex> lock_cache(m_step_cache_mutex);
+
+	StepCacheEntry entry;
+
+	//가장 오래된 것을 밀어내며 그 버퍼를 그대로 재사용한다. copyTo 는 크기·타입이 같으면
+	//재할당하지 않으므로, 처음 몇 장 이후로는 프레임마다 할당이 없다.
+	if ((int)m_step_cache.size() >= m_step_cache_count)
+	{
+		entry = std::move(m_step_cache.front());
+		m_step_cache.pop_front();
+	}
+
+	m_bgra.copyTo(entry.bgra);
+	entry.pts_ms = pts_ms;
+
+	m_step_cache.push_back(std::move(entry));
+}
+
+bool CSCVideoWndD2::show_cached_frame(double target_ms, double tolerance_ms)
+{
+	std::lock_guard<std::mutex> lock_bgra(m_bgra_mutex);
+	std::lock_guard<std::mutex> lock_cache(m_step_cache_mutex);
+
+	for (size_t i = 0; i < m_step_cache.size(); i++)
+	{
+		const StepCacheEntry& entry = m_step_cache[i];
+
+		if (entry.bgra.empty() || entry.pts_ms < 0.0)
+			continue;
+
+		if (fabs(entry.pts_ms - target_ms) > tolerance_ms)
+			continue;
+
+		entry.bgra.copyTo(m_bgra);
+		m_position_ms = entry.pts_ms;
+
+		return true;
+	}
+
+	return false;
+}
+
+bool CSCVideoWndD2::is_at_live_frame(double tolerance_ms)
+{
+	std::lock_guard<std::mutex> lock(m_step_cache_mutex);
+
+	//보관이 없으면 판단 근거가 없다 — 디코더를 따라가는 기존 동작으로 둔다.
+	if (m_step_cache.empty())
+		return true;
+
+	return fabs(m_step_cache.back().pts_ms - m_position_ms.load()) <= tolerance_ms;
+}
+
 void CSCVideoWndD2::step_frame(int count)
 {
-	if (m_decoder == nullptr || m_fps <= 0.0)
+	if (m_decoder == nullptr || m_fps <= 0.0 || count == 0)
 		return;
 
 	double interval_ms = 1000.0 / m_fps;
 
-	//앵커가 무효면(외부 seek·재생 직후) 현재 표시 위치에서 새로 시작한다.
-	if (m_step_anchor_ms < 0.0)
-		m_step_anchor_ms = m_position_ms.load();
+	//20260811 by claude. 기준은 "화면에 올라가 있는 프레임의 실제 pts" 다(closed loop).
+	//요청 위치를 계속 이어가면(open loop) 파일의 실제 프레임 간격이 1000/fps 와 미세하게
+	//다를 때 그 차이가 매 스텝 누적되고, 반 프레임을 넘는 순간 한 장을 건너뛰거나 제자리에
+	//머문다 — 어쩌다 한 번씩 튀는 원인이다. 매번 참값에서 다시 출발하면 오차가 쌓이지 않는다.
+	//(Endorphin2 CDShow::step_frame 의 closed-loop 재앵커와 같은 이유.)
+	double displayed = m_position_ms.load();
+	double target = displayed + interval_ms * count;
 
-	double target = m_step_anchor_ms + interval_ms * count;
+	//20260811 by claude. 프레임 스텝 추적용 진단 로그.
+	logWriteI(_T("[step] 요청 count=%d displayed=%.1f target=%.1f interval=%.3f fps=%.4f"),
+		count, displayed, target, interval_ms, m_fps);
 
 	if (target < 0.0)
 		target = 0.0;
@@ -353,11 +440,58 @@ void CSCVideoWndD2::step_frame(int count)
 	if (m_duration_ms > 0.0 && target > m_duration_ms - interval_ms)
 		target = m_duration_ms - interval_ms;
 
-	//seek() 가 앵커를 무효화하므로 그 뒤에 다시 세운다. 다음 스텝은 실제 착지 pts 가 아니라
-	//이 값에서 이어가야 오차가 쌓이지 않는다.
-	seek(target);
+	//pacer 는 "target - 반 프레임" 이상인 첫 프레임을 택한다. 그래서 뒤로 갈 때 유효 구간이
+	//(직전전, 직전] 의 중앙에 놓여 양쪽에 반 프레임씩 여유가 생긴다. pts 가 조금 흔들려도
+	//결정적으로 한 장만 움직인다. 보관분 조회도 같은 폭으로 맞춘다.
+	double tolerance = interval_ms / 2.0;
 
-	m_step_anchor_ms = target;
+	//보관해 둔 프레임이면 디코더를 아예 건드리지 않는다 — 즉시 바뀐다.
+	//뒤로 갈 때 이게 없으면 GOP 앞 keyframe 부터 수십 프레임을 다시 디코딩해야 한다.
+	if (show_cached_frame(target, tolerance))
+	{
+		m_bgra_dirty = true;
+		m_frame_count++;
+
+		logWriteI(_T("[step] 보관분 표시 pts=%.1f"), m_position_ms.load());
+
+		if (!m_render_pending.exchange(true))
+			PostMessage(Message_CSCVideoWndD2, (WPARAM)m_frame_count.load());
+
+		return;
+	}
+
+	int frame_count_before = m_frame_count.load();
+
+	//앞으로 가는 데는 seek 이 필요 없다. 디코더는 정지 중에도 큐를 채우므로 다음 프레임은
+	//이미 준비되어 있고, 한 장 더 그리라고만 하면 된다. 여기에 seek 을 걸면 GOP 앞 keyframe
+	//부터 수십 프레임을 다시 디코딩하느라 100ms 넘게 걸리고, 그보다 빨리 누르면 새 seek 이
+	//진행 중이던 디코딩을 flush 해서 중간 프레임이 통째로 사라진다.
+	//(실측: 120ms 간격 10회 → 표시 4회, 매번 2~4 프레임 건너뜀.)
+	//단, 화면이 과거(보관분)를 보고 있으면 디코더는 훨씬 앞에 있으므로 이 길로 가면 안 된다.
+	if (count > 0 && is_at_live_frame(tolerance))
+	{
+		m_seek_target_ms = target;
+		m_render_one = true;
+	}
+	else
+	{
+		//보관분 밖이다 — 디코더를 되돌리는 수밖에 없다.
+		seek(target);
+	}
+
+	wait_step_settle(frame_count_before);
+}
+
+//20260811 by claude. seek() 은 요청 위치를 m_position_ms 에 먼저 써넣으므로 그 값은 아직 참값이 아니다.
+//요청한 프레임이 실제로 올라올 때까지 기다렸다 반환해야 다음 스텝이 참값에서 출발한다.
+//기다리지 않으면 빨리 눌렀을 때 직전 요청과 같은 위치를 다시 계산해 제자리에 머물거나 건너뛴다.
+//(Endorphin2 CDShow::step_frame 의 closed-loop settle 과 같은 이유. 보통 한 프레임 디코드로 끝나고,
+//롱 GOP 에서 오래 걸릴 때를 위해 상한을 둔다. 기다리는 동안 프레임을 올리는 것은 pacer 스레드라
+//UI 스레드가 여기서 멈춰 있어도 진행된다.)
+void CSCVideoWndD2::wait_step_settle(int frame_count_before)
+{
+	for (int waited = 0; waited < step_settle_ms && m_frame_count.load() == frame_count_before; waited++)
+		::Sleep(1);
 }
 
 BOOL CSCVideoWndD2::PreTranslateMessage(MSG* pMsg)
@@ -384,6 +518,14 @@ void CSCVideoWndD2::OnLButtonDown(UINT nFlags, CPoint point)
 	SetFocus();
 
 	CWnd::OnLButtonDown(nFlags, point);
+}
+
+void CSCVideoWndD2::OnMButtonDown(UINT nFlags, CPoint point)
+{
+	if (m_mclick)
+		m_mclick(point);
+
+	CWnd::OnMButtonDown(nFlags, point);
 }
 
 void CSCVideoWndD2::OnLButtonDblClk(UINT nFlags, CPoint point)
@@ -441,8 +583,14 @@ void CSCVideoWndD2::close()
 	m_drag_grabbed = false;
 	m_drag_pending_pos = -1;
 	m_drag_last_seek_tick = 0;
-	m_step_anchor_ms = -1.0;
 	m_seek_target_ms = -1.0;
+
+	{
+		std::lock_guard<std::mutex> lock(m_step_cache_mutex);
+		m_step_cache.clear();
+	}
+
+	m_step_cache_count = 0;
 
 	if (m_slider.GetSafeHwnd())
 	{
@@ -458,8 +606,10 @@ void CSCVideoWndD2::play()
 	if (m_decoder == nullptr)
 		return;
 
-	//재생을 재개하면 프레임 스텝 앵커는 의미를 잃는다. 다음 스텝은 멈춘 그 위치에서 새로 잡는다.
-	m_step_anchor_ms = -1.0;
+	//20260811 by claude. 보관분의 과거 프레임을 보고 있었다면 디코더는 그보다 앞서 있다.
+	//그대로 재생하면 보고 있던 자리가 아니라 앞쪽에서 이어져 튄다. 본 위치로 맞추고 재개한다.
+	if (m_fps > 0.0 && !is_at_live_frame(500.0 / m_fps))
+		seek(m_position_ms.load());
 
 	m_playing = true;
 }
@@ -600,6 +750,9 @@ void CSCVideoWndD2::pacer_thread_proc()
 			double tolerance = (m_fps > 0.0) ? (500.0 / m_fps) : 0.0;
 			int skipped = 0;
 
+			//20260811 by claude. 프레임 스텝 추적용 진단 로그.
+			double first_ms = frame_position_ms(frame);
+
 			while (frame != nullptr && frame_position_ms(frame) < seek_target - tolerance)
 			{
 				//pts 가 어긋난 파일에서 무한히 버리지 않도록 상한을 둔다.
@@ -612,7 +765,16 @@ void CSCVideoWndD2::pacer_thread_proc()
 
 			//큐가 아직 안 찼으면 target 을 유지한 채 다음 틱에 이어서 버린다.
 			if (frame == nullptr)
+			{
+				//20260811 by claude. 프레임 스텝 추적용 진단 로그.
+				logWriteI(_T("[step] skip 계속 target=%.1f first=%.1f skipped=%d (큐 소진)"),
+					seek_target, first_ms, skipped);
 				continue;
+			}
+
+			//20260811 by claude. 프레임 스텝 추적용 진단 로그.
+			logWriteI(_T("[step] skip 완료 target=%.1f tol=%.1f first=%.1f accepted=%.1f skipped=%d"),
+				seek_target, tolerance, first_ms, frame_position_ms(frame), skipped);
 
 			m_seek_target_ms = -1.0;
 		}
@@ -634,6 +796,14 @@ void CSCVideoWndD2::pacer_thread_proc()
 
 		m_bgra_dirty = true;
 		m_frame_count++;
+
+		//20260811 by claude. 뒤로 이동할 때 다시 디코딩하지 않도록 화면에 올린 프레임을 보관한다.
+		push_step_cache(frame_ms);
+
+		//20260811 by claude. 프레임 스텝 추적용 — 정지 상태에서 실제로 화면에 올라간 프레임.
+		if (!m_playing)
+			logWriteI(_T("[step] 표시 pts=%.1f count=%d render_one=%d target=%.1f"),
+				frame_ms, m_frame_count.load(), (int)render_one, m_seek_target_ms.load());
 
 		//한 장을 실제로 표시했으니 해제한다. seek 후 큐가 빌 동안은 위에서 continue 되어
 		//플래그가 유지되므로, 프레임이 준비되는 즉시 정확히 한 장만 그려진다.
@@ -798,17 +968,12 @@ D2D1_RECT_F CSCVideoWndD2::calc_image_rect()
 	if (m_width <= 0 || m_height <= 0 || size.width <= 0 || size.height <= 0)
 		return D2D1::RectF(0, 0, size.width, size.height);
 
-	//가로세로 비율을 유지한 채 창 안에 최대로 채운다.
-	float scale_x = size.width / (float)m_width;
-	float scale_y = size.height / (float)m_height;
-	float scale = (scale_x < scale_y) ? scale_x : scale_y;
+	//20260811 by claude. 비율 유지 fit 은 Common 에 이미 있다. 실수 좌표로 받아야
+	//정수로 한 번 잘린 값이 다시 확대되지 않으므로 Rect2f 로 인스턴스화한다.
+	cv::Rect2f fit = getRatioRect(cv::Rect2f(0.0f, 0.0f, size.width, size.height),
+		(double)m_width / (double)m_height);
 
-	float w = m_width * scale;
-	float h = m_height * scale;
-	float x = (size.width - w) / 2.0f;
-	float y = (size.height - h) / 2.0f;
-
-	return D2D1::RectF(x, y, x + w, y + h);
+	return D2D1::RectF(fit.x, fit.y, fit.x + fit.width, fit.y + fit.height);
 }
 
 void CSCVideoWndD2::render()

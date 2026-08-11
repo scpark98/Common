@@ -28,6 +28,7 @@
 *
 * [의존]
 *   Common/directx/CSCD2Context/SCD2Context.{h,cpp}
+*   Common/CSliderCtrl/SCSliderCtrl/SCSliderCtrl.{h,cpp}   재생 트랙을 이 창이 직접 만든다
 *   Common/ffmpeg/internal/ffmpeg_internal.{h,cpp}, ffi_decoder.{h,cpp}
 *   Common/ffmpeg/include, Common/ffmpeg/lib, 실행 폴더에 av*.dll / sw*.dll
 *   OpenCV (프레임 전달 타입으로 cv::Mat 사용)
@@ -35,6 +36,7 @@
 
 #include <afxwin.h>
 #include <atomic>
+#include <deque>
 #include <functional>
 #include <memory>
 #include <mutex>
@@ -73,6 +75,12 @@ public:
 	typedef std::function<bool(CPoint point, const D2D1_RECT_F& image_rect)> dblclick_func;
 	void			set_dblclick_callback(dblclick_func func) { m_dblclick = func; }
 
+	//20260811 by claude. 가운데(휠) 버튼 클릭. 이 컨트롤에는 기본 동작이 없으므로
+	//콜백을 걸지 않으면 아무 일도 일어나지 않는다. 전체화면 전환처럼 창 정책에 속하는
+	//동작을 호출측이 붙이라고 열어둔 자리다.
+	typedef std::function<void(CPoint point)> mclick_func;
+	void			set_mclick_callback(mclick_func func) { m_mclick = func; }
+
 	//현재 프레임이 그려진 화면 영역(DIP). 원본 좌표 ↔ 화면 좌표 변환에 쓴다.
 	D2D1_RECT_F		get_image_rect() { return calc_image_rect(); }
 
@@ -103,7 +111,8 @@ public:
 	//방향키 탐색 폭(ms). 좌우 방향키 = step, Ctrl + 좌우 = step_large.
 	void			set_seek_step(double step_ms, double step_large_ms) { m_seek_step_ms = step_ms; m_seek_step_large_ms = step_large_ms; }
 
-	//재생 제어 키를 처리한다. ← → = 탐색, Ctrl 조합 = 큰 폭, Space = 재생/일시정지.
+	//재생 제어 키를 처리한다. ← → = 탐색, Ctrl 조합 = 큰 폭, Space = 재생/일시정지,
+	//D / F = 한 프레임 뒤/앞(재생 중이면 멈춘 뒤 이동).
 	//부모 다이얼로그가 방향키·스페이스를 먼저 가져가므로, 부모의 PreTranslateMessage
 	//에서 이 함수로 넘겨주면 된다. 처리하면 true.
 	bool			handle_key(UINT key);
@@ -162,6 +171,7 @@ protected:
 	afx_msg void	OnDestroy();
 	afx_msg void	OnLButtonDblClk(UINT nFlags, CPoint point);
 	afx_msg void	OnLButtonDown(UINT nFlags, CPoint point);
+	afx_msg void	OnMButtonDown(UINT nFlags, CPoint point);
 	afx_msg void	OnTimer(UINT_PTR nIDEvent);
 	virtual BOOL	PreTranslateMessage(MSG* pMsg);
 	afx_msg LRESULT on_message_CSCVideoWndD2(WPARAM wParam, LPARAM lParam);
@@ -235,11 +245,40 @@ private:
 	//pts 가 어긋난 파일에서 스킵이 끝나지 않는 것을 막는 상한.
 	enum { seek_skip_limit = 600 };
 
-	//20260811 by claude. 프레임 스텝 전용 위치(ms). -1 이면 무효 — 다음 스텝에서 재생 위치로 새로 잡는다.
-	//스텝마다 m_position_ms 를 다시 읽으면 디코더가 착지한 pts 가 요청 위치와 미세하게 달라
-	//반복 시 오차가 쌓이거나 같은 프레임에 머문다. seek / play 가 이 값을 무효화한다.
-	//(Endorphin2 CDShow::step_frame 의 m_step_anchor_ms 와 같은 이유.)
-	double					m_step_anchor_ms = -1.0;
+	//20260811 by claude. 화면에 올린 프레임을 최근 것부터 보관한다.
+	//뒤로 한 프레임 이동은 디코더를 되돌릴 방법이 없어 GOP 앞 keyframe 부터 수십 프레임을 다시
+	//디코딩해야 하고(1회 100~200ms), 그보다 빨리 누르면 중간 프레임이 통째로 사라진다.
+	//보관분 안에서 오가는 동안은 디코더를 아예 건드리지 않으므로 즉시 바뀐다.
+	struct StepCacheEntry
+	{
+		cv::Mat		bgra;
+		double		pts_ms = -1.0;
+	};
+
+	//오래된 것 → 최신 순. 크기는 open() 에서 해상도에 맞춰 정한다.
+	std::deque<StepCacheEntry>	m_step_cache;
+	std::mutex					m_step_cache_mutex;
+	int							m_step_cache_count = 0;
+
+	//보관에 쓸 메모리 상한. 1920x1080 BGRA 는 한 장에 약 8.3MB 이므로 11 장쯤 된다.
+	enum { step_cache_max_bytes = 96 * 1024 * 1024 };
+
+	//화면에 올린 프레임을 보관한다. pacer 스레드에서 호출.
+	void			push_step_cache(double pts_ms);
+
+	//보관분에서 target_ms 에 해당하는 프레임을 찾아 화면에 올린다. UI 스레드에서 호출.
+	//보관 순서는 "표시한 순서" 라 seek 이 끼면 시간순과 어긋난다. 그래서 인덱스가 아니라
+	//pts 로 찾는다 — 그러면 보관 순서와 무관하게 항상 옳은 프레임이 나온다.
+	bool			show_cached_frame(double target_ms, double tolerance_ms);
+
+	//화면이 디코더가 마지막으로 준 프레임을 보고 있는지. true 면 큐의 다음 프레임이 곧 다음 장이라
+	//앞으로 가기에 seek 이 필요 없다. 과거를 보고 있으면 재생 재개 시 그 위치로 맞춰야 한다.
+	bool			is_at_live_frame(double tolerance_ms);
+
+	//요청한 프레임이 실제로 화면에 올라올 때까지 기다린다. 상한(ms).
+	enum { step_settle_ms = 250 };
+
+	void			wait_step_settle(int frame_count_before);
 
 	//UI 스레드가 밀릴 때 렌더 메시지가 큐에 쌓이지 않도록 하는 게이트.
 	std::atomic<bool>		m_render_pending{ false };
@@ -251,6 +290,7 @@ private:
 
 	overlay_func			m_overlay;
 	dblclick_func			m_dblclick;
+	mclick_func				m_mclick;
 	Gdiplus::Color			m_cr_back = Gdiplus::Color(255, 24, 24, 24);
 
 	//youtube shorts 처럼 하단에 붙는 재생 트랙. 정지 이미지에는 타임라인이 없으므로 숨긴다.

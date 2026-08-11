@@ -187,6 +187,8 @@ private:
 	D2D1_RECT_F		calc_image_rect();
 
 	//20260811 by claude. 재생 트랙은 비디오 창이라면 없을 수 없으므로 호출측에 맡기지 않고 여기서 만든다.
+	//이미 만들어져 있으면 아무 것도 하지 않으므로 여러 곳에서 불러도 된다.
+	//PreSubclassWindow 에서 부르면 안 된다 — 아래 정의부 주석 참조.
 	void			create_slider();
 
 	//드래그 중 move 마다 seek 하면 디코더가 프레임을 만들 틈이 없어 화면이 멈춘 것처럼 보인다.

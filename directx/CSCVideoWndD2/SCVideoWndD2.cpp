@@ -56,21 +56,25 @@ void CSCVideoWndD2::PreSubclassWindow()
 
 	init_d2d();
 
-	create_slider();
-
 	CWnd::PreSubclassWindow();
 }
 
+//20260811 by claude. 여기서 자식을 만들면 안 된다. 이 창을 Create() 로 직접 만드는 경로에서는
+//PreSubclassWindow 가 CreateWindowEx 한복판(MFC 의 CBT 훅)에서 호출된다. 그 안에서 또
+//CreateWindowEx 를 부르면 MFC 가 창 생성 중첩을 ASSERT 로 잡는다(AfxHookWindowCreate 의
+//ASSERT(m_pWndInit == NULL)). 리소스 컨트롤에 SubclassDlgItem 으로 붙이는 경로에서는
+//PreSubclassWindow 가 창 생성 밖에서 불려 문제가 없어, 붙이는 방식에 따라 증상이 갈렸다.
+//그래서 생성을 창이 다 만들어진 뒤로 미루고, 두 경로가 모두 지나가는 OnSize/render 에서 부른다.
 void CSCVideoWndD2::create_slider()
 {
-	if (GetSafeHwnd() == NULL)
+	if (GetSafeHwnd() == NULL || m_slider.GetSafeHwnd())
 		return;
 
 	CRect rc;
 	GetClientRect(rc);
 
 	//열기 전에는 표시할 구간이 없으므로 WS_VISIBLE 없이 만든다. open() 에서 보인다.
-	m_slider.Create(WS_CHILD, CRect(0, rc.Height() - slider_height, rc.Width(), rc.Height() - 20), this, 0);
+	m_slider.Create(WS_CHILD, CRect(0, rc.Height() - slider_height, rc.Width(), rc.Height()), this, 0);
 
 	//썸 없이 경과 구간만 칠하는 스타일. 4px 두께에서 썸은 그릴 자리가 없다.
 	m_slider.set_style(CSCSliderCtrl::style_progress);
@@ -809,6 +813,9 @@ D2D1_RECT_F CSCVideoWndD2::calc_image_rect()
 
 void CSCVideoWndD2::render()
 {
+	//리소스 컨트롤에 붙는 경로는 WM_SIZE 가 바로 오지 않을 수 있어 여기서도 확인한다.
+	create_slider();
+
 	if (!m_d2d_ready)
 		return;
 
@@ -891,6 +898,8 @@ BOOL CSCVideoWndD2::OnEraseBkgnd(CDC*)
 void CSCVideoWndD2::OnSize(UINT nType, int cx, int cy)
 {
 	CWnd::OnSize(nType, cx, cy);
+
+	create_slider();
 
 	if (m_slider.GetSafeHwnd() && cx > 0 && cy > 0)
 		m_slider.MoveWindow(0, cy - slider_height, cx, slider_height);

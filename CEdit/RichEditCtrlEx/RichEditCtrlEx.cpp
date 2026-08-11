@@ -52,7 +52,7 @@ END_MESSAGE_MAP()
 
 
 // CRichEditCtrlEx 메시지 처리기입니다.
-CString CRichEditCtrlEx::addl(COLORREF cr, LPCTSTR lpszFormat, ...)
+CString CRichEditCtrlEx::addl(Gdiplus::Color cr, LPCTSTR lpszFormat, ...)
 {
 	//CString으로 변환
 	CString new_text;
@@ -63,7 +63,7 @@ CString CRichEditCtrlEx::addl(COLORREF cr, LPCTSTR lpszFormat, ...)
 	return add(cr, new_text + _T("\n"));
 }
 
-CString CRichEditCtrlEx::add(COLORREF cr, LPCTSTR lpszFormat, ...)
+CString CRichEditCtrlEx::add(Gdiplus::Color cr, LPCTSTR lpszFormat, ...)
 {
 	CString ret;
 
@@ -73,8 +73,8 @@ CString CRichEditCtrlEx::add(COLORREF cr, LPCTSTR lpszFormat, ...)
 	if (!m_show_log)
 		return ret;
 
-	if (cr == -1)
-		cr = m_theme.cr_text.ToCOLORREF();
+	if (cr.GetValue() == Gdiplus::Color::Transparent)
+		cr = m_theme.cr_text;
 
 	//CString으로 변환
 	CString new_text;
@@ -196,10 +196,8 @@ CString CRichEditCtrlEx::add(COLORREF cr, LPCTSTR lpszFormat, ...)
 	cf.cbSize = sizeof(CHARFORMAT);
 	cf.dwMask = CFM_COLOR | CFM_BOLD | CFM_ITALIC | CFM_UNDERLINE | CFM_STRIKEOUT;
 
-	if (cr == -1)
-		cf.crTextColor = m_theme.cr_text.ToCOLORREF();
-	else
-		cf.crTextColor = cr;
+	//cr 은 함수 앞부분에서 Transparent 면 m_theme.cr_text 로 이미 치환되므로 여기선 그대로 변환한다.
+	cf.crTextColor = cr.ToCOLORREF();
 
 	//텍스트 전체 크기가 특정 크기를 넘어가면 클리어
 	if (m_max_length > 0 && nInsertionPoint >= m_max_length)
@@ -232,7 +230,7 @@ CString CRichEditCtrlEx::add(COLORREF cr, LPCTSTR lpszFormat, ...)
 			int pos = results[j];
 			if (pos >= 0)
 			{
-				cf.crTextColor = m_keyword_formats[i].cr;
+				cf.crTextColor = m_keyword_formats[i].cr.ToCOLORREF();
 				cf.dwEffects = 0;
 				if (m_keyword_formats[i].bold)
 					cf.dwEffects |= CFE_BOLD;
@@ -426,7 +424,7 @@ void CRichEditCtrlEx::set_text(std::deque<CString>* dqlist)
 * 맨 마지막 라인으로 캐럿을 옮겨놓으면 자동 스크롤되도록 처리했으나
 * 뭔가 깜빡임이 발생한다.
 */
-int CRichEditCtrlEx::AppendToLog(CString str, COLORREF color /*= -1*/, BOOL bAddNewLine /*= TRUE*/)
+int CRichEditCtrlEx::AppendToLog(CString str, Gdiplus::Color color /*= Gdiplus::Color::Transparent*/, BOOL bAddNewLine /*= TRUE*/)
 {
 	if (m_hWnd == nullptr)
 		return 0;
@@ -532,10 +530,10 @@ int CRichEditCtrlEx::AppendToLog(CString str, COLORREF color /*= -1*/, BOOL bAdd
 	cf.dwMask		= CFM_COLOR;
 	cf.dwEffects	= 0;	// To disable CFE_AUTOCOLOR
 
-	if (color == -1)
+	if (color.GetValue() == Gdiplus::Color::Transparent)
 		cf.crTextColor	= m_theme.cr_text.ToCOLORREF();
 	else
-		cf.crTextColor	= color;
+		cf.crTextColor	= color.ToCOLORREF();
 
 	// Set insertion point to end of text
 	nInsertionPoint = GetWindowTextLength();
@@ -635,21 +633,21 @@ void CRichEditCtrlEx::Append(LPCTSTR lpszFormat, ...)
 		if (len > 0)
 		{
 			m_show_time = false;
-			AppendToLog(szBuffer, m_theme.cr_text.ToCOLORREF(), false);
+			AppendToLog(szBuffer, m_theme.cr_text, false);
 			m_show_time = true;
 		}
 		else
 		{
-			AppendToLog(szBuffer, m_theme.cr_text.ToCOLORREF(), false);
+			AppendToLog(szBuffer, m_theme.cr_text, false);
 		}
 	}
 	else
 	{
-		AppendToLog(szBuffer, m_theme.cr_text.ToCOLORREF(), false);
+		AppendToLog(szBuffer, m_theme.cr_text, false);
 	}
 }
 
-void CRichEditCtrlEx::Append(COLORREF cr, LPCTSTR lpszFormat, ...)
+void CRichEditCtrlEx::Append(Gdiplus::Color cr, LPCTSTR lpszFormat, ...)
 {
 	TCHAR szBuffer[512];
 
@@ -740,7 +738,7 @@ void CRichEditCtrlEx::Append(COLORREF cr, LPCTSTR lpszFormat, ...)
 /// Please note that the code is written for maximum comprehension / good
 /// readability, not for code or execution efficiency.
 //-----------------------------------------------------------------------------
-int CRichEditCtrlEx::AppendToLogAndScroll(CString str, COLORREF color /*= -1*/, BOOL bAddNewLine /*= TRUE*/)
+int CRichEditCtrlEx::AppendToLogAndScroll(CString str, Gdiplus::Color color /*= Gdiplus::Color::Transparent*/, BOOL bAddNewLine /*= TRUE*/)
 {
 	if (m_hWnd == nullptr)
 		return 0;
@@ -760,10 +758,10 @@ int CRichEditCtrlEx::AppendToLogAndScroll(CString str, COLORREF color /*= -1*/, 
 	cf.dwMask = CFM_COLOR;
 	cf.dwEffects = 0; // To disable CFE_AUTOCOLOR
 
-	if (color == -1)
+	if (color.GetValue() == Gdiplus::Color::Transparent)
 		cf.crTextColor = m_theme.cr_text.ToCOLORREF();
 	else
-		cf.crTextColor = color;
+		cf.crTextColor = color.ToCOLORREF();
 
 	// Set insertion point to end of text
 	nInsertionPoint = GetWindowTextLength();
@@ -920,14 +918,14 @@ void CRichEditCtrlEx::toggle_show_log()
 	if (m_show_log)
 	{
 		AppendToLog(_T("\n"));
-		AppendToLog(_T("로그를 디스플레이합니다."), color_complementary(m_theme.cr_back.ToCOLORREF()));
+		AppendToLog(_T("로그를 디스플레이합니다."), get_complementary_gcolor(m_theme.cr_back));
 	}
 	else
 	{
 		m_show_log = true;
 		AppendToLog(_T("\n"));
-		AppendToLog(_T("로그 디스플레이 옵션을 해제하였습니다."), color_complementary(m_theme.cr_back.ToCOLORREF()));
-		AppendToLog(_T("로그를 디스플레이 하려면 오른쪽 버튼을 누른 후 \"Display logs\" 옵션을 선택하세요."), color_complementary(m_theme.cr_back.ToCOLORREF()));
+		AppendToLog(_T("로그 디스플레이 옵션을 해제하였습니다."), get_complementary_gcolor(m_theme.cr_back));
+		AppendToLog(_T("로그를 디스플레이 하려면 오른쪽 버튼을 누른 후 \"Display logs\" 옵션을 선택하세요."), get_complementary_gcolor(m_theme.cr_back));
 		m_show_log = false;
 	}
 }
@@ -1009,7 +1007,7 @@ void CRichEditCtrlEx::OnTimer(UINT_PTR nIDEvent)
 	if (nIDEvent == TIMER_CLEAR_LOG)
 	{
 		clear_all();
-		AppendToLog(_T("로그를 주기적으로 Clear 합니다."), color_complementary(m_theme.cr_back.ToCOLORREF()));
+		AppendToLog(_T("로그를 주기적으로 Clear 합니다."), get_complementary_gcolor(m_theme.cr_back));
 	}
 }
 

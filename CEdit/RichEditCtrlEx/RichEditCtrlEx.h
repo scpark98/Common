@@ -32,7 +32,7 @@ public:
 
 	}
 
-	CSCKeywordFormat(CString _keyword, COLORREF _cr, bool _bold = false, bool _italic = false, bool _underline = false, bool _strikeout = false, bool _whole_word = false)
+	CSCKeywordFormat(CString _keyword, Gdiplus::Color _cr, bool _bold = false, bool _italic = false, bool _underline = false, bool _strikeout = false, bool _whole_word = false)
 	{
 		keyword = _keyword;
 		cr = _cr;
@@ -44,7 +44,7 @@ public:
 	}
 
 	CString		keyword;
-	COLORREF	cr;
+	Gdiplus::Color	cr;
 	bool		bold = false;
 	bool		italic = false;
 	bool		underline = false;
@@ -120,15 +120,15 @@ public:
 	//20231004. Append~로 시작되는 4개의 함수를 1개로 간소화한다.
 	//맨 끝에 "\n"을 자동으로 붙여주지 않으므로 필요하다면 addl()함수를 사용한다.
 	//간혹 한 라인에 추가적인 로그를 표시할 필요가 있으므로 add(), addl()를 분리함.
-	CString				add(COLORREF cr, LPCTSTR lpszFormat, ...);
+	CString				add(Gdiplus::Color cr, LPCTSTR lpszFormat, ...);
 	//addl은 add line의 약자로 맨 끝에 "\n"을 추가할 뿐 add와 동일하다.
 	//단, resource의 속성에서 multiline이 체크되어 있어야 한다.
-	CString				addl(COLORREF cr, LPCTSTR lpszFormat, ...);
+	CString				addl(Gdiplus::Color cr, LPCTSTR lpszFormat, ...);
 
-	int					AppendToLog(CString str, COLORREF color = -1, BOOL bAddNewLine = TRUE);	//color가 -1이면 기본 컬러를 사용한다.(m_crText)
+	int					AppendToLog(CString str, Gdiplus::Color color = Gdiplus::Color::Transparent, BOOL bAddNewLine = TRUE);	//color가 Transparent면 기본 컬러(m_theme.cr_text)를 사용한다.
 	void				Append(LPCTSTR lpszFormat, ...);
-	void				Append(COLORREF cr, LPCTSTR lpszFormat, ...);
-	int					AppendToLogAndScroll(CString str, COLORREF color = -1, BOOL bAddNewLine = TRUE);
+	void				Append(Gdiplus::Color cr, LPCTSTR lpszFormat, ...);
+	int					AppendToLogAndScroll(CString str, Gdiplus::Color color = Gdiplus::Color::Transparent, BOOL bAddNewLine = TRUE);
 
 	//한줄씩 deque에 저장된 내용을 모두 합쳐서 rich의 내용을 update한다.
 	void				set_text(std::deque<CString>* dqlist);

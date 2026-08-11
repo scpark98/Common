@@ -289,8 +289,48 @@ Mat			data2Mat( uint8_t *data, int w, int h, int ch );
 	//두 사각형의 겹치는 영역을 리턴한다.
 	cv::Rect	getIntersectionRect( cv::Rect r1, cv::Rect r2 );
 
-	//rTarget에 접하는 dRatio인 최대 사각형을 구한다.
-	cv::Rect	getRatioRect(cv::Rect rTarget, double dRatio);
+	//rTarget에 접하는 dRatio인 최대 사각형을 구한다. 결과는 rTarget 안에 가운데 정렬된다.
+	//20260811 by claude. cv::Rect(정수) 뿐 아니라 cv::Rect2f / cv::Rect2d 로도 쓸 수 있게 템플릿으로 바꿨다.
+	//D2D 처럼 실수 좌표로 그리는 쪽이 정수로 한 번 잘린 값을 다시 받지 않게 하기 위해서다.
+	//정수로 인스턴스화하면 대입 시점의 절삭이 이전 구현과 동일하므로 기존 호출부의 결과는 그대로다.
+	template <typename T>
+	cv::Rect_<T> getRatioRect(cv::Rect_<T> rTarget, double dRatio)
+	{
+		if (rTarget.area() <= 0)
+			return cv::Rect_<T>();
+
+		double dTargetRatio = (double)rTarget.width / (double)rTarget.height;
+
+		bool bResizeWidth;
+
+		if (dRatio > 1.0)
+			bResizeWidth = (dTargetRatio >= dRatio);
+		else
+			bResizeWidth = (dTargetRatio > dRatio);
+
+		cv::Rect_<T> rResult;
+
+		if (bResizeWidth)
+		{
+			rResult.y = rTarget.y;
+			rResult.height = rTarget.height;
+
+			T nNewW = (T)((double)rTarget.height * dRatio);
+			rResult.x = (T)(rTarget.x + (rTarget.width - nNewW) / 2.0);
+			rResult.width = nNewW;
+		}
+		else
+		{
+			rResult.x = rTarget.x;
+			rResult.width = rTarget.width;
+
+			T nNewH = (T)((double)rTarget.width / dRatio);
+			rResult.y = (T)(rTarget.y + (rTarget.height - nNewH) / 2.0);
+			rResult.height = nNewH;
+		}
+
+		return rResult;
+	}
 
 	//두 사각형 겹치는 정도를 r1 기준으로 계산해서 리턴한다.
 	double		getOverlappedRatio( cv::Rect r1, cv::Rect r2 );

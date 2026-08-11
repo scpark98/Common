@@ -1644,58 +1644,7 @@ cv::Rect	getIntersectionRect( cv::Rect r1, cv::Rect r2 )
 }
 
 //rTarget에 접하는 dRatio인 최대 사각형을 구한다.
-cv::Rect	getRatioRect(cv::Rect rTarget, double dRatio)
-{
-	int		w = rTarget.width;
-	int		h = rTarget.height;
-	int		nNewW;
-	int		nNewH;
-	double	dTargetRatio = (double)rTarget.width / (double)rTarget.height;
-
-	cv::Rect	rResult;
-
-	if (rTarget.area() <= 0)
-		return cv::Rect();
-
-	bool bResizeWidth;
-
-	if (dRatio > 1.0)
-	{
-		if (dTargetRatio < dRatio)
-			bResizeWidth = false;
-		else
-			bResizeWidth = true;
-	}
-	else
-	{
-		if (dTargetRatio > dRatio)
-			bResizeWidth = true;
-		else
-			bResizeWidth = false;
-	}
-
-
-	if (bResizeWidth)
-	{
-		rResult.y = rTarget.y;
-		rResult.height = rTarget.height;
-
-		nNewW = (double)(rTarget.height) * dRatio;
-		rResult.x = rTarget.x + (rTarget.width - nNewW) / 2.0;
-		rResult.width = nNewW;
-	}
-	else
-	{
-		rResult.x = rTarget.x;
-		rResult.width = rTarget.width;
-
-		nNewH = (double)(rTarget.width) / dRatio;
-		rResult.y = rTarget.y + (rTarget.height - nNewH) / 2.0;
-		rResult.height = nNewH;
-	}
-
-	return rResult;
-}
+//20260811 by claude. getRatioRect 는 OpenCVFunctions.h 로 옮겨 템플릿이 되었다.
 
 double		getOverlappedRatio( cv::Rect r1, cv::Rect r2 )
 {

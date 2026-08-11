@@ -335,8 +335,19 @@ void CSCSliderCtrl::OnPaint()
 		//트랙 두께는 정수 CRect+1 대신 float 중심 정렬(cy 기준)로 그린다. 기존 (int)(th/2)+1 은
 		//bottom 을 1px 더 내려 위/아래가 비대칭(아래로 1px 더 칠해짐)이었다. style_value 등과 동일 방식으로 통일.
 		rtrack = CRect(pxpos, m_rc.CenterPoint().y - (int)(m_track_height / 2), m_rc.right, m_rc.CenterPoint().y + (int)(m_track_height / 2));
+
+		//20260811 by claude. 이 스타일은 트랙이 컨트롤 높이를 그대로 채우는 용도로 쓰인다(예: 재생 트랙).
+		//AA 가 켜져 있으면 채움의 위/아래 경계 행이 반투명으로 합성되어 아래 배경색이 비친다.
+		//축에 정렬된 사각형이라 AA 로 얻을 것이 없으므로 이 채움에만 끈다.
+		//FillSolidRect(GDI) 로 바꾸지 않은 이유는 알파를 주던 기존 호출자의 결과가 달라지기 때문이다.
+		//고치는 범위를 경계 픽셀 하나로 한정한다.
+		Gdiplus::SmoothingMode old_mode = g.GetSmoothingMode();
+		g.SetSmoothingMode(Gdiplus::SmoothingModeNone);
+
 		g.FillRectangle(&Gdiplus::SolidBrush(cr_inactive),
 			Gdiplus::RectF((Gdiplus::REAL)rtrack.left, (float)cy - m_track_height / 2.0f, (Gdiplus::REAL)rtrack.Width(), m_track_height));
+
+		g.SetSmoothingMode(old_mode);
 	}
 	else if (m_style == style_progress_line)
 	{
@@ -512,8 +523,16 @@ void CSCSliderCtrl::OnPaint()
 	{
 		//inactive 와 동일하게 float 중심 정렬. +1 제거로 active/inactive 의 상하 범위가 정확히 일치.
 		rtrack = CRect(0, m_rc.CenterPoint().y - (int)(m_track_height / 2), pxpos, m_rc.CenterPoint().y + (int)(m_track_height / 2));
+
+		//20260811 by claude. AA 를 끄는 이유는 위 inactive 채움의 주석 참조. 두 채움이 같은 조건이어야
+		//경계에서 색이 어긋나지 않는다.
+		Gdiplus::SmoothingMode old_mode = g.GetSmoothingMode();
+		g.SetSmoothingMode(Gdiplus::SmoothingModeNone);
+
 		g.FillRectangle(&Gdiplus::SolidBrush(cr_active),
 			Gdiplus::RectF((Gdiplus::REAL)rtrack.left, (float)cy - m_track_height / 2.0f, (Gdiplus::REAL)rtrack.Width(), m_track_height));
+
+		g.SetSmoothingMode(old_mode);
 
 		//m_crValueText = RGB(12, 162, 255);
 		//m_cr_active = RGB(128,255,128);

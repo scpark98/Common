@@ -43,6 +43,7 @@
 #include <opencv2/opencv.hpp>
 
 #include "../CSCD2Context/SCD2Context.h"
+#include "../../CSliderCtrl/SCSliderCtrl/SCSliderCtrl.h"
 
 //ffmpeg 헤더를 이 헤더에 노출하지 않기 위한 전방 선언.
 struct AVFrame;
@@ -95,6 +96,10 @@ public:
 	//현재 위치 기준 상대 이동. 0 ~ duration 범위로 clamp 한다.
 	void			seek_relative(double delta_ms);
 
+	//20260811 by claude. 한 프레임 단위 이동. count 가 음수면 뒤로. 재생 중이면 멈춘다.
+	//open() 에서 키프레임 seek 을 꺼두므로 요청한 프레임에 정확히 착지한다.
+	void			step_frame(int count);
+
 	//방향키 탐색 폭(ms). 좌우 방향키 = step, Ctrl + 좌우 = step_large.
 	void			set_seek_step(double step_ms, double step_large_ms) { m_seek_step_ms = step_ms; m_seek_step_large_ms = step_large_ms; }
 
@@ -140,7 +145,15 @@ public:
 	//디바이스 의존 자원을 캐시한다면 이 값이 바뀌었을 때 다시 만들어야 한다.
 	int				get_device_generation() const { return m_device_generation; }
 
-	void			set_back_color(Gdiplus::Color color) { m_cr_back = color; }
+	//20260811 by claude. 재생 트랙도 이 창의 자식이라 배경을 같이 맞춘다.
+	//어긋나면 트랙 채움의 AA 가장자리로 다른 색이 비쳐 선처럼 보인다.
+	void			set_back_color(Gdiplus::Color color)
+					{
+						m_cr_back = color;
+
+						if (m_slider.GetSafeHwnd())
+							m_slider.set_back_color(color);
+					}
 
 protected:
 	afx_msg void	OnPaint();
@@ -149,8 +162,10 @@ protected:
 	afx_msg void	OnDestroy();
 	afx_msg void	OnLButtonDblClk(UINT nFlags, CPoint point);
 	afx_msg void	OnLButtonDown(UINT nFlags, CPoint point);
+	afx_msg void	OnTimer(UINT_PTR nIDEvent);
 	virtual BOOL	PreTranslateMessage(MSG* pMsg);
 	afx_msg LRESULT on_message_CSCVideoWndD2(WPARAM wParam, LPARAM lParam);
+	afx_msg LRESULT on_message_CSCSliderCtrl(WPARAM wParam, LPARAM lParam);
 	DECLARE_MESSAGE_MAP()
 
 	virtual void	PreSubclassWindow();
@@ -165,8 +180,19 @@ private:
 	//디코드된 AVFrame(대개 NV12) → BGRA. sws_getCachedContext 라 포맷이 바뀌어도 자동 대응.
 	bool			convert_to_bgra(AVFrame* frame);
 
+	//프레임의 표시 시각(ms). 시각을 못 구하면 음수.
+	double			frame_position_ms(const AVFrame* frame) const;
+
 	void			render();
 	D2D1_RECT_F		calc_image_rect();
+
+	//20260811 by claude. 재생 트랙은 비디오 창이라면 없을 수 없으므로 호출측에 맡기지 않고 여기서 만든다.
+	void			create_slider();
+
+	//드래그 중 move 마다 seek 하면 디코더가 프레임을 만들 틈이 없어 화면이 멈춘 것처럼 보인다.
+	//leading-edge 로 즉시 한 번 보내고, throttle 창 안의 추가 move 는 마지막 것만 타이머로 미뤄 보낸다.
+	//Endorphin2 의 CEndorphin2Dlg::seek_throttled() 와 같은 방식.
+	void			seek_throttled(int pos_ms);
 
 	CSCD2Context			m_d2context;
 	ComPtr<ID2D1Bitmap1>	m_bitmap;		//동영상 해상도 크기의 스트리밍 텍스처. 한 번만 만들고 픽셀만 교체.
@@ -199,6 +225,20 @@ private:
 	double					m_seek_step_ms = 5000.0;
 	double					m_seek_step_large_ms = 30000.0;
 
+	//20260811 by claude. seek 이 요청한 위치(ms). -1 이면 스킵할 것이 없다는 뜻.
+	//CDecoder 는 target 이하 keyframe 까지만 보장하므로, 거기서 target 까지 프레임을 흘려버리는 일은
+	//pacer 가 한다. 이게 없으면 ±1 프레임 이동이 같은 keyframe 만 반복해 화면이 바뀌지 않는다.
+	std::atomic<double>		m_seek_target_ms{ -1.0 };
+
+	//pts 가 어긋난 파일에서 스킵이 끝나지 않는 것을 막는 상한.
+	enum { seek_skip_limit = 600 };
+
+	//20260811 by claude. 프레임 스텝 전용 위치(ms). -1 이면 무효 — 다음 스텝에서 재생 위치로 새로 잡는다.
+	//스텝마다 m_position_ms 를 다시 읽으면 디코더가 착지한 pts 가 요청 위치와 미세하게 달라
+	//반복 시 오차가 쌓이거나 같은 프레임에 머문다. seek / play 가 이 값을 무효화한다.
+	//(Endorphin2 CDShow::step_frame 의 m_step_anchor_ms 와 같은 이유.)
+	double					m_step_anchor_ms = -1.0;
+
 	//UI 스레드가 밀릴 때 렌더 메시지가 큐에 쌓이지 않도록 하는 게이트.
 	std::atomic<bool>		m_render_pending{ false };
 
@@ -210,4 +250,21 @@ private:
 	overlay_func			m_overlay;
 	dblclick_func			m_dblclick;
 	Gdiplus::Color			m_cr_back = Gdiplus::Color(255, 24, 24, 24);
+
+	//youtube shorts 처럼 하단에 붙는 재생 트랙. 정지 이미지에는 타임라인이 없으므로 숨긴다.
+	enum { slider_height = 5 };
+
+	CSCSliderCtrl			m_slider;
+
+	//드래그 seek throttle. 값은 Endorphin2 와 동일.
+	enum { drag_throttle_ms = 50 };
+	enum { timer_drag_throttle = 1 };
+
+	DWORD					m_drag_last_seek_tick = 0;
+
+	//throttle 창에 걸려 아직 보내지 못한 위치. 없으면 -1.
+	int						m_drag_pending_pos = -1;
+
+	//클릭으로 시작된 조작인지. release 시 seek 여부를 가르는 근거다.
+	bool					m_drag_grabbed = false;
 };

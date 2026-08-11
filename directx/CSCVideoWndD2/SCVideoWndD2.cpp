@@ -14,12 +14,30 @@ BEGIN_MESSAGE_MAP(CSCVideoWndD2, CWnd)
 	ON_WM_DESTROY()
 	ON_WM_LBUTTONDBLCLK()
 	ON_WM_LBUTTONDOWN()
+	ON_WM_TIMER()
 	ON_MESSAGE(Message_CSCVideoWndD2, &CSCVideoWndD2::on_message_CSCVideoWndD2)
+	ON_REGISTERED_MESSAGE(Message_CSCSliderCtrl, &CSCVideoWndD2::on_message_CSCSliderCtrl)
 END_MESSAGE_MAP()
 
 static D2D1_COLOR_F to_d2color(Gdiplus::Color color)
 {
 	return D2D1::ColorF(color.GetR() / 255.0f, color.GetG() / 255.0f, color.GetB() / 255.0f, color.GetA() / 255.0f);
+}
+
+//20260811 by claude. 프레임의 표시 시각(ms). 시각을 못 구하면 음수.
+//ffi::CDecoder 는 best_effort_timestamp 를 채우지 않고 pts 만 넘긴다(ffi_decoder.cpp:1476, 1722).
+//다른 디코더로 바뀌어도 동작하도록 best_effort 를 폴백으로 둔다.
+double CSCVideoWndD2::frame_position_ms(const AVFrame* frame) const
+{
+	if (frame == nullptr || m_decoder == nullptr)
+		return -1.0;
+
+	int64_t timestamp = (frame->pts != AV_NOPTS_VALUE) ? frame->pts : frame->best_effort_timestamp;
+
+	if (timestamp == AV_NOPTS_VALUE)
+		return -1.0;
+
+	return timestamp * av_q2d(m_decoder->video_time_base()) * 1000.0;
 }
 
 CSCVideoWndD2::CSCVideoWndD2()
@@ -38,7 +56,36 @@ void CSCVideoWndD2::PreSubclassWindow()
 
 	init_d2d();
 
+	create_slider();
+
 	CWnd::PreSubclassWindow();
+}
+
+void CSCVideoWndD2::create_slider()
+{
+	if (GetSafeHwnd() == NULL)
+		return;
+
+	CRect rc;
+	GetClientRect(rc);
+
+	//열기 전에는 표시할 구간이 없으므로 WS_VISIBLE 없이 만든다. open() 에서 보인다.
+	m_slider.Create(WS_CHILD, CRect(0, rc.Height() - slider_height, rc.Width(), rc.Height() - 20), this, 0);
+
+	//썸 없이 경과 구간만 칠하는 스타일. 4px 두께에서 썸은 그릴 자리가 없다.
+	m_slider.set_style(CSCSliderCtrl::style_progress);
+	m_slider.set_track_height((float)slider_height);
+	m_slider.set_track_color(Gdiplus::Color::RoyalBlue, Gdiplus::Color(255, 64, 64, 64));
+	m_slider.set_use_slide();
+
+	//기본값이 text_style_value 라 "위치 / 전체" 가 트랙 위에 그려진다. 4px 높이에 글자를 얹을 자리가 없다.
+	m_slider.set_text_style(CSCSliderCtrl::text_style_none);
+
+	//20260811 by claude. 슬라이더는 컨트롤 전체를 배경색으로 칠한 뒤(SCSliderCtrl.cpp:156) 그 위에
+	//GDI+ 로 트랙을 채운다. AntiAlias 가 켜져 있어 채움의 가장자리 한 행이 반투명으로 합성되므로,
+	//배경이 테마 회색이면 그 줄이 비쳐 트랙 위쪽에 회색 선처럼 보인다.
+	//이 컨트롤은 비디오 창의 자식이므로 테마색이 아니라 그 창의 배경색을 써야 한다.
+	m_slider.set_back_color(m_cr_back);
 }
 
 bool CSCVideoWndD2::init_d2d()
@@ -104,6 +151,11 @@ bool CSCVideoWndD2::open(CString path, double start_ms)
 		return false;
 	}
 
+	//20260811 by claude. 키프레임 단위 seek 을 끈다. 이 컨트롤은 미디어 재생기가 아니라 영상처리·검출
+	//도구의 표시부라, 탐색 속도보다 "요청한 위치의 그 프레임" 이 정확히 나오는 것이 중요하다.
+	//켜져 있으면 GOP 가 긴 파일에서 방향키 이동이 같은 키프레임으로 되돌아와 제자리를 맴돈다.
+	m_decoder->set_seek_keyframe_mode(false);
+
 	m_width = m_decoder->video_width();
 	m_height = m_decoder->video_height();
 	m_fps = m_decoder->frame_rate();
@@ -146,6 +198,13 @@ bool CSCVideoWndD2::open(CString path, double start_ms)
 		m_decoder->seek(start_ms);
 		m_decoder->wait_seek_done(3000);
 		m_position_ms = start_ms;
+	}
+
+	if (m_slider.GetSafeHwnd())
+	{
+		m_slider.set_range(0, (int)m_duration_ms);
+		m_slider.set_pos((int)m_position_ms.load());
+		m_slider.ShowWindow(SW_SHOW);
 	}
 
 	m_thread_stop = false;
@@ -210,6 +269,13 @@ void CSCVideoWndD2::seek(double pos_ms)
 	m_decoder->seek(pos_ms);
 	m_position_ms = pos_ms;
 
+	//pacer 가 이 위치 이전 프레임을 흘려버리도록 목표를 남긴다.
+	m_seek_target_ms = pos_ms;
+
+	//프레임 스텝 앵커는 여기서 끊는다. 임의 위치로 뛴 뒤에는 이전 앵커가 의미 없다.
+	//step_frame() 은 이 호출 직후 앵커를 자기 목표값으로 다시 세운다.
+	m_step_anchor_ms = -1.0;
+
 	//일시정지 중이어도 이동한 위치의 화면은 바로 보여야 한다.
 	m_render_one = true;
 }
@@ -242,6 +308,17 @@ bool CSCVideoWndD2::handle_key(UINT key)
 		return true;
 	}
 
+	//20260811 by claude. D / F 로 한 프레임씩 이동. 검출 결과를 프레임 단위로 확인하려면 필수다.
+	//프레임 이동은 정지 상태에서만 의미가 있으므로 재생 중이면 먼저 멈춘다.
+	if (key == 'D' || key == 'F')
+	{
+		m_playing = false;
+
+		step_frame((key == 'D') ? -1 : 1);
+
+		return true;
+	}
+
 	if (key != VK_LEFT && key != VK_RIGHT)
 		return false;
 
@@ -251,6 +328,32 @@ bool CSCVideoWndD2::handle_key(UINT key)
 	seek_relative((key == VK_LEFT) ? -step : step);
 
 	return true;
+}
+
+void CSCVideoWndD2::step_frame(int count)
+{
+	if (m_decoder == nullptr || m_fps <= 0.0)
+		return;
+
+	double interval_ms = 1000.0 / m_fps;
+
+	//앵커가 무효면(외부 seek·재생 직후) 현재 표시 위치에서 새로 시작한다.
+	if (m_step_anchor_ms < 0.0)
+		m_step_anchor_ms = m_position_ms.load();
+
+	double target = m_step_anchor_ms + interval_ms * count;
+
+	if (target < 0.0)
+		target = 0.0;
+
+	if (m_duration_ms > 0.0 && target > m_duration_ms - interval_ms)
+		target = m_duration_ms - interval_ms;
+
+	//seek() 가 앵커를 무효화하므로 그 뒤에 다시 세운다. 다음 스텝은 실제 착지 pts 가 아니라
+	//이 값에서 이어가야 오차가 쌓이지 않는다.
+	seek(target);
+
+	m_step_anchor_ms = target;
 }
 
 BOOL CSCVideoWndD2::PreTranslateMessage(MSG* pMsg)
@@ -330,6 +433,19 @@ void CSCVideoWndD2::close()
 	m_frame_count = 0;
 	m_play_fps = 0.0;
 	m_hw_accel.Empty();
+
+	m_drag_grabbed = false;
+	m_drag_pending_pos = -1;
+	m_drag_last_seek_tick = 0;
+	m_step_anchor_ms = -1.0;
+	m_seek_target_ms = -1.0;
+
+	if (m_slider.GetSafeHwnd())
+	{
+		KillTimer(timer_drag_throttle);
+		m_slider.set_pos(0);
+		m_slider.ShowWindow(SW_HIDE);
+	}
 }
 
 void CSCVideoWndD2::play()
@@ -337,6 +453,9 @@ void CSCVideoWndD2::play()
 	//정지 이미지에는 재생 개념이 없다. pacer 스레드가 없어 상태만 어긋난다.
 	if (m_decoder == nullptr)
 		return;
+
+	//재생을 재개하면 프레임 스텝 앵커는 의미를 잃는다. 다음 스텝은 멈춘 그 위치에서 새로 잡는다.
+	m_step_anchor_ms = -1.0;
 
 	m_playing = true;
 }
@@ -464,8 +583,44 @@ void CSCVideoWndD2::pacer_thread_proc()
 			continue;	//디코더가 아직 못 따라옴 — 직전 프레임을 그대로 둔다.
 		}
 
-		if (frame->best_effort_timestamp != AV_NOPTS_VALUE && m_decoder)
-			m_position_ms = frame->best_effort_timestamp * av_q2d(m_decoder->video_time_base()) * 1000.0;
+		//20260811 by claude. seek 요청 위치 이전 프레임을 흘려버린다.
+		//CDecoder 의 정확 모드가 보장하는 것은 "target 이하 keyframe 착지" 까지고, 거기서 target 까지
+		//forward skip 하는 일은 호출측 몫이다(ffi_decoder.cpp:1320 주석의 source filter 역할).
+		//이게 없으면 ±1 프레임 이동이 같은 keyframe 을 계속 돌려줘 화면이 전혀 바뀌지 않는다.
+		//타이머 대기를 타지 않고 여기서 연속으로 버린다 — 한 프레임씩 대기하면 GOP 길이만큼 지연된다.
+		double seek_target = m_seek_target_ms.load();
+
+		if (seek_target >= 0.0)
+		{
+			//경계에서 반올림으로 한 프레임 더 버리지 않도록 반 프레임 여유를 둔다.
+			double tolerance = (m_fps > 0.0) ? (500.0 / m_fps) : 0.0;
+			int skipped = 0;
+
+			while (frame != nullptr && frame_position_ms(frame) < seek_target - tolerance)
+			{
+				//pts 가 어긋난 파일에서 무한히 버리지 않도록 상한을 둔다.
+				if (++skipped > seek_skip_limit)
+					break;
+
+				av_frame_free(&frame);
+				frame = m_decoder->pop_video_frame();
+			}
+
+			//큐가 아직 안 찼으면 target 을 유지한 채 다음 틱에 이어서 버린다.
+			if (frame == nullptr)
+				continue;
+
+			m_seek_target_ms = -1.0;
+		}
+
+		//20260811 by claude. ffi::CDecoder 는 best_effort_timestamp 를 채우지 않는다. 하드웨어 프레임을
+		//CPU 로 옮길 때 sw_frame->pts = frame->pts 만 복사한다(ffi_decoder.cpp:1476, 1722).
+		//그래서 best_effort_timestamp 만 보면 항상 AV_NOPTS_VALUE 라 재생 위치가 0 에서 멈춘다.
+		//pts 를 우선 쓰고, 다른 디코더로 바뀌어도 동작하도록 best_effort 를 폴백으로 둔다.
+		double frame_ms = frame_position_ms(frame);
+
+		if (frame_ms >= 0.0)
+			m_position_ms = frame_ms;
 
 		bool converted = convert_to_bgra(frame);
 		av_frame_free(&frame);
@@ -504,11 +659,132 @@ LRESULT CSCVideoWndD2::on_message_CSCVideoWndD2(WPARAM wParam, LPARAM)
 
 	render();
 
+	//마우스로 잡고 있는 동안에는 재생 위치로 덮어쓰지 않는다. 서로 밀어내면 트랙이 튄다.
+	//드래그 상태는 컨트롤이 이미 알고 있으므로 따로 들고 있지 않는다.
+	if (m_slider.GetSafeHwnd() && !m_slider.is_lbutton_down() && m_duration_ms > 0.0)
+		m_slider.set_pos((int)m_position_ms.load());
+
+	//20260811 by claude. 트랙 추적용 진단 로그. 동작 확인 후 제거한다. 30 프레임마다 한 줄.
+	if ((wParam % 30) == 0 && m_slider.GetSafeHwnd())
+	{
+		CRect rc_slider;
+		m_slider.GetWindowRect(&rc_slider);
+		ScreenToClient(&rc_slider);
+
+		CRect rc_client;
+		GetClientRect(&rc_client);
+
+		D2D1_RECT_F image_rect = calc_image_rect();
+
+		logWriteI(_T("[frame] frame=%d position=%.0f GetPos=%d lbutton=%d grabbed=%d | client=%dx%d slider=(%d,%d,%d,%d) image=(%.0f,%.0f,%.0f,%.0f)"),
+			(int)wParam, m_position_ms.load(), m_slider.GetPos(),
+			(int)m_slider.is_lbutton_down(), (int)m_drag_grabbed,
+			rc_client.Width(), rc_client.Height(),
+			rc_slider.left, rc_slider.top, rc_slider.right, rc_slider.bottom,
+			image_rect.left, image_rect.top, image_rect.right, image_rect.bottom);
+	}
+
 	CWnd* parent = GetParent();
 	if (parent && parent->GetSafeHwnd())
 		parent->PostMessage(Message_CSCVideoWndD2, wParam, 0);
 
 	return 0;
+}
+
+LRESULT CSCVideoWndD2::on_message_CSCSliderCtrl(WPARAM wParam, LPARAM)
+{
+	CSCSliderCtrlMsg* msg = (CSCSliderCtrlMsg*)wParam;
+
+	if (msg == nullptr)
+		return 0;
+
+	//20260811 by claude. 트랙 조작 추적용 진단 로그. 동작 확인 후 제거한다.
+	logWriteI(_T("[slider] msg=%d pos=%d grabbed=%d pending=%d lbutton=%d position=%.0f"),
+		msg->msg, msg->pos, (int)m_drag_grabbed, m_drag_pending_pos,
+		(int)m_slider.is_lbutton_down(), m_position_ms.load());
+
+	//20260811 by claude. 조작 처리 방식은 Endorphin2 의 트랙(CControlDlg + CEndorphin2Dlg)을 따랐다.
+	switch (msg->msg)
+	{
+	//grab 은 "잡았다" 가 아니라 PotPlayer 식으로 "클릭한 위치" 를 실어 온다(SCSliderCtrl.cpp:1186).
+	//여기서 seek 하지 않으면 트랙 클릭이 통째로 무시된다.
+	case CSCSliderCtrlMsg::msg_thumb_grab:
+		m_drag_grabbed = true;
+		seek_throttled(msg->pos);
+		break;
+
+	case CSCSliderCtrlMsg::msg_thumb_move:
+		seek_throttled(msg->pos);
+		break;
+
+	//놓을 때 무조건 seek 하면 안 된다. throttle 이 이미 마지막 위치로 보냈고 그 뒤로 영상이 앞으로
+	//흘렀는데 release 지점으로 다시 보내면 재생이 뒤로 되돌아간다.
+	//- grab 없이 release 만 온 경우: 그 위치로 보낸다.
+	//- 아직 못 보낸 위치가 남아 있으면: 그 위치로 보낸다.
+	//- 둘 다 아니면 보내지 않는다.
+	case CSCSliderCtrlMsg::msg_thumb_release:
+		{
+			KillTimer(timer_drag_throttle);
+
+			int seek_pos = -1;
+
+			if (!m_drag_grabbed)
+				seek_pos = msg->pos;
+			else if (m_drag_pending_pos >= 0)
+				seek_pos = m_drag_pending_pos;
+
+			if (seek_pos >= 0)
+			{
+				seek((double)seek_pos);
+				m_drag_last_seek_tick = GetTickCount();
+			}
+
+			m_drag_pending_pos = -1;
+			m_drag_grabbed = false;
+		}
+		break;
+	}
+
+	return 0;
+}
+
+void CSCVideoWndD2::seek_throttled(int pos_ms)
+{
+	DWORD now = GetTickCount();
+	DWORD elapsed = now - m_drag_last_seek_tick;
+
+	if (m_drag_last_seek_tick == 0 || elapsed >= drag_throttle_ms)
+	{
+		seek((double)pos_ms);
+		m_drag_last_seek_tick = now;
+		m_drag_pending_pos = -1;
+		KillTimer(timer_drag_throttle);
+	}
+	else
+	{
+		//throttle 창 안이면 발화를 미룬다. 남은 시간 뒤에 마지막 위치 하나만 보낸다.
+		m_drag_pending_pos = pos_ms;
+		SetTimer(timer_drag_throttle, drag_throttle_ms - elapsed, NULL);
+	}
+}
+
+void CSCVideoWndD2::OnTimer(UINT_PTR nIDEvent)
+{
+	if (nIDEvent == timer_drag_throttle)
+	{
+		KillTimer(timer_drag_throttle);
+
+		if (m_drag_pending_pos >= 0)
+		{
+			seek((double)m_drag_pending_pos);
+			m_drag_last_seek_tick = GetTickCount();
+			m_drag_pending_pos = -1;
+		}
+
+		return;
+	}
+
+	CWnd::OnTimer(nIDEvent);
 }
 
 D2D1_RECT_F CSCVideoWndD2::calc_image_rect()
@@ -615,6 +891,9 @@ BOOL CSCVideoWndD2::OnEraseBkgnd(CDC*)
 void CSCVideoWndD2::OnSize(UINT nType, int cx, int cy)
 {
 	CWnd::OnSize(nType, cx, cy);
+
+	if (m_slider.GetSafeHwnd() && cx > 0 && cy > 0)
+		m_slider.MoveWindow(0, cy - slider_height, cx, slider_height);
 
 	if (m_d2d_ready && cx > 0 && cy > 0)
 	{

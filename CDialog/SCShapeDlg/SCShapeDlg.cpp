@@ -381,18 +381,42 @@ CSCShapeDlgTextSetting* CSCShapeDlg::set_text(CWnd* parent, CString text,
 	//cr_back 이 Transparent 여도 stroke / shadow 가 있으면 비트맵을 그만큼 키워야
 	//SCParagraph::draw_text 의 path 가장자리·그림자 offset 이 잘리지 않는다.
 	//shadow_depth < 0 (자동) 인 경우 SCParagraph::draw_text 의 자동 계산식과 같은 추정으로 여유를 잡는다.
-	float shadow_extra = m_text_setting.text_prop.shadow_depth;
-	float blur_extra = 0.0f;
-	if (shadow_extra != 0.0f)
+	//<st>/<sd>/<sb>/<glow>/<style> 로 run 마다 base 설정보다 두꺼운 외곽선·그림자·발광이 섞일 수 있다.
+	//base(text_prop) 값만 보고 여백을 잡으면 그런 run 이 캔버스 밖으로 잘리므로 전 run 의 최대값을 쓴다.
+	float max_thickness = m_text_setting.text_prop.thickness;
+	float max_shadow_depth = fabs(m_text_setting.text_prop.shadow_depth);
+	float max_sigma = 0.0f;
+
+	for (auto& line : m_para)
 	{
-		shadow_extra = max((float)r.Height() / 30.0f, 2.0f);
-		//Gaussian blur 그림자가 활성화되어 있으면 sigma 의 약 3배까지 번지므로 그만큼 추가 여유를 준다.
-		blur_extra = m_text_setting.text_prop.shadow_blur_sigma;// *3.0f;
+		for (auto& run : line)
+		{
+			max_thickness = max(max_thickness, run.text_prop.thickness);
+			max_shadow_depth = max(max_shadow_depth, fabs(run.text_prop.shadow_depth));
+
+			if (run.text_prop.shadow_depth != 0.0f)
+				max_sigma = max(max_sigma, run.text_prop.shadow_blur_sigma);
+
+			//glow 는 offset 없이 사방으로 sigma 만큼 번지므로 같은 여백이 필요하다.
+			if (run.text_prop.cr_glow.GetA() > 0)
+				max_sigma = max(max_sigma, run.text_prop.glow_sigma);
+		}
 	}
+
+	float shadow_extra = 0.0f;
+	if (max_shadow_depth != 0.0f)
+	{
+		//shadow_depth < 0 (자동) 인 경우 SCParagraph::draw_text 의 자동 계산식과 같은 추정으로 여유를 잡는다.
+		shadow_extra = max((float)r.Height() / 30.0f, 2.0f);
+		shadow_extra = max(shadow_extra, max_shadow_depth);
+	}
+
+	//Gaussian blur 그림자·발광이 활성화되어 있으면 sigma 만큼 번지므로 그만큼 추가 여유를 준다.
+	float blur_extra = max_sigma;
 
 	//thickness 는 GDI+ Pen LineJoinRound + anti-alias 로 stroke 가 path 양쪽 외부에까지 번진다.
 	//calc_text_rect 가 path bounds 보다 약간 좁게 잡는 경우 글자 위/아래 디센더가 잘리는 회귀가 있어 +6 의 여유 추가.
-	int extra = (int)(m_text_setting.text_prop.thickness + shadow_extra + blur_extra) + 6;
+	int extra = (int)(max_thickness + shadow_extra + blur_extra) + 6;
 	if (extra > 0)
 		r.InflateRect(extra, extra / 2);
 	//호출자가 SetWindowPos 시 글자 첫 픽셀 정렬을 위해 보정할 수 있도록 노출.

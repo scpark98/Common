@@ -109,6 +109,105 @@ void CSCParagraph::clear_styles()
 	style_map().clear();
 }
 
+//<img=별칭> 등록표. 값은 파일 경로 또는 "#타입:id" / "#id" 형태의 리소스 스펙.
+static std::map<CString, CString>& image_alias_map()
+{
+	static std::map<CString, CString> m;
+	return m;
+}
+
+//로드 결과 캐시. 매 렌더마다 디코드하지 않도록 스펙 문자열을 키로 보관한다.
+//로드 실패도 NULL 로 캐시해 실패한 경로를 반복해서 재시도하지 않는다.
+static std::map<CString, CSCGdiplusBitmap*>& image_cache()
+{
+	static std::map<CString, CSCGdiplusBitmap*> m;
+	return m;
+}
+
+void CSCParagraph::register_image(LPCTSTR name, LPCTSTR file)
+{
+	CString key(name);
+	key.MakeLower();
+	image_alias_map()[key] = file;
+}
+
+void CSCParagraph::register_image(LPCTSTR name, LPCTSTR res_type, UINT res_id)
+{
+	CString key(name);
+	key.MakeLower();
+
+	CString spec;
+	spec.Format(_T("#%s:%u"), res_type, res_id);
+	image_alias_map()[key] = spec;
+}
+
+void CSCParagraph::clear_images()
+{
+	for (auto& it : image_cache())
+		delete it.second;
+
+	image_cache().clear();
+	image_alias_map().clear();
+}
+
+CSCGdiplusBitmap* CSCParagraph::get_image(LPCTSTR key)
+{
+	CString k(key);
+	if (k.IsEmpty())
+		return NULL;
+
+	//별칭으로 등록돼 있으면 실제 파일 경로 / 리소스 스펙으로 치환한다.
+	CString lower = k;
+	lower.MakeLower();
+
+	auto alias = image_alias_map().find(lower);
+	CString spec = (alias != image_alias_map().end()) ? alias->second : k;
+
+	auto cached = image_cache().find(spec);
+	if (cached != image_cache().end())
+		return cached->second;
+
+	CSCGdiplusBitmap* img = new CSCGdiplusBitmap();
+	bool ok = false;
+
+	if (spec[0] == _T('#'))
+	{
+		//"#PNG:142" = 타입 지정 리소스, "#142" = 타입 없이 id 만.
+		CString body = spec.Mid(1);
+		int colon = body.Find(_T(':'));
+
+		if (colon >= 0)
+		{
+			CString res_type = body.Left(colon);
+			UINT    res_id = (UINT)_ttoi(body.Mid(colon + 1));
+
+			//ICON 은 커스텀 데이터 리소스가 아니라 GDI 아이콘 리소스라 전용 로더가 필요하다.
+			//48px 로 뽑아 두고 배치 단계에서 요청 높이로 축소한다 (인라인 아이콘은 대개 그보다 작다).
+			if (res_type.CompareNoCase(_T("ICON")) == 0)
+				ok = img->load_icon(res_id, 48);
+			else
+				ok = img->load(res_type, res_id);
+		}
+		else
+		{
+			ok = img->load((UINT)_ttoi(body));
+		}
+	}
+	else
+	{
+		ok = img->load(spec);
+	}
+
+	if (!ok)
+	{
+		delete img;
+		img = NULL;
+	}
+
+	image_cache()[spec] = img;
+	return img;
+}
+
 //text의 태그를 파싱하여 각 구문의 속성을 설정한 후 para에 저장한다.
 //cr_text, cr_back은 글자, 배경 기본값
 void CSCParagraph::build_paragraph_str(CString& text, std::deque<std::deque<CSCParagraph>>& para, CSCTextProperty* text_prop)
@@ -136,6 +235,7 @@ void CSCParagraph::build_paragraph_str(CString& text, std::deque<std::deque<CSCP
 	//바로 다음 run 하나에만 적용되는 값.
 	int     pending_tab_x = -1;
 	CString pending_id;
+	CString pending_ruby;
 
 	//태그별 속성 스택. 닫는 태그가 "자기 그룹의 필드만" 되돌리므로
 	//<b><cr=red>This</b></cr> 처럼 교차 중첩된 기존 문서도 그대로 동작하면서
@@ -432,6 +532,62 @@ void CSCParagraph::build_paragraph_str(CString& text, std::deque<std::deque<CSCP
 			para_temp.text_prop = pop_attr(_T("style"));
 		}
 
+		//---- 루비(본문 위 작은 주석) ----
+		else if (name == _T("ruby"))
+		{
+			//바로 다음 텍스트 run 하나에 붙는다. <ruby=にほんご>日本語</ruby> 형태로 쓰며 </ruby> 는 생략 가능.
+			pending_ruby = value;
+		}
+		else if (name == _T("/ruby"))
+		{
+			//붙일 run 없이 닫힌 경우를 대비해 비운다.
+			pending_ruby.Empty();
+		}
+		else if (name == _T("cru"))
+		{
+			push_attr(_T("cru"));
+			para_temp.text_prop.cr_ruby = get_color(value);
+		}
+		else if (name == _T("/cru"))
+		{
+			para_temp.text_prop.cr_ruby = pop_attr(_T("cru")).cr_ruby;
+		}
+
+		//---- 인라인 이미지 ----
+		else if (name == _T("img"))
+		{
+			//이미지는 텍스트가 없는 독립 run 이므로 태그를 만난 자리에서 바로 push 한다.
+			CSCParagraph run = para_temp;
+			run.text.Empty();
+			run.img_key = value;
+			run.img_height = 0;
+
+			//"경로,높이" 에서 높이만 떼어낸다. 마지막 콤마 뒤가 전부 숫자일 때만 높이로 보므로
+			//"D:\a,b\x.png" 처럼 경로에 콤마가 들어 있어도 안전하다.
+			int comma = value.ReverseFind(_T(','));
+			if (comma >= 0)
+			{
+				CString tail = value.Mid(comma + 1);
+				bool all_digit = !tail.IsEmpty();
+
+				for (int k = 0; k < tail.GetLength() && all_digit; k++)
+					all_digit = (tail[k] >= _T('0') && tail[k] <= _T('9'));
+
+				if (all_digit)
+				{
+					run.img_key = value.Left(comma);
+					run.img_height = _ttoi(tail);
+				}
+			}
+
+			run.tab_x = pending_tab_x;
+			run.id = pending_id;
+			pending_tab_x = -1;
+			pending_id.Empty();
+
+			para_line.push_back(run);
+		}
+
 		//---- 다음 run 하나에만 적용 ----
 		else if (name == _T("id"))
 		{
@@ -491,6 +647,7 @@ void CSCParagraph::build_paragraph_str(CString& text, std::deque<std::deque<CSCP
 			run.text = tag;
 			run.tab_x = pending_tab_x;
 			run.id = pending_id;
+			run.ruby = pending_ruby;
 
 			//<sp> 자간은 "글자 사이" 간격이므로 run 을 글자 단위로 쪼개야 한다.
 			//calc_text_rect 가 인접 run 사이에 char_spacing 을 넣어주므로 쪼개기만 하면 그대로 자간이 된다.
@@ -505,6 +662,7 @@ void CSCParagraph::build_paragraph_str(CString& text, std::deque<std::deque<CSCP
 					{
 						one.tab_x = -1;
 						one.id.Empty();
+						one.ruby.Empty();
 					}
 					para_line.push_back(one);
 				}
@@ -516,6 +674,7 @@ void CSCParagraph::build_paragraph_str(CString& text, std::deque<std::deque<CSCP
 
 			pending_tab_x = -1;
 			pending_id.Empty();
+			pending_ruby.Empty();
 		}
 	}
 
@@ -844,6 +1003,9 @@ CRect CSCParagraph::calc_text_rect(CRect rc, CDC* pDC, std::deque<std::deque<CSC
 	{
 		CSize sz_text = CSize(0, 0);
 
+		//이 라인에서 <sup> 등으로 라인 top 위로 올라간 최대 픽셀 수.
+		int line_rise = 0;
+
 		for (j = 0; j < para[i].size(); j++)
 		{
 			//char_spacing: 같은 라인의 두 번째 run 부터 spacing 만큼 left 를 미리 옮긴다 (run 사이 간격).
@@ -881,6 +1043,33 @@ CRect CSCParagraph::calc_text_rect(CRect rc, CDC* pDC, std::deque<std::deque<CSC
 #else
 			Gdiplus::Font* font = NULL;
 			para[i][j].get_paragraph_font(g, &font);
+
+			//<img=...> run — 텍스트 대신 이미지를 한 글자처럼 배치한다.
+			//높이 0 이면 이 run 의 폰트 높이에 맞춘다 → <la=vcenter> 와 조합하면 "아이콘 + 텍스트" 가 자동 정렬된다.
+			if (!para[i][j].img_key.IsEmpty())
+			{
+				CSCGdiplusBitmap* img = CSCParagraph::get_image(para[i][j].img_key);
+
+				int img_h = para[i][j].img_height;
+				if (img_h <= 0)
+					img_h = (int)font->GetHeight(&g);
+
+				int img_w = (img && img->height > 0)
+							? (int)((float)img->width * img_h / img->height + 0.5f)
+							: img_h;	//로드 실패 시 정사각 자리만 잡아 레이아웃이 무너지지 않게 한다.
+
+				sz.cx = img_w;
+				sz.cy = img_h;
+				para[i][j].r = make_rect(sz_text.cx, sy, sz.cx, sz.cy);
+				para[i][j].ink_height = (float)img_h;
+
+				sz_text.cx += sz.cx;
+				sz_text.cy = MAX(sz_text.cy, sz.cy);
+
+				delete font;
+				continue;
+			}
+
 			Gdiplus::RectF boundRect;
 			Gdiplus::RectF boundRect_temp;
 
@@ -903,9 +1092,16 @@ CRect CSCParagraph::calc_text_rect(CRect rc, CDC* pDC, std::deque<std::deque<CSC
 			para[i][j].r = make_rect(sz_text.cx, sy, sz.cx, sz.cy);
 
 			//<sup>/<sub> — 폰트는 이미 script_scale 로 작아진 상태이고, 여기서 baseline 만 위/아래로 옮긴다.
-			//라인 높이(아래 sz_text.cy)는 이동 전 박스로 계산해 첨자가 줄 간격을 흔들지 않게 둔다.
+			//위로 올라간 만큼(line_rise)은 라인 루프가 끝난 뒤 라인 전체를 내리고 라인 높이를 키워 흡수한다.
+			//그렇게 하지 않으면 첫 줄의 <sup> 이 캔버스 상단 밖으로 나가 잘린다.
 			if (para[i][j].text_prop.script_offset != 0.0f)
-				para[i][j].r.OffsetRect(0, (int)(para[i][j].text_prop.script_offset * sz.cy));
+			{
+				int script_dy = (int)(para[i][j].text_prop.script_offset * sz.cy);
+				para[i][j].r.OffsetRect(0, script_dy);
+
+				if (script_dy < 0)
+					line_rise = MAX(line_rise, -script_dy);
+			}
 
 			//<ls> 줄간격용 실제 글자 높이 — sz.cy(=boundRect.Height) 는 MeasureString 의 라인 높이(박스)로 폰트 ascent/descent/leading 을 포함해 실제 글자보다 크다.
 			//set_line_spacing 이 '여백 = box - 글자높이' 로 여백만 ls 배율 적용하므로, 실제 글자 윤곽 높이를 GraphicsPath 로 직접 잰다.
@@ -921,11 +1117,55 @@ CRect CSCParagraph::calc_text_rect(CRect rc, CDC* pDC, std::deque<std::deque<CSC
 					para[i][j].ink_height = ink_bounds.Height + para[i][j].text_prop.thickness;
 			}
 #endif
+			//<ruby=주석> — 본문 위에 ruby_scale 배 크기의 주석을 얹는다.
+			//r 은 [루비 + 본문] 전체 박스가 되고 폭은 max(본문, 루비) 라 좁은 쪽이 가운데로 정렬된다.
+			//본문 글자의 실제 출력 위치는 get_text_origin() 이 돌려준다.
+			if (!para[i][j].ruby.IsEmpty())
+			{
+				CSCParagraph ruby_run;
+				ruby_run.text_prop = para[i][j].text_prop;
+				ruby_run.text_prop.size *= para[i][j].text_prop.ruby_scale;
+
+				Gdiplus::Font* ruby_font = NULL;
+				ruby_run.get_paragraph_font(g, &ruby_font);
+
+				Gdiplus::RectF rubyRect, rubyRect_temp;
+				g.MeasureString(CStringW(para[i][j].ruby + _T("|")), -1, ruby_font, Gdiplus::PointF(0, 0), sf.GenericTypographic(), &rubyRect);
+				g.MeasureString(L"|", -1, ruby_font, Gdiplus::PointF(0, 0), sf.GenericTypographic(), &rubyRect_temp);
+				delete ruby_font;
+
+				int ruby_w = (int)(rubyRect.Width - rubyRect_temp.Width);
+				int ruby_h = (int)rubyRect.Height;
+				int base_w = sz.cx;
+				int advance = MAX(base_w, ruby_w);
+
+				para[i][j].ruby_height = (float)ruby_h;
+				para[i][j].base_dx = (advance - base_w) / 2;
+				para[i][j].ruby_dx = (advance - ruby_w) / 2;
+
+				sz.cx = advance;
+				sz.cy += ruby_h;
+				para[i][j].r = make_rect(sz_text.cx, sy, sz.cx, sz.cy);
+
+				//루비도 '글자' 이므로 ink 로 친다 — <ls=0> 에서 루비 높이가 여백으로 깎여 윗줄과 겹치는 것을 막는다.
+				para[i][j].ink_height += (float)ruby_h;
+			}
+
 			//TRACE(_T("[%d][%d] text = %s, sz = %dx%d, r = %s\n"), i, j, para[i][j].text, sz.cx, sz.cy, get_rect_info_string(para[i][j].r));
 			sz_text.cx += sz.cx;
 
 			//한 라인에서 가장 cy가 큰 값을 기억시킨다.
 			sz_text.cy = MAX(sz_text.cy, sz.cy);
+		}
+
+		//<sup> 이 라인 박스 위로 삐져나간 만큼 라인 전체를 내리고 라인 높이를 키운다.
+		//이렇게 해야 첫 줄의 첨자도 캔버스 안에 들어오고, 아랫줄과의 간격도 그만큼 유지된다.
+		if (line_rise > 0)
+		{
+			for (j = 0; j < para[i].size(); j++)
+				para[i][j].r.OffsetRect(0, line_rise);
+
+			sz_text.cy += line_rise;
 		}
 
 		//각 라인들 중에서 최대 너비를 구한다.
@@ -1546,11 +1786,13 @@ CRect CSCParagraph::draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCPar
 						off.y = max(off.y, (LONG)(para[i][j].text_prop.thickness / 1.4f));
 					}
 
+					CPoint pt_base = para[i][j].get_text_origin();
+
 					Gdiplus::GraphicsPath shadow_path;
 					shadow_path.SetFillMode(Gdiplus::FillModeWinding);
 					shadow_path.AddString(CStringW(para[i][j].text), para[i][j].text.GetLength(), ff,
 						para[i][j].text_prop.style, emSize,
-						Gdiplus::Point(para[i][j].r.left + off.x, para[i][j].r.top + off.y),
+						Gdiplus::Point(pt_base.x + off.x, pt_base.y + off.y),
 						sf.GenericTypographic());
 
 					Gdiplus::SolidBrush br_shadow(para[i][j].text_prop.cr_shadow);
@@ -1619,11 +1861,13 @@ CRect CSCParagraph::draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCPar
 
 						float emSize = fDpiY * para[i][j].text_prop.size * para[i][j].text_prop.script_scale / 72.0f;
 
+						CPoint pt_base = para[i][j].get_text_origin();
+
 						Gdiplus::GraphicsPath glow_path;
 						glow_path.SetFillMode(Gdiplus::FillModeWinding);
 						glow_path.AddString(CStringW(para[i][j].text), para[i][j].text.GetLength(), ff,
 							para[i][j].text_prop.style, emSize,
-							Gdiplus::Point(para[i][j].r.left, para[i][j].r.top), sf.GenericTypographic());
+							Gdiplus::Point(pt_base.x, pt_base.y), sf.GenericTypographic());
 
 						Gdiplus::SolidBrush br_glow(para[i][j].text_prop.cr_glow);
 						Gdiplus::Pen pen_glow(para[i][j].text_prop.cr_glow, para[i][j].text_prop.glow_sigma);
@@ -1675,6 +1919,23 @@ CRect CSCParagraph::draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCPar
 					(int)para[i][j].text_prop.box_round, 0);
 			}
 
+			//<img=...> run — 계산된 r 에 이미지를 그리고 끝낸다.
+			if (!para[i][j].img_key.IsEmpty())
+			{
+				CSCGdiplusBitmap* img = CSCParagraph::get_image(para[i][j].img_key);
+				if (img && img->m_pBitmap)
+				{
+					Gdiplus::InterpolationMode old_interp = g.GetInterpolationMode();
+					g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
+					g.DrawImage(img->m_pBitmap,
+						Gdiplus::Rect(para[i][j].r.left, para[i][j].r.top, para[i][j].r.Width(), para[i][j].r.Height()));
+					g.SetInterpolationMode(old_interp);
+				}
+
+				//이 run 의 r 은 함수 끝의 합집합 계산에 이미 포함되므로 여기서 따로 누적할 필요가 없다.
+				continue;
+			}
+
 			Gdiplus::FontFamily* fontFamily = new Gdiplus::FontFamily((WCHAR*)(const WCHAR*)CStringW(para[i][j].text_prop.name));
 
 			//시스템에 등록되지 않은 폰트를 설정할 경우 ff는 null이므로 기본 폰트로라도 대체시켜야 한다.
@@ -1712,9 +1973,11 @@ CRect CSCParagraph::draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCPar
 						: Gdiplus::TextRenderingHintClearTypeGridFit);
 				}
 
+				CPoint pt_base = para[i][j].get_text_origin();
+
 				Gdiplus::SolidBrush text_brush(para[i][j].text_prop.cr_text);
 				g.DrawString(CStringW(para[i][j].text), -1, font,
-					Gdiplus::PointF((Gdiplus::REAL)para[i][j].r.left, (Gdiplus::REAL)para[i][j].r.top), sf.GenericTypographic(), &text_brush);
+					Gdiplus::PointF((Gdiplus::REAL)pt_base.x, (Gdiplus::REAL)pt_base.y), sf.GenericTypographic(), &text_brush);
 			}
 			else
 			{
@@ -1728,7 +1991,11 @@ CRect CSCParagraph::draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCPar
 				//AddString() 파라미터 중 출력위치를 줄 때 Gdiplus::Rect() 또는 Gdiplus::Point()로 줄 수 있는데
 				//stroke 또는 shadow가 추가되어 r이 작으면 텍스트가 출력되지 않는 현상이 있다.
 				//r을 정확히 계산하는 것이 정석이나 굳이 r을 주지 않고 Gdiplus::Point()로 주면 문제되지 않는다.
+				//ruby 가 붙은 run 은 r 이 [루비 + 본문] 전체 박스이므로 본문 글자의 출력 원점을 따로 구한다.
+				//ruby 가 없으면 get_text_origin() == r 의 좌상단이라 기존과 동일하다.
 				CRect r = para[i][j].r;
+				r.MoveToXY(para[i][j].get_text_origin());
+
 				str_path.AddString(CStringW(para[i][j].text), para[i][j].text.GetLength(), fontFamily,
 					para[i][j].text_prop.style, emSize, Gdiplus::Point(r.left, r.top), sf.GenericTypographic());
 
@@ -1840,6 +2107,7 @@ CRect CSCParagraph::draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCPar
 							Gdiplus::GraphicsPath sp;
 							sp.SetFillMode(Gdiplus::FillModeWinding);
 							CRect rs = para[i][j].r;
+							rs.MoveToXY(para[i][j].get_text_origin());
 							rs.OffsetRect((int)shx, (int)shy);
 							sp.AddString(CStringW(para[i][j].text), para[i][j].text.GetLength(), fontFamily,
 								para[i][j].text_prop.style, emSize, Gdiplus::Point(rs.left, rs.top), sf.GenericTypographic());
@@ -1947,6 +2215,50 @@ CRect CSCParagraph::draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCPar
 						g.FillPath(brush, &str_path);
 					}
 				}
+			}
+
+			//<ruby=주석> — 본문 위 작은 주석.
+			//본문에 외곽선이 있으면 같은 비율로 줄인 외곽선을 함께 준다. 영상 위 자막에서 루비만 외곽선이 없으면
+			//그 부분만 배경에 묻혀 안 읽히기 때문이다.
+			if (!para[i][j].ruby.IsEmpty())
+			{
+				CSCParagraph ruby_run;
+				ruby_run.text_prop = para[i][j].text_prop;
+				ruby_run.text_prop.size *= para[i][j].text_prop.ruby_scale;
+
+				Gdiplus::Font* ruby_font = NULL;
+				ruby_run.get_paragraph_font(g, &ruby_font);
+
+				Gdiplus::Color cr_ruby = (para[i][j].text_prop.cr_ruby.GetA() > 0)
+										 ? para[i][j].text_prop.cr_ruby : para[i][j].text_prop.cr_text;
+
+				CPoint pt_ruby(para[i][j].r.left + para[i][j].ruby_dx, para[i][j].r.top);
+
+				if (para[i][j].text_prop.thickness > 0.0f)
+				{
+					float ruby_em = fDpiY * ruby_run.text_prop.size * ruby_run.text_prop.script_scale / 72.0f;
+
+					Gdiplus::GraphicsPath ruby_path;
+					ruby_path.SetFillMode(Gdiplus::FillModeWinding);
+					ruby_path.AddString(CStringW(para[i][j].ruby), para[i][j].ruby.GetLength(), fontFamily,
+						para[i][j].text_prop.style, ruby_em, Gdiplus::Point(pt_ruby.x, pt_ruby.y), sf.GenericTypographic());
+
+					Gdiplus::Pen ruby_pen(para[i][j].text_prop.cr_stroke,
+						para[i][j].text_prop.thickness * para[i][j].text_prop.ruby_scale);
+					ruby_pen.SetLineJoin(Gdiplus::LineJoinRound);
+
+					Gdiplus::SolidBrush ruby_brush(cr_ruby);
+					g.DrawPath(&ruby_pen, &ruby_path);
+					g.FillPath(&ruby_brush, &ruby_path);
+				}
+				else
+				{
+					Gdiplus::SolidBrush ruby_brush(cr_ruby);
+					g.DrawString(CStringW(para[i][j].ruby), -1, ruby_font,
+						Gdiplus::PointF((Gdiplus::REAL)pt_ruby.x, (Gdiplus::REAL)pt_ruby.y), sf.GenericTypographic(), &ruby_brush);
+				}
+
+				delete ruby_font;
 			}
 #endif
 

@@ -57,6 +57,15 @@
 	<tab=170>				//다음 run 의 라인 내 시작 x 를 강제. 열 맞추기용. 이미 지난 위치면 무시.
 	<nowrap> </nowrap>		//word-wrap 이 이 구간을 쪼개지 않는다. "홍길동 님", "12.5 GB" 처럼 붙어야 하는 덩어리용.
 
+	[루비 / 이미지]
+	<ruby=にほんご>日本語</ruby>	//본문 위에 0.5배 크기 주석을 얹는다. 바로 다음 텍스트 run 하나에 붙으며 </ruby> 는 생략 가능.
+							//run 폭 = max(본문, 루비) 라 좁은 쪽이 가운데 정렬되고, 본문에 외곽선이 있으면 루비도 같은 비율로 받는다.
+	<cru=gray>				//루비 색. 미지정이면 본문 색(cr_text)을 그대로 쓴다.
+	<img=rec,24>			//register_image() 로 등록한 별칭. 높이 0 이면 그 자리 폰트 높이에 맞춘다.
+	<img=D:\icons\rec.png,24>	//외부 파일 직접 지정. 마지막 콤마 뒤가 전부 숫자일 때만 높이로 해석하므로 경로에 콤마가 있어도 안전.
+	<img=#142,24>			//리소스 id 직접 지정. <img=#PNG:142,24> 는 리소스 타입까지 지정.
+							//태그는 런타임 문자열이라 IDB_XXX 심볼을 못 읽으므로 리소스는 register_image() 별칭 사용을 권장.
+
 	[묶음 / 식별]
 	<style=title> </style>	//CSCParagraph::register_style() 로 등록해 둔 속성 묶음을 통째로 적용
 	<id=score>				//다음 run 에 이름을 붙인다. 렌더에는 영향 없고 호출자가 특정 run 을 찾아 갱신/hit-test 하는 용도.
@@ -79,6 +88,8 @@
 	- calc_text_rect()에서 각 항목이 출력될 위치까지 모두 계산되고 OnPaint()에서는 정해진 위치에 그리기만 한다.
 
 */
+
+class CSCGdiplusBitmap;
 
 //기존 LOGFONT는 GDI용이고 fontsize가 int만 지원되거나, lfFaceName이 TCHAR [] 등
 //불편한 점이 많으므로 Gdi+에서도 사용할 수 있도록 CSCTextProperty 클래스를 정의함.
@@ -135,6 +146,11 @@ public:
 
 	//<nowrap> 구간 — word wrap 이 이 run 을 쪼개지 않는다.
 	bool		nowrap = false;
+
+	//<ruby=주석> 의 주석 글자 크기 배율(본문 대비)과 색.
+	//cr_ruby 가 Transparent 면 본문 색(cr_text)을 그대로 쓴다. <cru=색> 으로 따로 지정.
+	float		ruby_scale = 0.5f;
+	Gdiplus::Color cr_ruby = Gdiplus::Color::Transparent;
 };
 
 class CSCParagraph
@@ -180,6 +196,23 @@ public:
 	//<id=이름> run 식별자. 렌더에는 영향 없고 호출자가 특정 run 을 찾아 부분 갱신/hit-test 하는 용도.
 	CString			id;
 
+	//<ruby=주석> — 이 run 의 본문 위에 얹을 작은 주석. 비어 있으면 ruby 없음.
+	CString			ruby;
+
+	//아래 셋은 calc_text_rect 가 채운다. ruby 가 없으면 모두 0 이라 기존 경로와 완전히 동일하게 동작한다.
+	//r 은 [루비 + 본문] 을 합친 박스이고, 본문 글자는 그 안에서 (base_dx, ruby_height) 만큼 들어간 곳에 그려진다.
+	//폭은 max(본문, 루비) 라 좁은 쪽이 가운데로 정렬된다.
+	float			ruby_height = 0.0f;
+	int				base_dx = 0;
+	int				ruby_dx = 0;
+
+	//<img=...> — 이 run 은 텍스트 대신 이미지를 한 글자처럼 배치한다. 비어 있으면 이미지 run 이 아니다.
+	CString			img_key;
+	int				img_height = 0;		//0 = 이 run 의 폰트 높이에 맞춘다.
+
+	//본문 글자를 그릴 좌상단. ruby 가 없으면 r 의 좌상단과 같다.
+	CPoint			get_text_origin() const { return CPoint(r.left + base_dx, r.top + (int)ruby_height); }
+
 	//calc_text_rect 가 채우는 실측 글자 높이(폰트 ascent+descent 기준). r.Height()(글자 박스)는 패딩을 포함해 더 크다.
 	//set_line_spacing 이 <ls> 줄간격을 "보이는 여백 = pitch - ink_height" 로 계산할 때 사용.
 	float			ink_height = 0.0f;
@@ -191,6 +224,17 @@ public:
 	//register_style(_T("title"), prop) 후 "<style=title>제목</style>" 로 쓴다.
 	static void		register_style(LPCTSTR name, const CSCTextProperty& prop);
 	static void		clear_styles();
+
+	//<img=별칭> 으로 참조할 이미지를 등록한다.
+	//태그는 런타임 문자열이라 IDB_XXX 같은 심볼을 해석할 수 없으므로 리소스를 쓰려면 이 등록이 사실상 필수다.
+	//배포 형태가 파일 <-> 리소스로 바뀌어도 태그 문자열은 그대로 둘 수 있다는 것도 이 방식의 이점.
+	static void		register_image(LPCTSTR name, LPCTSTR file);
+	static void		register_image(LPCTSTR name, LPCTSTR res_type, UINT res_id);
+	static void		clear_images();
+
+	//태그 값(별칭 / "#123" / "#PNG:123" / 파일경로)을 로드해 캐시된 포인터를 돌려준다. 실패 시 NULL.
+	//반환 포인터의 소유권은 캐시에 있다 — 호출자가 delete 하면 안 된다.
+	static CSCGdiplusBitmap* get_image(LPCTSTR key);
 
 
 	//아래 static 함수들은 하나의 CSCParagraph에 대해 수행되는 함수들이 아니고

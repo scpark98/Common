@@ -117,10 +117,11 @@ static std::map<CString, CString>& image_alias_map()
 }
 
 //로드 결과 캐시. 매 렌더마다 디코드하지 않도록 스펙 문자열을 키로 보관한다.
-//로드 실패도 NULL 로 캐시해 실패한 경로를 반복해서 재시도하지 않는다.
-static std::map<CString, CSCGdiplusBitmap*>& image_cache()
+//로드 실패도 빈 unique_ptr 로 캐시해 실패한 경로를 반복해서 재시도하지 않는다.
+//raw 포인터로 담으면 map 소멸자가 노드만 지우고 비트맵은 남겨 프로그램 종료 시 leak 으로 잡힌다.
+static std::map<CString, std::unique_ptr<CSCGdiplusBitmap>>& image_cache()
 {
-	static std::map<CString, CSCGdiplusBitmap*> m;
+	static std::map<CString, std::unique_ptr<CSCGdiplusBitmap>> m;
 	return m;
 }
 
@@ -143,9 +144,6 @@ void CSCParagraph::register_image(LPCTSTR name, LPCTSTR res_type, UINT res_id)
 
 void CSCParagraph::clear_images()
 {
-	for (auto& it : image_cache())
-		delete it.second;
-
 	image_cache().clear();
 	image_alias_map().clear();
 }
@@ -165,9 +163,9 @@ CSCGdiplusBitmap* CSCParagraph::get_image(LPCTSTR key)
 
 	auto cached = image_cache().find(spec);
 	if (cached != image_cache().end())
-		return cached->second;
+		return cached->second.get();
 
-	CSCGdiplusBitmap* img = new CSCGdiplusBitmap();
+	std::unique_ptr<CSCGdiplusBitmap> img = std::make_unique<CSCGdiplusBitmap>();
 	bool ok = false;
 
 	if (spec[0] == _T('#'))
@@ -199,13 +197,11 @@ CSCGdiplusBitmap* CSCParagraph::get_image(LPCTSTR key)
 	}
 
 	if (!ok)
-	{
-		delete img;
-		img = NULL;
-	}
+		img.reset();
 
-	image_cache()[spec] = img;
-	return img;
+	CSCGdiplusBitmap* result = img.get();
+	image_cache()[spec] = std::move(img);
+	return result;
 }
 
 //text의 태그를 파싱하여 각 구문의 속성을 설정한 후 para에 저장한다.
@@ -1156,6 +1152,44 @@ CRect CSCParagraph::calc_text_rect(CRect rc, CDC* pDC, std::deque<std::deque<CSC
 
 			//한 라인에서 가장 cy가 큰 값을 기억시킨다.
 			sz_text.cy = MAX(sz_text.cy, sz.cy);
+
+			//get_paragraph_font() 는 Clone() 한 Font 를 넘겨주므로 호출자가 해제해야 한다.
+			//레이아웃은 텍스트가 바뀔 때마다 run 수만큼 돌기 때문에 그냥 두면 계속 쌓인다.
+			delete font;
+		}
+
+		//루비 공간은 그 run 혼자가 아니라 라인 전체가 나눠 갖는다.
+		//안 그러면 <ruby=にほんご>日本語</ruby>를 처럼 섞였을 때 루비가 붙은 本문만 아래로 내려가
+		//"日本語" 와 "를" 의 세로 위치가 어긋난다. HTML/CSS ruby, JIS X 4051 모두 본문 baseline 은
+		//주변 글자와 같게 두고 루비가 라인 위쪽 공간을 차지하는 것이 맞다.
+		//→ 라인 최대 루비 높이를 루비 없는 run 에도 그대로 얹어 본문 출력 원점을 맞춘다.
+		{
+			float line_ruby = 0.0f;
+			for (j = 0; j < para[i].size(); j++)
+				line_ruby = max(line_ruby, para[i][j].ruby_height);
+
+			if (line_ruby > 0.0f)
+			{
+				for (j = 0; j < para[i].size(); j++)
+				{
+					if (para[i][j].ruby_height >= line_ruby)
+						continue;
+
+					//박스를 위로 키우는 대신 아래로 늘린다 — r.top 은 라인 top 으로 유지되어야
+					//라인 stacking 과 set_per_line_align 의 기준이 흔들리지 않는다.
+					float delta = line_ruby - para[i][j].ruby_height;
+					para[i][j].r.bottom += (int)delta;
+					para[i][j].ruby_height = line_ruby;
+
+					//늘어난 만큼은 여백이 아니라 루비가 쓰는 공간이므로 ink 로 친다
+					//(이 run 이 라인 최고 높이가 되면 set_line_spacing 이 그 공간을 여백으로 보고 압축한다).
+					para[i][j].ink_height += delta;
+				}
+
+				//루비 공간을 얹은 만큼 라인 높이도 다시 잡는다.
+				for (j = 0; j < para[i].size(); j++)
+					sz_text.cy = MAX(sz_text.cy, para[i][j].r.Height());
+			}
 		}
 
 		//<sup> 이 라인 박스 위로 삐져나간 만큼 라인 전체를 내리고 라인 높이를 키운다.
@@ -1925,10 +1959,15 @@ CRect CSCParagraph::draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCPar
 				CSCGdiplusBitmap* img = CSCParagraph::get_image(para[i][j].img_key);
 				if (img && img->m_pBitmap)
 				{
+					//같은 라인에 ruby 가 있으면 그 높이만큼 아래로 내려 본문 글자와 세로 위치를 맞춘다.
+					//(ruby 가 없으면 get_text_origin() 은 r 의 좌상단이고 ruby_height 는 0 이라 기존과 동일.)
+					CPoint pt_img = para[i][j].get_text_origin();
+
 					Gdiplus::InterpolationMode old_interp = g.GetInterpolationMode();
 					g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
 					g.DrawImage(img->m_pBitmap,
-						Gdiplus::Rect(para[i][j].r.left, para[i][j].r.top, para[i][j].r.Width(), para[i][j].r.Height()));
+						Gdiplus::Rect(pt_img.x, pt_img.y,
+							para[i][j].r.Width(), para[i][j].r.Height() - (int)para[i][j].ruby_height));
 					g.SetInterpolationMode(old_interp);
 				}
 

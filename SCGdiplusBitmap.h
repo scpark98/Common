@@ -468,7 +468,12 @@ public:
 	//sigma = Gaussian standard deviation (float). Should be positive.
 	//order: optional filter order [1: box, 2: bilinear, 3: biquadratic, 4. bicubic, ..., 10]. should be positive. Default is 3
 	//border: optional treatment of image boundaries[mirror, extend, crop, wrap].Default is mirror.
-	void			blur(float sigma = 10.0f, int order = 1/*, int border = 2*/);
+	//alpha_correct = true 이면 RGB 를 alpha 로 premultiply 한 뒤 blur 하고 다시 되돌린다.
+	//straight(비-premultiplied) 상태로 blur 하면 투명 픽셀의 RGB(= 캔버스 clear 값 0)가 섞여 들어와
+	//결과 RGB 가 alpha 에 비례해 깎인다. 그림자 가장자리가 회색이 아니라 검게 죽는 원인이며
+	//layered window 합성 시 한 번 더 premultiply 되어 밝기가 a^2 로 떨어진다.
+	//alpha 가 전부 255 인 이미지에서는 premul/unpremul 이 항등이므로 기존 동작과 동일.
+	void			blur(float sigma = 10.0f, int order = 1, bool alpha_correct = true/*, int border = 2*/);
 	//Gdiplus에서 제공하는 GaussianBlur 방식이지만 radius가 작을 경우는 좌우로만 흐려지는 등의 문제가 있다.
 	void			gdip_blur(float radius, BOOL expandEdge);
 

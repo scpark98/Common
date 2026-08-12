@@ -90,18 +90,30 @@ CSCParagraph::~CSCParagraph()
 {
 }
 
+//<style=이름> 으로 참조할 속성 묶음. 태그를 길게 나열하는 대신 이름 하나로 적용한다.
+static std::map<CString, CSCTextProperty>& style_map()
+{
+	static std::map<CString, CSCTextProperty> m;
+	return m;
+}
+
+void CSCParagraph::register_style(LPCTSTR name, const CSCTextProperty& prop)
+{
+	CString key(name);
+	key.MakeLower();
+	style_map()[key] = prop;
+}
+
+void CSCParagraph::clear_styles()
+{
+	style_map().clear();
+}
+
 //text의 태그를 파싱하여 각 구문의 속성을 설정한 후 para에 저장한다.
 //cr_text, cr_back은 글자, 배경 기본값
 void CSCParagraph::build_paragraph_str(CString& text, std::deque<std::deque<CSCParagraph>>& para, CSCTextProperty* text_prop)
 {
-	int i;
-	CString cr_str;
-	CString str;
 	std::deque<CString> tags;
-	int line = 0;
-
-	//<ls=값> 으로 지정된, 현재 build 중인 라인의 윗 간격 factor. 라인을 flush 할 때 그 라인 첫 run 에 기록 후 -1 로 리셋.
-	float pending_line_spacing = -1.0f;
 
 	//"<b><cr=red>This</b></cr> is a <cr=blue><i>sample</i> <b>paragraph</b>."
 	get_tag_str(text, tags);
@@ -112,156 +124,402 @@ void CSCParagraph::build_paragraph_str(CString& text, std::deque<std::deque<CSCP
 
 	std::deque<CSCParagraph> para_line;
 
+	//라인 단위 태그(<ls> <vsp> <al> <la> <indent> <hang>)의 값은 라인이 확정될 때 그 라인의 "모든" run 에 찍는다.
+	//run[0] 에만 넣으면 word-wrap 이 라인을 다시 쪼갤 때 대표 run 이 바뀌면서 값이 사라진다.
+	float pending_line_spacing = -1.0f;
+	float pending_line_vspace = -1.0f;
+	DWORD pending_h_align = (DWORD)-1;
+	DWORD pending_v_align = DT_TOP;
+	float pending_indent = 0.0f;
+	float pending_hang = 0.0f;
+
+	//바로 다음 run 하나에만 적용되는 값.
+	int     pending_tab_x = -1;
+	CString pending_id;
+
+	//태그별 속성 스택. 닫는 태그가 "자기 그룹의 필드만" 되돌리므로
+	//<b><cr=red>This</b></cr> 처럼 교차 중첩된 기존 문서도 그대로 동작하면서
+	//<cr=red>바깥<cr=blue>안쪽</cr>다시바깥</cr> 같은 정상 중첩도 이제 맞게 복원된다.
+	std::map<CString, std::deque<CSCTextProperty>> stacks;
+
+	auto push_attr = [&](LPCTSTR key) { stacks[key].push_back(para_temp.text_prop); };
+	auto pop_attr = [&](LPCTSTR key) -> CSCTextProperty
+	{
+		auto it = stacks.find(key);
+		if (it == stacks.end() || it->second.empty())
+			return basic_para.text_prop;	//짝 없는 닫는 태그 — 기존 동작대로 기본값 복귀.
+
+		CSCTextProperty prev = it->second.back();
+		it->second.pop_back();
+		return prev;
+	};
+
+	//"<name=value>" / "<name>" / "</name>" 에서 name 과 value 를 분리.
+	auto get_tag_name = [](const CString& tag) -> CString
+	{
+		int eq = tag.Find(_T('='));
+		int end = (eq >= 0) ? eq : tag.GetLength() - 1;
+		if (end < 1)
+			return _T("");
+		return tag.Mid(1, end - 1);
+	};
+	auto get_tag_value = [](const CString& tag) -> CString
+	{
+		int eq = tag.Find(_T('='));
+		if (eq < 0)
+			return _T("");
+		return tag.Mid(eq + 1, tag.GetLength() - eq - 2);
+	};
+	//"a,b,c" 의 index 번째 인자. 없으면 빈 문자열.
+	auto arg = [](const CString& value, int index) -> CString
+	{
+		int start = 0;
+		for (int n = 0; ; n++)
+		{
+			int comma = value.Find(_T(','), start);
+			CString token = (comma < 0) ? value.Mid(start) : value.Mid(start, comma - start);
+			if (n == index)
+				return token;
+			if (comma < 0)
+				return _T("");
+			start = comma + 1;
+		}
+	};
+
+	auto flush_line = [&](bool make_empty_line)
+	{
+		if (para_line.empty())
+		{
+			//<br>에 의해 공백 라인이 추가된 경우
+			if (!make_empty_line)
+				return;
+			para_line.push_back(basic_para);
+		}
+
+		for (auto& run : para_line)
+		{
+			run.line_spacing = pending_line_spacing;
+			run.line_vspace = pending_line_vspace;
+			run.line_h_align = pending_h_align;
+			run.line_align = pending_v_align;
+			run.line_indent = pending_indent;
+			run.line_hang = pending_hang;
+		}
+
+		para.push_back(para_line);
+		para_line.clear();
+
+		pending_line_spacing = -1.0f;
+		pending_line_vspace = -1.0f;
+		pending_h_align = (DWORD)-1;
+		pending_v_align = DT_TOP;
+		pending_indent = 0.0f;
+		pending_hang = 0.0f;
+	};
+
 	//시작 태그를 만나면 속성을 세팅하고
 	//단순 텍스트를 만나면 해당 속성과 함께 paragraph로 push하고
-	//끝 태그를 만나면 끝 태그가 끝날때까지 진행하고 끝 태그를 만나면 그 속성을 해제한다. 
-	for (i = 0; i < tags.size(); i++)
+	//끝 태그를 만나면 그 태그가 담당하는 속성만 직전 값으로 되돌린다.
+	for (int i = 0; i < (int)tags.size(); i++)
 	{
-		if (tags[i] == _T("<b>"))
+		const CString& tag = tags[i];
+
+		CString name, value;
+		if (tag.GetLength() >= 3 && tag[0] == _T('<') && tag[tag.GetLength() - 1] == _T('>'))
 		{
-			para_temp.text_prop.style |= Gdiplus::FontStyleBold;
+			name = get_tag_name(tag);
+			name.MakeLower();
+			value = get_tag_value(tag);
 		}
-		else if (tags[i] == _T("</b>"))
+
+		//---- 글꼴 스타일 (누적 비트라 스택 불필요) ----
+		if (name == _T("b"))				para_temp.text_prop.style |= Gdiplus::FontStyleBold;
+		else if (name == _T("/b"))			para_temp.text_prop.style &= ~Gdiplus::FontStyleBold;
+		else if (name == _T("i"))			para_temp.text_prop.style |= Gdiplus::FontStyleItalic;
+		else if (name == _T("/i"))			para_temp.text_prop.style &= ~Gdiplus::FontStyleItalic;
+		else if (name == _T("u"))			para_temp.text_prop.style |= Gdiplus::FontStyleUnderline;
+		else if (name == _T("/u"))			para_temp.text_prop.style &= ~Gdiplus::FontStyleUnderline;
+		else if (name == _T("s"))			para_temp.text_prop.style |= Gdiplus::FontStyleStrikeout;
+		else if (name == _T("/s"))			para_temp.text_prop.style &= ~Gdiplus::FontStyleStrikeout;
+
+		//---- 글자색 / 배경색 ----
+		else if (name == _T("cr") || name == _T("ct"))
 		{
-			para_temp.text_prop.style &= ~Gdiplus::FontStyleBold;
+			push_attr(_T("cr"));
+			para_temp.text_prop.cr_text = get_color(value);
 		}
-		else if (tags[i] == _T("<i>"))
+		else if (name == _T("/cr") || name == _T("/ct"))
 		{
-			para_temp.text_prop.style |= Gdiplus::FontStyleItalic;
+			para_temp.text_prop.cr_text = pop_attr(_T("cr")).cr_text;
 		}
-		else if (tags[i] == _T("</i>"))
+		else if (name == _T("cb") || name == _T("crb"))
 		{
-			para_temp.text_prop.style &= ~Gdiplus::FontStyleItalic;
+			push_attr(_T("cb"));
+			para_temp.text_prop.cr_back = get_color(value);
 		}
-		else if (tags[i] == _T("<u>"))
+		else if (name == _T("/cb") || name == _T("/crb"))
 		{
-			para_temp.text_prop.style |= Gdiplus::FontStyleUnderline;
+			para_temp.text_prop.cr_back = pop_attr(_T("cb")).cr_back;
 		}
-		else if (tags[i] == _T("</u>"))
+
+		//---- 폰트 이름 / 크기 ----
+		else if (name == _T("f") || name == _T("font") || name == _T("name") || name == _T("fontname"))
 		{
-			para_temp.text_prop.style &= ~Gdiplus::FontStyleUnderline;
+			push_attr(_T("f"));
+			_tcscpy_s(para_temp.text_prop.name, value);
 		}
-		else if (tags[i] == _T("<s>"))
+		else if (name == _T("/f") || name == _T("/font") || name == _T("/name") || name == _T("/fontname"))
 		{
-			para_temp.text_prop.style |= Gdiplus::FontStyleStrikeout;
+			CSCTextProperty prev = pop_attr(_T("f"));
+			_tcscpy_s(para_temp.text_prop.name, prev.name);
 		}
-		else if (tags[i] == _T("</s>"))
+		else if (name == _T("sz") || name == _T("size") || name == _T("fontsize"))
 		{
-			para_temp.text_prop.style &= ~Gdiplus::FontStyleStrikeout;
+			push_attr(_T("sz"));
+			para_temp.text_prop.size = (float)_tstof(value);
 		}
-		else if (tags[i].Find(_T("<cr=")) >= 0 || tags[i].Find(_T("<ct=")) >= 0)
+		else if (name == _T("/sz") || name == _T("/size") || name == _T("/fontsize"))
 		{
-			cr_str = tags[i].Mid(4, tags[i].GetLength() - 5);
-			para_temp.text_prop.cr_text = get_color(cr_str);
+			para_temp.text_prop.size = pop_attr(_T("sz")).size;
 		}
-		else if (tags[i].Find(_T("</cr>")) >= 0 || tags[i].Find(_T("</ct>")) >= 0)
+
+		//---- 외곽선 ----
+		else if (name == _T("st") || name == _T("stroke"))
 		{
-			para_temp.text_prop.cr_text = basic_para.text_prop.cr_text;
+			push_attr(_T("st"));
+			para_temp.text_prop.thickness = (float)_tstof(value);
 		}
-		else if (tags[i].Find(_T("<cb=")) >= 0)
+		else if (name == _T("/st") || name == _T("/stroke"))
 		{
-			cr_str = tags[i].Mid(4, tags[i].GetLength() - 5);
-			para_temp.text_prop.cr_back = get_color(cr_str);
+			para_temp.text_prop.thickness = pop_attr(_T("st")).thickness;
 		}
-		else if (tags[i].Find(_T("<crb=")) >= 0)
+		else if (name == _T("cs"))
 		{
-			cr_str = tags[i].Mid(5, tags[i].GetLength() - 6);
-			para_temp.text_prop.cr_back = get_color(cr_str);
+			push_attr(_T("cs"));
+			para_temp.text_prop.cr_stroke = get_color(value);
 		}
-		else if (tags[i].Find(_T("</cb>")) >= 0 || tags[i].Find(_T("</crb>")) >= 0)
+		else if (name == _T("/cs"))
 		{
-			para_temp.text_prop.cr_back = basic_para.text_prop.cr_back;
+			para_temp.text_prop.cr_stroke = pop_attr(_T("cs")).cr_stroke;
 		}
-		else if (tags[i].Find(_T("<f=")) >= 0)
+
+		//---- 그림자 ----
+		else if (name == _T("sd") || name == _T("shadow"))
 		{
-			CString str_font = tags[i].Mid(3, tags[i].GetLength() - 4);
-			_tcscpy_s(para_temp.text_prop.name, str_font);
+			push_attr(_T("sd"));
+			para_temp.text_prop.shadow_depth = (float)_tstof(value);
 		}
-		else if (tags[i].Find(_T("<font=")) >= 0)
+		else if (name == _T("/sd") || name == _T("/shadow"))
 		{
-			CString str_font = tags[i].Mid(6, tags[i].GetLength() - 7);
-			_tcscpy_s(para_temp.text_prop.name, str_font);
+			para_temp.text_prop.shadow_depth = pop_attr(_T("sd")).shadow_depth;
 		}
-		else if (tags[i].Find(_T("<name=")) >= 0)
+		else if (name == _T("csh"))
 		{
-			CString str_font = tags[i].Mid(6, tags[i].GetLength() - 7);
-			_tcscpy_s(para_temp.text_prop.name, str_font);
+			push_attr(_T("csh"));
+			para_temp.text_prop.cr_shadow = get_color(value);
 		}
-		else if (tags[i].Find(_T("<font_name=")) >= 0)
+		else if (name == _T("/csh"))
 		{
-			CString str_font = tags[i].Mid(11, tags[i].GetLength() - 12);
-			_tcscpy_s(para_temp.text_prop.name, str_font);
+			para_temp.text_prop.cr_shadow = pop_attr(_T("csh")).cr_shadow;
 		}
-		else if (tags[i].Find(_T("</f>")) >= 0 || tags[i].Find(_T("</font>")) >= 0 || tags[i].Find(_T("</name>")) >= 0 || tags[i].Find(_T("</font_name>")) >= 0)
+		else if (name == _T("sb"))
 		{
-			_tcscpy_s(para_temp.text_prop.name, basic_para.text_prop.name);
+			push_attr(_T("sb"));
+			para_temp.text_prop.shadow_blur_sigma = (float)_tstof(value);
 		}
-		else if (tags[i].Find(_T("<sz=")) >= 0)
+		else if (name == _T("/sb"))
 		{
-			CString str_size = tags[i].Mid(4, tags[i].GetLength() - 5);
-			para_temp.text_prop.size = _ttoi(str_size);
+			para_temp.text_prop.shadow_blur_sigma = pop_attr(_T("sb")).shadow_blur_sigma;
 		}
-		else if (tags[i].Find(_T("<size=")) >= 0)
+
+		//---- 외곽 발광 ----
+		else if (name == _T("glow"))
 		{
-			CString str_size = tags[i].Mid(6, tags[i].GetLength() - 7);
-			para_temp.text_prop.size = _ttoi(str_size);
+			push_attr(_T("glow"));
+			para_temp.text_prop.cr_glow = get_color(arg(value, 0));
+			CString sigma = arg(value, 1);
+			para_temp.text_prop.glow_sigma = sigma.IsEmpty() ? 4.0f : (float)_tstof(sigma);
 		}
-		else if (tags[i].Find(_T("<font_size=")) >= 0)
+		else if (name == _T("/glow"))
 		{
-			CString str_size = tags[i].Mid(11, tags[i].GetLength() - 12);
-			para_temp.text_prop.size = _ttoi(str_size);
+			CSCTextProperty prev = pop_attr(_T("glow"));
+			para_temp.text_prop.cr_glow = prev.cr_glow;
+			para_temp.text_prop.glow_sigma = prev.glow_sigma;
 		}
-		else if (tags[i].Find(_T("</sz>")) >= 0 || tags[i].Find(_T("</size>")) >= 0 || tags[i].Find(_T("</font_size>")) >= 0)
+
+		//---- 그라디언트 채우기 ----
+		else if (name == _T("grad"))
 		{
-			para_temp.text_prop.size = basic_para.text_prop.size;
+			push_attr(_T("grad"));
+			para_temp.text_prop.cr_grad2 = get_color(arg(value, 0));
+			CString dir = arg(value, 1);
+			dir.MakeLower();
+			para_temp.text_prop.grad_horz = (dir == _T("h"));
 		}
-		else if (tags[i].Find(_T("<ls=")) >= 0)
+		else if (name == _T("/grad"))
+		{
+			CSCTextProperty prev = pop_attr(_T("grad"));
+			para_temp.text_prop.cr_grad2 = prev.cr_grad2;
+			para_temp.text_prop.grad_horz = prev.grad_horz;
+		}
+
+		//---- run 단위 라운드 배경 ----
+		else if (name == _T("box"))
+		{
+			push_attr(_T("box"));
+			para_temp.text_prop.cr_box = get_color(arg(value, 0));
+			CString radius = arg(value, 1);
+			CString pad = arg(value, 2);
+			para_temp.text_prop.box_round = radius.IsEmpty() ? 8.0f : (float)_tstof(radius);
+			para_temp.text_prop.box_pad = pad.IsEmpty() ? 4 : _ttoi(pad);
+		}
+		else if (name == _T("/box"))
+		{
+			CSCTextProperty prev = pop_attr(_T("box"));
+			para_temp.text_prop.cr_box = prev.cr_box;
+			para_temp.text_prop.box_round = prev.box_round;
+			para_temp.text_prop.box_pad = prev.box_pad;
+		}
+
+		//---- 자간 ----
+		else if (name == _T("sp"))
+		{
+			push_attr(_T("sp"));
+			para_temp.text_prop.char_spacing = (float)_tstof(value);
+		}
+		else if (name == _T("/sp"))
+		{
+			para_temp.text_prop.char_spacing = pop_attr(_T("sp")).char_spacing;
+		}
+
+		//---- 위/아래 첨자 ----
+		else if (name == _T("sup") || name == _T("sub"))
+		{
+			push_attr(_T("script"));
+			para_temp.text_prop.script_scale = 0.62f;
+			para_temp.text_prop.script_offset = (name == _T("sup")) ? -0.42f : 0.28f;
+		}
+		else if (name == _T("/sup") || name == _T("/sub"))
+		{
+			CSCTextProperty prev = pop_attr(_T("script"));
+			para_temp.text_prop.script_scale = prev.script_scale;
+			para_temp.text_prop.script_offset = prev.script_offset;
+		}
+
+		//---- 줄바꿈 금지 ----
+		else if (name == _T("nowrap"))
+		{
+			push_attr(_T("nowrap"));
+			para_temp.text_prop.nowrap = true;
+		}
+		else if (name == _T("/nowrap"))
+		{
+			para_temp.text_prop.nowrap = pop_attr(_T("nowrap")).nowrap;
+		}
+
+		//---- 스타일 묶음 ----
+		else if (name == _T("style"))
+		{
+			push_attr(_T("style"));
+			CString key = value;
+			key.MakeLower();
+			auto it = style_map().find(key);
+			if (it != style_map().end())
+				para_temp.text_prop = it->second;
+		}
+		else if (name == _T("/style"))
+		{
+			para_temp.text_prop = pop_attr(_T("style"));
+		}
+
+		//---- 다음 run 하나에만 적용 ----
+		else if (name == _T("id"))
+		{
+			pending_id = value;
+		}
+		else if (name == _T("tab"))
+		{
+			pending_tab_x = _ttoi(value);
+		}
+
+		//---- 라인 단위 ----
+		else if (name == _T("al") || name == _T("align"))
+		{
+			CString v = value;
+			v.MakeLower();
+			pending_h_align = (v == _T("right")) ? DT_RIGHT : (v == _T("center")) ? DT_CENTER : DT_LEFT;
+		}
+		else if (name == _T("la") || name == _T("valign"))
+		{
+			CString v = value;
+			v.MakeLower();
+			pending_v_align = (v == _T("vcenter") || v == _T("center")) ? DT_VCENTER : (v == _T("bottom")) ? DT_BOTTOM : DT_TOP;
+		}
+		else if (name == _T("indent"))
+		{
+			pending_indent = (float)_tstof(value);
+		}
+		else if (name == _T("hang"))
+		{
+			pending_hang = (float)_tstof(value);
+		}
+		else if (name == _T("vsp"))
+		{
+			pending_line_vspace = (float)_tstof(value);
+		}
+		else if (name == _T("ls"))
 		{
 			//<ls=값> 은 "이전 줄과의 간격" 이라 그 자체로 줄 경계 — 진행 중인 라인이 있으면 flush 하여 새 라인을 시작한다.
 			//별도 <br> 불필요. 이미 라인이 비어 있으면 (직전 <br> 등) 줄바꿈은 건너뛰고 다음 라인의 간격만 설정 → <br><ls=..> 도 빈 줄·중복 줄바꿈 없이 동작.
-			if (para_line.size())
-			{
-				para_line[0].line_spacing = pending_line_spacing;
-				para.push_back(para_line);
-				para_line.clear();
-				line++;
-			}
-
-			CString str_ls = tags[i].Mid(4, tags[i].GetLength() - 5);
-			pending_line_spacing = (float)_tstof(str_ls);
+			flush_line(false);
+			pending_line_spacing = (float)_tstof(value);
 		}
-		else if (tags[i] == _T("<br>"))
+		else if (name == _T("br"))
 		{
-			//<br>에 의해 공백 라인이 추가된 경우
-			if (para_line.size() == 0)
-			{
-				para_line.push_back(basic_para);
-			}
-
-			para_line[0].line_spacing = pending_line_spacing;
-			para.push_back(para_line);
-			para_line.clear();
-			pending_line_spacing = -1.0f;
-			line++;
+			flush_line(true);
 		}
+
+		//---- 일반 텍스트 (인식하지 못한 태그도 기존처럼 그대로 출력된다) ----
 		else
 		{
-			para_temp.text = tags[i];
-
 			//전체 배경색인 cr_back이 Transparent가 아닐 때 색상이 별도로 지정되지 않은 para[][].cr_back에 cr_back을 줄 경우 중복으로 그려지게 된다.
 			//cr_back이 불투명이면 덮어써서 그려져서 표가 나지 않지만 반투명이면 겹쳐져 그려지게 된다.
 			if (para_temp.text_prop.cr_back.GetValue() == basic_para.text_prop.cr_back.GetValue())
 				para_temp.text_prop.cr_back = Gdiplus::Color::Transparent;
 
-			para_line.push_back(para_temp);
+			CSCParagraph run = para_temp;
+			run.text = tag;
+			run.tab_x = pending_tab_x;
+			run.id = pending_id;
+
+			//<sp> 자간은 "글자 사이" 간격이므로 run 을 글자 단위로 쪼개야 한다.
+			//calc_text_rect 가 인접 run 사이에 char_spacing 을 넣어주므로 쪼개기만 하면 그대로 자간이 된다.
+			if (run.text_prop.char_spacing != 0.0f && run.text.GetLength() > 1)
+			{
+				CString whole = run.text;
+				for (int k = 0; k < whole.GetLength(); k++)
+				{
+					CSCParagraph one = run;
+					one.text = whole.Mid(k, 1);
+					if (k > 0)
+					{
+						one.tab_x = -1;
+						one.id.Empty();
+					}
+					para_line.push_back(one);
+				}
+			}
+			else
+			{
+				para_line.push_back(run);
+			}
+
+			pending_tab_x = -1;
+			pending_id.Empty();
 		}
 	}
 
-	if (para_line.size())
-	{
-		para_line[0].line_spacing = pending_line_spacing;
-		para.push_back(para_line);
-	}
+	flush_line(false);
 }
 
 //run 들을 character 단위로 split.
@@ -441,6 +699,21 @@ CRect CSCParagraph::calc_text_rect(CRect rc, CDC* pDC, std::deque<std::deque<CSC
 			{
 				CString text = run.text;
 
+				//<nowrap> run 은 쪼개지 않는다 — 라인이 넘치면 먼저 라인을 끊고, 그래도 넘치면 넘친 채로 둔다.
+				//"홍길동 님", "12.5 GB" 처럼 붙어 있어야 의미가 사는 덩어리용.
+				if (run.text_prop.nowrap && !text.IsEmpty())
+				{
+					int w = measure_run_w(run, text);
+					if (!cur.empty() && cur_w + w > max_width)
+						flush_with_word_boundary();
+
+					CSCParagraph chunk = run;
+					chunk.text = text;
+					cur.push_back(chunk);
+					cur_w += w;
+					continue;
+				}
+
 				while (!text.IsEmpty())
 				{
 					int avail = max_width - cur_w;
@@ -577,6 +850,15 @@ CRect CSCParagraph::calc_text_rect(CRect rc, CDC* pDC, std::deque<std::deque<CSC
 			if (j > 0 && char_spacing != 0)
 				sz_text.cx += char_spacing;
 
+			//<sp=값> 의 run 별 자간도 같은 방식으로 run 사이에 더한다.
+			//(파서가 <sp> 구간을 글자 단위 run 으로 쪼개 두었으므로 이게 곧 글자 사이 간격이 된다.)
+			if (j > 0 && para[i][j].text_prop.char_spacing != 0.0f)
+				sz_text.cx += (int)para[i][j].text_prop.char_spacing;
+
+			//<tab=x> — 이 run 의 라인 내 시작 x 를 강제. 이미 그 지점을 지났으면 무시한다.
+			if (para[i][j].tab_x > sz_text.cx)
+				sz_text.cx = para[i][j].tab_x;
+
 			CSize sz;
 #if 0
 			pOldFont = select_paragraph_font(pDC, para, i, j, lf, &font);
@@ -619,6 +901,11 @@ CRect CSCParagraph::calc_text_rect(CRect rc, CDC* pDC, std::deque<std::deque<CSC
 			sz.cx = boundRect.Width - boundRect_temp.Width + para[i][j].text_prop.thickness;// *2.0f;
 			sz.cy = boundRect.Height + para[i][j].text_prop.thickness;// *2.0f;
 			para[i][j].r = make_rect(sz_text.cx, sy, sz.cx, sz.cy);
+
+			//<sup>/<sub> — 폰트는 이미 script_scale 로 작아진 상태이고, 여기서 baseline 만 위/아래로 옮긴다.
+			//라인 높이(아래 sz_text.cy)는 이동 전 박스로 계산해 첨자가 줄 간격을 흔들지 않게 둔다.
+			if (para[i][j].text_prop.script_offset != 0.0f)
+				para[i][j].r.OffsetRect(0, (int)(para[i][j].text_prop.script_offset * sz.cy));
 
 			//<ls> 줄간격용 실제 글자 높이 — sz.cy(=boundRect.Height) 는 MeasureString 의 라인 높이(박스)로 폰트 ascent/descent/leading 을 포함해 실제 글자보다 크다.
 			//set_line_spacing 이 '여백 = box - 글자높이' 로 여백만 ls 배율 적용하므로, 실제 글자 윤곽 높이를 GraphicsPath 로 직접 잰다.
@@ -681,61 +968,35 @@ CRect CSCParagraph::calc_text_rect(CRect rc, CDC* pDC, std::deque<std::deque<CSC
 
 	CRect margin;
 
-	//align에 따른 보정
-	if (align & DT_CENTER)
+	//align에 따른 보정.
+	//라인에 <al=..> 로 지정된 line_h_align 이 있으면 그 라인만 다르게 정렬한다 (0 = 미지정 → 인자 align 사용).
+	//라인 너비는 run 들의 r 로부터 직접 구한다 — r.left 에 char_spacing 과 <tab> 이 이미 반영돼 있어
+	//폭을 따로 합산하는 것보다 정확하다.
+	for (i = 0; i < para.size(); i++)
 	{
-		//각 라인마다 total_width를 구하고
-		for (i = 0; i < para.size(); i++)
-		{
-			int total_width = 0;
-			for (j = 0; j < para[i].size(); j++)
-			{
-				//char_spacing 도 라인 너비에 반영 — 안 그러면 negative spacing 시 라인이 실제보다 넓다고 계산되어 왼쪽으로 밀려 widest 라인의 첫 글자가 잘림.
-				if (j > 0 && char_spacing != 0)
-					total_width += char_spacing;
-				total_width += para[i][j].r.Width();
-			}
+		if (para[i].empty())
+			continue;
 
-			//아이콘을 포함하여 center에 표시할 지, 텍스트만 center에 표시할 지...
-			//if (m_hIcon)
-			//	total_width -= (m_sz_icon.cx + 4);
+		DWORD align_h = (para[i][0].line_h_align != (DWORD)-1) ? para[i][0].line_h_align : align;
+		int total_width = para[i][para[i].size() - 1].r.right - para[i][0].r.left;
 
-			//cx에서 total_width/2를 뺀 위치가 첫 번째 항목의 sx이므로 그 만큼 shift시키면 된다.
+		//left 기준은 rc.left — 호출자가 rc 를 좌우로 inset 해서 넘기면 그만큼이 좌우 여백이 된다
+		//(기존 호출은 모두 rc.left == 0 이라 동작 변화 없음).
+		sx = rc.left;
+		if (align_h & DT_CENTER)
 			sx = rc.CenterPoint().x - total_width / 2;
-			for (j = 0; j < para[i].size(); j++)
-				para[i][j].r.OffsetRect(sx, 0);
-		}
-	}
-	else if (align & DT_RIGHT)
-	{
-		//각 라인마다 total_width를 구하고
-		for (i = 0; i < para.size(); i++)
-		{
-			int total_width = 0;
-			for (j = 0; j < para[i].size(); j++)
-			{
-				if (j > 0 && char_spacing != 0)
-					total_width += char_spacing;
-				total_width += para[i][j].r.Width();
-			}
-
-			//rc.right에서 total_width를 뺀 위치가 첫 번째 항목의 sx이므로 그 만큼 shift시키면 된다.
+		else if (align_h & DT_RIGHT)
 			sx = rc.right - margin.right - total_width;
+
+		//<indent> 는 라인 전체를, <hang> 은 wrap 으로 이어진 라인만 추가로 민다.
+		sx += (int)para[i][0].line_indent;
+		if (para[i][0].wrap_continuation)
+			sx += (int)para[i][0].line_hang;
+
+		if (sx != 0)
+		{
 			for (j = 0; j < para[i].size(); j++)
 				para[i][j].r.OffsetRect(sx, 0);
-		}
-	}
-	else //SS_LEFT (default)
-	{
-		if (false)//m_hIcon)
-		{
-			for (i = 0; i < para.size(); i++)
-			{
-				for (j = 0; j < para[i].size(); j++)
-				{
-					//para[i][j].r.OffsetRect(m_margin.left + m_sz_icon.cx + 4, 0);
-				}
-			}
 		}
 	}
 
@@ -769,9 +1030,31 @@ CRect CSCParagraph::calc_text_rect(CRect rc, CDC* pDC, std::deque<std::deque<CSC
 		//아이콘을 top 정렬하느냐, 모든 라인의 vcenter에 정렬하느냐...
 		//m_pt_icon.y = m_para[0][0].r.top;
 
-		rect_text.left = para[max_width_line][0].r.left;	//최대 넓이 라인의 0번 아이템의 left
+		//모든 run 의 min-left / max-right 로 잡는다.
+		//"최대 넓이 라인의 첫/마지막 run" 만 보면 <tab>/<indent> 로 시작 x 가 0 이 아닌 라인에서
+		//그 앞 여백이 폭에서 빠져 캔버스가 좁게 잡히고 오른쪽 끝 글자가 잘린다.
+		//라인마다 <al> 정렬이 다를 수 있는 것도 같은 이유로 union 이 맞다.
+		bool first_run = true;
+
+		for (i = 0; i < (int)para.size(); i++)
+		{
+			for (j = 0; j < (int)para[i].size(); j++)
+			{
+				if (first_run)
+				{
+					rect_text.left = para[i][j].r.left;
+					rect_text.right = para[i][j].r.right;
+					first_run = false;
+				}
+				else
+				{
+					rect_text.left = MIN(rect_text.left, para[i][j].r.left);
+					rect_text.right = MAX(rect_text.right, para[i][j].r.right);
+				}
+			}
+		}
+
 		rect_text.top = para[0][0].r.top;					//최상단 항목의 top
-		rect_text.right = para[max_width_line][para[max_width_line].size() - 1].r.right;	//최대 넓이 라인의 마지막 항목의 right
 		rect_text.bottom = para[0][0].r.top + total_text_height;	//최상단 항목의 top + 전체 텍스트 높이
 	}
 	else
@@ -918,7 +1201,17 @@ CRect CSCParagraph::set_line_spacing(std::deque<std::deque<CSCParagraph>>& para,
 		//<ls=값> 으로 명시된 라인 (wrap 연속 라인 제외): "보이는 여백 = ls * 기본여백" 이 되도록 shift 한다.
 		//보이는 여백 = pitch - ink(실측 글자 높이). 기본여백 = (기본 pitch - ink). 따라서 ls=1.0 = 기본과 동일, 0.5 = 정확히 절반, 0 = 딱 붙음, 2.0 = 2배.
 		//이 식은 ink 추정이 다소 부정확해도 0.5 가 1.0 의 절반임을 정확히 보장한다 (같은 padding 을 양쪽에 쓰므로).
-		if (!para[i].empty() && para[i][0].line_spacing >= 0.0f && !para[i][0].wrap_continuation)
+		//<vsp=값> 은 이 라인 윗 "여백"을 픽셀로 직접 지정한다 — 배수인 <ls> 보다 우선.
+		//여백 = pitch - ink 이므로, 기본 여백(padding)에서 목표 여백까지의 차이만큼만 shift 하면 된다.
+		if (!para[i].empty() && para[i][0].line_vspace >= 0.0f)
+		{
+			float ink = line_inks[i - 1];
+			if (ink <= 0.0f || ink > box)
+				ink = box;
+
+			increment = para[i][0].line_vspace - (box - ink);
+		}
+		else if (!para[i].empty() && para[i][0].line_spacing >= 0.0f && !para[i][0].wrap_continuation)
 		{
 			float ink = line_inks[i - 1];
 			if (ink <= 0.0f || ink > box)
@@ -1013,7 +1306,7 @@ void CSCParagraph::get_paragraph_font(Gdiplus::Graphics& g, Gdiplus::Font** font
 	float fDpiY = g.GetDpiY();
 
 	int logPixelsY = ::GetDeviceCaps(NULL, LOGPIXELSY);
-	float emSize = fDpiY * text_prop.size / 96.0;
+	float emSize = fDpiY * text_prop.size * text_prop.script_scale / 96.0;	//script_scale = <sup>/<sub> 배율(기본 1.0). 측정·렌더가 같은 크기를 쓰도록 폰트 생성 지점에서 곱한다.
 
 	Gdiplus::FontFamily fontFamily((WCHAR*)(const WCHAR*)CStringW(text_prop.name));
 
@@ -1237,7 +1530,7 @@ CRect CSCParagraph::draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCPar
 						ff = Gdiplus::FontFamily::GenericSansSerif()->Clone();
 					}
 
-					float emSize = fDpiY * para[i][j].text_prop.size / 72.0f;
+					float emSize = fDpiY * para[i][j].text_prop.size * para[i][j].text_prop.script_scale / 72.0f;
 
 					CPoint off;
 					if (para[i][j].text_prop.shadow_depth > 0)
@@ -1267,11 +1560,85 @@ CRect CSCParagraph::draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCPar
 				}
 			}
 
-			shadow_layer.blur(global_blur_sigma);
+			//order 는 box blur 반복 횟수. 1 이면 단일 box 라 감쇠가 직선이고 끝이 각져 "원뿔" 처럼 보인다.
+			//3 이면 box*3 이 Gaussian 에 수렴해 글자 주변 감쇠가 부드러워진다 (비용은 여전히 O(n)).
+			shadow_layer.blur(global_blur_sigma, 3);
 			if (global_gray_weight > 0.0f && global_gray_weight < 1.0f)
 				shadow_layer.gray(global_gray_weight);
 
 			g.DrawImage(shadow_layer.m_pBitmap, 0, 0);
+		}
+	}
+
+	//<glow=색,sigma> 외곽 발광 사전 패스.
+	//그림자와 구조는 같지만 offset 0 이고, 글자를 fill 한 뒤 같은 path 를 굵은 pen 으로 한 번 더 그려
+	//광원을 글자 바깥으로 넓힌 다음 blur 한다. 그림자 위, 글자 아래에 깔린다.
+	{
+		bool has_glow = false;
+		float glow_sigma_max = 0.0f;
+
+		for (i = 0; i < para.size() && !has_glow; i++)
+		{
+			for (j = 0; j < (int)para[i].size(); j++)
+			{
+				if (para[i][j].text_prop.cr_glow.GetA() > 0 && para[i][j].text_prop.glow_sigma > 0.0f)
+				{
+					has_glow = true;
+					glow_sigma_max = max(glow_sigma_max, para[i][j].text_prop.glow_sigma);
+					break;
+				}
+			}
+		}
+
+		if (has_glow)
+		{
+			Gdiplus::RectF clip;
+			g.GetVisibleClipBounds(&clip);
+			int layer_w = (int)ceil(clip.X + clip.Width);
+			int layer_h = (int)ceil(clip.Y + clip.Height);
+
+			if (layer_w > 0 && layer_h > 0)
+			{
+				CSCGdiplusBitmap glow_layer(layer_w, layer_h, Gdiplus::Color::Transparent, PixelFormat32bppARGB);
+				Gdiplus::Graphics gg(glow_layer.m_pBitmap);
+				gg.SetSmoothingMode(Gdiplus::SmoothingMode::SmoothingModeAntiAlias);
+
+				for (i = 0; i < para.size(); i++)
+				{
+					for (j = (int)para[i].size() - 1; j >= 0; j--)
+					{
+						if (para[i][j].text_prop.cr_glow.GetA() == 0 || para[i][j].text_prop.glow_sigma <= 0.0f)
+							continue;
+
+						Gdiplus::FontFamily* ff = new Gdiplus::FontFamily((WCHAR*)(const WCHAR*)CStringW(para[i][j].text_prop.name));
+						if (!ff->IsAvailable())
+						{
+							delete ff;
+							ff = Gdiplus::FontFamily::GenericSansSerif()->Clone();
+						}
+
+						float emSize = fDpiY * para[i][j].text_prop.size * para[i][j].text_prop.script_scale / 72.0f;
+
+						Gdiplus::GraphicsPath glow_path;
+						glow_path.SetFillMode(Gdiplus::FillModeWinding);
+						glow_path.AddString(CStringW(para[i][j].text), para[i][j].text.GetLength(), ff,
+							para[i][j].text_prop.style, emSize,
+							Gdiplus::Point(para[i][j].r.left, para[i][j].r.top), sf.GenericTypographic());
+
+						Gdiplus::SolidBrush br_glow(para[i][j].text_prop.cr_glow);
+						Gdiplus::Pen pen_glow(para[i][j].text_prop.cr_glow, para[i][j].text_prop.glow_sigma);
+						pen_glow.SetLineJoin(Gdiplus::LineJoinRound);
+
+						gg.FillPath(&br_glow, &glow_path);
+						gg.DrawPath(&pen_glow, &glow_path);
+
+						delete ff;
+					}
+				}
+
+				glow_layer.blur(glow_sigma_max, 3);
+				g.DrawImage(glow_layer.m_pBitmap, 0, 0);
+			}
 		}
 	}
 
@@ -1298,18 +1665,14 @@ CRect CSCParagraph::draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCPar
 			//text 배경색을 칠하고
 			draw_rect(g, para[i][j].r, Gdiplus::Color::Transparent, para[i][j].text_prop.cr_back);
 
-			//음절별 폰트 종류 + 크기로 hint 자동 결정.
-			//각 폰트는 비트맵 보유 범위가 달라 단일 임계치로 부정확 — 폰트별 매핑(get_AA_from_pt)을 거쳐
-			//effective threshold 를 구한 뒤 size 와 비교한다.
-			//- size >= effective → AntiAliasGridFit (큰 글씨 외곽 매끈)
-			//- size <  effective → ClearTypeGridFit  (작은 글씨 비트맵/서브픽셀로 또렷)
-			//AA_from_pt == 0 이면 자동 결정 비활성 (호출자가 미리 설정한 hint 유지).
-			if (AA_from_pt > 0)
+			//<box=색,radius,pad> — run 단위 라운드 배경. 사각형인 cr_back 과 달리 "태그 칩" 모양이 된다.
+			if (para[i][j].text_prop.cr_box.GetA() > 0)
 			{
-				int effective = CSCParagraph::get_AA_from_pt(para[i][j].text_prop.name, AA_from_pt, dark_background);
-				g.SetTextRenderingHint(para[i][j].text_prop.size >= effective
-					? Gdiplus::TextRenderingHintAntiAliasGridFit
-					: Gdiplus::TextRenderingHintClearTypeGridFit);
+				CRect rb = para[i][j].r;
+				rb.InflateRect(para[i][j].text_prop.box_pad, para[i][j].text_prop.box_pad);
+				draw_round_rect(&g, Gdiplus::Rect(rb.left, rb.top, rb.Width(), rb.Height()),
+					Gdiplus::Color::Transparent, para[i][j].text_prop.cr_box,
+					(int)para[i][j].text_prop.box_round, 0);
 			}
 
 			Gdiplus::FontFamily* fontFamily = new Gdiplus::FontFamily((WCHAR*)(const WCHAR*)CStringW(para[i][j].text_prop.name));
@@ -1328,18 +1691,34 @@ CRect CSCParagraph::draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCPar
 
 			//GraphicsPath를 이용하면 stroke, shadow 등 다양한 효과를 구현할 수 있지만
 			//DrawString()보다 글자가 선명하게 보이지 않는 단점이 있다.
-			//stroke/shadow 없는 평문 run 은 GDI+ DrawString 으로 그린다. 작은 글자 또렷함은 위에서 set 한
+			//stroke/shadow 없는 평문 run 은 GDI+ DrawString 으로 그린다. 작은 글자 또렷함은 아래에서 set 하는
 			//ClearTypeGridFit 힌트가 담당. (GDI TextOut 으로 그리면 렌더 폭이 GDI+ 측정 rect 와 어긋나
 			// run 겹침·배경 오정렬이 발생하므로 측정·렌더를 GDI+ 로 일원화한다.)
 			if (para[i][j].text_prop.shadow_depth == 0 && para[i][j].text_prop.thickness == 0)
 			{
+				//음절별 폰트 종류 + 크기로 hint 자동 결정.
+				//각 폰트는 비트맵 보유 범위가 달라 단일 임계치로 부정확 — 폰트별 매핑(get_AA_from_pt)을 거쳐
+				//effective threshold 를 구한 뒤 size 와 비교한다.
+				//- size >= effective → AntiAliasGridFit (큰 글씨 외곽 매끈)
+				//- size <  effective → ClearTypeGridFit  (작은 글씨 비트맵/서브픽셀로 또렷)
+				//AA_from_pt == 0 이면 자동 결정 비활성 (호출자가 미리 설정한 hint 유지).
+				//SetTextRenderingHint 는 DrawString/MeasureString 에만 적용된다. 아래 else 의 GraphicsPath
+				//경로(FillPath/DrawPath)는 SmoothingMode 만 보므로 여기서만 세팅한다.
+				if (AA_from_pt > 0)
+				{
+					int effective = CSCParagraph::get_AA_from_pt(para[i][j].text_prop.name, AA_from_pt, dark_background);
+					g.SetTextRenderingHint(para[i][j].text_prop.size >= effective
+						? Gdiplus::TextRenderingHintAntiAliasGridFit
+						: Gdiplus::TextRenderingHintClearTypeGridFit);
+				}
+
 				Gdiplus::SolidBrush text_brush(para[i][j].text_prop.cr_text);
 				g.DrawString(CStringW(para[i][j].text), -1, font,
 					Gdiplus::PointF((Gdiplus::REAL)para[i][j].r.left, (Gdiplus::REAL)para[i][j].r.top), sf.GenericTypographic(), &text_brush);
 			}
 			else
 			{
-				float emSize = fDpiY * para[i][j].text_prop.size / 72.0;
+				float emSize = fDpiY * para[i][j].text_prop.size * para[i][j].text_prop.script_scale / 72.0;
 				Gdiplus::GraphicsPath str_path, shadow_path;
 
 				//겹치는 부분을 반전시키지 않는다. FillModeAlternate는 반전시킴.
@@ -1385,7 +1764,27 @@ CRect CSCParagraph::draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCPar
 				}
 
 				Gdiplus::Pen   pen(para[i][j].text_prop.cr_stroke, para[i][j].text_prop.thickness);
-				Gdiplus::SolidBrush brush(para[i][j].text_prop.cr_text);
+				Gdiplus::SolidBrush solid_brush(para[i][j].text_prop.cr_text);
+
+				//<grad=색2[,h]> — 글자 채우기를 cr_text → cr_grad2 그라디언트로 교체.
+				//브러시 좌표는 world 기준이라 아래 SS 경로의 ScaleTransform 아래에서도 그대로 맞는다.
+				Gdiplus::Brush* brush = &solid_brush;
+				std::unique_ptr<Gdiplus::LinearGradientBrush> grad_brush;
+
+				if (para[i][j].text_prop.cr_grad2.GetA() > 0)
+				{
+					Gdiplus::RectF pb;
+					str_path.GetBounds(&pb);
+					//폭/높이가 0 이면 브러시 생성이 실패하므로 최소 1 로 보정.
+					if (pb.Width < 1.0f)  pb.Width = 1.0f;
+					if (pb.Height < 1.0f) pb.Height = 1.0f;
+
+					grad_brush = std::make_unique<Gdiplus::LinearGradientBrush>(pb,
+						para[i][j].text_prop.cr_text, para[i][j].text_prop.cr_grad2,
+						para[i][j].text_prop.grad_horz ? Gdiplus::LinearGradientModeHorizontal
+													   : Gdiplus::LinearGradientModeVertical);
+					brush = grad_brush.get();
+				}
 
 				//pen.SetLineJoin(Gdiplus::LineJoinMiter);
 				pen.SetLineJoin(Gdiplus::LineJoinRound);
@@ -1451,7 +1850,7 @@ CRect CSCParagraph::draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCPar
 						//외곽선(밑) → 내부 SourceCopy 교체(안쪽 외곽선/그림자 제거) → 바깥 외곽선만 남음.
 						gt.DrawPath(&pen, &str_path);
 						gt.SetCompositingMode(Gdiplus::CompositingModeSourceCopy);
-						gt.FillPath(&brush, &str_path);
+						gt.FillPath(brush, &str_path);
 						gt.SetCompositingMode(Gdiplus::CompositingModeSourceOver);
 
 						//g 에 이미 그려진 그림자(사전 blur 패스 등)가 글자 내부에 깔려 있으면 반투명 fill 뒤로 비친다.
@@ -1482,12 +1881,71 @@ CRect CSCParagraph::draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCPar
 				}
 				else
 				{
-					//thickness가 0.0f이면 g.DrawPath()가 아닌 g.DrawString()으로 그리면 되고 이전 버전은 잘 그려졌으나
-					//뭔가 옵셋이 틀어진 현상이 발생하여 우선 아래와 같이 조건에 의해 g.DrawPath()를 실행하도록 한다.
-					if (para[i][j].text_prop.thickness > 0.0f)
-						g.DrawPath(&pen, &str_path);
+					//불투명 글자 + 외곽선: GDI+ 는 pen widening 과 path flattening 을 "최종 픽셀 해상도"에서 수행한다.
+					//그래서 폭이 2~3px 정도인 얇은 외곽선은 곡선 구간에서 폭이 들쭉날쭉해지거나 아예 끊긴다
+					//(직선 stem 은 멀쩡한데 'g','C' 같은 라운드에서만 지저분해 보이는 이유).
+					//SS 배 캔버스에 그린 뒤 고품질 축소하면 widening/flattening 오차가 1/SS 로 줄어 외곽선이 균일해진다.
+					//외곽선이 없으면 (thickness == 0) 단순 fill 이라 1x 로도 충분하므로 건너뛴다.
+					int SS = (para[i][j].text_prop.thickness > 0.0f) ? para[i][j].text_prop.path_supersample : 1;
 
-					g.FillPath(&brush, &str_path);
+					Gdiplus::RectF gb;
+					if (SS > 1)
+					{
+						str_path.GetBounds(&gb, NULL, &pen);
+						//SS 배 임시 비트맵이 과도하게 커지면 (초대형 글씨) 배율을 낮추거나 포기한다.
+						while (SS > 1 && (double)(gb.Width + 4) * (gb.Height + 4) * SS * SS > 64.0 * 1024 * 1024)
+							SS--;
+					}
+
+					if (SS > 1)
+					{
+						const float margin = 2.0f;
+						float minx = gb.X - margin;
+						float miny = gb.Y - margin;
+						int bw = (int)ceil(gb.Width + margin * 2);
+						int bh = (int)ceil(gb.Height + margin * 2);
+
+						CSCGdiplusBitmap tmp(bw * SS, bh * SS, Gdiplus::Color::Transparent, PixelFormat32bppARGB);
+						Gdiplus::Graphics gt(tmp.m_pBitmap);
+
+						//축소 시 bicubic 은 RGB 를 alpha 와 무관하게 섞으므로, 투명 영역의 RGB 가 0 이면
+						//글자 가장자리 색이 검게 끌려간다 (blur() 의 premultiply 문제와 동일). 투명하되 RGB 는
+						//바깥쪽 색 = 외곽선 색으로 채워 두면 축소 결과가 그대로 외곽선 색으로 수렴한다.
+						//alpha=0 을 SourceOver 로 Clear 하면 무시되므로 SourceCopy 로 강제한다.
+						{
+							Gdiplus::Color cs = para[i][j].text_prop.cr_stroke;
+							Gdiplus::SolidBrush br_clear(Gdiplus::Color(0, cs.GetR(), cs.GetG(), cs.GetB()));
+							gt.SetCompositingMode(Gdiplus::CompositingModeSourceCopy);
+							gt.FillRectangle(&br_clear, 0, 0, bw * SS, bh * SS);
+							gt.SetCompositingMode(Gdiplus::CompositingModeSourceOver);
+						}
+
+						gt.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
+						gt.ScaleTransform((Gdiplus::REAL)SS, (Gdiplus::REAL)SS);
+						gt.TranslateTransform(-minx, -miny);
+
+						gt.DrawPath(&pen, &str_path);
+						gt.FillPath(brush, &str_path);
+
+						Gdiplus::InterpolationMode old_interp = g.GetInterpolationMode();
+						Gdiplus::PixelOffsetMode  old_pom = g.GetPixelOffsetMode();
+						g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
+						g.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHighQuality);
+						g.DrawImage(tmp.m_pBitmap,
+							Gdiplus::RectF(minx, miny, (Gdiplus::REAL)bw, (Gdiplus::REAL)bh),
+							0.0f, 0.0f, (Gdiplus::REAL)(bw * SS), (Gdiplus::REAL)(bh * SS), Gdiplus::UnitPixel);
+						g.SetInterpolationMode(old_interp);
+						g.SetPixelOffsetMode(old_pom);
+					}
+					else
+					{
+						//thickness가 0.0f이면 g.DrawPath()가 아닌 g.DrawString()으로 그리면 되고 이전 버전은 잘 그려졌으나
+						//뭔가 옵셋이 틀어진 현상이 발생하여 우선 아래와 같이 조건에 의해 g.DrawPath()를 실행하도록 한다.
+						if (para[i][j].text_prop.thickness > 0.0f)
+							g.DrawPath(&pen, &str_path);
+
+						g.FillPath(brush, &str_path);
+					}
 				}
 			}
 #endif

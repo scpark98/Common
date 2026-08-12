@@ -10216,8 +10216,17 @@ void get_tag_str(CString& src, std::deque<CString>& tags)
 			//fontname은 공백을 제거해서는 안된다.
 			if (!find_one_of(str, _T("<f="), _T("<font="), _T("<name="), _T("<fontname=")))
 				str.Replace(_T(" "), _T(""));
-			str.Replace(_T("_"), _T(""));
-			str.Replace(_T("-"), _T(""));
+
+			//'_' 와 '-' 는 태그 "이름" 표기 흔들림(font_size, font-size)을 흡수하기 위한 것이므로 '=' 앞에서만 제거한다.
+			//값에서까지 제거하면 <sp=-2>, <vsp=-4> 같은 음수 인자가 조용히 양수로 바뀐다.
+			{
+				int eq = str.Find(_T('='));
+				CString name = (eq >= 0) ? str.Left(eq) : str;
+				CString value = (eq >= 0) ? str.Mid(eq) : _T("");
+				name.Replace(_T("_"), _T(""));
+				name.Replace(_T("-"), _T(""));
+				str = name + value;
+			}
 			tags.push_back(str);
 			str.Empty();
 		}

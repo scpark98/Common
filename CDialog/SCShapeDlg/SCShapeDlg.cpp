@@ -402,7 +402,9 @@ CSCShapeDlgTextSetting* CSCShapeDlg::set_text(CWnd* parent, CString text,
 	//Phase 0 wrap 은 첫 calc_text_rect 호출에서 이미 적용됨. 두 번째는 wrapped para 의 최종 위치만 재측정 — max_width 다시 넘기면 이미 짧아진 chunk 가 더 잘게 쪼개짐. 0 으로 호출.
 	//char_spacing 은 동일 값 전달 — run 위치 재계산 시 자간 유지.
 	//rc.H 는 canvas (post + 2 + extra) 가 아니라 pre + 2 + extra. DT_VCENTER 의 sy_offset = (rc.H - pre_h)/2 = 1+extra/2 (=stroke 여백 M) 로 고정 — spacing 이 캔버스 크기 변경해도 stroke 여백은 일정.
-	CRect r_for_calc(0, 0, r.Width(), pre_h + (r.Height() - r_spacing.Height()));
+	//좌우를 stroke 여백(extra)만큼 inset 해서 넘긴다 — DT_CENTER 는 중심이 그대로라 무영향이고,
+	//<al=left>/<al=right> 로 라인을 좌우 끝에 붙이는 경우에만 그 여백이 살아 글자가 캔버스 밖으로 잘리지 않는다.
+	CRect r_for_calc(m_text_left_padding, 0, r.Width() - m_text_left_padding, pre_h + (r.Height() - r_spacing.Height()));
 	r = CSCParagraph::calc_text_rect(r_for_calc, &dc, m_para, DT_CENTER | DT_VCENTER, 0, m_char_spacing);
 
 	//행간 factor 재적용 — 두 번째 calc_text_rect 가 r 을 재계산하므로 다시 호출.

@@ -12,22 +12,55 @@
 
 	태그는 소문자로, 컬러값은 Gdiplus::Color에 정의된 이름(web color와 naming이 동일함)을 사용해야 한다.
 	컬러 이름은 대소문자를 구분하지 않는다. ("red", "Red", "RED" 모두 동일함)
-	태그명에 공백, 하이픈, underscore는 모두 무시된다.
+	태그명(= '=' 앞부분)에 공백, 하이픈, underscore는 모두 무시된다. 값에서는 하이픈이 유지되므로 <sp=-2> 같은 음수도 쓸 수 있다.
+	닫는 태그는 "자기가 담당하는 속성"만 직전 값으로 되돌린다(속성별 스택).
+	따라서 <b><cr=red>This</b></cr> 처럼 교차 중첩된 기존 문서도 그대로 동작하고,
+	<cr=red>바깥<cr=blue>안</cr>다시바깥</cr> 처럼 같은 속성을 중첩해도 정확히 복원된다.
 	지원하는 태그는 다음과 같다.
 
+	[글꼴]
 	<f=굴림> = <font=굴림> = <name=굴림> = <font_name=굴림>
 	<sz=10> = <size=10> = <font_size=10>
 	<b>						//bold
 	<i>						//italic
 	<u>						//underline
 	<s>						//strike out
+	<sup> </sup>			//위 첨자 (크기 0.62배 + baseline 위로)
+	<sub> </sub>			//아래 첨자
+	<sp=2>	</sp>			//자간(픽셀). 구간을 글자 단위 run 으로 쪼개 글자 사이에 간격을 넣는다. 음수 = 좁힘.
+
+	[색]
 	<cr=red> = <ct=red>		//cr_text
-	<crb=Blue> = <cb=Blue>	//cr_back
+	<crb=Blue> = <cb=Blue>	//cr_back (run 영역 사각형)
+	<grad=gold,orangered>	//글자를 cr_text → 지정색 그라디언트로 채운다. 세 번째 인자 h 를 주면 가로 방향.
+	<box=royalblue,12,7>	//run 단위 라운드 배경(색, 반지름, 여백). cr_back 의 사각형과 달리 "태그 칩" 모양.
+
+	[외곽선 / 그림자 / 발광]
+	<st=4> = <stroke=4>		//외곽선 두께. 펜이 path 중앙 정렬이라 눈에 보이는 두께는 이 값의 절반이다.
+	<cs=black>				//외곽선 색
+	<sd=3> = <shadow=3>		//그림자 offset(px). 0 = 없음, 음수 = 글자 높이에 비례한 자동값.
+	<csh=dimgray>			//그림자 색
+	<sb=3>					//그림자 blur sigma. 0 이면 blur 없이 하드 엣지 offset 그림자.
+	<glow=aqua,14>			//외곽 발광(색, sigma). 그림자와 달리 offset 0 이라 글자 사방으로 퍼진다.
+
+	[줄 / 배치]
 	<br>					//line break — 줄 "종결자"다. 진행 중인 텍스트가 있으면 그 줄을 확정만 하므로
 							//20260721 by claude. 빈 줄(공백 한 줄)을 넣으려면 <br> 를 두 개 쓴다. 단 맨 앞은 진행 중인 줄이 없어 하나로 빈 줄이 생긴다.
 	<ls=0.5>				//line spacing — 이 태그 이후 텍스트를 새 라인으로 시작하며, 그 라인과 바로 전 라인 사이의 '빈 여백' 크기를 지정한다.
 							//<ls> 자체가 줄바꿈을 내포하므로 <br> 를 따로 둘 필요 없다 (둘 다 써도 빈 줄·중복 줄바꿈 없음).
 							//값은 "기본 여백의 배수": 1.0 = 기본(태그 없을 때)과 동일, 0.5 = 그 절반(여백만 좁아짐, 안 겹침), 0 = 딱 붙음, 2.0 = 2배.
+	<vsp=14>				//<ls> 의 절대 픽셀 버전 — 이 라인의 윗 여백을 픽셀로 직접 지정. 둘 다 있으면 vsp 가 이긴다.
+	<al=left|center|right>	//이 라인만의 가로 정렬. 미지정 라인은 calc_text_rect 의 align 인자를 따른다.
+	<la=top|vcenter|bottom>	//이 라인만의 세로 정렬. 한 라인에 크기가 다른 run 이 섞였을 때 기준선을 고른다.
+	<indent=30>				//이 라인 전체를 오른쪽으로 미는 픽셀(들여쓰기)
+	<hang=20>				//word-wrap 으로 이어진 라인만 추가로 미는 픽셀(내어쓰기)
+	<tab=170>				//다음 run 의 라인 내 시작 x 를 강제. 열 맞추기용. 이미 지난 위치면 무시.
+	<nowrap> </nowrap>		//word-wrap 이 이 구간을 쪼개지 않는다. "홍길동 님", "12.5 GB" 처럼 붙어야 하는 덩어리용.
+
+	[묶음 / 식별]
+	<style=title> </style>	//CSCParagraph::register_style() 로 등록해 둔 속성 묶음을 통째로 적용
+	<id=score>				//다음 run 에 이름을 붙인다. 렌더에는 영향 없고 호출자가 특정 run 을 찾아 갱신/hit-test 하는 용도.
+
 	ex. "<b><cr=red>This</b></cr > is a <ct=blue><i>sample</i> <b>paragraph</b>."
 
 	- cr은 Gdiplus::Color에 명시된 컬러 외에 다음 형식들도 지원한다.
@@ -64,6 +97,12 @@ public:
 	float		shadow_gray_weight = 1.0f;
 
 	float		thickness = 0.0f;
+
+	//외곽선(thickness > 0)이 있는 글자를 SS 배 캔버스에 그린 뒤 축소한다. 1 = 끔.
+	//GDI+ 의 pen widening/flattening 은 최종 픽셀 해상도에서 수행되므로 얇은 외곽선이 곡선 구간에서
+	//끊기거나 폭이 들쭉날쭉해진다. SS 배로 그리면 그 오차가 1/SS 로 줄어든다.
+	int			path_supersample = 3;
+
 	float		round = 0.0f;
 	float		round_thickness = 0.0f;
 	Gdiplus::Color cr_text = Gdiplus::Color::Black;
@@ -72,6 +111,30 @@ public:
 	Gdiplus::Color cr_shadow = Gdiplus::Color::Transparent;
 	Gdiplus::Color cr_round = Gdiplus::Color::Transparent;
 	Gdiplus::Color cr_round_stroke = Gdiplus::Color::Transparent;
+
+	//<grad=색2[,h]> — Transparent 가 아니면 cr_text → cr_grad2 로 글자를 채운다(기본 세로, h 면 가로).
+	//GraphicsPath 렌더의 장점을 그대로 쓰는 부분이라 SolidBrush 대신 LinearGradientBrush 만 갈아끼우면 된다.
+	Gdiplus::Color cr_grad2 = Gdiplus::Color::Transparent;
+	bool		grad_horz = false;
+
+	//<glow=색,sigma> — 외곽 발광. 그림자와 같은 blur layer 를 offset 0 으로 그린 것.
+	Gdiplus::Color cr_glow = Gdiplus::Color::Transparent;
+	float		glow_sigma = 0.0f;
+
+	//<box=색,radius,pad> — run 단위 라운드 배경. 사각형인 cr_back 과 별개.
+	Gdiplus::Color cr_box = Gdiplus::Color::Transparent;
+	float		box_round = 0.0f;
+	int			box_pad = 0;
+
+	//<sp=값> — 이 run 안의 글자 사이 간격(픽셀). calc_text_rect 가 run 폭에 반영한다.
+	float		char_spacing = 0.0f;
+
+	//<sup>/<sub> — 첨자. size 에 곱할 배율과, 글자 높이 대비 baseline 이동 비율(양수 = 아래로).
+	float		script_scale = 1.0f;
+	float		script_offset = 0.0f;
+
+	//<nowrap> 구간 — word wrap 이 이 run 을 쪼개지 않는다.
+	bool		nowrap = false;
 };
 
 class CSCParagraph
@@ -97,12 +160,37 @@ public:
 	//라인 최대높이 기준으로 세로 정렬. 데이터(para)에 저장되므로 재레이아웃돼도 지속된다. 라인의 각 run 에 동일 값 저장(대표=para[i][0]).
 	DWORD			line_align = DT_TOP;
 
+	//<al=left|center|right> 로 지정한 이 라인만의 가로 정렬. (DWORD)-1 = 미지정(calc_text_rect 의 align 인자를 따름).
+	//DT_LEFT 가 0 이라 0 을 "미지정" 으로 쓸 수 없어 -1 을 센티널로 쓴다.
+	//line_align 과 마찬가지로 라인의 모든 run 에 같은 값이 들어간다(대표 = para[i][0]).
+	DWORD			line_h_align = (DWORD)-1;
+
+	//<indent=값> 이 라인 전체를 오른쪽으로 미는 픽셀. <hang=값> 은 wrap 으로 이어진 라인에만 적용되도록
+	//파서가 wrap_continuation 여부와 무관하게 값을 넣고 calc_text_rect 가 wrap 라인에만 더한다.
+	float			line_indent = 0.0f;
+	float			line_hang = 0.0f;
+
+	//<vsp=값> 이 라인의 윗 여백을 "픽셀"로 직접 지정. < 0 = 미지정.
+	//line_spacing(<ls>) 은 배수라 폰트 크기에 딸려가지만 이쪽은 절대값이다. 둘 다 있으면 vsp 가 이긴다.
+	float			line_vspace = -1.0f;
+
+	//<tab=x> 이 run 의 라인 내 시작 x 를 강제(현재 누적 폭이 이미 x 를 넘었으면 무시). < 0 = 미지정.
+	int				tab_x = -1;
+
+	//<id=이름> run 식별자. 렌더에는 영향 없고 호출자가 특정 run 을 찾아 부분 갱신/hit-test 하는 용도.
+	CString			id;
+
 	//calc_text_rect 가 채우는 실측 글자 높이(폰트 ascent+descent 기준). r.Height()(글자 박스)는 패딩을 포함해 더 크다.
 	//set_line_spacing 이 <ls> 줄간격을 "보이는 여백 = pitch - ink_height" 로 계산할 때 사용.
 	float			ink_height = 0.0f;
 
 	//이 paragraph의 CSCTextProperty 설정에 맞는 Gdiplus::Font를 구한다.
 	void			get_paragraph_font(Gdiplus::Graphics& g, Gdiplus::Font** font);
+
+	//<style=이름> 으로 한 번에 적용할 속성 묶음을 등록한다. 태그를 길게 나열하는 대신
+	//register_style(_T("title"), prop) 후 "<style=title>제목</style>" 로 쓴다.
+	static void		register_style(LPCTSTR name, const CSCTextProperty& prop);
+	static void		clear_styles();
 
 
 	//아래 static 함수들은 하나의 CSCParagraph에 대해 수행되는 함수들이 아니고

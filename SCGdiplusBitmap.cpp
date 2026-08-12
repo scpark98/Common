@@ -2895,15 +2895,48 @@ void CSCGdiplusBitmap::gdip_blur(float radius, BOOL expandEdge)
 	m_pBitmap->ApplyEffect(&gdi_blur, NULL);
 }
 
-void CSCGdiplusBitmap::blur(float sigma, int order)
+void CSCGdiplusBitmap::blur(float sigma, int order, bool alpha_correct)
 {
 	CSCGdiplusBitmap temp;
 	deep_copy(&temp);
 	temp.get_raw_data();
 
 	get_raw_data();
-	
+
+	const bool premul = (alpha_correct && channel == 4 && temp.data != NULL && data != NULL);
+	const int len = height * stride;
+
+	//blur 는 채널을 독립적으로 섞는다. straight alpha 상태에서는 투명 픽셀의 RGB(0)까지 평균에 들어가
+	//결과 RGB 가 alpha 에 비례해 어두워지므로, premultiply 해 두면 색이 alpha 와 함께 정확히 이동한다.
+	if (premul)
+	{
+		for (int i = 0; i < len; i += 4)
+		{
+			const int a = temp.data[i + 3];
+			temp.data[i + 0] = (BYTE)((temp.data[i + 0] * a + 127) / 255);
+			temp.data[i + 1] = (BYTE)((temp.data[i + 1] * a + 127) / 255);
+			temp.data[i + 2] = (BYTE)((temp.data[i + 2] * a + 127) / 255);
+		}
+	}
+
+	//in/out 버퍼는 내부에서 swap 되며 결과는 out(= data) 에 들어온다.
 	fast_gaussian_blur(temp.data, data, width, height, channel, sigma, order, Border::kKernelCrop);
+
+	if (premul)
+	{
+		for (int i = 0; i < len; i += 4)
+		{
+			const int a = data[i + 3];
+			//a 가 아주 작으면 나눗셈이 8bit 반올림 오차를 크게 증폭시킨다. 어차피 보이지 않는 픽셀이라 그대로 둔다.
+			if (a < 4)
+				continue;
+
+			data[i + 0] = (BYTE)min(255, (data[i + 0] * 255 + a / 2) / a);
+			data[i + 1] = (BYTE)min(255, (data[i + 1] * 255 + a / 2) / a);
+			data[i + 2] = (BYTE)min(255, (data[i + 2] * 255 + a / 2) / a);
+		}
+	}
+
 	set_raw_data();
 
 #ifdef _DEBUG

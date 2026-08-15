@@ -84,6 +84,10 @@ Common 에 **새 C++ 컨트롤·다이얼로그 클래스 파일을 추가**할 
 - `enum_monitor_rects()` 라는 자체 helper 작성 → 사용자 지적 → Common 의 `enum_display_monitors()` + `g_monitors` + `get_monitor_rect(-1)` 로 전부 대체 가능했음.
 - `GetSystemMetrics(SM_*VIRTUALSCREEN)` 4번 조합도 `get_monitor_rect(-1)` 한 번으로 충분.
 
+**구체 사례 (2026-08-15, MiniClock2 floating 제목 색):** "시간보다 -32 진한 색" 을 만들려고 `Gdiplus::Color(a, R-32, G-32, B-32)` + clamp 를 5 줄로 직접 작성 → 사용자 지적 — *"왜 colors.h의 get_color()를 쓰지 않은건가?"* `colors.h` 에 이미 `get_color(Gdiplus::Color crOrigin, int nOffset)` (알파 보존 + 0~255 clamp, `colors.cpp:224`) 가 있어 `get_color(cr, -32)` 한 줄이면 끝이었다. 이때 사용자 지적 — *"왠만한 헬퍼함수는 대부분 다 있다. 메모를 해놨다면 그 메모들부터 정확히 학습하고 작업하라."*
+
+**검색 대상은 `Functions.h` 하나가 아니다 (위 사례의 진짜 원인).** 색을 다루면 **`colors.h` 를 먼저** 본다 — 파생·보간이 이미 다 있다: `get_color(cr, offset)` (채널 가감), `get_color(cr1, cr2, ratio)` (보간), `get_weak_color`, `get_ratio_color` (밝기 배수), `get_lightened_color` (흰색 쪽), `get_leveled_color`, `get_gray_color`, `get_readable_text_color`, `get_complementary_gcolor`, `get_distinct_bw_color`, `gcolor_to_hsl`/`hsl_to_gcolor`. 마찬가지로 그리기는 `Functions.h` 의 `draw_*`, 태그 텍스트는 `SCParagraph.h`, 테마는 `CSCColorTheme`.
+
 **적용 (helper 작성 전 의무 절차):**
 
 1. **Functions.h 카테고리 grep** — 함수 의도와 관련된 키워드로 검색. 예: 모니터 → `monitor`, 색상 → `color`/`gRGB`/`Gdiplus`, 경로 → `path`/`get_part`/`fn_`, 윈도우 → `window`/`hwnd`/`Restore`/`Save`, 그리기 → `draw`/`gradient`/`round`.

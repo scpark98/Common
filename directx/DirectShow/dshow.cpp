@@ -1276,12 +1276,6 @@ CDShow::CDShow()
 	m_pFileSource = NULL;
 	m_pSplitter = NULL;
 
-	m_pParentDC = NULL;
-	m_pMemDC[0] = NULL;
-	m_pMemDC[1] = NULL;
-	m_pBitmap[0] = NULL;
-	m_pBitmap[1] = NULL;
-
 	m_pSubtitleGrabber = NULL;
 	m_pSubtitleNullRenderer = NULL;
 	m_pSubtitleGrabberCB = NULL;
@@ -1403,7 +1397,6 @@ void CDShow::close_media()
 	m_pVMRWC.Release();
 	m_pVMRFC.Release();
 	m_pVMRMC.Release();
-	m_pVMRMB.Release();
 	m_pVDC.Release();
 	m_pVP.Release();
 	m_pMixerControl.Release();
@@ -1430,37 +1423,6 @@ void CDShow::close_media()
 	m_panscan_left = 0.0f; m_panscan_top = 0.0f; m_panscan_right = 1.0f; m_panscan_bottom = 1.0f;
 	m_last_video_position_rect.SetRectEmpty();
 
-	if (m_pParentDC)
-	{
-		m_pParent->ReleaseDC(m_pParentDC);
-		m_pParentDC = NULL;
-	}
-
-	if (m_pMemDC[0])
-	{
-		m_pMemDC[0]->DeleteDC();
-		delete m_pMemDC[0];
-		m_pMemDC[0] = NULL;
-	}
-	if (m_pMemDC[1])
-	{
-		m_pMemDC[1]->DeleteDC();
-		delete m_pMemDC[1];
-		m_pMemDC[1] = NULL;
-	}
-
-	if (m_pBitmap[0])
-	{
-		m_pBitmap[0]->DeleteObject();
-		delete m_pBitmap[0];
-		m_pBitmap[0] = NULL;
-	}
-	if (m_pBitmap[1])
-	{
-		m_pBitmap[1]->DeleteObject();
-		delete m_pBitmap[1];
-		m_pBitmap[1] = NULL;
-	}
 }
 
 //#include "C:\\1.projects\\mpc-hc-develop\\src\\filters\\transform\\VSFilter\\IDirectVobSub.h"
@@ -1619,7 +1581,6 @@ int CDShow::load_media(CString sfile, CWnd* pParent, bool auto_render)
 			m_pVMRWC->SetBorderColor(RGB(0, 0, 0));
 		}
 
-		m_VMR->QueryInterface(IID_PPV_ARGS(&m_pVMRMB));
 		m_VMR->QueryInterface(IID_PPV_ARGS(&m_pVMRMC));
 
 		if (m_pVMRMC != NULL)
@@ -2071,9 +2032,6 @@ int CDShow::load_media(CString sfile, CWnd* pParent, bool auto_render)
 	{
 		m_video_size = CSize(640, 368);
 	}
-
-	if (is_media_video())
-		prepare_AlphaBitmap();
 
 	//audio gain filter + video time-scale filter 끼움 — graph 의 audio/video renderer 직전. graph 빌드 끝난 후 한 번.
 	setup_audio_filter_chain();
@@ -5312,320 +5270,6 @@ HRESULT CDShow::HandleGraphEvent(WPARAM wParam,LPARAM lparam)
 	return NOERROR;
 }
 
-void CDShow::prepare_AlphaBitmap()
-{
-	if (!m_pVMRWC)
-		return;
-
-	m_pParentDC = m_pParent->GetDC();
-
-	float fZoom = 1.0f;
-
-	m_crColorKey = RGB(0, 31, 1);
-
-	for (int i = 0; i < 2; i++)
-	{
-		m_pMemDC[i] = new CDC();
-		m_pMemDC[i]->CreateCompatibleDC(m_pParentDC);
-
-		m_pBitmap[i] = new CBitmap();
-		m_pBitmap[i]->CreateCompatibleBitmap(m_pParentDC, m_video_size.cx * fZoom, m_video_size.cy * fZoom);
-		m_pMemDC[i]->SelectObject(m_pBitmap[i]);
-		m_pMemDC[i]->SetBkMode(TRANSPARENT);
-
-		//VMR9 mixer 가 alpha bitmap 을 colorkey 기반 투명도로 합성. 새로 생성한 비트맵의 픽셀이
-		//undefined (보통 black) 상태면 mixer 는 이를 불투명으로 보고 영상 위 덮어 영상이 안 보임.
-		//전체를 colorkey 색으로 채워 mixer 가 fully transparent 로 인식하도록 초기화.
-		m_pMemDC[i]->FillSolidRect(0, 0, m_video_size.cx * fZoom, m_video_size.cy * fZoom, m_crColorKey);
-	}
-
-	m_buf_index = 0;
-	RECT reText;
-	SetRect(&reText, 0, 0, m_video_size.cx * fZoom, m_video_size.cy * fZoom);
-
-	ZeroMemory(&m_AlphaBitmap,sizeof(m_AlphaBitmap));
-	m_AlphaBitmap.dwFlags = VMRBITMAP_HDC;
-	m_AlphaBitmap.hdc = m_pMemDC[m_buf_index]->GetSafeHdc();        // 나타낼 메모리 
-	m_AlphaBitmap.rDest.left = 0.0f;//EDGE_BUFFER;
-	m_AlphaBitmap.rDest.right = 1.0f;// - EDGE_BUFFER;
-	m_AlphaBitmap.rDest.top = 0.00f;
-	m_AlphaBitmap.rDest.bottom = 1.0f;// -EDGE_BUFFER;
-	m_AlphaBitmap.rSrc = reText;
-	m_AlphaBitmap.fAlpha = 1.0f;//TRANSPARENCY_VALUE;
-	m_AlphaBitmap.clrSrcKey = m_crColorKey;
-	m_AlphaBitmap.dwFlags |= VMRBITMAP_SRCCOLORKEY;
-
-	m_pVMRMB->SetAlphaBitmap(&m_AlphaBitmap);
-
-	m_osd_text.Empty();
-	m_cur_subtitle.reset();
-}
-
-HRESULT CDShow::update_osd_subtitle()
-{
-	if (!m_pVMRWC)
-		return E_FAIL;
-
-	//OSD 텍스트와 자막 모두 비어있으면 alpha bitmap 을 그릴 일이 없음 → SetAlphaBitmap 호출 자체 skip.
-	//일부 환경 (특정 GPU/드라이버) 에서 graph Running 중 SetAlphaBitmap 호출이 VMR9 mixer 내부 lock 으로
-	//무한 block 되는 현상 (UI thread freeze, CPU 0~5%) 회피.
-	//Endorphin2 는 OSD/자막을 모두 별도 CSCShapeDlg popup 으로 그리므로 dshow 의 alpha bitmap path 는 미사용.
-	if (m_osd_text.IsEmpty() && !(m_show_subtitle && m_cur_subtitle.is_valid()))
-		return S_OK;
-
-	int i;
-	int sx = m_video_size.cx * m_subCfg.pos_x / 100.0;
-	int sy = m_video_size.cy * m_subCfg.pos_y / 100.0;// -56;
-	HRESULT hr = S_OK;
-
-	Trace(_T("m_video_size = %d, %d"), m_video_size.cx, m_video_size.cy);
-	m_pMemDC[m_buf_index]->SetTextAlign(TA_CENTER);
-	m_pMemDC[m_buf_index]->SetTextCharacterExtra(m_subCfg.char_spacing);
-	m_pMemDC[m_buf_index]->FillSolidRect(0, 0, m_video_size.cx, m_video_size.cy, m_crColorKey);
-
-	Gdiplus::Graphics gr(m_pMemDC[m_buf_index]->GetSafeHdc());
-	Gdiplus::StringFormat strFormat;
-	Gdiplus::GraphicsPath path_outline;
-	Gdiplus::GraphicsPath *path_text;
-	Gdiplus::GraphicsPath *path_shadow;
-	Gdiplus::Color color;
-
-	gr.SetSmoothingMode(Gdiplus::SmoothingModeHighQuality);
-	gr.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
-	gr.SetTextRenderingHint(Gdiplus::TextRenderingHintAntiAliasGridFit);
-	//gr.SetTextRenderingHint(Gdiplus::TextRenderingHintClearTypeGridFit);
-
-	if (m_osd_text.IsEmpty() == false)
-	{
-		Gdiplus::FontFamily osd_font(L"맑은 고딕");
-
-		//osd display
-		path_outline.AddString(m_osd_text, _tcslen(m_osd_text), &osd_font, Gdiplus::FontStyleRegular, 48,
-			Gdiplus::Point(10, 10), &strFormat );
-
-		path_text = path_outline.Clone();
-
-		//외곽선
-		Gdiplus::Pen pen(Gdiplus::Color(0, 0, 0), 8);
-		pen.SetLineJoin(Gdiplus::LineJoinRound);
-
-		//외곽선의 두께를 늘려준 다음
-		path_outline.Widen(&pen);
-		gr.FillPath(&Gdiplus::SolidBrush(Gdiplus::Color(212, 0, 0, 0)), &path_outline);
-
-		color.SetFromCOLORREF(m_osd_color);
-		Gdiplus::SolidBrush brush(color);
-		gr.FillPath(&brush, path_text);
-
-		path_outline.Reset();
-		path_text->Reset();
-	}
-
-
-	if (m_show_subtitle && m_cur_subtitle.is_valid())
-	{
-		Gdiplus::FontFamily font(m_subCfg.lf->lfFaceName);
-#if 0
-		strFormat.SetAlignment(Gdiplus::StringAlignmentCenter);
-
-		//라인 간격은 기본 120%를 기본으로 하되
-		//사용자가 그 기본값에서 -50% ~ +50%를 조정할 수 있다.
-		//조정 화면에서는 그 조정 범위만 표시되도록 하고
-		//실제 적용하는 여기에서 120을 더해서 라인 간격을 계산한다.
-		int line_spacing = -(double)m_subCfg.lf->lfHeight * (double)(m_subCfg.line_spacing + 120) / 100.0;
-
-		for (i = m_cur_subtitle.sentences.size() - 1; i >= 0; i--)
-		{
-			TextDesigner::OutlineText td;
-
-			Gdiplus::Color color = m_subCfg.cr[CSubtitleSetting::cr_sub_primary];
-			if (m_cur_subtitle.sentences[i].color.IsEmpty() == false)
-			{
-				COLORREF crText = get_color(m_cur_subtitle.sentences[i].color);
-				color = Gdiplus::Color(m_subCfg.cr[CSubtitleSetting::cr_sub_primary].GetA(), GetRValue(crText), GetGValue(crText), GetBValue(crText));
-			}
-
-			td.TextOutline(color, m_subCfg.cr[CSubtitleSetting::cr_sub_outline], m_subCfg.outline_widthX * 2.5);
-			//text.TextGlow(Gdiplus::Color(255, 255, 255), Gdiplus::Color(32, 255, 0, 0), 16);
-
-			td.EnableShadow(true);
-
-			td.Shadow(m_subCfg.cr[CSubtitleSetting::cr_sub_shadow],
-									m_subCfg.shadow_depthX,
-									Gdiplus::Point(m_subCfg.shadow_depthX, m_subCfg.shadow_depthY));
-			/*
-			td.DiffusedShadow(Gdiplus::Color(m_subCfg.alpha[3],
-									GetRValue(m_subCfg.colors[3]),
-									GetGValue(m_subCfg.colors[3]),
-									GetBValue(m_subCfg.colors[3])),
-									m_subCfg.shadow_depthX * 2,
-									Gdiplus::Point(m_subCfg.shadow_depthX, m_subCfg.shadow_depthY));
-			*/
-			
-			//이걸 쓰면 자간 조절이 안되고
-			if (false)
-			{
-				td.DrawString(&gr, &font, (m_subCfg.lf->lfWeight == 0 ? Gdiplus::FontStyleRegular : Gdiplus::FontStyleBold),
-					m_subCfg.lf->lfHeight * -1, m_cur_subtitle.sentences[i].sentence,
-					Gdiplus::Point(sx, sy), &strFormat);
-			}
-			//이걸 쓰면 폰트 Weight가 적용이 안된다.
-			//td에서 FW_BOLD만 bold로 처리되기 때문이었다.
-			else
-			{
-				td.GdiDrawString(&gr, m_subCfg.lf, m_cur_subtitle.sentences[i].sentence,
-					Gdiplus::Point(sx, sy));
-			}
-
-			sy -= line_spacing;
-		}
-#else
-		//Gdiplus::Graphics gr(m_pMemDC[m_buf_index]->GetSafeHdc());
-		//Gdiplus::StringFormat strFormat;
-		//Gdiplus::GraphicsPath path_outline;
-		//Gdiplus::GraphicsPath *path_text;
-		//Gdiplus::GraphicsPath *path_shadow;
-		Gdiplus::Matrix m;
-		m.Translate(m_subCfg.shadow_depthX, m_subCfg.shadow_depthY);
-
-		//gr.SetSmoothingMode(Gdiplus::SmoothingModeHighQuality);
-		//gr.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
-		//gr.SetTextRenderingHint(Gdiplus::TextRenderingHintClearTypeGridFit);
-		//gr.SetTextRenderingHint(Gdiplus::TextRenderingHintAntiAlias);
-
-		strFormat.SetAlignment(Gdiplus::StringAlignmentCenter);
-
-		//라인 간격은 기본 120%를 기본으로 하되
-		//사용자가 그 기본값에서 -50% ~ +50%를 조정할 수 있다.
-		//조정 화면에서는 그 조정 범위만 표시되도록 하고
-		//실제 적용하는 여기에서 120을 더해서 라인 간격을 계산한다.
-		//int line_spacing = -m_subCfg.lf->lfHeight * ((double)m_subCfg.line_spacing / 100.0);
-		int line_spacing = -(double)m_subCfg.lf->lfHeight * (double)(m_subCfg.line_spacing + 120) / 100.0;
-
-		for (i = m_cur_subtitle.sentences.size() - 1; i >= 0; i--)
-		{
-			path_outline.AddString(m_cur_subtitle.sentences[i].sentence,
-							_tcslen(m_cur_subtitle.sentences[i].sentence),
-							&font,
-							(m_subCfg.lf->lfWeight == 500 ? Gdiplus::FontStyleBold : Gdiplus::FontStyleRegular),
-							m_subCfg.lf->lfHeight * -1,
-							Gdiplus::Point(m_video_size.cx / 2, sy), &strFormat );
-
-			path_text = path_outline.Clone();
-
-			//외곽선
-			Gdiplus::Pen pen(Gdiplus::Color(128, 0, 0, 0), m_subCfg.outline_widthX * 2);
-			pen.SetLineJoin(Gdiplus::LineJoinRound);
-
-			//외곽선의 두께를 늘려준 다음
-			path_outline.Widen(&pen);
-
-			//그 값을 복사해서 이동시켜서 칠해주면 그림자가 된다.
-			path_shadow = path_outline.Clone();
-			path_shadow->Transform(&m);
-			gr.FillPath(&Gdiplus::SolidBrush(Gdiplus::Color(/*m_subCfg.alphaShadow*/128, 16, 16, 16)), path_shadow);
-
-			//그림자 위에 외곽선을 그려주고
-			gr.FillPath(&Gdiplus::SolidBrush(Gdiplus::Color(/*m_subCfg.alphaOutline*/128, 0, 0, 0)), &path_outline);
-
-
-			//마지막으로 실제 글자 출력
-			Gdiplus::SolidBrush brush(m_subCfg.cr[CSubtitleSetting::cr_sub_primary]);
-			if (m_cur_subtitle.sentences[i].color.IsEmpty() == false)
-			{
-				Gdiplus::Color crText = get_color(m_cur_subtitle.sentences[i].color);
-				brush.SetColor(crText);
-			}
-			gr.FillPath(&brush, path_text);
-
-			path_outline.Reset();
-			path_shadow->Reset();
-			path_text->Reset();
-
-			sy -= line_spacing;
-		}
-#endif
-	}
-
-	float fZoom = 1.0f;
-	RECT reText;
-	SetRect(&reText, 0, 0, m_video_size.cx * fZoom, m_video_size.cy * fZoom);
-
-	ZeroMemory(&m_AlphaBitmap,sizeof(m_AlphaBitmap));
-	m_AlphaBitmap.dwFlags = VMRBITMAP_HDC;
-	m_AlphaBitmap.hdc = m_pMemDC[m_buf_index]->GetSafeHdc();        // 나타낼 메모리 
-	m_AlphaBitmap.rDest.left = 0.0f;// + 10;//X_EDGE_BUFFER;
-	m_AlphaBitmap.rDest.right = 1.0f;//textWidthRatioX;// + 10;//X_EDGE_BUFFER;
-	m_AlphaBitmap.rDest.top = 0.0f;//(float)(cy - 100) / (float)cy - 0.05;
-	m_AlphaBitmap.rDest.bottom = 1.0f;// -EDGE_BUFFER;
-	m_AlphaBitmap.rSrc = reText;
-	m_AlphaBitmap.clrSrcKey = m_crColorKey;
-	m_AlphaBitmap.dwFlags |= VMRBITMAP_SRCCOLORKEY;
-	//m_AlphaBitmap.fAlpha = (float)m_subCfg.alpha[0];
-	m_AlphaBitmap.fAlpha = 0.5f;// (float)m_subCfg.alpha[0] / 255.0;
-	m_pVMRMB->SetAlphaBitmap(&m_AlphaBitmap);
-
-	//이걸 해주지 않으면 일시정지인 경우 OSD가 제대로 표시되지 않는다.
-	//repaint는 먹히지 않아서 트랙 이동 방법을 사용했다.
-	if (m_play_state == State_Paused)
-	{
-		//pVMRWC->RepaintVideo(m_pParent->GetSafeHwnd(), ::GetDC(m_pParent->GetSafeHwnd()));
-		double d = get_track_pos();
-		set_track_pos(d);
-	}
-
-	return hr;
-}
-
-void CDShow::prepare_next_subtitle(CString text, COLORREF crText)
-{
-	int index = !m_buf_index;
-
-	m_pMemDC[index]->FillSolidRect(0, 0, m_video_size.cx, m_video_size.cy, m_crColorKey);
-
-	Gdiplus::Graphics gr(m_pMemDC[index]->GetSafeHdc());
-	Gdiplus::FontFamily osd_font(L"맑은 고딕");
-	Gdiplus::StringFormat strFormat;
-	Gdiplus::GraphicsPath path;
-
-	//USES_CONVERSION;
-	gr.SetSmoothingMode(Gdiplus::SmoothingModeHighQuality);
-	gr.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
-
-	//osd display
-	path.AddString(text, _tcslen(text), &osd_font, Gdiplus::FontStyleRegular, 48,
-		Gdiplus::Point(10, 10), &strFormat );
-	for (int i = 0; i < 10; i++ )
-	{
-		Gdiplus::Pen pen(Gdiplus::Color(32, 4, 7, 4), i);
-		pen.SetLineJoin(Gdiplus::LineJoinRound);
-		gr.DrawPath(&pen, &path);
-	}
-
-	Gdiplus::SolidBrush brush(Gdiplus::Color(GetRValue(crText), GetGValue(crText), GetBValue(crText)));
-	gr.FillPath(&brush, &path);
-	path.Reset();
-}
-
-void CDShow::show_next_subtitle()
-{
-
-}
-
-void CDShow::set_osd_text(CString text, COLORREF cr)
-{
-	m_osd_text = text;
-	m_osd_color = cr;
-	update_osd_subtitle();
-}
-
-void CDShow::set_subtitle_text(CCaption caption)
-{
-	if (m_cur_subtitle.start == caption.start)
-		return;
-	m_cur_subtitle = caption;
-	update_osd_subtitle();
-}
 
 int CDShow::subtitle_font_enlarge(int enlarge)
 {
@@ -5637,7 +5281,6 @@ int CDShow::subtitle_font_enlarge(int enlarge)
 	Clamp(m_subCfg.font_size, 2, 100);
 
 	m_subCfg.lf->lfHeight = get_pixel_size_from_font_size(m_pParent->m_hWnd, m_subCfg.font_size);
-	update_osd_subtitle();
 
 	return m_subCfg.font_size;
 }
@@ -6319,7 +5962,6 @@ void CDShow::subtitle_placement(int dir)
 		DirectVobSub_function(msg_put_Placement, (LPARAM)(MAKEWORD(m_subCfg.pos_x, m_subCfg.pos_y)));
 
 	TRACE(_T("subtitle pos = %d%%, %d%%\n"), m_subCfg.pos_x, m_subCfg.pos_y);
-	update_osd_subtitle();
 }
 
 void CDShow::subtitle_placement(int x, int y)
@@ -6333,7 +5975,6 @@ void CDShow::subtitle_placement(int x, int y)
 		DirectVobSub_function(msg_put_Placement, (LPARAM)(MAKEWORD(m_subCfg.pos_x, m_subCfg.pos_y)));
 
 	TRACE(_T("subtitle pos = %d%%, %d%%\n"), m_subCfg.pos_x, m_subCfg.pos_y);
-	update_osd_subtitle();
 }
 
 void CDShow::save_sub_cfg()

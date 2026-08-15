@@ -403,27 +403,8 @@ public:
 	void			subtitle_placement(int x, int y);
 
 
-	CDC*		m_pParentDC;
-	int			m_buf_index;
-	CDC*		m_pMemDC[2];
-	CBitmap*	m_pBitmap[2];
-	VMR9AlphaBitmap m_AlphaBitmap;
-	COLORREF	m_crColorKey;
-
-	HRESULT		update_osd_subtitle();
-	void		prepare_AlphaBitmap();
-	void		prepare_next_subtitle(CString text, COLORREF crText);
-	void		show_next_subtitle();
-
-	//osd용
-	LOGFONT		m_lfOsd;
-	CString		m_osd_text;
-	COLORREF	m_osd_color;
-	void		set_osd_text(CString text, COLORREF cr = RGB(234, 212, 198));
-
 	//subtitle용
 	CCaption	m_cur_subtitle;
-	void		set_subtitle_text(CCaption caption);
 	int			subtitle_font_enlarge(int enlarge);		//1:larger, -1:smaller, 0:default
 	int			subtitle_font_bold(bool bold);
 
@@ -451,7 +432,6 @@ protected:
 	CComQIPtr<IVMRWindowlessControl9> m_pVMRWC;
 	CComQIPtr<IVMRFilterConfig9> m_pVMRFC;
 	CComQIPtr<IVMRMixerControl9> m_pVMRMC;
-	CComQIPtr<IVMRMixerBitmap9> m_pVMRMB;
 
 	//MPC VR / madVR 등 비-VMR9 렌더러용 windowless 제어. windowless EVR 인터페이스로 자식 윈도우 안 만들고 parent 에 직접 D3D 출력.
 	CComPtr<IMFVideoDisplayControl> m_pVDC;

@@ -1425,6 +1425,41 @@ namespace ffi
 					if (t_dlv_ms > 50)
 						logWrite(_T("[ffi/src/audio/diag] Deliver BLOCKED %llums (DSound input 큐 full = 오디오 렌더러/클럭 stall 신호)"), t_dlv_ms);
 
+					//20260816 by claude. [resume] 무음 구간의 downstream 절반을 측정한다.
+					//  first_deliver    = seek 후 첫 Deliver 반환. 소스가 렌더러에 실제로 넘긴 시각.
+					//  renderer_pacing  = Deliver 가 처음 블록한 시각. 렌더러 입력 큐가 찼다 = 재생 페이스로 소비 중.
+					//rtStart / stream_clock 은 raw 로 남긴다 — NewSegment 매핑을 가정하지 않고 값으로 판단하기 위함.
+					if (m_resume_armed.load())
+					{
+						LARGE_INTEGER rqf, rqn;
+						::QueryPerformanceFrequency(&rqf);
+						::QueryPerformanceCounter(&rqn);
+						long long rt0 = m_seekgap_qpc.load();
+						long long since_seek_ms = rt0 ? (rqn.QuadPart - rt0) * 1000LL / rqf.QuadPart : -1;
+
+						REFERENCE_TIME rt_s = 0;
+						REFERENCE_TIME rt_e = 0;
+						pSample->GetTime(&rt_s, &rt_e);
+
+						CRefTime rt_stream;
+						m_pFilter->StreamTime(rt_stream);
+
+						if (!m_resume_first_logged.exchange(true))
+							logWrite(_T("[ffi/src/audio/resume] first_deliver=+%lldms rtStart=%lldms stream_clock=%lldms block=%llums sc=%lld"),
+								since_seek_ms, (long long)(rt_s / 10000),
+								(long long)((REFERENCE_TIME)rt_stream / 10000), t_dlv_ms, (long long)m_sample_count);
+
+						//10ms 이상 블록 = 렌더러가 더 못 받는다 = 이미 재생 중. 여기서 무음이 끝난 것으로 본다.
+						//10초까지 블록이 없으면 재생이 아니라 다른 이유이므로 무장만 해제(로그로 구분 가능).
+						if (t_dlv_ms >= 10 || since_seek_ms > 10000)
+						{
+							logWrite(_T("[ffi/src/audio/resume] renderer_pacing=+%lldms block=%llums rtStart=%lldms stream_clock=%lldms"),
+								since_seek_ms, t_dlv_ms, (long long)(rt_s / 10000),
+								(long long)((REFERENCE_TIME)rt_stream / 10000));
+							m_resume_armed.store(false);
+						}
+					}
+
 					pSample->Release();
 					if (hr != S_OK)
 						return S_OK;
@@ -1516,6 +1551,10 @@ namespace ffi
 		//[seekgap diag] resume 시점(t0)부터 첫 15 fill 의 delivery 타이밍 측정 시작.
 		m_seekgap_qpc.store(a5.QuadPart);
 		m_seekgap_remaining.store(15);
+
+		//20260816 by claude. [resume] 계측 무장 — 같은 t0 기준으로 downstream 재개까지 잰다.
+		m_resume_armed.store(true);
+		m_resume_first_logged.store(false);
 	}
 
 	HRESULT CFFiAudioStream::OnThreadStartPlay()

@@ -223,6 +223,13 @@ namespace ffi
 		//source 측(무음/지연 delivery)인지 downstream(DSound 재프라임)인지 격리용. on_seek_flush 가 t0/카운트 set.
 		std::atomic<long long> m_seekgap_qpc{ 0 };
 		std::atomic<int>		m_seekgap_remaining{ 0 };
+
+		//20260816 by claude. (측정) 트랙이동 후 *실제로 소리가 나기 시작*할 때까지의 공백 구간용.
+		//기존 seekgap 계측(anchor_wait+queue_wait)은 소스가 첫 샘플을 만드는 데까지만 재서 downstream
+		//(DSound 재프라임) 구간이 비어 있었다 — 실측 최대 390ms 인데 체감은 1~2초라 그 차이를 설명 못 한다.
+		//on_seek_flush 가 무장하고, DoBufferProcessingLoop 이 first_deliver / renderer_pacing 두 줄을 남긴 뒤 해제.
+		std::atomic<bool>		m_resume_armed{ false };
+		std::atomic<bool>		m_resume_first_logged{ false };
 	public:
 		HRESULT OnThreadStartPlay() override;
 	};

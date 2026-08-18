@@ -23,6 +23,11 @@
 // MAX_ID_LEN 이 달라 각 프로젝트 로컬 파일에 유지한다.
 // ============================================================================
 
+// windows.h 가 winsock.h(1.1) 를 함께 끌어오면 이후 winsock2.h 와 재정의 충돌(C2375)이 난다.
+// 이 헤더는 WM_USER 만 필요하므로 _WINSOCKAPI_ 를 선언해 winsock.h 만 차단한다.
+#ifndef _WINSOCKAPI_
+#define _WINSOCKAPI_
+#endif
 #include <windows.h>   // WM_USER
 
 // Clipboard helper (Agent tvnserver-app 계열)

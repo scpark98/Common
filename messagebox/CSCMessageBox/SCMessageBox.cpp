@@ -58,6 +58,7 @@ BEGIN_MESSAGE_MAP(CSCMessageBox, CDialogEx)
 	ON_WM_PAINT()
 	ON_WM_LBUTTONDOWN()
 	ON_WM_TIMER()
+	ON_WM_ACTIVATE()
 END_MESSAGE_MAP()
 
 
@@ -229,6 +230,9 @@ bool CSCMessageBox::create(CWnd* parent, CString title, UINT icon_id, bool as_mo
 		//apply_theme 와 동일한 경로 (CGdiButton::set_color_theme) 로 초기 색 산출 — main dlg 의 일반
 		//GdiButton 과 외관 일관성 확보. set_color_theme 안에서 set_round(4, ...) 도 함께 적용됨.
 		m_button[i].set_color_theme(m_theme);
+		//포커스 표시도 여기서 걸어둔다. apply_theme 에만 두면 호출자가 set_color_theme 을 한 번도
+		//부르지 않는 경우(기본 테마 그대로 사용) 포커스가 표시되지 않는다.
+		m_button[i].set_focus_style(CGdiButton::focus_style_border, m_theme.cr_border_active);
 	}
 
 	reconstruct_font();
@@ -524,10 +528,10 @@ void CSCMessageBox::set_message(CString msg, int type, int timeout_sec, int alig
 		m_theme.cr_title_text = gRGB(0, 0, 0);
 
 		//버튼 색상도 타이틀바 색상과 동일하게 하려 했으나 우선 포커스 색상만 동일하게 한다.
-		//focus_rect 도 apply_theme 와 동일하게 cr_border_inactive 로 통일 — active/deactive 외관 일치 위함.
+		//포커스 표시 방식은 apply_theme 와 동일하게 유지 (accent 보더). 여기선 색만 재확인.
 		for (int i = 0; i < TOTAL_BUTTON_COUNT; i++)
 		{
-			m_button[i].draw_focus_rect(true, m_theme.cr_border_inactive);
+			m_button[i].set_focus_style(CGdiButton::focus_style_border, m_theme.cr_border_active);
 			//m_button[i].set_text_color(m_theme.cr_title_text);
 			//m_button[i].set_back_color(m_theme.cr_title_back);
 		}
@@ -616,9 +620,129 @@ void CSCMessageBox::set_message(CString msg, int type, int timeout_sec, int alig
 		CenterWindow(m_show_on_parent_center ? m_parent : nullptr);
 		ShowWindow(SW_SHOW);
 
+		//표시는 mark 만으로 충분하다 — 포커스는 박스가 활성화될 때 OnActivate 에서 확정된다.
+		mark_default_button();
+		set_focus_to_default_button();
+
 		if (m_timeout_sec > 0)
 			SetTimer(timer_timeout, 1000, NULL);
 	}
+}
+
+//표시 중인 버튼을 화면 좌→우 순으로 수집한다.
+//조합별 순서 테이블을 따로 두면 recalc_layout 의 배치 switch 와 어긋날 위험이 있으므로
+//실제 배치된 좌표에서 역으로 구한다 — 버튼 조합이 늘어나도 자동으로 따라간다.
+void CSCMessageBox::get_visible_button_ids(std::deque<int>& ids) const
+{
+	ids.clear();
+
+	std::deque<std::pair<int, int>> sorted;		//<x, button id>
+
+	for (int i = IDOK; i < TOTAL_BUTTON_COUNT; i++)
+	{
+		//IsWindowVisible() 이 아니라 자기 WS_VISIBLE 만 본다 — set_message() 가 박스를 띄우기
+		//전에도 호출되는데, 그 시점엔 부모(박스)가 아직 hidden 이라 IsWindowVisible() 이 전부 FALSE 다.
+		if (m_button[i].m_hWnd == NULL || !(m_button[i].GetStyle() & WS_VISIBLE))
+			continue;
+
+		CRect rc;
+		m_button[i].GetWindowRect(rc);
+		sorted.push_back(std::make_pair((int)rc.left, i));
+	}
+
+	std::sort(sorted.begin(), sorted.end());
+
+	for (size_t i = 0; i < sorted.size(); i++)
+		ids.push_back(sorted[i].second);
+}
+
+//엔터키 응답 / 초기 포커스가 가리킬 기본 버튼.
+//Windows MessageBox 의 규칙을 그대로 따른다 — 기본은 *맨 왼쪽(첫 번째)* 버튼이고,
+//MB_DEFBUTTON2 / 3 / 4 가 주어지면 그 순번의 버튼. 조합별 예외 테이블은 필요 없다.
+//  MB_OK                 [확인]
+//  MB_OKCANCEL           [확인][취소]
+//  MB_ABORTRETRYIGNORE   [중지][재시도][무시]
+//  MB_YESNOCANCEL        [예][아니오][취소]
+//  MB_YESNO              [예][아니오]
+//  MB_RETRYCANCEL        [재시도][취소]
+//  MB_CANCELTRYCONTINUE  [취소][다시 시도][계속]
+int CSCMessageBox::get_default_button_id() const
+{
+	std::deque<int> ids;
+	get_visible_button_ids(ids);
+
+	//MB_HELP 의 도움말 버튼은 대화를 끝내지 않으므로 Windows 에서도 기본 버튼이 되지 않는다.
+	while (!ids.empty() && ids.back() == IDHELP)
+		ids.pop_back();
+
+	if (ids.empty())
+		return -1;
+
+	//m_type 이 BUTTON_TYPE_NO_BUTTON 등 음수여도 아래 범위 검사에서 0 으로 걸러진다.
+	int index = ((m_type & MB_DEFMASK) >> 8);
+	if (index < 0 || index >= (int)ids.size())
+		index = 0;
+
+	return ids[index];
+}
+
+//현재 포커스를 가진 버튼의 ID(IDOK ~ IDCONTINUE). 포커스가 버튼이 아니면 -1.
+int CSCMessageBox::get_focused_button_id() const
+{
+	CWnd* focus = GetFocus();
+	if (focus == nullptr)
+		return -1;
+
+	//생성 시 SC_BUTTON_ID + 버튼ID 로 부여했으므로 역산한다.
+	int id = focus->GetDlgCtrlID() - SC_BUTTON_ID;
+	if (id < IDOK || id >= TOTAL_BUTTON_COUNT)
+		return -1;
+
+	//타이틀바의 X 버튼은 m_button[IDCANCEL] 과 컨트롤 ID 가 같으므로 hwnd 로 걸러낸다.
+	if (focus->m_hWnd == m_button_quit.m_hWnd)
+		return -1;
+
+	return id;
+}
+
+//기본 버튼을 CGdiButton 에 표시해 둔다.
+//포커스와 별개로 걸어두는 이유 — modeless 로 띄우면 보통 parent 의 OnInitDialog 안에서
+//set_message() 가 호출되고, 그 직후 MFC 가 parent 의 첫 컨트롤로 포커스를 가져가므로
+//박스는 *활성화된 적이 없는* 상태로 화면에 남는다. 이때 포커스에만 의존하면 어느 버튼이
+//엔터 대상인지 전혀 표시되지 않는다 (2026-08-19 사용자 보고).
+//기본 버튼은 포커스가 없어도 표시를 갖고, 탭으로 포커스가 옮겨가면 그쪽에 표시를 양보한다.
+void CSCMessageBox::mark_default_button()
+{
+	int def_id = get_default_button_id();
+
+	for (int i = IDOK; i < TOTAL_BUTTON_COUNT; i++)
+	{
+		if (m_button[i].m_hWnd)
+			m_button[i].set_default_button(i == def_id);
+	}
+}
+
+//기본 버튼에 초기 포커스를 준다. 사용자가 엔터/스페이스로 바로 확정할 수 있고 탭 이동의 기점이 된다.
+//버튼이 하나도 표시되지 않는 타입(BUTTON_TYPE_NO_BUTTON 등)이면 아무것도 하지 않는다.
+void CSCMessageBox::set_focus_to_default_button()
+{
+	int id = get_default_button_id();
+
+	if (id > 0 && m_button[id].m_hWnd && m_button[id].IsWindowVisible())
+		m_button[id].SetFocus();
+}
+
+void CSCMessageBox::OnActivate(UINT nState, CWnd* pWndOther, BOOL bMinimized)
+{
+	CDialogEx::OnActivate(nState, pWndOther, bMinimized);
+
+	//포커스 확정은 여기가 최종 지점이다.
+	//modeless 로 띄우면 보통 parent 의 OnInitDialog 안에서 set_message() 가 호출되는데,
+	//OnInitDialog 가 TRUE 를 반환하는 순간 MFC 가 *parent 의 첫 컨트롤* 로 포커스를 가져가버려
+	//set_message() 에서 준 포커스가 지워진다. 박스가 실제로 활성화되는 시점에 다시 준다.
+	//이미 우리 버튼 중 하나가 포커스를 갖고 있으면(탭으로 옮겨둔 상태) 건드리지 않는다.
+	if (nState != WA_INACTIVE && get_focused_button_id() < 0)
+		set_focus_to_default_button();
 }
 
 void CSCMessageBox::set_align(int align)
@@ -675,10 +799,13 @@ void CSCMessageBox::apply_theme(bool invalidate)
 			//일반 GdiButton 과 *동일한* Win11-look 산출 공식 (face = cr_back +16, border = cr_back +40
 			//for dark; light 는 -8 / -40) 을 그대로 타게 해 외관 일관성 확보.
 			m_button[i].set_color_theme(m_theme);
-			//focus_rect 끔 — 탭으로 focus 가 옮겨가도 두 버튼 외관이 동일하게 유지되도록.
-			//(이전엔 cr_border_inactive 로 dotted overlay 를 그려 focused 만 다르게 보였음 — 사용자 지적 2026-05-21.
-			// "탭은 별도 효과 OR 생략" 중 생략 선택.)
-			m_button[i].draw_focus_rect(false);
+			//포커스 표시 = Win10/11 방식(보더 색만 accent 로 교체). 2026-08-19 사용자 요청.
+			//  - 배경색 톤 차이는 "다른 버튼과 비교"해야 알 수 있어 버튼이 2개뿐이면 판별이 어렵다.
+			//    보더 색조 교체는 accent hue 유무라는 *절대적* 단서라 버튼이 몇 개든 즉시 읽힌다.
+			//  - 웹에서 흔한 바깥 링 방식은 버튼 영역을 깎아먹지만, 이건 이미 그리던 보더의 색만
+			//    바꾸는 것이라 추가 픽셀이 0 이다.
+			//고전 dotted rect 를 원하면 focus_style_dotted 로 바꾸면 된다 (색은 cr_text_dim 권장).
+			m_button[i].set_focus_style(CGdiButton::focus_style_border, m_theme.cr_border_active);
 		}
 	}
 
@@ -746,19 +873,13 @@ BOOL CSCMessageBox::PreTranslateMessage(MSG* pMsg)
 				return TRUE;
 
 			case VK_RETURN :
+			{
 				//모든 버튼이 CGdiButton 으로 동적 생성되어 표준 BS_DEFPUSHBUTTON 이 없다.
-				//엔터키는 여기서 직접 m_type 에 따라 기본 응답을 결정해 종료한다.
-				switch (m_type & MB_TYPEMASK)
-				{
-				case MB_YESNO :
-				case MB_YESNOCANCEL :
-					m_response = IDYES; break;
-				case MB_RETRYCANCEL :
-				case MB_ABORTRETRYIGNORE :
-					m_response = IDRETRY; break;
-				default :
-					m_response = IDOK;  break;
-				}
+				//탭으로 포커스를 옮겨둔 상태면 *포커스된 버튼* 이 응답이어야 한다 — 그렇지 않으면
+				//탭으로 옮겨놓고 엔터를 쳤는데 엉뚱한 기본 버튼이 눌리는 모순이 생긴다.
+				//포커스가 버튼이 아니면 m_type 별 기본 버튼으로 폴백.
+				int focused = get_focused_button_id();
+				m_response = (focused > 0) ? focused : get_default_button_id();
 
 				//우리 popup 은 CreateEx 로 만들었으므로 ::EndDialog 호출은 undefined behavior.
 				//modal: m_response 만 설정 → 펌프 루프 자체 종료 → DoModal 끝에서 ShowWindow(SW_HIDE).
@@ -770,6 +891,7 @@ BOOL CSCMessageBox::PreTranslateMessage(MSG* pMsg)
 					ShowWindow(SW_HIDE);
 				}
 				return TRUE;
+			}
 		}
 	}
 
@@ -879,6 +1001,10 @@ INT_PTR CSCMessageBox::DoModal(CString msg, int type, int timeout_sec)
 
 	ShowWindow(SW_SHOW);
 
+	//set_message 안에서도 한 번 주지만, msg 가 비어 set_message 를 건너뛴 경우도 있고
+	//그 시점엔 아직 top-level 이 활성화 전이라 포커스가 안 붙기도 한다. 여기서 다시 확정한다.
+	mark_default_button();
+	set_focus_to_default_button();
 
 	m_timeout_sec = timeout_sec;
 	if (m_timeout_sec > 0)
@@ -910,6 +1036,15 @@ INT_PTR CSCMessageBox::DoModal(CString msg, int type, int timeout_sec)
 		//(포커스된 버튼을 클릭처럼 처리) 와 본 dialog 의 VK_RETURN/VK_ESCAPE 처리가 모두 동작한다.
 		//단순히 this->PreTranslateMessage 만 호출하면 자식 컨트롤의 PreTranslate 는 누락됨.
 		if (CWnd::WalkPreTranslateTree(m_hWnd, &stmsg))
+			continue;
+
+		//Tab / Shift+Tab 의 컨트롤 간 포커스 이동은 전적으로 IsDialogMessage 가 구현한다.
+		//본 popup 은 dialog template 이 아니라 CreateEx 로 만든 데다 메시지 펌프도 직접 돌리므로,
+		//이 호출이 없으면 탭키가 아무 동작도 하지 않는다 (2026-08-19 사용자 보고).
+		//VK_RETURN / VK_ESCAPE 는 바로 위 WalkPreTranslateTree 에서 이미 소비되므로
+		//IsDialogMessage 의 기본 pushbutton 처리와 충돌하지 않는다.
+		//숨겨진 버튼(ShowWindow(SW_HIDE))은 IsDialogMessage 가 자동으로 건너뛴다.
+		if (::IsDialogMessage(m_hWnd, &stmsg))
 			continue;
 
 		TranslateMessage(&stmsg);

@@ -409,10 +409,38 @@ public:
 							Gdiplus::Color cr_border = Gdiplus::Color::Transparent,
 							Gdiplus::Color cr_parent_back = Gdiplus::Color::Transparent);
 
-	//포커스 사각형 관련
-	void		draw_focus_rect(bool draw = true, Gdiplus::Color cr_focus = Gdiplus::Color::LightGray) { m_draw_focus_rect = draw; m_cr_focus_rect = cr_focus; Invalidate(); }
+	//포커스 표시 관련.
+	//두 방식 모두 *버튼 클라이언트 안쪽* 에만 그리므로 버튼 크기·레이아웃·면적이 변하지 않는다.
+	//(웹에서 흔한 "버튼 바깥에 링" 방식은 버튼 영역을 그만큼 깎아먹어 채택하지 않았다.)
+	enum focus_style
+	{
+		focus_style_none = 0,	//포커스 표시 안 함
+		focus_style_dotted,		//Windows 고전 dotted rect 를 보더 한 칸 안쪽에
+		focus_style_border,		//Win10/11 방식 — base 보더의 색만 accent 로 교체 (추가 픽셀 0)
+	};
+
+	//cr_focus 는 두 방식이 공용으로 쓴다. dotted 면 점의 색, border 면 accent 보더 색.
+	void		set_focus_style(int style, Gdiplus::Color cr_focus = Gdiplus::Color::Transparent)
+				{
+					m_focus_style = style;
+					if (cr_focus.GetA() != 0)
+						m_cr_focus_rect = cr_focus;
+					Invalidate();
+				}
+	//기존 호출부 호환용. draw=true 는 고전 dotted 방식을 의미한다.
+	void		draw_focus_rect(bool draw = true, Gdiplus::Color cr_focus = Gdiplus::Color::LightGray) { m_focus_style = draw ? focus_style_dotted : focus_style_none; m_cr_focus_rect = cr_focus; Invalidate(); }
 	void		set_focus_rect_color(Gdiplus::Color cr_focus) { m_cr_focus_rect = cr_focus; Invalidate(); }
 	void		set_focus_rect_width(int nWidth) { m_focus_rect_width = nWidth; Invalidate(); }
+	//dotted rect 를 버튼 가장자리에서 몇 px 안쪽에 그릴지. 0 이면 보더와 겹친다.
+	void		set_focus_rect_inset(int inset) { m_focus_rect_inset = inset; Invalidate(); }
+	//focus_style_border 일 때의 보더 두께. 1 이면 색만 바뀌고, 2 면 Win11 처럼 살짝 굵어진다.
+	void		set_focus_border_thick(int thick) { m_focus_border_thick = thick; Invalidate(); }
+
+	//기본 버튼(Windows 의 default pushbutton) 지정.
+	//포커스와 별개의 개념이다 — 창이 아직 활성화되지 않아 포커스가 아무데도 없는 상태에서도
+	//"엔터를 치면 이 버튼" 임을 보여줘야 하므로, 기본 버튼은 포커스 없이도 표시를 갖는다.
+	//표시는 m_focus_style 이 지정한 방식(dotted / border)을 그대로 쓴다.
+	void		set_default_button(bool is_default = true) { m_is_default_button = is_default; Invalidate(); }
 
 	void		use_hover(bool use = true);
 
@@ -623,9 +651,14 @@ protected:
 	bool		m_bPushed = false;
 
 	bool		m_bHasFocus = false;
-	bool		m_draw_focus_rect = false;				//포커스 사각형 표시 여부(기본값 false)
-	Gdiplus::Color	m_cr_focus_rect = Gdiplus::Color::DimGray;	//색상
-	int			m_focus_rect_width = 1;					//두께
+	int			m_focus_style = focus_style_none;		//포커스 표시 방식(기본값 표시 안 함)
+	Gdiplus::Color	m_cr_focus_rect = Gdiplus::Color::DimGray;	//색상. dotted 면 점 색, border 면 accent 보더 색
+	int			m_focus_rect_width = 1;					//dotted 점 두께
+	int			m_focus_rect_inset = 2;					//dotted rect 를 가장자리에서 몇 px 안쪽에 그릴지
+	int			m_focus_border_thick = 1;				//focus_style_border 일 때의 보더 두께
+	bool		m_is_default_button = false;			//기본 버튼 여부. 포커스 없이도 표시를 갖는다.
+	//실제로 포커스 표시를 그려야 하는지. 포커스가 있거나, 기본 버튼인데 형제 중 아무도 포커스가 없을 때.
+	bool		need_draw_focus_mark() const;
 
 	bool		m_draw_3D_rect = false;					//입체 느낌의 3D, 누르면 sunken. default = true;
 	CPoint		m_down_offset = CPoint(0, 0);			//눌렸을 때 그려질 위치. default는 offset=0. 이 값이 클 경우 여백이 없는 이미지라면 잘릴 수 있다.

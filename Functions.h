@@ -607,7 +607,16 @@ struct	NETWORK_INFO
 	// - 항상 "cmd.exe /c <cmd>" 로 실행 → cmd 창과 동일한 의미 (popen 방식과 같되 창이 없음)
 	// - 자식과 동시에 파이프를 드레인 → 출력 크기와 무관하게 데드락 없음 (systeminfo/tasklist 도 안전)
 	// - 콘솔 OEM 코드페이지로 변환 → 한글 깨짐 없음.  끝나지 않는 대화형 명령(ping -t, pause, more)은 부적합.
-	CString		run_command(CString cmd, DWORD timeout_ms = INFINITE);
+	//exit_code 에 포인터를 주면 자식 프로세스의 종료 코드를 받는다(성공 판정용). mt/signtool 등은 실패 시 0이 아닌 값을 반환.
+	//(타임아웃으로 아직 실행 중이면 STILL_ACTIVE(259) 가 담길 수 있다. GetExitCodeProcess 실패 시 (DWORD)-1.)
+	CString		run_command(CString cmd, DWORD timeout_ms = INFINITE, DWORD* exit_code = nullptr);
+
+	//파일을 수정하는 외부 명령(delcert/mt/signtool 등)은 프로세스가 끝나도 AV 스캔·인덱서·지연 flush 때문에
+	//대상 파일이 잠시 잠겨 있을 수 있다. 파일을 단독(공유 0)으로 열 수 있을 때까지(=아무도 핸들을 쥐지 않은 상태)
+	//최대 timeout_ms 만큼 기다린다. 이어지는 명령이 파일을 못 열어 조용히 실패하는 것을 막는 용도.
+	//true = 열 수 있게 됨, false = 타임아웃(여전히 잠김) 또는 파일 없음.
+	bool		wait_until_file_writable(const CString& path, DWORD timeout_ms = 10000);
+
 	extern		void* g_wow64_preset;
 	void		Wow64Disable(bool disable = true);
 

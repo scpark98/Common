@@ -13681,7 +13681,7 @@ CString run_process(CString exePath, bool wait_process_exit, bool return_after_f
 }
 
 //cmd 창에 친 명령을 그대로 수행하고 표준출력+표준에러를 문자열로 돌려준다. (선언부 주석 참고)
-CString run_command(CString cmd, DWORD timeout_ms /*= INFINITE*/)
+CString run_command(CString cmd, DWORD timeout_ms /*= INFINITE*/, DWORD* exit_code /*= nullptr*/)
 {
 	CString result;
 
@@ -13736,6 +13736,13 @@ CString run_command(CString cmd, DWORD timeout_ms /*= INFINITE*/)
 
 	WaitForSingleObject(pi.hProcess, timeout_ms);
 
+	//종료 코드를 원하면 프로세스 핸들을 닫기 전에 조회한다(성공/실패 판정용).
+	if (exit_code)
+	{
+		DWORD code = 0;
+		*exit_code = GetExitCodeProcess(pi.hProcess, &code) ? code : (DWORD)-1;
+	}
+
 	CloseHandle(rd);
 	CloseHandle(pi.hThread);
 	CloseHandle(pi.hProcess);
@@ -13789,6 +13796,33 @@ CString run_command(CString cmd, DWORD timeout_ms /*= INFINITE*/)
 
 	result.Replace(_T("\r\n"), _T("\n"));
 	return result;
+}
+
+//파일을 수정하는 외부 명령이 끝나도 exe 가 잠시 잠겨 있으면 이어지는 명령이 조용히 실패한다.
+//단독(공유 0)으로 열 수 있을 때까지 최대 timeout_ms 만큼 100ms 간격으로 기다린다(핸들 완전 해제 확인).
+bool wait_until_file_writable(const CString& path, DWORD timeout_ms /*= 10000*/)
+{
+	ULONGLONG start = GetTickCount64();
+
+	for (;;)
+	{
+		HANDLE h = CreateFile(path, GENERIC_READ | GENERIC_WRITE, 0,
+			NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+		if (h != INVALID_HANDLE_VALUE)
+		{
+			CloseHandle(h);
+			return true;
+		}
+
+		//파일 자체가 없으면 잠금 대기가 의미 없다 → 즉시 실패로 본다(무한 폴링 방지).
+		if (GetLastError() == ERROR_FILE_NOT_FOUND || GetLastError() == ERROR_PATH_NOT_FOUND)
+			return false;
+
+		if (GetTickCount64() - start >= timeout_ms)
+			return false;
+
+		Sleep(100);
+	}
 }
 
 //─────────────────────────────────────────────────────────────────────────────

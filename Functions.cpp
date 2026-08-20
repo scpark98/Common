@@ -10564,15 +10564,6 @@ CString	extract_sub_str(CString src, CString prefix, CString postfix)
 	return src.Mid(start, end - start);
 }
 
-//resource string table의 문자열을 리턴한다.
-CString	load_string(UINT nID)
-{
-	CString str;
-	str.LoadString(nID);
-	return str;
-}
-
-
 //src 문자열에 set_of_keyword에 나열된 단어가 있는지 검사.
 //set_of_keyword는 세미콜론으로 구분해서 여러 문자 또는 문자열을 넣을 수 있다.
 //ex. src = "abcd1234"일 때 set_of_keyword = "bc;21" => true, set_of_keyword = "212" => false

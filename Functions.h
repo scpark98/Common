@@ -60,6 +60,7 @@ http://www.devpia.com/MAEUL/Contents/Detail.aspx?BoardID=51&MAEULNo=20&no=567
 
 #include "colors.h"
 #include "data_structure/SCParagraph/SCParagraph.h"
+#include "system/ui_language.h"
 
 #include <WinInet.h>
 #include <specstrings.h>
@@ -861,8 +862,9 @@ struct	NETWORK_INFO
 	//src에서 prefix와 postfix 사이에 있는 문자열을 추출한다.
 	CString		extract_sub_str(CString src, CString prefix, CString postfix);
 
-	//resource string table의 문자열을 리턴한다.
-	extern CString load_string(UINT nID);
+	//load_string(= _S) 은 system/ui_language.h 로 옮겼다.
+	//CString::LoadString 은 언어를 OS 판단에 맡겨 OS 버전·MUI 설치 형태에 따라 결과가 달라졌다.
+	//새 구현은 FindResourceEx 에 LANGID 를 명시하고 반환 타입이 const TCHAR* 다.
 
 	//마지막 표시 자리의 반올림 방향. 탐색기는 파일 크기(KB)=올림, 드라이브/폴더 용량(GB/TB)=내림이라 용도별로 다르다.
 	enum size_round { size_round_up = 0, size_round_down = 1 };

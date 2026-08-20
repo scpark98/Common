@@ -1398,6 +1398,49 @@ namespace ffi
 			{
 				IMediaSample* pSample;
 
+				//20260817 by claude. [playrate] 오디오가 "쌓였다가 한번에" 재생되는지 직접 잰다.
+				//DSound 가 그래프 클럭 마스터이므로 클럭의 진행 = 오디오 재생 진행이다. 따라서
+				//(클럭 증가분 / 실제 경과시간) 이 1.0 이면 정상 재생, 1 보다 크게 튀면 그 구간의 오디오가
+				//실시간보다 빠르게 소비된 것 = 몰아 재생(트랙이동 때 들리는 짧은 "드르륵").
+				//0 에 가까우면 반대로 재생이 멈춘 것(뮤트). 100ms 창으로 보고 벗어날 때만 남긴다.
+				{
+					//QueryPerformanceFrequency 는 부팅 후 불변 — 매 iteration 호출하지 않는다.
+					static LARGE_INTEGER pqf = []() { LARGE_INTEGER f; ::QueryPerformanceFrequency(&f); return f; }();
+					LARGE_INTEGER pqn;
+					::QueryPerformanceCounter(&pqn);
+
+					CRefTime rt_now;
+					m_pFilter->StreamTime(rt_now);
+					const long long clock_ms = (long long)((REFERENCE_TIME)rt_now / 10000);
+
+					if (m_playrate_qpc_last == 0)
+					{
+						m_playrate_qpc_last = pqn.QuadPart;
+						m_playrate_clock_last = clock_ms;
+					}
+					else
+					{
+						const long long wall_ms = (pqn.QuadPart - m_playrate_qpc_last) * 1000LL / pqf.QuadPart;
+						if (wall_ms >= 100)
+						{
+							const long long clock_delta = clock_ms - m_playrate_clock_last;
+							const double ratio = (double)clock_delta / (double)wall_ms;
+
+							//seek 로 클럭이 재기준되면 delta 가 음수/거대값이 되므로 그 구간은 버린다.
+							if (clock_delta >= 0 && clock_delta < 60000 && (ratio > 1.30 || ratio < 0.70))
+							{
+								long long t0 = m_seekgap_qpc.load();
+								long long since_seek_ms = t0 ? (pqn.QuadPart - t0) * 1000LL / pqf.QuadPart : -1;
+								logWrite(_T("[ffi/src/audio/playrate] ratio=%.2f (클럭 %lldms / 실제 %lldms) seek 후 +%lldms  %s"),
+									ratio, clock_delta, wall_ms, since_seek_ms,
+									ratio > 1.30 ? _T("← 몰아 재생") : _T("← 재생 정체"));
+							}
+							m_playrate_qpc_last = pqn.QuadPart;
+							m_playrate_clock_last = clock_ms;
+						}
+					}
+				}
+
 				m_audio_loop_state.store(1);
 				ULONGLONG t_gdb0 = GetTickCount64();
 				HRESULT hr = GetDeliveryBuffer(&pSample, NULL, NULL, 0);
@@ -1444,10 +1487,30 @@ namespace ffi
 						CRefTime rt_stream;
 						m_pFilter->StreamTime(rt_stream);
 
+						//20260817 by claude. [clock_ahead] 그래프 클럭이 이 샘플의 표시시각보다 얼마나 앞서 있는가.
+						//양수가 크면 렌더러 입장에서 이 샘플은 이미 지난 시각의 것이다. seek 12123 회 중 14 회에서
+						//1.6~3.1 초 앞선 것이 관측됐고, 전부 *정상 재생 후 첫 seek* 였다(연타 중에는 안 나온다).
+						//이 구간은 Deliver 가 블록하지 않아 renderer_pacing 계측에는 전혀 잡히지 않는다 — 별도로 잰다.
+						const long long clock_ahead_ms = (long long)((REFERENCE_TIME)rt_stream / 10000) - (long long)(rt_s / 10000);
+
 						if (!m_resume_first_logged.exchange(true))
-							logWrite(_T("[ffi/src/audio/resume] first_deliver=+%lldms rtStart=%lldms stream_clock=%lldms block=%llums sc=%lld"),
+						{
+							logWrite(_T("[ffi/src/audio/resume] first_deliver=+%lldms rtStart=%lldms stream_clock=%lldms clock_ahead=%lldms block=%llums sc=%lld"),
 								since_seek_ms, (long long)(rt_s / 10000),
-								(long long)((REFERENCE_TIME)rt_stream / 10000), t_dlv_ms, (long long)m_sample_count);
+								(long long)((REFERENCE_TIME)rt_stream / 10000), clock_ahead_ms, t_dlv_ms, (long long)m_sample_count);
+
+							m_clock_ahead_ms.store(clock_ahead_ms);
+
+							//앞서 있으면 클럭이 새 구간으로 재조정될 때까지를 잰다 — 그 시간이 곧 렌더러가
+							//샘플을 늦은 것으로 취급하는 구간(=무음 후보 구간)의 길이다.
+							m_clock_rebase_watch.store(clock_ahead_ms > 200);
+						}
+						else if (m_clock_rebase_watch.load() && clock_ahead_ms <= 200)
+						{
+							logWrite(_T("[ffi/src/audio/resume] clock_rebase=+%lldms (ahead 해소, rtStart=%lldms stream_clock=%lldms)"),
+								since_seek_ms, (long long)(rt_s / 10000), (long long)((REFERENCE_TIME)rt_stream / 10000));
+							m_clock_rebase_watch.store(false);
+						}
 
 						//10ms 이상 블록 = 렌더러가 더 못 받는다 = 이미 재생 중. 여기서 무음이 끝난 것으로 본다.
 						//10초까지 블록이 없으면 재생이 아니라 다른 이유이므로 무장만 해제(로그로 구분 가능).
@@ -1456,6 +1519,8 @@ namespace ffi
 							logWrite(_T("[ffi/src/audio/resume] renderer_pacing=+%lldms block=%llums rtStart=%lldms stream_clock=%lldms"),
 								since_seek_ms, t_dlv_ms, (long long)(rt_s / 10000),
 								(long long)((REFERENCE_TIME)rt_stream / 10000));
+							//20260817 by claude. 앱(자동 트랙이동 테스트)이 폴링해 증상 발생 여부를 판정하도록 보관.
+							m_resume_gap_ms.store(since_seek_ms);
 							m_resume_armed.store(false);
 						}
 					}

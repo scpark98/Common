@@ -230,8 +230,29 @@ namespace ffi
 		//on_seek_flush 가 무장하고, DoBufferProcessingLoop 이 first_deliver / renderer_pacing 두 줄을 남긴 뒤 해제.
 		std::atomic<bool>		m_resume_armed{ false };
 		std::atomic<bool>		m_resume_first_logged{ false };
+
+		//20260817 by claude. 마지막 seek 의 renderer_pacing 값 보관 — 앱이 폴링해 증상 발생을 자동 판정한다.
+		std::atomic<long long>	m_resume_gap_ms{ -1 };
+
+		//20260817 by claude. [playrate] 그래프 클럭 진행 / 실제 경과시간 비율 측정용 직전 표본.
+		//DSound 가 클럭 마스터일 때 이 비율이 곧 오디오의 실제 재생 속도다.
+		long long				m_playrate_qpc_last = 0;
+		long long				m_playrate_clock_last = 0;
+
+		//20260817 by claude. 마지막 seek 의 첫 delivery 시점에 그래프 클럭이 샘플 표시시각보다 앞선 양(ms).
+		//renderer_pacing 은 Deliver 블록을 재므로 이 현상을 원리적으로 못 잡는다 — 별도 채널이 필요하다.
+		std::atomic<long long>	m_clock_ahead_ms{ LLONG_MIN };
+		std::atomic<bool>		m_clock_rebase_watch{ false };
 	public:
 		HRESULT OnThreadStartPlay() override;
+
+		//20260817 by claude. 마지막 트랙이동에서 측정된 오디오 재개 지연(ms). 읽으면서 비우므로 같은 seek 를
+		//두 번 집계하지 않는다. 새 측정값이 없으면 -1.
+		long long		take_resume_gap_ms() { return m_resume_gap_ms.exchange(-1); }
+
+		//20260817 by claude. 마지막 트랙이동의 clock_ahead(ms). 읽으면서 비운다. 새 측정값이 없으면 LLONG_MIN.
+		//양수가 크다 = 렌더러가 이 샘플들을 이미 지난 시각의 것으로 본다(무음 후보).
+		long long		take_clock_ahead_ms() { return m_clock_ahead_ms.exchange(LLONG_MIN); }
 	};
 
 	//CSource — base filter. Pin (CFFiVideoStream) 을 보유. open_file 로 CDecoder 준비.
@@ -284,6 +305,14 @@ namespace ffi
 		//get_track_pos 가 wall clock 기반 graph position 대신 이 값을 반환해 rate 무관 정확 시점.
 		//audio pin 없으면 -1.
 		int64_t		   audio_current_pts_ms() const;
+
+		//20260817 by claude. 마지막 트랙이동에서 측정된 오디오 재개 지연(ms) — CFFiAudioStream::take_resume_gap_ms 위임.
+		//읽으면서 비운다. audio pin 이 없거나 새 측정값이 없으면 -1.
+		long long	   take_audio_resume_gap_ms() { return m_pAudioStream ? m_pAudioStream->take_resume_gap_ms() : -1; }
+
+		//20260817 by claude. 마지막 트랙이동의 clock_ahead(ms) — CFFiAudioStream::take_clock_ahead_ms 위임.
+		//읽으면서 비운다. audio pin 이 없거나 새 측정값이 없으면 LLONG_MIN.
+		long long	   take_audio_clock_ahead_ms() { return m_pAudioStream ? m_pAudioStream->take_clock_ahead_ms() : LLONG_MIN; }
 
 		//A/V stretch — audio 의 "pts 1초당 실제 샘플수 / reported sample_rate" 비율(≈1.0=정상). 1 보다 크면 이 파일은
 		//오디오 샘플이 pts 보다 많아(주기적 짧은 pts) 모든 샘플 자연재생 시 ~ratio 배 느려진다(PotPlayer 와 동일).

@@ -168,7 +168,9 @@ STDMETHODIMP CSCAudioTransformFilter::GetClassID(CLSID* pClsID)
 
 STDMETHODIMP CSCAudioTransformFilter::Stop()  { m_state = State_Stopped; stop_worker(); return S_OK; }
 STDMETHODIMP CSCAudioTransformFilter::Pause() { m_state = State_Paused; start_worker(); return S_OK; }
-STDMETHODIMP CSCAudioTransformFilter::Run(REFERENCE_TIME) { m_state = State_Running; start_worker(); return S_OK; }
+//20260817 by claude. tStart 를 보관한다 — stream time(= 기준클럭 - tStart) 계산에 필요하고,
+//그게 있어야 하류로 넘기는 샘플이 현재 시점보다 얼마나 미래인지 잴 수 있다.
+STDMETHODIMP CSCAudioTransformFilter::Run(REFERENCE_TIME tStart) { m_run_start = tStart; m_state = State_Running; start_worker(); return S_OK; }
 STDMETHODIMP CSCAudioTransformFilter::GetState(DWORD, FILTER_STATE* pState)
 {
 	if (!pState) return E_POINTER;
@@ -470,6 +472,12 @@ void CSCAudioTransformFilter::begin_flush()
 void CSCAudioTransformFilter::end_flush()
 {
 	m_flushing.store(false);
+
+	//20260817 by claude. [renderer_diag] seek 직후 하류에 넘기는 첫 샘플 몇 개의 표시시각을 기록한다.
+	//DSound 는 sample.rtStart 가 stream time 보다 미래면 그때까지 재생을 미룬다. 트랙이동 후 오디오가
+	//~2 초 멈추는 현상에서 DSound 가 "샘플을 받고도 재생을 안 하는" 것이 확인됐으므로(버퍼를 붙든 채
+	//clk_advance≈0), 넘긴 샘플이 얼마나 미래인지가 그 대기의 정당한 이유인지 판정한다.
+	m_post_flush_log_left.store(24);	//1024 샘플 x 21.3ms x 24 = 약 500ms — 정지가 드러나는 341ms 창을 덮는다.
 }
 
 void CSCAudioTransformFilter::worker_main()
@@ -525,8 +533,27 @@ void CSCAudioTransformFilter::process_one(const work_item& w)
 			}
 		}
 
+		//20260817 by claude. [chain_diag] worker 가 하류(다음 필터 또는 DSound)로 넘기는 데 걸린 시간.
+		//여기가 길면 정체의 근원이 이 필터보다 아래(최종적으로 DSound), 여기가 짧은데 Receive 의
+		//getbuf_wait 만 길면 이 필터의 worker/큐 쪽이다. 두 값의 짝으로 단계를 특정한다.
 		if (m_pOutputPin)
+		{
+			//20260817 by claude. seek 마다 48 줄(필터 2 x 샘플 24)을 남기던 [renderer_diag] 를 제거했다.
+			//logWrite 는 한 줄마다 fflush + 전역 critical section 이라, 그걸 오디오를 렌더러에 넘기는
+			//워커 스레드에서 하니 트랙이동 때 잡음이 크게 늘었다(사용자 청취: 30% → 80%).
+			//측정 목적(넘기는 샘플의 lead)은 이미 달성했고, 진행 상황은 audio pin 의 [playrate] 로 본다.
+			LARGE_INTEGER dqf, dq0, dq1;
+			::QueryPerformanceFrequency(&dqf);
+			::QueryPerformanceCounter(&dq0);
+
 			m_pOutputPin->deliver_sample(w.sample);
+
+			::QueryPerformanceCounter(&dq1);
+			const long long deliver_us = (dq1.QuadPart - dq0.QuadPart) * 1000000LL / dqf.QuadPart;
+			if (deliver_us >= 300000)
+				logWrite(_T("[AudioFilter/chain_diag] %s worker deliver=%lldms (하류 정체 = 이 필터가 원인 아님)"),
+					CString(m_name).GetString(), deliver_us / 1000);
+		}
 		w.sample->Release();	//enqueue 시 AddRef 된 ref 해제
 	}
 	else if (w.kind == kind_new_segment)
@@ -576,8 +603,14 @@ IMemAllocator* CSCAudioTransformInputPin::get_or_create_internal_allocator()
 		return NULL;
 
 	//async queue path 의 sample copy 용 — LAV ↔ DSound 의 buffer pool 과 분리.
-	//cBuffers 충분히 (16) — worker 가 dequeue 후 downstream 에 forward 되기까지의 in-flight.
+	//worker 가 dequeue 후 downstream 에 forward 되기까지의 in-flight 를 덮을 만큼만 있으면 된다.
 	//cbBuffer 는 first Receive 시 upstream sample size 로 동적 갱신 가능하나 일단 64KB.
+	//
+	//cBuffers 충분히 (16) — worker 가 dequeue 후 downstream 에 forward 되기까지의 in-flight.
+	//20260817 by claude. 8 로 줄여봤으나 트랙이동 시 잡음이 오히려 잦아져(30% 이상) 원복했다.
+	//"체인 지연 때문에 샘플이 늦게 닿아 렌더러가 몰아 재생한다"는 가설이 이 결과로 기각된다 —
+	//지연이 줄면 잡음도 줄어야 하는데 반대였다. 버퍼가 얇을수록 심해지는 것은 오히려 seek 직후
+	//렌더러 버퍼를 채울 여력이 부족해지는 쪽(underrun)을 가리킨다. 이 값을 더 줄이지 말 것.
 	ALLOCATOR_PROPERTIES props = { 0 };
 	props.cBuffers = 16;
 	props.cbBuffer = 65536;
@@ -782,6 +815,15 @@ STDMETHODIMP CSCAudioTransformInputPin::Receive(IMediaSample* pSample)
 	//Deliver→이 Receive 를 잡아, seek 시 on_seek_flush 의 Stop() 이 그만큼 기다리게 해 오디오 끊김의 원인이 됐다.
 	//AM_GBF_NOWAIT 폴링 + m_flushing 체크로 in-progress 블록을 ~1ms 안에 abort. allocator Decommit(=silence 회귀)·
 	//렌더러(=영상 stutter 회귀) 를 안 건드리고, flush 중엔 기존 enqueue_sample 과 동일하게 sample drop.
+	//20260817 by claude. [chain_diag] 이 폴링 루프가 소스의 Deliver 를 붙잡는 지점이다.
+	//16 버퍼가 전부 in-flight = worker 가 downstream(다음 필터/DSound)에 넘기지 못하고 있다는 뜻이므로,
+	//여기서 오래 막히면 원인은 *하류*다. process_one 의 deliver_us 와 짝으로 봐야 어느 단계인지 갈린다.
+	//(트랙이동 직후 오디오 뮤트 + 영상 정지 현상 — 정지의 93.6% 가 seek 후 0.5초 이내, 중앙값 0.32s
+	// = 16 버퍼 x 21.3ms = 341ms 로 이 큐 깊이와 일치한다.)
+	LARGE_INTEGER gqf, gq0, gq1;
+	::QueryPerformanceFrequency(&gqf);
+	::QueryPerformanceCounter(&gq0);
+
 	IMediaSample* pOur = NULL;
 	HRESULT hr;
 	for (;;)
@@ -795,6 +837,12 @@ STDMETHODIMP CSCAudioTransformInputPin::Receive(IMediaSample* pSample)
 			return E_UNEXPECTED;
 		Sleep(1);
 	}
+
+	::QueryPerformanceCounter(&gq1);
+	const long long getbuf_us = (gq1.QuadPart - gq0.QuadPart) * 1000000LL / gqf.QuadPart;
+	if (getbuf_us >= 300000)
+		logWrite(_T("[AudioFilter/chain_diag] %s Receive getbuf_wait=%lldms (16 버퍼 전부 in-flight = 하류 정체)"),
+			CString(m_pFilter->name()).GetString(), getbuf_us / 1000);
 
 	BYTE* pInBuf = NULL;
 	pSample->GetPointer(&pInBuf);

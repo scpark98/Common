@@ -48,6 +48,14 @@ public:
 	int				get_delay_ms() const { return (int)(m_delay_100ns.load() / 10000LL); }
 	LONGLONG		get_delay_ns()  const { return m_delay_100ns.load(); }	//Receive 가 timestamp shift 시 호출
 
+	//20260817 by claude. 진단 로그에서 체인의 어느 단계인지 구분하기 위한 friendly name.
+	const WCHAR*	name() const { return m_name; }
+
+	//20260817 by claude. [renderer_diag] Run 의 tStart 보관 — stream time(= 기준클럭 - tStart) 계산용.
+	//flush(=seek) 직후 하류로 넘기는 샘플이 현재보다 얼마나 미래인지 재기 위해 필요하다.
+	REFERENCE_TIME		m_run_start = 0;
+	std::atomic<int>	m_post_flush_log_left{ 0 };
+
 //IUnknown
 	STDMETHODIMP			QueryInterface(REFIID iid, void** ppv) override;
 	STDMETHODIMP_(ULONG)	AddRef() override;

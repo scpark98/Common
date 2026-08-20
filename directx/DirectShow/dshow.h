@@ -206,6 +206,14 @@ public:
 	//open 전후 아무 때나 호출 가능 — 값이 유지되고, 이후 load_media 가 새 CFFiSource 에 자동 승계한다. open 중이면 즉시 반영.
 	void			set_seek_keyframe_mode(bool seek_keyframe);
 	bool			get_seek_keyframe_mode();
+	//20260817 by claude. 마지막 트랙이동 후 오디오가 재생 페이스로 소비되기 시작할 때까지 걸린 시간(ms).
+	//호출하면 값을 비우므로 같은 seek 를 두 번 집계하지 않는다. 아직 새 측정값이 없거나 내장 FFmpeg 경로가
+	//아니면(LAV 경로엔 이 계측이 없음) -1. 트랙이동 직후 오디오만 무음인 현상의 자동 판정에 쓴다.
+	long long		take_audio_resume_gap_ms();
+	//20260817 by claude. 마지막 트랙이동의 첫 오디오 delivery 시점에 그래프 클럭이 그 샘플의 표시시각보다
+	//앞서 있던 양(ms). 양수가 크면 렌더러가 그 샘플들을 이미 지난 시각의 것으로 취급한다(무음 후보 구간).
+	//호출하면 값을 비운다. 새 측정값이 없거나 내장 FFmpeg 경로가 아니면 LLONG_MIN.
+	long long		take_audio_clock_ahead_ms();
 	//EOS(재생 종료) 후 반복재생 — 맨 처음으로 돌아가 다시 재생. 내장 FFmpeg 경로는 Stop→seek0→Run 로
 	//streaming thread·EOS 상태를 완전 리셋 (NoFlush seek 만으로는 EOS 후 frame deliver 가 재개 안 됨).
 	//LAV 경로는 기존 seek(0) 동작 유지.
@@ -260,6 +268,9 @@ public:
 	//인지 음량을 키운다. chain: upstream → CSCAudioGain → CSCAudioCompressor → renderer.
 	void			setup_audio_filter_chain();
 	void			teardown_audio_filter_chain();
+	//20260817 by claude. 그래프 기준 클럭을 오디오 렌더러 대신 SystemClock 으로. graph build 직후 호출.
+	//호출하지 않으면 DSound 가 클럭 마스터가 되어, DSound 가 멈출 때 클럭까지 정지해 영상도 같이 멈춘다.
+	void			set_graph_reference_clock_to_system();
 	void			setup_audio_gain_filter();		//internal — chain 의 한 단계
 	void			teardown_audio_gain_filter();	//internal — chain 전체 해체
 

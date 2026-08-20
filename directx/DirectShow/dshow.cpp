@@ -576,6 +576,38 @@ void CDShow::setup_audio_filter_chain()
 	setup_audio_gain_filter();
 	setup_video_time_scale_filter();
 }
+
+//Graph reference clock 을 audio renderer (default) 가 아닌 SystemClock 으로 변경 —
+//  audio renderer 가 clock master 면 seek 후 audio buffer preroll (~50-200ms) 동안 clock 이 정지 → video 도 wait → 사용자 체감 delay.
+//  SystemClock 은 시스템 시간 기반 free-running 이라 buffer fill 과 무관하게 항상 advance → seek 후 first frame 도착 즉시 표시.
+//  Trade-off: audio renderer 가 system clock 에 sync (자체 sample rate 와 미세 차이 보정 — drop/dup sample 가능, 보통 imperceptible).
+//  진단에서 SetSyncSource(NULL) 시 video 가 1배속보다 빠르게 free-run 됨을 확인 → clock 이 video pace limiter 임을 증명.
+//  NULL 대신 SystemClock 으로 video pace 유지 + audio buffer wait 우회.
+//20260817 by claude. LAV 경로에만 inline 으로 있던 것을 함수로 빼고 내장 FFmpeg 경로에서도 호출한다.
+//내장 경로가 이걸 빠뜨려 DSound 가 클럭 마스터로 남아 있었고, 트랙이동 후 DSound 가 멈추면 클럭까지
+//같이 서서(clk_advance=0ms 실측) 영상도 함께 정지했다 — 위 주석이 예고한 바로 그 증상이다.
+void CDShow::set_graph_reference_clock_to_system()
+{
+	if (!m_pGB)
+		return;
+
+	CComPtr<IReferenceClock> pSysClock;
+	HRESULT hr_sc = CoCreateInstance(CLSID_SystemClock, NULL, CLSCTX_INPROC_SERVER,
+		IID_IReferenceClock, (void**)&pSysClock);
+	if (SUCCEEDED(hr_sc) && pSysClock)
+	{
+		CComQIPtr<IMediaFilter> pMF(m_pGB);
+		if (pMF)
+		{
+			HRESULT hr_set = pMF->SetSyncSource(pSysClock);
+			logWrite(_T("[clock] graph sync source = SystemClock hr=0x%08x"), hr_set);
+		}
+	}
+	else
+	{
+		logWrite(_T("[clock] SystemClock CoCreateInstance failed hr=0x%08x — keep default audio clock"), hr_sc);
+	}
+}
 void CDShow::teardown_audio_filter_chain()
 {
 	teardown_video_time_scale_filter();
@@ -2036,30 +2068,7 @@ int CDShow::load_media(CString sfile, CWnd* pParent, bool auto_render)
 	//audio gain filter + video time-scale filter 끼움 — graph 의 audio/video renderer 직전. graph 빌드 끝난 후 한 번.
 	setup_audio_filter_chain();
 
-	//Graph reference clock 을 audio renderer (default) 가 아닌 SystemClock 으로 변경 —
-	//  audio renderer 가 clock master 면 seek 후 audio buffer preroll (~50-200ms) 동안 clock 이 정지 → video 도 wait → 사용자 체감 delay.
-	//  SystemClock 은 시스템 시간 기반 free-running 이라 buffer fill 과 무관하게 항상 advance → seek 후 first frame 도착 즉시 표시.
-	//  Trade-off: audio renderer 가 system clock 에 sync (자체 sample rate 와 미세 차이 보정 — drop/dup sample 가능, 보통 imperceptible).
-	//  진단에서 SetSyncSource(NULL) 시 video 가 1배속보다 빠르게 free-run 됨을 확인 → clock 이 video pace limiter 임을 증명.
-	//  NULL 대신 SystemClock 으로 video pace 유지 + audio buffer wait 우회.
-	{
-		CComPtr<IReferenceClock> pSysClock;
-		HRESULT hr_sc = CoCreateInstance(CLSID_SystemClock, NULL, CLSCTX_INPROC_SERVER,
-			IID_IReferenceClock, (void**)&pSysClock);
-		if (SUCCEEDED(hr_sc) && pSysClock)
-		{
-			CComQIPtr<IMediaFilter> pMF(m_pGB);
-			if (pMF)
-			{
-				HRESULT hr_set = pMF->SetSyncSource(pSysClock);
-				//logWrite(_T("[clock] graph sync source = SystemClock hr=0x%08x"), hr_set);
-			}
-		}
-		else
-		{
-			//logWrite(_T("[clock] SystemClock CoCreateInstance failed hr=0x%08x — keep default audio clock"), hr_sc);
-		}
-	}
+	set_graph_reference_clock_to_system();
 
 	//graph 의 현재 connection 상태를 .grf 파일로 export — GraphEdit/GraphStudioNext 로 시각화 검증.
 	{
@@ -2218,6 +2227,22 @@ void CDShow::set_seek_keyframe_mode(bool seek_keyframe)
 bool CDShow::get_seek_keyframe_mode()
 {
 	return m_seek_keyframe_mode;
+}
+
+long long CDShow::take_audio_resume_gap_ms()
+{
+	if (!m_pFFiSource)
+		return -1;
+
+	return ((ffi::CFFiSource*)m_pFFiSource)->take_audio_resume_gap_ms();
+}
+
+long long CDShow::take_audio_clock_ahead_ms()
+{
+	if (!m_pFFiSource)
+		return LLONG_MIN;
+
+	return ((ffi::CFFiSource*)m_pFFiSource)->take_audio_clock_ahead_ms();
 }
 
 CString CDShow::get_video_codec_name()
@@ -2964,6 +2989,29 @@ int CDShow::load_media_internal_ffmpeg(CString sfile, CWnd* pParent)
 	}
 	m_pGB->AddFilter(pBF, L"FFmpeg Internal Source");
 
+	//20260817 by claude. [비교군] 오디오 렌더러 명시 지정 — registry "setting\audio_renderer".
+	//0(기본) = DirectShow 자동 선택(= DirectSound Renderer). 1 = WaveOut 렌더러.
+	//트랙이동 후 DSound 가 샘플은 받아 쥔 채 재생만 멈추는 현상(clk_advance≈0 으로 1.5~2.3초)이
+	//DirectSound 렌더러 고유의 문제인지 가리기 위한 것. Render() 의 intelligent connect 는 그래프에
+	//이미 있는 필터를 우선 쓰므로, 미리 넣어두면 그쪽으로 연결된다.
+	//기본값이 기존 동작과 같아 회귀 없음.
+	{
+		const int audio_renderer_kind = AfxGetApp()->GetProfileInt(_T("setting"), _T("audio_renderer"), 0);
+		if (audio_renderer_kind == 1)
+		{
+			CComPtr<IBaseFilter> pWaveOut;
+			HRESULT hr_ar = CoCreateInstance(CLSID_AudioRender, NULL, CLSCTX_INPROC_SERVER,
+				IID_IBaseFilter, (void**)&pWaveOut);
+			if (SUCCEEDED(hr_ar) && pWaveOut)
+				hr_ar = m_pGB->AddFilter(pWaveOut, L"WaveOut Renderer");
+			logWrite(_T("[audio_renderer] WaveOut 지정 hr=0x%08x"), hr_ar);
+		}
+		else
+		{
+			logWrite(_T("[audio_renderer] 기본(DirectSound) 자동 선택"));
+		}
+	}
+
 	//=== 3) output pins → renderer connect (Render 가 자동 처리, video + audio 모두) ===
 	IEnumPins* pEnumP = NULL;
 	if (SUCCEEDED(pBF->EnumPins(&pEnumP)) && pEnumP)
@@ -3044,6 +3092,16 @@ int CDShow::load_media_internal_ffmpeg(CString sfile, CWnd* pParent)
 		setup_audio_filter_chain();
 		//logWrite(_T("[internal] SC Audio chain setup"));
 	}
+
+	//20260817 by claude. LAV 경로에만 있던 클럭 교체를 내장 경로에도 적용한다.
+	//정지의 정체는 오디오 렌더러의 교착이다 — 렌더러가 그래프 클럭 마스터이면서 동시에 미래 시각의
+	//샘플을 기다리는데, 그 시각은 클럭이 진행해야 오고 클럭은 오디오가 재생돼야 진행한다. 서로 기다린다.
+	//렌더러를 WaveOut 으로 바꿔도 동일하게 재현되므로(DirectSound 는 샘플을 받아 쥔 채 재생만 멈추고,
+	//WaveOut 은 아예 받기를 거부 — 방식만 다르고 결과는 같음) 특정 렌더러의 결함이 아니다.
+	//클럭이 자유 진행하면 기다리던 시각이 실제로 도래해 교착이 풀린다.
+	//(한 차례 원복했던 이유는 트랙이동 잡음 악화였는데, 그 평가 구간이 전부 seek 당 48 줄을 워커 스레드에서
+	// 디스크로 flush 하던 진단 로그가 켜져 있던 때였다. 그 로그를 제거한 뒤 재평가한다.)
+	set_graph_reference_clock_to_system();
 
 	//새 renderer 인스턴스의 surface position 설정 — OnSize 가 fire 안 되는 미디어 전환 (mkv→mp4 등) 케이스에서
 	//MPCVR 의 SetWindowPosition / SetDestinationPosition 이 한 번도 안 호출되어 surface 표시 안 되는 결함 fix.
@@ -3707,6 +3765,12 @@ void CDShow::set_track_pos(double pos, bool seek_to_keyframe)
 			else if (fs == State_Running)
 			{
 				::QueryPerformanceCounter(&qpc_t2);
+
+				//20260817 by claude. MPC-VR 경로에도 Pause→GetState→Run(= DirectShow preroll)을 주어
+				//flush 로 비워진 DSound 버퍼를 채운 뒤 재생을 시작하게 해봤으나 실패했다 —
+				//오디오 뮤트(클럭 진행 0ms 가 1.5~1.6초)가 사라지기는커녕 세션 시작 20초 만에 두 번
+				//재현돼 오히려 잦아졌다. 매 seek 마다 그래프 상태를 흔드는 것이 DSound 를 더 불안정하게
+				//만드는 것으로 보인다. 이 방향은 재시도하지 말 것.
 				if (m_use_mpcvr && m_VMR)
 				{
 					CComQIPtr<IExFilterConfig> pCfg(m_VMR);
@@ -4627,6 +4691,20 @@ void CDShow::repaint_video(HDC hdc)
 
 void CDShow::repaint_for_procamp_change()
 {
+	//20260817 by claude. MPC-VR 은 마지막 프레임을 다시 합성시키기만 하면 새 ProcAmp 가 반영된다.
+	//재생 위치도 디코더도 건드리지 않으므로 일시정지 중 화면이 그대로 유지된다.
+	if (m_use_mpcvr && m_VMR)
+	{
+		CComQIPtr<IExFilterConfig> pCfg(m_VMR);
+		if (pCfg)
+			pCfg->Flt_SetBool("cmd_redraw", true);
+		return;
+	}
+
+	//그 외 렌더러는 프레임을 한 번 다시 흘려보내야 반영되는 경우가 있어 현재 위치로 재-seek 한다.
+	//단 *정확* seek 이어야 한다 — "키프레임 단위로 이동" 모드에서 일반 seek 을 쓰면 인접 키프레임에
+	//착지해, 조정키를 누를 때마다 표시 프레임이 두 장 사이를 오간다. set_track_pos_exact 주석의
+	//북마크 ping-pong 과 같은 원인이다.
 	if (m_pMC && m_pMS)
 	{
 		OAFilterState state = State_Stopped;
@@ -4634,8 +4712,7 @@ void CDShow::repaint_for_procamp_change()
 		{
 			LONGLONG cur = 0;
 			if (SUCCEEDED(m_pMS->GetCurrentPosition(&cur)))
-				m_pMS->SetPositions(&cur, AM_SEEKING_AbsolutePositioning,
-					NULL, AM_SEEKING_NoPositioning);
+				set_track_pos_exact(cur / 10000.0);
 		}
 	}
 

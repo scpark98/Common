@@ -183,6 +183,17 @@ protected:
 	CGdiButton		m_button_quit;
 	LRESULT			on_message_CGdiButton(WPARAM wParam, LPARAM lParam);
 
+	//표시 중인 버튼을 화면 좌→우 순으로 수집.
+	void			get_visible_button_ids(std::deque<int>& ids) const;
+	//엔터키 응답 / 초기 포커스가 가리킬 기본 버튼 ID. 버튼이 없으면 -1.
+	int				get_default_button_id() const;
+	//현재 포커스를 가진 버튼의 ID(IDOK ~ IDCONTINUE). 포커스가 버튼이 아니면 -1.
+	int				get_focused_button_id() const;
+	//기본 버튼을 CGdiButton 에 표시. 포커스가 없어도(modeless 로 비활성 상태여도) 표시된다.
+	void			mark_default_button();
+	//기본 버튼에 초기 포커스를 준다. 탭 이동의 기점.
+	void			set_focus_to_default_button();
+
 //messagebox icon
 //https://blog.naver.com/pks1217/220407691110
 	//MB_ICONSTOP, MB_ICONQUESTION, MB_ICONEXCLAMATION, MB_ICONINFORMATION
@@ -225,4 +236,5 @@ public:
 	afx_msg void OnPaint();
 	afx_msg void OnLButtonDown(UINT nFlags, CPoint point);
 	afx_msg void OnTimer(UINT_PTR nIDEvent);
+	afx_msg void OnActivate(UINT nState, CWnd* pWndOther, BOOL bMinimized);
 };

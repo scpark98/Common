@@ -1201,6 +1201,36 @@ Common 의 `CSCLog` (`log/SCLog/SCLog.cpp`) 가 모든 프로젝트의 `logWrite
 **Why:** 사용자 명시 (2026-06-11). 슬라이더 정렬 검증 후 로그 제거 시 *"개발작업중일때마다 log를 넣었다 뺐다 할거냐? 최종 푸시하기 전까지는 로그를 유지해라."* → push 직전 정리 원칙. 이어서 *"dshow, ffmpeg, audio, subtitle 등 미디어 관련외에 일반 파생 컨트롤 및 헬퍼 모듈에서는 절대 SCLog, logWrite를 포함한 채 푸시해서는 안된다."* → 멀티미디어만 예외. (이때 tree/list/listbox 의 `[hscroll-*]` + slider `[slider]` 로그를 push 전 제거.)
 
 ---
+## 로그 태그 표기 — `[PascalCase]`, 전체 대문자는 레벨 전용 (강제, 모든 프로젝트)
+
+로그 한 줄 앞에 붙이는 서브시스템/기능 태그는 **PascalCase 로 쓰고, 그 태그가 가리키는 코드 식별자(클래스·모듈 이름)와 같은 표기를 쓴다.**
+
+- O: `[Clipboard]`, `[FileTransfer]`, `[Clipboard.Chain]`
+- X: `[CLIPBOARD]`, `[CLIP]`, `[clipboard]` (그 코드베이스가 소문자 식별자를 쓰는 경우는 예외)
+
+### 규칙
+
+1. **전체 대문자는 로그 레벨 전용으로 예약한다.** `ERROR`/`WARN`/`INFO`/`DEBUG` 가 이미 대문자를 쓰므로, 태그까지 대문자면 한 줄 안에서 레벨과 태그가 시각적으로 경쟁해 어느 쪽이 레벨인지 헷갈린다.
+2. **태그 표기는 그 코드베이스가 타입·모듈을 명명하는 방식을 그대로 따른다.** MFC/PascalCase 코드베이스면 `[Clipboard]`, 소문자 모듈 기반이면 `[clipboard]`.
+3. **약어 금지.** `[CLIP]` 처럼 줄이면 grep 할 때 축약형을 따로 기억해야 하고, 검색어가 코드의 실제 이름과 달라진다. 몇 글자 아끼는 이득보다 손해가 크다.
+4. **하위 구분은 점으로**: `[Clipboard.Chain]`, `[Clipboard.Sync]`.
+5. 한 줄에 태그는 하나만 붙인다.
+
+### 근거 — 주요 생태계의 관행
+
+| 생태계 | 태그 형태 | 그 표기가 된 이유 |
+|---|---|---|
+| Android | `TAG = "ClipboardManager"` | 클래스명 그대로 (PascalCase) |
+| SLF4J / Log4j / java.util.logging | `com.foo.ClipboardService` | 로거 이름 = FQCN |
+| Python `logging` | `foo.clipboard` | `getLogger(__name__)` — 파이썬 모듈이 소문자 |
+| Linux 커널 / systemd | `clipboard: ...` | C 관행이 소문자 |
+| Windows ETW / .NET EventSource | `Microsoft-Windows-Kernel-Process` | .NET 타입명이 PascalCase |
+
+공통점은 "대문자냐 소문자냐" 자체가 규칙인 것이 아니라, **그 언어·코드베이스가 식별자를 쓰는 방식을 태그가 그대로 따른다**는 점이다. 따라서 새 프로젝트에서 태그를 정할 때는 그 코드베이스의 클래스 명명 규칙을 먼저 보면 된다.
+
+**Why:** 2026-08-19, KoinoViewer 클립보드 진단 로그에 `[CLIP]` 태그를 썼다가 사용자 지적 — *"이렇게 줄여쓰는거 맘에 안든다. 몇글자 줄어든다고 그걸 줄이나. 그냥 [Clipboard]라고 써라."* 이어서 대소문자 규칙의 근거를 물어와, 위 관행을 조사해 규칙으로 확정.
+
+---
 
 ## Windows XP 호환 — SC 컨트롤은 XP 까지 지원 (강제, 최우선)
 

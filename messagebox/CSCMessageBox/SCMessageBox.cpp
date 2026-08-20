@@ -89,18 +89,28 @@ bool CSCMessageBox::create(CWnd* parent, CString title, UINT icon_id, bool as_mo
 	//아이콘 로드 실패는 치명적이지 않으므로 NULL 이어도 그대로 둔다 (그리기 측에서 가드).
 	m_hIcon = (icon_id != 0) ? load_icon(NULL, icon_id, 16, 16) : NULL;
 
-	LANGID lang = GetUserDefaultUILanguage();
-	m_button_caption[IDOK]			= (lang == 1042 ? _T("확인") : _T("Ok"));
-	m_button_caption[IDCANCEL]		= (lang == 1042 ? _T("취소") : _T("Cancel"));
-	m_button_caption[IDABORT]		= (lang == 1042 ? _T("중지") : _T("Stop"));
-	m_button_caption[IDRETRY]		= (lang == 1042 ? _T("재시도") : _T("Retry"));
-	m_button_caption[IDIGNORE]		= (lang == 1042 ? _T("무시") : _T("Ignore"));
-	m_button_caption[IDYES]			= (lang == 1042 ? _T("예") : _T("Yes"));
-	m_button_caption[IDNO]			= (lang == 1042 ? _T("아니오") : _T("No"));
-	m_button_caption[IDCLOSE]		= (lang == 1042 ? _T("닫기") : _T("Close"));
-	m_button_caption[IDHELP]		= (lang == 1042 ? _T("도움말") : _T("Help"));
-	m_button_caption[IDTRYAGAIN]	= (lang == 1042 ? _T("다시 시도") : _T("Retry"));
-	m_button_caption[IDCONTINUE]	= (lang == 1042 ? _T("계속") : _T("Continue"));
+	//20260820 by claude. GetUserDefaultUILanguage() 를 직접 읽으면 앱이 확정한 UI 언어(_S 가 쓰는 값)와
+	//어긋난다. 실측(XP SP3, MUI 팩 미설치)에서 그 API 가 설치 언어(영어)를 돌려줘, 본문은 한국어인데
+	//버튼만 영어로 나왔다. ui_language.h 의 get_ui_language() 가 단일 진실 원천이다.
+	//일본어도 함께 추가한다 — .rc 는 한/일/영 3개국어인데 여기만 한/영 2개국어라 어긋나 있었다.
+	//배열 인덱스는 버튼 ID(IDOK ~ IDCONTINUE). 0 번은 쓰지 않는다.
+	static const TCHAR* caption_korean[TOTAL_BUTTON_COUNT] =
+		{ _T(""), _T("확인"), _T("취소"), _T("중지"), _T("재시도"), _T("무시"), _T("예"), _T("아니오"), _T("닫기"), _T("도움말"), _T("다시 시도"), _T("계속") };
+	static const TCHAR* caption_japanese[TOTAL_BUTTON_COUNT] =
+		{ _T(""), _T("OK"), _T("キャンセル"), _T("中止"), _T("再試行"), _T("無視"), _T("はい"), _T("いいえ"), _T("閉じる"), _T("ヘルプ"), _T("再実行"), _T("続行") };
+	static const TCHAR* caption_english[TOTAL_BUTTON_COUNT] =
+		{ _T(""), _T("Ok"), _T("Cancel"), _T("Stop"), _T("Retry"), _T("Ignore"), _T("Yes"), _T("No"), _T("Close"), _T("Help"), _T("Retry"), _T("Continue") };
+
+	const WORD lang = PRIMARYLANGID(get_ui_language());
+	const TCHAR** caption = caption_english;
+
+	if (lang == LANG_KOREAN)
+		caption = caption_korean;
+	else if (lang == LANG_JAPANESE)
+		caption = caption_japanese;
+
+	for (int i = IDOK; i < TOTAL_BUTTON_COUNT; i++)
+		m_button_caption[i] = caption[i];
 
 	//메시지박스 아이콘 로딩.
 	//Vista+ : SHGetStockIconInfo 로 현재 테마/DPI 에 맞는 시스템 stock 아이콘.

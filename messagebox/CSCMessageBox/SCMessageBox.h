@@ -110,6 +110,10 @@ public:
 
 	bool			set_show_on_parent_center(bool show_on_parent_center = true) { m_show_on_parent_center = show_on_parent_center; return m_show_on_parent_center; }
 
+	//20260821 by claude. 기본 버튼 / 포커스 버튼의 표시 방식. CGdiButton::focus_style_dotted 또는 focus_style_border.
+	//색은 넘기지 않는다 — CGdiButton 이 자기 면색·글자색에서 산출한다(테마별 검증 불필요).
+	void			set_button_focus_style(int style) { m_button_focus_style = style; apply_button_focus_style(); }
+
 //title 관련
 	void			set_title(CString title);
 	void			set_title_height(int title_height) { m_title_height = title_height; }
@@ -183,15 +187,20 @@ protected:
 	CGdiButton		m_button_quit;
 	LRESULT			on_message_CGdiButton(WPARAM wParam, LPARAM lParam);
 
-	//표시 중인 버튼을 화면 좌→우 순으로 수집.
+	//20260821 by claude. 기본 버튼 / 포커스 버튼 표시 방식. 3곳(create / 타이틀색 분기 / apply_theme)에서 같은 값을 걸어야 하므로
+	//멤버로 두고 apply_button_focus_style() 한 곳에서만 버튼에 전파한다.
+	int				m_button_focus_style = CGdiButton::focus_style_border;
+	void			apply_button_focus_style();
+
+	//20260819 by claude. 표시 중인 버튼을 화면 좌→우 순으로 수집.
 	void			get_visible_button_ids(std::deque<int>& ids) const;
-	//엔터키 응답 / 초기 포커스가 가리킬 기본 버튼 ID. 버튼이 없으면 -1.
+	//20260819 by claude. 엔터키 응답 / 초기 포커스가 가리킬 기본 버튼 ID. 버튼이 없으면 -1.
 	int				get_default_button_id() const;
-	//현재 포커스를 가진 버튼의 ID(IDOK ~ IDCONTINUE). 포커스가 버튼이 아니면 -1.
+	//20260819 by claude. 현재 포커스를 가진 버튼의 ID(IDOK ~ IDCONTINUE). 포커스가 버튼이 아니면 -1.
 	int				get_focused_button_id() const;
-	//기본 버튼을 CGdiButton 에 표시. 포커스가 없어도(modeless 로 비활성 상태여도) 표시된다.
+	//20260819 by claude. 기본 버튼을 CGdiButton 에 표시. 포커스가 없어도(modeless 로 비활성 상태여도) 표시된다.
 	void			mark_default_button();
-	//기본 버튼에 초기 포커스를 준다. 탭 이동의 기점.
+	//20260819 by claude. 기본 버튼에 초기 포커스를 준다. 탭 이동의 기점.
 	void			set_focus_to_default_button();
 
 //messagebox icon

@@ -240,10 +240,11 @@ bool CSCMessageBox::create(CWnd* parent, CString title, UINT icon_id, bool as_mo
 		//apply_theme 와 동일한 경로 (CGdiButton::set_color_theme) 로 초기 색 산출 — main dlg 의 일반
 		//GdiButton 과 외관 일관성 확보. set_color_theme 안에서 set_round(4, ...) 도 함께 적용됨.
 		m_button[i].set_color_theme(m_theme);
-		//포커스 표시도 여기서 걸어둔다. apply_theme 에만 두면 호출자가 set_color_theme 을 한 번도
-		//부르지 않는 경우(기본 테마 그대로 사용) 포커스가 표시되지 않는다.
-		m_button[i].set_focus_style(CGdiButton::focus_style_border, m_theme.cr_border_active);
 	}
+
+	//20260819 by claude. 포커스 표시도 여기서 걸어둔다. apply_theme 에만 두면 호출자가 set_color_theme 을
+	//한 번도 부르지 않는 경우(기본 테마 그대로 사용) 포커스가 표시되지 않는다.
+	apply_button_focus_style();
 
 	reconstruct_font();
 
@@ -537,14 +538,8 @@ void CSCMessageBox::set_message(CString msg, int type, int timeout_sec, int alig
 	{
 		m_theme.cr_title_text = gRGB(0, 0, 0);
 
-		//버튼 색상도 타이틀바 색상과 동일하게 하려 했으나 우선 포커스 색상만 동일하게 한다.
-		//포커스 표시 방식은 apply_theme 와 동일하게 유지 (accent 보더). 여기선 색만 재확인.
-		for (int i = 0; i < TOTAL_BUTTON_COUNT; i++)
-		{
-			m_button[i].set_focus_style(CGdiButton::focus_style_border, m_theme.cr_border_active);
-			//m_button[i].set_text_color(m_theme.cr_title_text);
-			//m_button[i].set_back_color(m_theme.cr_title_back);
-		}
+		//20260821 by claude. 타이틀 색을 바꿔도 포커스 표시 방식은 apply_theme 와 동일하게 유지한다.
+		apply_button_focus_style();
 
 		m_button_quit.set_text_color(m_theme.cr_title_text);
 		//OnPaint 가 title bar 를 cr_title_back_inactive 로 그리므로 X 버튼도 같은 색이어야 blend.
@@ -630,7 +625,7 @@ void CSCMessageBox::set_message(CString msg, int type, int timeout_sec, int alig
 		CenterWindow(m_show_on_parent_center ? m_parent : nullptr);
 		ShowWindow(SW_SHOW);
 
-		//표시는 mark 만으로 충분하다 — 포커스는 박스가 활성화될 때 OnActivate 에서 확정된다.
+		//20260819 by claude. 표시는 mark 만으로 충분하다 — 포커스는 박스가 활성화될 때 OnActivate 에서 확정된다.
 		mark_default_button();
 		set_focus_to_default_button();
 
@@ -639,7 +634,7 @@ void CSCMessageBox::set_message(CString msg, int type, int timeout_sec, int alig
 	}
 }
 
-//표시 중인 버튼을 화면 좌→우 순으로 수집한다.
+//20260819 by claude. 표시 중인 버튼을 화면 좌→우 순으로 수집한다.
 //조합별 순서 테이블을 따로 두면 recalc_layout 의 배치 switch 와 어긋날 위험이 있으므로
 //실제 배치된 좌표에서 역으로 구한다 — 버튼 조합이 늘어나도 자동으로 따라간다.
 void CSCMessageBox::get_visible_button_ids(std::deque<int>& ids) const
@@ -666,7 +661,7 @@ void CSCMessageBox::get_visible_button_ids(std::deque<int>& ids) const
 		ids.push_back(sorted[i].second);
 }
 
-//엔터키 응답 / 초기 포커스가 가리킬 기본 버튼.
+//20260819 by claude. 엔터키 응답 / 초기 포커스가 가리킬 기본 버튼.
 //Windows MessageBox 의 규칙을 그대로 따른다 — 기본은 *맨 왼쪽(첫 번째)* 버튼이고,
 //MB_DEFBUTTON2 / 3 / 4 가 주어지면 그 순번의 버튼. 조합별 예외 테이블은 필요 없다.
 //  MB_OK                 [확인]
@@ -696,7 +691,7 @@ int CSCMessageBox::get_default_button_id() const
 	return ids[index];
 }
 
-//현재 포커스를 가진 버튼의 ID(IDOK ~ IDCONTINUE). 포커스가 버튼이 아니면 -1.
+//20260819 by claude. 현재 포커스를 가진 버튼의 ID(IDOK ~ IDCONTINUE). 포커스가 버튼이 아니면 -1.
 int CSCMessageBox::get_focused_button_id() const
 {
 	CWnd* focus = GetFocus();
@@ -715,7 +710,22 @@ int CSCMessageBox::get_focused_button_id() const
 	return id;
 }
 
-//기본 버튼을 CGdiButton 에 표시해 둔다.
+//20260821 by claude. 기본 버튼 / 포커스 버튼의 표시 방식을 모든 버튼에 전파한다.
+//색을 넘기지 않는 것이 핵심이다 — 이전엔 m_theme.cr_border_active 를 넘겼는데, 그 슬롯의 의미가
+//테마마다 달라 linkmemine 처럼 cr_border_active == cr_button_back 인 테마에서는 포커스 보더가
+//버튼 면색과 같아져 표시가 통째로 사라졌다 (2026-08-21 사용자 보고).
+//CGdiButton 이 자기 면색·글자색(·border 방식이면 부모 배경)에서 직접 산출하게 두면 테마별 검증이
+//필요 없다. CGdiButton::get_focus_mark_color 참조.
+void CSCMessageBox::apply_button_focus_style()
+{
+	for (int i = 0; i < TOTAL_BUTTON_COUNT; i++)
+	{
+		if (m_button[i].m_hWnd)
+			m_button[i].set_focus_style(m_button_focus_style);
+	}
+}
+
+//20260819 by claude. 기본 버튼을 CGdiButton 에 표시해 둔다.
 //포커스와 별개로 걸어두는 이유 — modeless 로 띄우면 보통 parent 의 OnInitDialog 안에서
 //set_message() 가 호출되고, 그 직후 MFC 가 parent 의 첫 컨트롤로 포커스를 가져가므로
 //박스는 *활성화된 적이 없는* 상태로 화면에 남는다. 이때 포커스에만 의존하면 어느 버튼이
@@ -732,7 +742,7 @@ void CSCMessageBox::mark_default_button()
 	}
 }
 
-//기본 버튼에 초기 포커스를 준다. 사용자가 엔터/스페이스로 바로 확정할 수 있고 탭 이동의 기점이 된다.
+//20260819 by claude. 기본 버튼에 초기 포커스를 준다. 사용자가 엔터/스페이스로 바로 확정할 수 있고 탭 이동의 기점이 된다.
 //버튼이 하나도 표시되지 않는 타입(BUTTON_TYPE_NO_BUTTON 등)이면 아무것도 하지 않는다.
 void CSCMessageBox::set_focus_to_default_button()
 {
@@ -746,7 +756,7 @@ void CSCMessageBox::OnActivate(UINT nState, CWnd* pWndOther, BOOL bMinimized)
 {
 	CDialogEx::OnActivate(nState, pWndOther, bMinimized);
 
-	//포커스 확정은 여기가 최종 지점이다.
+	//20260819 by claude. 포커스 확정은 여기가 최종 지점이다.
 	//modeless 로 띄우면 보통 parent 의 OnInitDialog 안에서 set_message() 가 호출되는데,
 	//OnInitDialog 가 TRUE 를 반환하는 순간 MFC 가 *parent 의 첫 컨트롤* 로 포커스를 가져가버려
 	//set_message() 에서 준 포커스가 지워진다. 박스가 실제로 활성화되는 시점에 다시 준다.
@@ -809,15 +819,11 @@ void CSCMessageBox::apply_theme(bool invalidate)
 			//일반 GdiButton 과 *동일한* Win11-look 산출 공식 (face = cr_back +16, border = cr_back +40
 			//for dark; light 는 -8 / -40) 을 그대로 타게 해 외관 일관성 확보.
 			m_button[i].set_color_theme(m_theme);
-			//포커스 표시 = Win10/11 방식(보더 색만 accent 로 교체). 2026-08-19 사용자 요청.
-			//  - 배경색 톤 차이는 "다른 버튼과 비교"해야 알 수 있어 버튼이 2개뿐이면 판별이 어렵다.
-			//    보더 색조 교체는 accent hue 유무라는 *절대적* 단서라 버튼이 몇 개든 즉시 읽힌다.
-			//  - 웹에서 흔한 바깥 링 방식은 버튼 영역을 깎아먹지만, 이건 이미 그리던 보더의 색만
-			//    바꾸는 것이라 추가 픽셀이 0 이다.
-			//고전 dotted rect 를 원하면 focus_style_dotted 로 바꾸면 된다 (색은 cr_text_dim 권장).
-			m_button[i].set_focus_style(CGdiButton::focus_style_border, m_theme.cr_border_active);
 		}
 	}
+
+	//20260821 by claude. set_color_theme 이 버튼 면색을 새로 잡았으므로 포커스 표시도 다시 걸어준다.
+	apply_button_focus_style();
 
 	//dialog 자체의 OnPaint 가 cr_title_back_inactive / cr_back 등을 직접 사용하므로
 	//invalidate=true 면 명시적으로 redraw 트리거. 자식 컨트롤들은 set_*_color 안에서 자체 invalidate 함.
@@ -884,7 +890,7 @@ BOOL CSCMessageBox::PreTranslateMessage(MSG* pMsg)
 
 			case VK_RETURN :
 			{
-				//모든 버튼이 CGdiButton 으로 동적 생성되어 표준 BS_DEFPUSHBUTTON 이 없다.
+				//20260819 by claude. 모든 버튼이 CGdiButton 으로 동적 생성되어 표준 BS_DEFPUSHBUTTON 이 없다.
 				//탭으로 포커스를 옮겨둔 상태면 *포커스된 버튼* 이 응답이어야 한다 — 그렇지 않으면
 				//탭으로 옮겨놓고 엔터를 쳤는데 엉뚱한 기본 버튼이 눌리는 모순이 생긴다.
 				//포커스가 버튼이 아니면 m_type 별 기본 버튼으로 폴백.
@@ -1011,7 +1017,7 @@ INT_PTR CSCMessageBox::DoModal(CString msg, int type, int timeout_sec)
 
 	ShowWindow(SW_SHOW);
 
-	//set_message 안에서도 한 번 주지만, msg 가 비어 set_message 를 건너뛴 경우도 있고
+	//20260819 by claude. set_message 안에서도 한 번 주지만, msg 가 비어 set_message 를 건너뛴 경우도 있고
 	//그 시점엔 아직 top-level 이 활성화 전이라 포커스가 안 붙기도 한다. 여기서 다시 확정한다.
 	mark_default_button();
 	set_focus_to_default_button();
@@ -1048,7 +1054,7 @@ INT_PTR CSCMessageBox::DoModal(CString msg, int type, int timeout_sec)
 		if (CWnd::WalkPreTranslateTree(m_hWnd, &stmsg))
 			continue;
 
-		//Tab / Shift+Tab 의 컨트롤 간 포커스 이동은 전적으로 IsDialogMessage 가 구현한다.
+		//20260819 by claude. Tab / Shift+Tab 의 컨트롤 간 포커스 이동은 전적으로 IsDialogMessage 가 구현한다.
 		//본 popup 은 dialog template 이 아니라 CreateEx 로 만든 데다 메시지 펌프도 직접 돌리므로,
 		//이 호출이 없으면 탭키가 아무 동작도 하지 않는다 (2026-08-19 사용자 보고).
 		//VK_RETURN / VK_ESCAPE 는 바로 위 WalkPreTranslateTree 에서 이미 소비되므로

@@ -1602,7 +1602,7 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		}
 	}
 
-	//base 보더는 *focus / hover 와 독립적* 으로 항상 그린다 — 탭으로 focus 가 옮겨가도 버튼의 기본 형태는 동일.
+	//20260819 by claude. base 보더는 *focus / hover 와 독립적* 으로 항상 그린다 — 탭으로 focus 가 옮겨가도 버튼의 기본 형태는 동일.
 	//이전엔 else-if 체인이라 focus 시 focus_rect 만, hover 시 hover_rect 만 그려져 같은 다이얼로그의
 	//두 버튼이 시각적으로 다른 base 형태로 보이는 문제. (사용자 지적 2026-05-21)
 	//focus / hover 는 overlay 효과로 base 위에 *덧그려* 진다 — 옵션 (m_focus_style / m_draw_hover_rect)
@@ -1613,7 +1613,14 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 
 	if (m_draw_border || focus_on_border)
 	{
-		Gdiplus::Color cr_line = focus_on_border ? m_cr_focus_rect : cr_border;
+		//20260821 by claude. 보더는 버튼 가장자리라 바깥으로 부모 배경과 접한다 — 면색뿐 아니라 부모 배경과도
+		//구분돼야 linkmemine 처럼 둘 다 어두운 테마에서 선이 어느 한쪽에 먹히지 않는다. (dotted 는 inset 이라 불필요)
+		//20260821 by claude. avoid 에 cr_border(교체 대상) 를 넣는 것이 핵심이다 — 이게 빠지면
+		//linkmemine 처럼 산출색이 원래 테두리색과 같아져 포커스 표시가 사라진다.
+		//m_cr_parent_back 은 보더가 버튼 바깥으로 맞닿는 색이라 함께 넣는다.
+		Gdiplus::Color cr_line = focus_on_border
+							   ? get_focus_mark_color(cr_back, cr_text, { cr_border, m_cr_parent_back })
+							   : cr_border;
 		//보더를 안 그리던 버튼도 focus 일 때만 accent 선이 생기면 두께가 0→N 으로 튄다.
 		//m_draw_border 가 꺼져 있으면 m_border_thick 기본값(1)로 그린다.
 		const int thick = (focus_on_border ? m_focus_border_thick : m_border_thick);
@@ -1647,34 +1654,48 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 			draw_rect(g, rc, cr_border);
 	}
 
-	//focus_style_dotted — Windows 고전 dotted focus rect 를 base 보더 *한 칸 안쪽* 에 그린다.
+	//20260821 by claude. focus_style_dotted — dotted focus rect 를 base 보더 *한 칸 안쪽* 에 그린다.
 	//버튼 클라이언트 안에서만 그리므로 버튼 크기·레이아웃·면적이 전혀 변하지 않는다.
 	//round 버튼도 동일하게 dotted — 이전엔 draw_round_rect 가 내부에서 자체 solid pen 을 만들어
-	//바로 위에서 세팅한 DashStyleDot 이 버려졌고, 결과적으로 실선 이중 테두리로 보였다.
+	//바로 위에서 세팅한 dash 가 버려졌고, 결과적으로 실선 이중 테두리로 보였다.
 	if (m_focus_style == focus_style_dotted && need_draw_focus_mark())
 	{
+		//20260821 by claude. 네 변을 동일하게 줄인다. stroke 1px 보정은 아래 두 분기가 각자 처리한다
+		//— DrawRectangle 은 (w-1, h-1) 로, round 는 get_round_rect_path 가 내부에서 stroke_thick 을 뺀다.
+		//여기서 right/bottom 만 미리 +1 더 줄이면 round 경로에서 보정이 이중으로 들어가
+		//우/하 여백만 1px 더 안쪽이 된다 (2026-08-21 사용자 지적).
 		CRect rfocus = rc;
-		rfocus.DeflateRect(m_focus_rect_inset, m_focus_rect_inset,
-						   m_focus_rect_inset + 1, m_focus_rect_inset + 1);
+		rfocus.DeflateRect(m_focus_rect_inset, m_focus_rect_inset);
 
-		Gdiplus::Pen	pen(m_cr_focus_rect, (Gdiplus::REAL)m_focus_rect_width);
-		pen.SetDashStyle(Gdiplus::DashStyleDot);
-		pen.SetAlignment(Gdiplus::PenAlignmentInset);
+		//20260821 by claude. dotted 는 avoid 를 비워 넘긴다 — 점은 면 위의 패턴이라 모양만으로 이미
+		//구분되므로 주변색과의 거리를 강제하면 m_focus_mark_ratio 로 맞춘 은은함만 깨진다.
+		Gdiplus::Pen	pen(get_focus_mark_color(cr_back, cr_text, {}), (Gdiplus::REAL)m_focus_rect_width);
 
-		//dotted 는 AA 를 끈 채로 그려야 점이 번지지 않고 고전 focus rect 특유의 또렷한 1px 점이 된다.
+		//20260821 by claude. 점:빈칸 = 1:2. DashStyleDot 은 대시 길이가 *펜 폭의 배수* 라 폭을 바꾸면
+		//점 간격까지 같이 변한다 — 폭과 무관하게 고정되도록 패턴을 직접 준다.
+		if (m_focus_dot_gap > 0)
+		{
+			Gdiplus::REAL dash_pattern[] = { 1.0f, (Gdiplus::REAL)m_focus_dot_gap };
+			pen.SetDashPattern(dash_pattern, 2);
+		}
+
+		//20260821 by claude. AA 를 끄고 폭 1.0 정수로 그려야 픽셀 격자에 딱 맞는 또렷한 1px 점이 된다.
+		//폭 0.7 + AA 조합은 서브픽셀 선이 2픽셀에 걸쳐 번지고 0.7px 대시까지 뭉개져 점이 오히려
+		//뚱뚱한 얼룩으로 보였다 (2026-08-21 사용자 지적 — "크래파스 낙서"). 옅게 하려면 폭이 아니라
+		//색으로(m_focus_mark_ratio) 조절한다.
 		Gdiplus::SmoothingMode old_smoothing = g.GetSmoothingMode();
 		g.SetSmoothingMode(Gdiplus::SmoothingModeNone);
 
 		if (m_round <= 0)
 		{
-			g.DrawRectangle(&pen, rfocus.left, rfocus.top, rfocus.Width(), rfocus.Height());
+			g.DrawRectangle(&pen, rfocus.left, rfocus.top, rfocus.Width() - 1, rfocus.Height() - 1);
 		}
 		else
 		{
 			//radius 도 inset 만큼 줄여야 모서리가 base round 와 동심(concentric)으로 보인다.
 			const int round_inner = (m_round > m_focus_rect_inset) ? (m_round - m_focus_rect_inset) : 0;
 			Gdiplus::GraphicsPath focus_path;
-			get_round_rect_path(&focus_path, CRect_to_gpRect(rfocus), (float)round_inner, m_focus_rect_width);
+			get_round_rect_path(&focus_path, CRect_to_gpRect(rfocus), (float)round_inner, 1);
 			g.DrawPath(&pen, &focus_path);
 		}
 
@@ -1909,7 +1930,7 @@ void CGdiButton::OnTimer(UINT_PTR nIDEvent)
 }
 
 
-//포커스 표시를 그려야 하는지 판단.
+//20260819 by claude. 포커스 표시를 그려야 하는지 판단.
 //기본 버튼 표시는 "형제 중 아무도 포커스를 갖고 있지 않을 때" 만 그린다 — Windows 의 DM_SETDEFID
 //처럼 표시가 항상 한 개만 보이게 하기 위함. 탭으로 다른 버튼에 포커스가 가면 그쪽만 표시된다.
 //(GetFocus() 는 호출 스레드 기준이라, 창이 비활성이면 NULL 을 돌려준다 → 기본 버튼이 표시를 가져간다.)
@@ -1924,6 +1945,74 @@ bool CGdiButton::need_draw_focus_mark() const
 	CWnd* focus = GetFocus();
 
 	return (focus == nullptr || focus->GetParent() != GetParent());
+}
+
+
+//20260821 by claude. 포커스 표시 색을 결정한다.
+//set_focus_style / set_focus_rect_color 로 명시색을 주면 그대로 쓰고, 미지정(Transparent)이면
+//*이 버튼이 실제로 칠한 면색* 을 그 버튼 자신의 글자색 쪽으로 m_focus_mark_ratio 만큼 섞어 만든다.
+//cr_fore 는 정의상 cr_face 위에서 읽히는 색이므로 대비의 *방향과 최소량이 구조적으로 보장* 된다
+//— 테마 슬롯(cr_border_active)을 받아쓰거나 ±N 절대 offset 으로 미는 방식과 달리 테마별 검증이 필요없다.
+//(cr_border_active 방식은 linkmemine 처럼 cr_border_active == cr_button_back 인 테마에서 표시가
+// 통째로 사라졌다. ±32 offset 은 면색이 어디 있느냐에 따라 체감 대비가 들쭉날쭉. 2026-08-21 사용자 지적.)
+//
+//cr_avoid: 선이 맞닿는 제3의 색(focus_style_border 는 버튼 가장자리에 그려져 부모 배경과 접한다).
+//주어지면 그 색과도 충분히 벌어질 때까지 혼합비를 올린다. 혼합비를 올리는 방향은 면색에서 멀어지는
+//방향이므로 면색 대비는 그대로 유지된다.
+Gdiplus::Color CGdiButton::get_focus_mark_color(Gdiplus::Color cr_face, Gdiplus::Color cr_fore,
+											   const std::deque<Gdiplus::Color>& avoid) const
+{
+	if (m_cr_focus_rect.GetA() != 0)
+		return m_cr_focus_rect;
+
+	//20260821 by claude. avoid 가 비면(dotted) 단순 혼합. 점은 면 위에 얹히는 *패턴* 이라 모양만으로
+	//이미 구분되므로, 주변 색과의 거리를 강제하면 사용자가 맞춰둔 은은함만 깨진다.
+	if (avoid.empty())
+		return get_color(cr_face, cr_fore, m_focus_mark_ratio);
+
+	//20260821 by claude. 면색→글자색 축을 훑으며 "면색 + avoid 의 모든 색" 에서 min_gap 이상 떨어진
+	//*첫* 지점을 고른다. 가장 먼 지점을 고르면 밝은 테마에서 순검정까지 가버려 과하다 — 조건을
+	//만족하는 최소 이동이 목표다.
+	//
+	//avoid 에 *원래 테두리색* 을 반드시 넣어야 한다. focus_style_border 는 그 색을 교체하는 것이라
+	//면색·부모배경과 아무리 떨어져도 교체 대상과 같으면 표시가 없는 것과 같다.
+	//linkmemine 이 이 경우였다 — 면색 #222E3D(luma 44) / 원래 테두리 #D2D2D2(210) 인데 혼합비를
+	//올릴수록 흰색에 가까워져 테두리와 *더* 붙었다 (2026-08-21 사용자 보고: 0.7 로 올려도 구분 안 됨).
+	//탐색 시작점은 낮게 고정한다 — m_focus_mark_ratio(dotted 진하기)를 시작점으로 쓰면 그 값을
+	//높게 잡아둔 순간 낮은 쪽의 정답 구간(linkmemine 의 0.4 부근)을 건너뛰어 버린다.
+	const double	search_start = 0.25;
+
+	Gdiplus::Color	best = get_color(cr_face, cr_fore, search_start);
+	int				best_score = -1;
+
+	for (double ratio = search_start; ratio <= 1.0001; ratio += 0.05)
+	{
+		Gdiplus::Color	cr = get_color(cr_face, cr_fore, min(ratio, 1.0));
+		const int		lum = (int)get_luminance(cr);
+
+		int score = abs(lum - (int)get_luminance(cr_face));
+
+		for (size_t i = 0; i < avoid.size(); i++)
+		{
+			if (avoid[i].GetA() == 0)
+				continue;
+
+			score = min(score, abs(lum - (int)get_luminance(avoid[i])));
+		}
+
+		if (score >= m_focus_mark_min_gap)
+			return cr;
+
+		if (score > best_score)
+		{
+			best_score = score;
+			best = cr;
+		}
+	}
+
+	//면색·테두리·부모배경이 모두 한 톤이라 축 위 어디서도 간격이 안 나오는 극단 테마.
+	//그나마 가장 잘 떨어진 지점으로 물러선다.
+	return best;
 }
 
 

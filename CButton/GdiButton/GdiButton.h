@@ -409,7 +409,7 @@ public:
 							Gdiplus::Color cr_border = Gdiplus::Color::Transparent,
 							Gdiplus::Color cr_parent_back = Gdiplus::Color::Transparent);
 
-	//포커스 표시 관련.
+	//20260819 by claude. 포커스 표시 관련.
 	//두 방식 모두 *버튼 클라이언트 안쪽* 에만 그리므로 버튼 크기·레이아웃·면적이 변하지 않는다.
 	//(웹에서 흔한 "버튼 바깥에 링" 방식은 버튼 영역을 그만큼 깎아먹어 채택하지 않았다.)
 	enum focus_style
@@ -419,24 +419,31 @@ public:
 		focus_style_border,		//Win10/11 방식 — base 보더의 색만 accent 로 교체 (추가 픽셀 0)
 	};
 
-	//cr_focus 는 두 방식이 공용으로 쓴다. dotted 면 점의 색, border 면 accent 보더 색.
+	//20260821 by claude. cr_focus 는 두 방식이 공용으로 쓴다. dotted 면 점의 색, border 면 accent 보더 색.
+	//Transparent(기본) 를 주면 *버튼이 실제로 칠한 면색* 에서 자동 산출한다 — m_cr_focus_rect 주석 참조.
+	//테마 슬롯(cr_border_active 등)을 넘겨받는 방식은 테마마다 그 슬롯의 의미가 달라 표시가 통째로
+	//사라지는 경우가 있어 폐기했다. 자동 산출이 기본이고 명시 색은 override 로만 쓴다.
 	void		set_focus_style(int style, Gdiplus::Color cr_focus = Gdiplus::Color::Transparent)
 				{
 					m_focus_style = style;
-					if (cr_focus.GetA() != 0)
-						m_cr_focus_rect = cr_focus;
+					m_cr_focus_rect = cr_focus;
 					Invalidate();
 				}
 	//기존 호출부 호환용. draw=true 는 고전 dotted 방식을 의미한다.
 	void		draw_focus_rect(bool draw = true, Gdiplus::Color cr_focus = Gdiplus::Color::LightGray) { m_focus_style = draw ? focus_style_dotted : focus_style_none; m_cr_focus_rect = cr_focus; Invalidate(); }
 	void		set_focus_rect_color(Gdiplus::Color cr_focus) { m_cr_focus_rect = cr_focus; Invalidate(); }
-	void		set_focus_rect_width(int nWidth) { m_focus_rect_width = nWidth; Invalidate(); }
+	//20260821 by claude. 1 미만은 AA 로 2픽셀에 번져 오히려 뚱뚱해 보인다. 옅게 하려면 폭이 아니라 색으로.
+	void		set_focus_rect_width(float width) { m_focus_rect_width = width; Invalidate(); }
+	//20260821 by claude. 자동 산출 시 면색을 글자색 쪽으로 섞는 비율. 낮출수록 옅어진다(0.22 ≈ 아주 옅은 힌트).
+	void		set_focus_mark_ratio(double ratio) { m_focus_mark_ratio = ratio; Invalidate(); }
+	//20260821 by claude. 점 사이 빈칸(px). 0 이면 dash 없이 얇은 실선이 된다.
+	void		set_focus_dot_gap(int gap) { m_focus_dot_gap = gap; Invalidate(); }
 	//dotted rect 를 버튼 가장자리에서 몇 px 안쪽에 그릴지. 0 이면 보더와 겹친다.
 	void		set_focus_rect_inset(int inset) { m_focus_rect_inset = inset; Invalidate(); }
 	//focus_style_border 일 때의 보더 두께. 1 이면 색만 바뀌고, 2 면 Win11 처럼 살짝 굵어진다.
 	void		set_focus_border_thick(int thick) { m_focus_border_thick = thick; Invalidate(); }
 
-	//기본 버튼(Windows 의 default pushbutton) 지정.
+	//20260819 by claude. 기본 버튼(Windows 의 default pushbutton) 지정.
 	//포커스와 별개의 개념이다 — 창이 아직 활성화되지 않아 포커스가 아무데도 없는 상태에서도
 	//"엔터를 치면 이 버튼" 임을 보여줘야 하므로, 기본 버튼은 포커스 없이도 표시를 갖는다.
 	//표시는 m_focus_style 이 지정한 방식(dotted / border)을 그대로 쓴다.
@@ -652,13 +659,28 @@ protected:
 
 	bool		m_bHasFocus = false;
 	int			m_focus_style = focus_style_none;		//포커스 표시 방식(기본값 표시 안 함)
-	Gdiplus::Color	m_cr_focus_rect = Gdiplus::Color::DimGray;	//색상. dotted 면 점 색, border 면 accent 보더 색
-	int			m_focus_rect_width = 1;					//dotted 점 두께
+	//20260821 by claude. Transparent = 미지정. 그리기 직전에 *이 버튼이 실제로 칠한 면색* 을 자기 글자색 쪽으로
+	//m_focus_mark_ratio 만큼 섞어 산출한다(get_focus_mark_color 참조).
+	Gdiplus::Color	m_cr_focus_rect = Gdiplus::Color::Transparent;
+	float		m_focus_rect_width = 1.0f;				//20260821 by claude. dotted 점 두께. 1 미만은 AA 로 번져 오히려 뚱뚱해 보인다.
 	int			m_focus_rect_inset = 2;					//dotted rect 를 가장자리에서 몇 px 안쪽에 그릴지
+	int			m_focus_dot_gap = 2;					//20260821 by claude. 점 사이 빈칸(px). 0 이면 dash 없이 실선.
 	int			m_focus_border_thick = 1;				//focus_style_border 일 때의 보더 두께
+	//20260821 by claude. dotted 전용 — 점 색의 진하기(면색→글자색 혼합 비율). border 방식은 이 값을
+	//쓰지 않는다. border 는 주변색과의 간격 조건으로 색이 자동 결정된다(m_focus_mark_min_gap).
+	double		m_focus_mark_ratio = 0.18;
+	//20260821 by claude. border 방식이 확보해야 할 최소 휘도 간격(8bit). 면색·원래 테두리·부모 배경
+	//모두에서 이만큼 떨어진 색을 찾는다. 올리면 더 또렷해지고, 너무 올리면 흑/백으로 치우친다.
+	int			m_focus_mark_min_gap = 60;
 	bool		m_is_default_button = false;			//기본 버튼 여부. 포커스 없이도 표시를 갖는다.
 	//실제로 포커스 표시를 그려야 하는지. 포커스가 있거나, 기본 버튼인데 형제 중 아무도 포커스가 없을 때.
 	bool		need_draw_focus_mark() const;
+	//20260821 by claude. 포커스 표시 색. 명시색이 있으면 그것, 없으면 면색·글자색에서 자동 산출.
+	//avoid = 반드시 벌어져야 하는 주변색들. border 방식은 {원래 테두리색, 부모 배경} 을 넘긴다 —
+	//특히 *원래 테두리색* 이 빠지면 그 색을 교체하는 방식이라 표시가 통째로 사라진다.
+	//비워서 넘기면(dotted) 거리 강제 없이 m_focus_mark_ratio 그대로 혼합한다.
+	Gdiplus::Color	get_focus_mark_color(Gdiplus::Color cr_face, Gdiplus::Color cr_fore,
+										 const std::deque<Gdiplus::Color>& avoid) const;
 
 	bool		m_draw_3D_rect = false;					//입체 느낌의 3D, 누르면 sunken. default = true;
 	CPoint		m_down_offset = CPoint(0, 0);			//눌렸을 때 그려질 위치. default는 offset=0. 이 값이 클 경우 여백이 없는 이미지라면 잘릴 수 있다.

@@ -1426,6 +1426,15 @@ void CDShow::close_media()
 	m_pMC.Release();
 	m_pME.Release();
 
+	//20260822 by claude. 렌더러 통계 인터페이스도 graph 와 함께 놓아준다. 여기서 안 놓으면 dtor 의
+	//CComPtr 소멸이 CoUninitialize 뒤에 일어나 Release 에서 access violation.
+	//캐시한 카운터도 리셋 — 다음 미디어는 렌더러 인스턴스가 달라 이전 값과 비교하면 안 된다.
+	m_pAudioStats.Release();
+	m_audio_stat_break = 0;
+	m_audio_stat_silence = 0;
+	m_audio_stat_discont = 0;
+	m_audio_stat_dropwrite = 0;
+
 	m_pVMRWC.Release();
 	m_pVMRFC.Release();
 	m_pVMRMC.Release();
@@ -2710,6 +2719,50 @@ CString CDShow::get_audio_decoder_label()
 	CString name = filter_name(pDecoder);
 	pDecoder->Release();
 	return name;
+}
+
+void CDShow::log_audio_renderer_stats()
+{
+	if (!m_pAudioStats)
+	{
+		if (!m_pGB)
+			return;
+		IBaseFilter* pRenderer = find_renderer_by_majortype(m_pGB, MEDIATYPE_Audio);
+		if (!pRenderer)
+			return;
+		pRenderer->QueryInterface(IID_PPV_ARGS(&m_pAudioStats));
+		pRenderer->Release();
+		if (!m_pAudioStats)
+			return;
+	}
+
+	DWORD dev = 0;
+	DWORD br = 0;
+	DWORD silence = 0;
+	DWORD discont = 0;
+	DWORD dropwrite = 0;
+	DWORD slave_mode = 0;
+	m_pAudioStats->GetStatParam(AM_AUDREND_STAT_PARAM_BREAK_COUNT, &br, &dev);
+	m_pAudioStats->GetStatParam(AM_AUDREND_STAT_PARAM_SILENCE_DUR, &silence, &dev);
+	m_pAudioStats->GetStatParam(AM_AUDREND_STAT_PARAM_DISCONTINUITIES, &discont, &dev);
+	m_pAudioStats->GetStatParam(AM_AUDREND_STAT_PARAM_SLAVE_DROPWRITE_DUR, &dropwrite, &dev);
+	m_pAudioStats->GetStatParam(AM_AUDREND_STAT_PARAM_SLAVE_MODE, &slave_mode, &dev);
+
+	if (br == m_audio_stat_break && silence == m_audio_stat_silence
+		&& discont == m_audio_stat_discont && dropwrite == m_audio_stat_dropwrite)
+		return;
+
+	logWrite(_T("[audio/rstat] break=%lu(+%ld) silence_ms=%lu(+%ld) discont=%lu(+%ld) dropwrite_ms=%lu(+%ld) slave=%lu"),
+		br, (long)(br - m_audio_stat_break),
+		silence, (long)(silence - m_audio_stat_silence),
+		discont, (long)(discont - m_audio_stat_discont),
+		dropwrite, (long)(dropwrite - m_audio_stat_dropwrite),
+		slave_mode);
+
+	m_audio_stat_break = br;
+	m_audio_stat_silence = silence;
+	m_audio_stat_discont = discont;
+	m_audio_stat_dropwrite = dropwrite;
 }
 
 bool CDShow::get_frame_stats(FrameStats& out)

@@ -136,6 +136,11 @@ public:
 	};
 	bool			get_frame_stats(FrameStats& out);
 
+	//20260822 by claude. [진단] DirectSound 렌더러가 스스로 세는 글리치 카운터(IAMAudioRendererStats).
+	//끊김이 렌더러 안에서 일어났는지, 무음을 얼마나 채워 넣었는지를 추정이 아니라 값으로 확인한다.
+	//값이 변했을 때만 로그를 남기므로 주기 호출(앱의 100ms 타이머)해도 부담이 없다.
+	void			log_audio_renderer_stats();
+
 	//현재 monitor 의 refresh rate (Hz). EnumDisplaySettings.
 	int				get_refresh_rate_hz();
 
@@ -437,6 +442,13 @@ protected:
 	CComQIPtr<IMediaSeeking> m_pMS;
 	CComQIPtr<IMediaControl> m_pMC;
 	CComQIPtr<IMediaEventEx> m_pME;
+
+	//20260822 by claude. log_audio_renderer_stats() 용 — 렌더러 통계 인터페이스와 직전 카운터 값.
+	CComPtr<IAMAudioRendererStats>	m_pAudioStats;
+	DWORD			m_audio_stat_break	= 0;
+	DWORD			m_audio_stat_silence	= 0;
+	DWORD			m_audio_stat_discont	= 0;
+	DWORD			m_audio_stat_dropwrite	= 0;
 
 
 	//VMR관련

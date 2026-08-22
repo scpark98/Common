@@ -1461,12 +1461,36 @@ namespace ffi
 				if (hr == S_OK)
 				{
 					m_audio_loop_state.store(3);
+
+					//20260822 by claude. [stall] 렌더러(CBaseRenderer)는 Receive 안에서 그 샘플의 표시시각까지
+					//블록한다. 따라서 Deliver 가 오래 막히면 원인은 둘 중 하나다 —
+					//  (1) 샘플 타임스탬프가 그래프 클럭보다 그만큼 앞서 있다(lead ≈ block).
+					//  (2) 렌더러가 표시시각과 무관하게 멎었다(lead ≈ 0 인데 block 이 길다).
+					//둘을 가르려면 Deliver *직전* 클럭이 필요하므로 여기서 미리 읽어둔다.
+					REFERENCE_TIME rt_dbg_s = 0;
+					REFERENCE_TIME rt_dbg_e = 0;
+					pSample->GetTime(&rt_dbg_s, &rt_dbg_e);
+					CRefTime rt_dbg_before;
+					m_pFilter->StreamTime(rt_dbg_before);
+
 					ULONGLONG t_dlv0 = GetTickCount64();
 					hr = Deliver(pSample);
 					ULONGLONG t_dlv_ms = GetTickCount64() - t_dlv0;
 					m_audio_loop_state.store(0);
 					if (t_dlv_ms > 50)
 						logWrite(_T("[ffi/src/audio/diag] Deliver BLOCKED %llums (DSound input 큐 full = 오디오 렌더러/클럭 stall 신호)"), t_dlv_ms);
+
+					if (t_dlv_ms > 300)
+					{
+						CRefTime rt_dbg_after;
+						m_pFilter->StreamTime(rt_dbg_after);
+						const long long rt_ms	= (long long)(rt_dbg_s / 10000);
+						const long long clk_before	= (long long)((REFERENCE_TIME)rt_dbg_before / 10000);
+						const long long clk_after	= (long long)((REFERENCE_TIME)rt_dbg_after / 10000);
+						logWrite(_T("[ffi/src/audio/stall] block=%llums rtStart=%lldms clk_before=%lldms clk_after=%lldms lead_before=%lldms clk_advance=%lldms sc=%lld"),
+							t_dlv_ms, rt_ms, clk_before, clk_after,
+							rt_ms - clk_before, clk_after - clk_before, (long long)m_sample_count);
+					}
 
 					//20260816 by claude. [resume] 무음 구간의 downstream 절반을 측정한다.
 					//  first_deliver    = seek 후 첫 Deliver 반환. 소스가 렌더러에 실제로 넘긴 시각.

@@ -722,6 +722,54 @@ bool CSubtitle::load_ass(CString sfile)
 	return !m_subtitle.empty();
 }
 
+//20260822 by claude. 자막 파일의 실제 포맷을 앞부분 내용으로 판별한다.
+//확장자만 믿으면 이름과 본문이 어긋난 파일에서 엉뚱한 파서로 가 큐 0 개로 끝난다 — .smi 이름에
+//ASS 본문(<SYNC> 0 개, Dialogue: 1567 줄)이 든 파일이 실제로 있었고 화면에 아무것도 안 나왔다.
+//판별 순서가 중요하다: SMI 의 <STYLE> 안에는 HTML 주석 닫기 "-->" 가 흔히 들어 있어 SRT 보다 먼저 봐야 한다.
+//UTF-16 은 ASCII 토큰이 NUL 과 섞여 있으므로 NUL 을 걸러낸 뒤 찾는다. UTF-8 / CP949 는 바이트 그대로 통한다.
+namespace
+{
+	enum class subtitle_format { unknown, smi, srt, ass };
+
+	subtitle_format sniff_subtitle_format(const CString& sfile)
+	{
+		std::ifstream f(sfile.GetString(), std::ios::binary);
+		if (!f.is_open())
+			return subtitle_format::unknown;
+
+		char raw[4096] = { 0 };
+		f.read(raw, sizeof(raw));
+		std::streamsize n = f.gcount();
+		f.close();
+		if (n <= 0)
+			return subtitle_format::unknown;
+
+		std::string head;
+		head.reserve((size_t)n);
+		for (std::streamsize i = 0; i < n; i++)
+		{
+			if (raw[i] == '\0')
+				continue;
+			head.push_back((char)tolower((unsigned char)raw[i]));
+		}
+
+		if (head.find("[script info]") != std::string::npos
+			|| head.find("[v4+ styles]") != std::string::npos
+			|| head.find("[v4 styles]") != std::string::npos
+			|| head.find("dialogue:") != std::string::npos)
+			return subtitle_format::ass;
+
+		if (head.find("<sami") != std::string::npos
+			|| head.find("<sync") != std::string::npos)
+			return subtitle_format::smi;
+
+		if (head.find("-->") != std::string::npos)
+			return subtitle_format::srt;
+
+		return subtitle_format::unknown;
+	}
+}
+
 bool CSubtitle::load_subtitle_file(CString sfile)
 {
 	if (sfile.IsEmpty())
@@ -743,7 +791,19 @@ bool CSubtitle::load_subtitle_file(CString sfile)
 		return false;
 
 	//인코딩 판별·파일 열기는 load_smi / load_srt 가 read_lines() (Common helper) 로 처리.
-	//여기서는 확장자 dispatch 만.
+	//20260822 by claude. 확장자보다 실제 내용을 우선한다. 내용으로 판별되지 않을 때만 확장자로 되돌아간다.
+	switch (sniff_subtitle_format(sfile))
+	{
+		case subtitle_format::ass:
+			return load_ass(sfile);
+		case subtitle_format::smi:
+			return load_smi(sfile);
+		case subtitle_format::srt:
+			return load_srt(sfile);
+		default:
+			break;
+	}
+
 	CString ext = get_part(sfile, fn_ext);
 	ext.MakeLower();
 

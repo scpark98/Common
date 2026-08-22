@@ -235,12 +235,15 @@ void CSubtitle::set_active_classes(const std::vector<CString>& classes)
 
 void CSubtitle::rebuild_active_view()
 {
-	m_subtitle.clear();
-
 	//m_tracks 가 비어있으면 srt 등 단일 트랙 경로 — m_subtitle 은 이미 load_srt 가 채움.
 	//rebuild 가 m_subtitle 을 지우면 srt 자막 손실 → 그 케이스는 m_tracks 가 없음을 검사해 skip.
+	//20260822 by claude. 이 검사는 반드시 m_subtitle.clear() *앞* 에 있어야 한다. 뒤에 두면
+	//clear 가 먼저 실행돼 srt cue 가 전부 사라진다 — 내장 자막에서 외부 srt 로 메뉴 전환 시
+	//set_active_classes 가 이 함수를 부르면서 자막이 통째로 없어지던 원인.
 	if (m_tracks.empty())
 		return;
+
+	m_subtitle.clear();
 
 	//각 sentence 의 source_class 를 *원래 track 의 Class 명* 으로 set — lists_to_subtitle 의 m_tracks update 위해.
 	//copy 1번만 — push_back 의 copy 후 m_subtitle.back() 에서 in-place source_class set (이전 deep copy 2번 → 로딩 시간 2배).

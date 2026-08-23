@@ -17,6 +17,20 @@ static LRESULT CALLBACK sccombo_edit_subclass(
 	HWND hwnd, UINT msg, WPARAM wp, LPARAM lp,
 	UINT_PTR /*id_subclass*/, DWORD_PTR ref_data)
 {
+	//20260823 by claude. 편집 가능한 콤보(CBS_DROPDOWN)는 휠로 항목이 바뀌지 않는다.
+	//WM_MOUSEWHEEL 이 내부 edit 으로 가는데, EDIT 은 스크롤 가능한 컨트롤이라 이 메시지를 *자기가 소비*하고
+	//(한 줄 edit 이라 스크롤할 것이 없어 아무 일도 안 한다) 콤보로 넘기지 않기 때문이다.
+	//CBS_DROPDOWNLIST 는 edit 자체가 없어 콤보가 직접 받으므로 원래 동작한다 — 편집 콤보도 같아지도록 넘긴다.
+	//드롭다운이 펼쳐진 동안은 listbox 가 직접 받아 스크롤하므로 건드리지 않는다.
+	if (msg == WM_MOUSEWHEEL)
+	{
+		CSCComboBox* self = reinterpret_cast<CSCComboBox*>(ref_data);
+		HWND combo = self ? self->GetSafeHwnd() : nullptr;
+		//combo != hwnd 확인 — GetComboBoxInfo 가 edit 대신 콤보 자신을 돌려주는 경우 무한 재귀가 된다.
+		if (combo && combo != hwnd && !self->GetDroppedState())
+			return ::SendMessage(combo, msg, wp, lp);
+	}
+
 	LRESULT r = ::DefSubclassProc(hwnd, msg, wp, lp);
 	if (msg == WM_IME_COMPOSITION)
 	{
@@ -1112,6 +1126,14 @@ void CSCComboBox::OnTimer(UINT_PTR nIDEvent)
 
 void CSCComboBox::apply_filter_now()
 {
+	//20260823 by claude. 이 필터는 m_font_list 를 원본으로 목록을 *다시 만든다*. 그 목록은 set_as_font_combo /
+	//add_font_list 로만 채워지는 폰트 콤보 전용이라, 일반 입력 콤보에서는 비어 있다. 그대로 진행하면
+	//ResetContent 로 항목이 전부 지워지고 아무것도 복구되지 않아 *타이핑하는 순간 목록이 통째로 사라진다*.
+	//(2026-08-23 발견: CBS_DROPDOWN 히스토리 콤보에서 입력할 때마다 히스토리가 1개로 리셋됐다.
+	// 기존 사용처는 모두 CBS_DROPDOWNLIST 라 타이핑 경로가 없어 드러나지 않았다.)
+	if (m_font_list.empty())
+		return;
+
 	CString filter;
 	GetWindowText(filter);
 

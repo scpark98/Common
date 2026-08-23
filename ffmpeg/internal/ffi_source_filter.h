@@ -72,6 +72,7 @@ namespace ffi
 		//CSourceStream overrides
 		HRESULT FillBuffer(IMediaSample* pSample) override;
 		HRESULT GetMediaType(CMediaType* pMediaType) override;
+		HRESULT GetMediaType(int iPosition, CMediaType* pMediaType) override;
 		HRESULT CheckMediaType(const CMediaType* pmt) override;
 		HRESULT DecideBufferSize(IMemAllocator* pAlloc, ALLOCATOR_PROPERTIES* pProperties) override;
 		HRESULT OnThreadCreate() override;
@@ -90,6 +91,12 @@ namespace ffi
 		CFFiSource*			source() { return m_pSource; }
 
 	private:
+		//media type 구성 — p010=true 면 10bit P010(24bpp), false 면 8bit NV12(12bpp).
+		//with_colorinfo=true 면 VIDEOINFOHEADER2 + AMCONTROL_COLORINFO 로 색공간을 명시한다.
+		HRESULT			build_media_type(CMediaType* pMediaType, bool p010, bool with_colorinfo);
+		//협상된 출력이 P010 인지 — DecideBufferSize / FillBuffer 가 버퍼 크기·복사 폭을 이걸로 정한다.
+		bool			out_is_p010() const;
+
 		CFFiSource*		m_pSource;
 		LONGLONG		m_sample_count = 0;	  //sample 순번. timestamping 에 사용.
 		LONGLONG		m_last_rtStart = 0;	  //직전 emit 한 frame 의 rtStart. GetCurrentPosition 의 응답값.

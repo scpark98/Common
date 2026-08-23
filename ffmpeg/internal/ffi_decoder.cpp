@@ -920,6 +920,39 @@ namespace ffi
 		return m_video_ctx ? (int)m_video_ctx->pix_fmt : (int)AV_PIX_FMT_NONE;
 	}
 
+	int CDecoder::video_color_primaries() const
+	{
+		return m_video_ctx ? (int)m_video_ctx->color_primaries : (int)AVCOL_PRI_UNSPECIFIED;
+	}
+
+	int CDecoder::video_color_trc() const
+	{
+		return m_video_ctx ? (int)m_video_ctx->color_trc : (int)AVCOL_TRC_UNSPECIFIED;
+	}
+
+	int CDecoder::video_colorspace() const
+	{
+		return m_video_ctx ? (int)m_video_ctx->colorspace : (int)AVCOL_SPC_UNSPECIFIED;
+	}
+
+	int CDecoder::video_color_range() const
+	{
+		return m_video_ctx ? (int)m_video_ctx->color_range : (int)AVCOL_RANGE_UNSPECIFIED;
+	}
+
+	int CDecoder::video_chroma_location() const
+	{
+		return m_video_ctx ? (int)m_video_ctx->chroma_sample_location : (int)AVCHROMA_LOC_UNSPECIFIED;
+	}
+
+	bool CDecoder::video_is_hdr() const
+	{
+		if (!m_video_ctx)
+			return false;
+		return m_video_ctx->color_trc == AVCOL_TRC_SMPTE2084 ||
+			   m_video_ctx->color_trc == AVCOL_TRC_ARIB_STD_B67;
+	}
+
 	int CDecoder::audio_sample_rate() const
 	{
 		return m_audio_ctx ? m_audio_ctx->sample_rate : 0;

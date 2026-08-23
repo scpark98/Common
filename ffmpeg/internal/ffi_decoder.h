@@ -65,6 +65,18 @@ namespace ffi
 		AVRational video_time_base() const;	 //stream 의 time_base. pts→ms 변환에 사용.
 		int		video_pixel_format() const;	 //AVPixelFormat. AVFrame 의 format 과 동일 또는 codec 의 hw_pix_fmt.
 
+		//색공간 — 렌더러에 넘길 DXVA_ExtendedFormat 구성용. 값은 AVColor* enum 그대로.
+		//컨테이너/비트스트림에 표기가 없으면 *_UNSPECIFIED 를 그대로 반환한다 — 호출측이 Unknown 으로
+		//전달해 렌더러의 기존 추정(해상도 기반)을 유지하게 하려는 것. 임의로 추정값을 채우지 않는다.
+		int		video_color_primaries() const;	 //AVColorPrimaries
+		int		video_color_trc()		 const;	 //AVColorTransferCharacteristic
+		int		video_colorspace()		 const;	 //AVColorSpace — YUV→RGB 매트릭스
+		int		video_color_range()		 const;	 //AVColorRange
+		int		video_chroma_location()	 const;	 //AVChromaLocation
+		//HDR 전송함수(PQ/HLG) 여부. true 면 8bit NV12 로 떨어뜨리지 말고 P010 + 색공간 메타데이터를
+		//렌더러에 그대로 넘겨야 한다 — 톤매핑은 렌더러(MPC-VR)가 GPU 에서 수행.
+		bool	video_is_hdr() const;
+
 		//display info — UI 표시용 (codec name string, fourcc, bit depth, bit rate, aspect ratio).
 		std::wstring video_codec_name()		 const;	 //"HEVC" / "H264" / "VP9" 등 — avcodec_get_name() 결과.
 		std::wstring video_fourcc()			 const;	 //codec_tag 4-char ("HVC1" / "AVC1" 등). 없으면 빈 문자열.

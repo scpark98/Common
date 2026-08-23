@@ -6,6 +6,9 @@
 
 #include "ffi_source_filter.h"
 
+//VIDEOINFOHEADER2 / FORMAT_VideoInfo2 — 색공간(AMCONTROL_COLORINFO)을 실을 수 있는 유일한 format block.
+#include <dvdmedia.h>
+
 #include "../../Functions.h"
 #include "../../log/SCLog/SCLog.h"
 
@@ -212,7 +215,170 @@ namespace ffi
 		return NOERROR;
 	}
 
-	HRESULT CFFiVideoStream::GetMediaType(CMediaType* pMediaType)
+	//NV12 / P010 의 DirectShow media subtype — FOURCC + 표준 GUID 꼬리.
+	static const GUID MEDIASUBTYPE_NV12_FFI = { MAKEFOURCC('N','V','1','2'),
+		0x0000, 0x0010, { 0x80, 0x00, 0x00, 0xAA, 0x00, 0x38, 0x9B, 0x71 } };
+	static const GUID MEDIASUBTYPE_P010_FFI = { MAKEFOURCC('P','0','1','0'),
+		0x0000, 0x0010, { 0x80, 0x00, 0x00, 0xAA, 0x00, 0x38, 0x9B, 0x71 } };
+
+	//VIDEOINFOHEADER2::dwControlFlags 에 겹쳐 넣는 색공간 기술자 (dxva.h 의 DXVA_ExtendedFormat 과 동일 레이아웃).
+	//하위 8bit(SampleFormat)이 AMCONTROL_* 플래그 자리와 겹친다 — 플래그를 먼저 쓰고 비트필드를 채워야 한다.
+	struct ffi_extended_format
+	{
+		UINT SampleFormat			: 8;
+		UINT VideoChromaSubsampling	: 4;
+		UINT NominalRange			: 3;
+		UINT VideoTransferMatrix	: 3;
+		UINT VideoLighting			: 4;
+		UINT VideoPrimaries			: 5;
+		UINT VideoTransferFunction	: 5;
+	};
+
+	//MF* enum 값. SDK 의 DXVA2_VideoTransFunc_* 는 HDR 전송함수(PQ/HLG)를 정의하지 않아 여기서 함께 둔다.
+	enum
+	{
+		ffi_amcontrol_used				= 0x00000001,
+		ffi_amcontrol_colorinfo_present	= 0x00000080,
+
+		ffi_range_unknown	= 0,
+		ffi_range_full		= 1,	//0-255
+		ffi_range_limited	= 2,	//16-235
+
+		ffi_matrix_unknown		= 0,
+		ffi_matrix_bt709		= 1,
+		ffi_matrix_bt601		= 2,
+		ffi_matrix_smpte240m	= 3,
+		ffi_matrix_bt2020_10	= 4,
+
+		ffi_primaries_unknown		= 0,
+		ffi_primaries_bt709			= 2,
+		ffi_primaries_bt470_2_m		= 3,
+		ffi_primaries_bt470_2_bg	= 4,
+		ffi_primaries_smpte170m		= 5,
+		ffi_primaries_smpte240m		= 6,
+		ffi_primaries_bt2020		= 9,
+		ffi_primaries_dci_p3		= 11,
+
+		ffi_transfer_unknown	= 0,
+		ffi_transfer_10			= 1,
+		ffi_transfer_22			= 4,
+		ffi_transfer_709		= 5,
+		ffi_transfer_240m		= 6,
+		ffi_transfer_srgb		= 7,
+		ffi_transfer_28			= 8,
+		ffi_transfer_log100		= 9,
+		ffi_transfer_log316		= 10,
+		ffi_transfer_2020		= 13,
+		ffi_transfer_2084		= 15,	//PQ (SMPTE ST 2084) — HDR10
+		ffi_transfer_hlg		= 16,	//ARIB STD-B67
+
+		ffi_chroma_unknown	= 0,
+		ffi_chroma_mpeg1	= 1,	//center
+		ffi_chroma_mpeg2	= 5,	//left — H.264/HEVC 의 표준 위치
+		ffi_chroma_dv_pal	= 6,	//topleft
+	};
+
+	static UINT ffi_map_primaries(int av_primaries)
+	{
+		switch (av_primaries)
+		{
+			case AVCOL_PRI_BT709:
+				return ffi_primaries_bt709;
+			case AVCOL_PRI_BT470M:
+				return ffi_primaries_bt470_2_m;
+			case AVCOL_PRI_BT470BG:
+				return ffi_primaries_bt470_2_bg;
+			case AVCOL_PRI_SMPTE170M:
+				return ffi_primaries_smpte170m;
+			case AVCOL_PRI_SMPTE240M:
+				return ffi_primaries_smpte240m;
+			case AVCOL_PRI_BT2020:
+				return ffi_primaries_bt2020;
+			case AVCOL_PRI_SMPTE431:
+			case AVCOL_PRI_SMPTE432:
+				return ffi_primaries_dci_p3;
+			default:
+				return ffi_primaries_unknown;
+		}
+	}
+
+	static UINT ffi_map_transfer(int av_trc)
+	{
+		switch (av_trc)
+		{
+			case AVCOL_TRC_BT709:
+			case AVCOL_TRC_SMPTE170M:
+				return ffi_transfer_709;
+			case AVCOL_TRC_GAMMA22:
+				return ffi_transfer_22;
+			case AVCOL_TRC_GAMMA28:
+				return ffi_transfer_28;
+			case AVCOL_TRC_SMPTE240M:
+				return ffi_transfer_240m;
+			case AVCOL_TRC_LINEAR:
+				return ffi_transfer_10;
+			case AVCOL_TRC_LOG:
+				return ffi_transfer_log100;
+			case AVCOL_TRC_LOG_SQRT:
+				return ffi_transfer_log316;
+			case AVCOL_TRC_IEC61966_2_1:
+				return ffi_transfer_srgb;
+			case AVCOL_TRC_BT2020_10:
+			case AVCOL_TRC_BT2020_12:
+				return ffi_transfer_2020;
+			case AVCOL_TRC_SMPTE2084:
+				return ffi_transfer_2084;
+			case AVCOL_TRC_ARIB_STD_B67:
+				return ffi_transfer_hlg;
+			default:
+				return ffi_transfer_unknown;
+		}
+	}
+
+	static UINT ffi_map_matrix(int av_colorspace)
+	{
+		switch (av_colorspace)
+		{
+			case AVCOL_SPC_BT709:
+				return ffi_matrix_bt709;
+			case AVCOL_SPC_BT470BG:
+			case AVCOL_SPC_SMPTE170M:
+				return ffi_matrix_bt601;
+			case AVCOL_SPC_SMPTE240M:
+				return ffi_matrix_smpte240m;
+			case AVCOL_SPC_BT2020_NCL:
+			case AVCOL_SPC_BT2020_CL:
+				return ffi_matrix_bt2020_10;
+			default:
+				return ffi_matrix_unknown;
+		}
+	}
+
+	static UINT ffi_map_chroma(int av_chroma_location)
+	{
+		switch (av_chroma_location)
+		{
+			case AVCHROMA_LOC_LEFT:
+				return ffi_chroma_mpeg2;
+			case AVCHROMA_LOC_CENTER:
+				return ffi_chroma_mpeg1;
+			case AVCHROMA_LOC_TOPLEFT:
+				return ffi_chroma_dv_pal;
+			default:
+				return ffi_chroma_unknown;
+		}
+	}
+
+	//스트림이 색공간을 하나라도 표기했는지. 전부 미표기면 Unknown 만 채운 colorinfo 를 붙일 이유가 없다
+	//(오히려 렌더러의 해상도 기반 추정을 방해할 수 있다).
+	static bool ffi_has_color_info(CDecoder& dec)
+	{
+		return dec.video_color_primaries() != AVCOL_PRI_UNSPECIFIED ||
+			   dec.video_color_trc()	   != AVCOL_TRC_UNSPECIFIED ||
+			   dec.video_colorspace()	   != AVCOL_SPC_UNSPECIFIED;
+	}
+
+	HRESULT CFFiVideoStream::build_media_type(CMediaType* pMediaType, bool p010, bool with_colorinfo)
 	{
 		if (!pMediaType || !m_pSource)
 			return E_POINTER;
@@ -223,58 +389,144 @@ namespace ffi
 
 		int w = dec.video_width();
 		int h = dec.video_height();
-		int aligned_w = (w + 127) & ~127;	//128 byte alignment — DecideBufferSize / FillBuffer 와 일치.
+		int aligned_w = (w + 127) & ~127;	//stride. rcSource 가 valid 영역.
 		double fps = dec.frame_rate();
 		if (fps <= 0.0)
 			fps = 30.0;
 
-		//NV12 media type 구성. MPC-VR / EVR / VMR9 모두 NV12 받음.
-		VIDEOINFOHEADER* pvi = (VIDEOINFOHEADER*)pMediaType->AllocFormatBuffer(sizeof(VIDEOINFOHEADER));
-		if (!pvi)
-			return E_OUTOFMEMORY;
-		ZeroMemory(pvi, sizeof(VIDEOINFOHEADER));
+		const DWORD fourcc		 = p010 ? MAKEFOURCC('P','0','1','0') : MAKEFOURCC('N','V','1','2');
+		const WORD	bit_count	 = p010 ? 24 : 12;
+		const DWORD size_image	 = p010 ? (DWORD)aligned_w * h * 3 : (DWORD)aligned_w * h * 3 / 2;
+		const REFERENCE_TIME avg = (REFERENCE_TIME)(10000000.0 / fps);
 
-		pvi->bmiHeader.biSize		 = sizeof(BITMAPINFOHEADER);
-		pvi->bmiHeader.biWidth		 = aligned_w;	//stride. rcSource 가 valid 영역.
-		pvi->bmiHeader.biHeight		 = h;
-		pvi->bmiHeader.biPlanes		 = 1;
-		pvi->bmiHeader.biBitCount	 = 12;			//NV12 = 12 bpp
-		pvi->bmiHeader.biCompression = MAKEFOURCC('N','V','1','2');
-		pvi->bmiHeader.biSizeImage	 = aligned_w * h * 3 / 2;
+		BITMAPINFOHEADER bmi;
+		ZeroMemory(&bmi, sizeof(bmi));
+		bmi.biSize		  = sizeof(BITMAPINFOHEADER);
+		bmi.biWidth		  = aligned_w;
+		bmi.biHeight	  = h;
+		bmi.biPlanes	  = 1;
+		bmi.biBitCount	  = bit_count;
+		bmi.biCompression = fourcc;
+		bmi.biSizeImage	  = size_image;
 
-		pvi->AvgTimePerFrame = (REFERENCE_TIME)(10000000.0 / fps);	 //100ns 단위
-		pvi->rcSource.right	 = w;	//valid 영역만 (padded stride 가 아닌 실제 표시 영역).
-		pvi->rcSource.bottom = h;
-		pvi->rcTarget		 = pvi->rcSource;
-		pvi->dwBitRate		 = aligned_w * h * 3 / 2 * 8 * (DWORD)fps;
-		pvi->dwBitErrorRate	 = 0;
+		if (with_colorinfo)
+		{
+			VIDEOINFOHEADER2* pvi = (VIDEOINFOHEADER2*)pMediaType->AllocFormatBuffer(sizeof(VIDEOINFOHEADER2));
+			if (!pvi)
+				return E_OUTOFMEMORY;
+			ZeroMemory(pvi, sizeof(VIDEOINFOHEADER2));
 
-		const GUID MEDIASUBTYPE_NV12_LOCAL = { MAKEFOURCC('N','V','1','2'),
-			0x0000, 0x0010, { 0x80, 0x00, 0x00, 0xAA, 0x00, 0x38, 0x9B, 0x71 } };
+			pvi->bmiHeader			= bmi;
+			pvi->AvgTimePerFrame	= avg;
+			pvi->rcSource.right		= w;
+			pvi->rcSource.bottom	= h;
+			pvi->rcTarget			= pvi->rcSource;
+			pvi->dwBitRate			= size_image * 8 * (DWORD)fps;
+			pvi->dwPictAspectRatioX	= w;
+			pvi->dwPictAspectRatioY	= h;
+
+			pvi->dwControlFlags = ffi_amcontrol_used | ffi_amcontrol_colorinfo_present;
+
+			ffi_extended_format* pfmt = (ffi_extended_format*)&pvi->dwControlFlags;
+			pfmt->VideoPrimaries		 = ffi_map_primaries(dec.video_color_primaries());
+			pfmt->VideoTransferFunction	 = ffi_map_transfer(dec.video_color_trc());
+			pfmt->VideoTransferMatrix	 = ffi_map_matrix(dec.video_colorspace());
+			pfmt->VideoChromaSubsampling = ffi_map_chroma(dec.video_chroma_location());
+			pfmt->NominalRange			 = ffi_range_limited;	//FillBuffer 가 항상 limited 로 맞춰 출력한다.
+
+			pMediaType->SetFormatType(&FORMAT_VideoInfo2);
+		}
+		else
+		{
+			VIDEOINFOHEADER* pvi = (VIDEOINFOHEADER*)pMediaType->AllocFormatBuffer(sizeof(VIDEOINFOHEADER));
+			if (!pvi)
+				return E_OUTOFMEMORY;
+			ZeroMemory(pvi, sizeof(VIDEOINFOHEADER));
+
+			pvi->bmiHeader		 = bmi;
+			pvi->AvgTimePerFrame = avg;
+			pvi->rcSource.right	 = w;
+			pvi->rcSource.bottom = h;
+			pvi->rcTarget		 = pvi->rcSource;
+			pvi->dwBitRate		 = size_image * 8 * (DWORD)fps;
+
+			pMediaType->SetFormatType(&FORMAT_VideoInfo);
+		}
 
 		pMediaType->SetType(&MEDIATYPE_Video);
-		pMediaType->SetFormatType(&FORMAT_VideoInfo);
 		pMediaType->SetTemporalCompression(FALSE);
-		pMediaType->SetSubtype(&MEDIASUBTYPE_NV12_LOCAL);
-		pMediaType->SetSampleSize(pvi->bmiHeader.biSizeImage);
+		pMediaType->SetSubtype(p010 ? &MEDIASUBTYPE_P010_FFI : &MEDIASUBTYPE_NV12_FFI);
+		pMediaType->SetSampleSize(size_image);
 
 		return NOERROR;
 	}
 
+	bool CFFiVideoStream::out_is_p010() const
+	{
+		return m_mt.subtype == MEDIASUBTYPE_P010_FFI;
+	}
+
+	HRESULT CFFiVideoStream::GetMediaType(CMediaType* pMediaType)
+	{
+		return GetMediaType(0, pMediaType);
+	}
+
+	//렌더러에 제시할 media type 우선순위.
+	// 0: HDR 이면 P010(10bit) + 색공간 메타데이터 — 렌더러가 PQ/HLG 를 인지해 톤매핑할 수 있는 유일한 형태.
+	//    8bit NV12 로 먼저 떨어뜨리면 그 시점에 계조가 사라져 렌더러가 복원할 방법이 없다.
+	// 1: NV12 + 색공간 메타데이터 — P010 을 못 받는 렌더러용. 톤매핑은 못 해도 매트릭스는 맞는다.
+	// 2: NV12 + VIDEOINFOHEADER — VIDEOINFOHEADER2 자체를 못 받는 렌더러용 최종 fallback (종전 동작).
+	HRESULT CFFiVideoStream::GetMediaType(int iPosition, CMediaType* pMediaType)
+	{
+		if (!pMediaType || !m_pSource)
+			return E_POINTER;
+		if (iPosition < 0)
+			return E_INVALIDARG;
+
+		CDecoder& dec = m_pSource->decoder();
+		if (!dec.is_opened())
+			return E_FAIL;
+
+		const bool hdr		 = dec.video_is_hdr();
+		const bool colorinfo = hdr || ffi_has_color_info(dec);
+
+		int index = iPosition;
+		if (hdr)
+		{
+			if (index == 0)
+				return build_media_type(pMediaType, true, true);
+			--index;
+		}
+		if (colorinfo)
+		{
+			if (index == 0)
+				return build_media_type(pMediaType, false, true);
+			--index;
+		}
+		if (index == 0)
+			return build_media_type(pMediaType, false, false);
+
+		return VFW_S_NO_MORE_ITEMS;
+	}
+
 	HRESULT CFFiVideoStream::CheckMediaType(const CMediaType* pmt)
 	{
-		if (!pmt)
+		if (!pmt || !m_pSource)
 			return E_POINTER;
 
-		if (*pmt->Type()		!= MEDIATYPE_Video) return E_INVALIDARG;
-		if (*pmt->FormatType()	!= FORMAT_VideoInfo) return E_INVALIDARG;
+		if (*pmt->Type() != MEDIATYPE_Video)
+			return E_INVALIDARG;
+		if (*pmt->FormatType() != FORMAT_VideoInfo && *pmt->FormatType() != FORMAT_VideoInfo2)
+			return E_INVALIDARG;
 
-		//NV12 만 허용.
-		const GUID MEDIASUBTYPE_NV12_LOCAL = { MAKEFOURCC('N','V','1','2'),
-			0x0000, 0x0010, { 0x80, 0x00, 0x00, 0xAA, 0x00, 0x38, 0x9B, 0x71 } };
-		if (*pmt->Subtype() != MEDIASUBTYPE_NV12_LOCAL) return E_INVALIDARG;
+		//P010 은 HDR 소스에서만 — SDR 을 10bit 로 부풀려 보낼 이유가 없다.
+		if (*pmt->Subtype() == MEDIASUBTYPE_P010_FFI)
+			return m_pSource->decoder().video_is_hdr() ? S_OK : E_INVALIDARG;
 
-		return S_OK;
+		if (*pmt->Subtype() == MEDIASUBTYPE_NV12_FFI)
+			return S_OK;
+
+		return E_INVALIDARG;
 	}
 
 	HRESULT CFFiVideoStream::DecideBufferSize(IMemAllocator* pAlloc, ALLOCATOR_PROPERTIES* pProperties)
@@ -286,10 +538,10 @@ namespace ffi
 		int w = dec.video_width();
 		int h = dec.video_height();
 
-		//NV12 stride 를 128 byte align — MPCVR 의 D3D11 texture upload 가 aligned stride 가정 시 480 같은 unaligned width 에서 garbage 합성 가능.
+		//NV12/P010 stride 를 128 byte align — MPCVR 의 D3D11 texture upload 가 aligned stride 가정 시 480 같은 unaligned width 에서 garbage 합성 가능.
 		int aligned_w = (w + 127) & ~127;
 		pProperties->cBuffers = 3;
-		pProperties->cbBuffer = aligned_w * h * 3 / 2;
+		pProperties->cbBuffer = out_is_p010() ? aligned_w * h * 3 : aligned_w * h * 3 / 2;
 
 		ALLOCATOR_PROPERTIES Actual;
 		HRESULT hr = pAlloc->SetProperties(pProperties, &Actual);
@@ -298,6 +550,13 @@ namespace ffi
 
 		if (Actual.cbBuffer < pProperties->cbBuffer)
 			return E_FAIL;
+
+		//20260823 by claude. [진단] 렌더러가 실제로 받기로 한 포맷. HDR 인데 NV12 로 떨어졌다면
+		//렌더러가 P010 을 거절한 것 — 톤매핑이 안 되는 이유를 이 한 줄로 가른다.
+		logWrite(_T("[ffi/src/video/format] 출력=%s %dx%d (HDR=%d trc=%d primaries=%d matrix=%d range=%d)"),
+			out_is_p010() ? _T("P010(10bit)") : _T("NV12(8bit)"), w, h,
+			(int)dec.video_is_hdr(), dec.video_color_trc(), dec.video_color_primaries(),
+			dec.video_colorspace(), dec.video_color_range());
 
 		return NOERROR;
 	}
@@ -494,34 +753,40 @@ namespace ffi
 		int w = dec.video_width();
 		int h = dec.video_height();
 		int aligned_w = (w + 127) & ~127;	//DecideBufferSize 와 같은 alignment.
+		const bool p010 = out_is_p010();
+		const int bytes_per_sample = p010 ? 2 : 1;
+		const int dst_stride = aligned_w * bytes_per_sample;
 		long buffer_size = pSample->GetSize();
-		long required = aligned_w * h * 3 / 2;
+		long required = p010 ? aligned_w * h * 3 : aligned_w * h * 3 / 2;
 		if (buffer_size < required)
 		{
 			av_frame_free(&frame);
 			return E_FAIL;
 		}
 
-		//fast path — frame 이 이미 NV12 (HW transferred 등) 면 swscale 우회, 직접 copy.
+		const AVPixelFormat dst_fmt = p010 ? AV_PIX_FMT_P010LE : AV_PIX_FMT_NV12;
+
+		//fast path — frame 이 이미 출력 포맷 (HW transfer 결과 등) 이면 swscale 우회, 직접 copy.
 		//매 frame swscale alloc/free 가 thread-unsafe 또는 무거워 crash/freeze 원인.
 		//단, frame 크기가 negotiated 크기(w,h)와 같을 때만. 가변 해상도 스트림(인트로 큰 해상도 → 본편 작은 해상도)
 		//에서 다른 크기 frame 은 아래 swscale 로 negotiated 크기에 맞춰 스케일해야 stride 가 안 어긋난다.
-		if ((AVPixelFormat)frame->format == AV_PIX_FMT_NV12 && frame->width == w && frame->height == h)
+		if ((AVPixelFormat)frame->format == dst_fmt && frame->width == w && frame->height == h)
 		{
-			//dst stride = aligned_w. src 의 valid 영역은 처음 w byte, 나머지는 padding (0 또는 stale 무관).
+			//dst stride = aligned_w. src 의 valid 영역은 처음 w 픽셀, 나머지는 padding (0 또는 stale 무관).
 			uint8_t* dst_y	= pData;
-			uint8_t* dst_uv = pData + aligned_w * h;
+			uint8_t* dst_uv = pData + dst_stride * h;
+			const int copy_bytes = w * bytes_per_sample;
 			for (int y = 0; y < h; ++y)
-				memcpy(dst_y + y * aligned_w, frame->data[0] + y * frame->linesize[0], w);
+				memcpy(dst_y + y * dst_stride, frame->data[0] + y * frame->linesize[0], copy_bytes);
 			for (int y = 0; y < h / 2; ++y)
-				memcpy(dst_uv + y * aligned_w, frame->data[1] + y * frame->linesize[1], w);
+				memcpy(dst_uv + y * dst_stride, frame->data[1] + y * frame->linesize[1], copy_bytes);
 		}
 		else
 		{
-			//AVFrame → NV12 변환 (YUV420P 등). swscale 로 통합 처리.
+			//AVFrame → NV12/P010 변환 (YUV420P 등). swscale 로 통합 처리.
 			SwsContext* sws = sws_getContext(
 				frame->width, frame->height, (AVPixelFormat)frame->format,
-				w, h, AV_PIX_FMT_NV12,
+				w, h, dst_fmt,
 				SWS_BILINEAR, NULL, NULL, NULL);
 
 			if (!sws)
@@ -530,11 +795,19 @@ namespace ffi
 				return E_FAIL;
 			}
 
+			//range 를 지정하지 않으면 swscale 은 src/dst 를 모두 limited 로 가정한다. full range(JPEG) 소스가
+			//그대로 통과해 렌더러의 limited 해석과 어긋나면 검정이 뜨고 흰색이 클리핑된다. 출력은 항상
+			//limited 로 맞춘다 — media type 의 NominalRange 도 limited 로 선언하고 있다.
+			const int src_range = (frame->color_range == AVCOL_RANGE_JPEG) ? 1 : 0;
+			const int src_cs = (frame->colorspace != AVCOL_SPC_UNSPECIFIED) ? (int)frame->colorspace : SWS_CS_DEFAULT;
+			const int* coeff = sws_getCoefficients(src_cs);
+			sws_setColorspaceDetails(sws, coeff, src_range, coeff, 0, 0, 1 << 16, 1 << 16);
+
 			//dst_planes/dst_strides 는 size 4 배열 — swscale 이 4 plane 가정. size 2 면 [2], [3] 가 stack
-			//uninitialized (0xCCCC...) 인데 swscale 이 NULL check 없이 access → crash. NV12 는 2 plane 만 쓰지만
+			//uninitialized (0xCCCC...) 인데 swscale 이 NULL check 없이 access → crash. NV12/P010 는 2 plane 만 쓰지만
 			//배열 자체는 4 개 필요.
-			uint8_t* dst_planes[4] = { pData, pData + aligned_w * h, NULL, NULL };
-			int		 dst_strides[4] = { aligned_w, aligned_w, 0, 0 };
+			uint8_t* dst_planes[4] = { pData, pData + dst_stride * h, NULL, NULL };
+			int		 dst_strides[4] = { dst_stride, dst_stride, 0, 0 };
 
 			sws_scale(sws, frame->data, frame->linesize, 0, frame->height,
 					  dst_planes, dst_strides);
@@ -1462,6 +1735,39 @@ namespace ffi
 				{
 					m_audio_loop_state.store(3);
 
+					//20260822 by claude. [clock_rebase 경합] seek 시 두 가지가 순서 보장 없이 일어난다 —
+					//  (1) 소스가 새 세그먼트를 rtStart≈0 부터 내보내기 시작
+					//  (2) 그래프 클럭이 새 세그먼트 기준으로 rebase (StreamTime 이 0 으로 되돌아감)
+					//(2) 보다 먼저 나간 샘플은 *옛 클럭* 기준으로 렌더러 큐에 들어간다. 곧 클럭이 뒤로
+					//점프하면 그 샘플들이 통째로 "미래" 가 되고, 렌더러는 클럭이 거기 닿을 때까지
+					//DirectSound 버퍼 재생을 멈춘다 — 링에 데이터가 찬 채로 1~2 초 무음.
+					//측정: 21:47:30.038 첫 deliver 가 clock_ahead=678ms(직전 seek 의 클럭) → 30.066 에 rebase
+					//→ 파이프라인 깊이(2.0 초) 만큼 지난 32.372 에 Deliver BLOCKED 2032ms.
+					//seek 53 회 중 이 경합은 1 회, 2 초급 stall 도 1 회, 둘이 같이 왔다.
+					//정상 seek 의 stream_clock 은 0 근처(관측 0/-2/14/-8)라 아래 검사는 즉시 통과한다.
+					if (m_resume_armed.load() && !m_resume_first_logged.load())
+					{
+						static constexpr REFERENCE_TIME clock_rebase_threshold_rt = 300 * 10000LL;
+						static constexpr ULONGLONG clock_rebase_wait_max_ms = 150;
+
+						CRefTime rt_chk;
+						if (SUCCEEDED(m_pFilter->StreamTime(rt_chk))
+							&& (REFERENCE_TIME)rt_chk > clock_rebase_threshold_rt)
+						{
+							const ULONGLONG wait0 = GetTickCount64();
+							while (GetTickCount64() - wait0 < clock_rebase_wait_max_ms)
+							{
+								Sleep(5);
+								if (FAILED(m_pFilter->StreamTime(rt_chk)))
+									break;
+								if ((REFERENCE_TIME)rt_chk <= clock_rebase_threshold_rt)
+									break;
+							}
+							logWrite(_T("[ffi/src/audio/clock_wait] rebase 대기 %llums → stream_clock=%lldms (경합 회피)"),
+								GetTickCount64() - wait0, (long long)((REFERENCE_TIME)rt_chk / 10000));
+						}
+					}
+
 					//20260822 by claude. [stall] 렌더러(CBaseRenderer)는 Receive 안에서 그 샘플의 표시시각까지
 					//블록한다. 따라서 Deliver 가 오래 막히면 원인은 둘 중 하나다 —
 					//  (1) 샘플 타임스탬프가 그래프 클럭보다 그만큼 앞서 있다(lead ≈ block).
@@ -1480,7 +1786,8 @@ namespace ffi
 					if (t_dlv_ms > 50)
 						logWrite(_T("[ffi/src/audio/diag] Deliver BLOCKED %llums (DSound input 큐 full = 오디오 렌더러/클럭 stall 신호)"), t_dlv_ms);
 
-					if (t_dlv_ms > 300)
+					//30 초 이상은 일시정지 구간이라 증상과 무관 — 로그에서 뺀다.
+					if (t_dlv_ms > 300 && t_dlv_ms < 30000)
 					{
 						CRefTime rt_dbg_after;
 						m_pFilter->StreamTime(rt_dbg_after);

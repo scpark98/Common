@@ -1776,7 +1776,25 @@ CRect CSCParagraph::draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCPar
 		global_gray_weight = para[0][0].text_prop.shadow_gray_weight;
 	}
 
-	if (global_blur_sigma > 0.0f)
+	//20260823 by claude. 그림자를 실제로 쓰는 run 이 하나도 없으면 이 패스 전체를 건너뛴다.
+	//이전엔 sigma(기본 3.0)만 보고 진입해서, 그림자가 없는 텍스트에서도 캔버스 전체 레이어 생성 +
+	//box blur ×3 + 전체 합성이 매번 돌았다. 안쪽 루프가 run 을 건너뛰므로 결과는 빈 레이어였고,
+	//빈 레이어를 blur 해서 합성하는 것은 화면상 아무 변화가 없다 — 순수 낭비다.
+	//(바로 아래 glow 패스는 has_glow 로 이미 이렇게 사전 검사한다. 그림자 쪽에만 빠져 있었다.)
+	bool has_shadow = false;
+	for (i = 0; i < para.size() && !has_shadow; i++)
+	{
+		for (j = 0; j < (int)para[i].size(); j++)
+		{
+			if (para[i][j].text_prop.shadow_depth != 0.0f && para[i][j].text_prop.cr_shadow.GetA() > 0)
+			{
+				has_shadow = true;
+				break;
+			}
+		}
+	}
+
+	if (global_blur_sigma > 0.0f && has_shadow)
 	{
 		Gdiplus::RectF clip;
 		g.GetVisibleClipBounds(&clip);

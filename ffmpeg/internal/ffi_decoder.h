@@ -85,6 +85,12 @@ namespace ffi
 		std::wstring video_aspect_ratio()	 const;	 //"16:9" / "1.85:1" 같은 표시용. sample_aspect_ratio + width/height 조합.
 		std::wstring video_pixel_format_name() const;//"yuv420p" / "nv12" 등 — av_get_pix_fmt_name(). 없으면 빈 문자열.
 		std::wstring video_chroma_location_name() const;//"left"/"center"/"topleft" 등 — av_chroma_location_name(). unspecified/없으면 빈 문자열.
+		//색공간 표기 — FFmpeg 의 표준 이름 그대로("tv"/"bt2020"/"smpte2084"/"bt2020nc").
+		//컨테이너/비트스트림에 표기가 없으면 빈 문자열(추정값을 만들지 않는다).
+		std::wstring video_color_range_name()	  const;
+		std::wstring video_color_primaries_name() const;
+		std::wstring video_color_transfer_name()  const;
+		std::wstring video_colorspace_name()	  const;
 		std::wstring video_hw_accel_name()	 const;	 //HW accel 사용 중이면 "D3D11VA"/"DXVA2"/"CUDA" 등, 아니면 빈 문자열.
 
 		//audio info — Phase 4. has_audio() false 면 audio stream 없음 / 디코더 fail.

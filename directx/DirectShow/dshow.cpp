@@ -2471,6 +2471,46 @@ CString CDShow::get_video_chroma_location()
 	return _T("");
 }
 
+CString CDShow::get_video_color_range()
+{
+	if (m_use_internal_ffmpeg)
+	{
+		if (auto* d = ffi_decoder_or_null(m_pFFiSource))
+			return CString(d->video_color_range_name().c_str());
+	}
+	return _T("");
+}
+
+CString CDShow::get_video_color_primaries()
+{
+	if (m_use_internal_ffmpeg)
+	{
+		if (auto* d = ffi_decoder_or_null(m_pFFiSource))
+			return CString(d->video_color_primaries_name().c_str());
+	}
+	return _T("");
+}
+
+CString CDShow::get_video_color_transfer()
+{
+	if (m_use_internal_ffmpeg)
+	{
+		if (auto* d = ffi_decoder_or_null(m_pFFiSource))
+			return CString(d->video_color_transfer_name().c_str());
+	}
+	return _T("");
+}
+
+CString CDShow::get_video_colorspace()
+{
+	if (m_use_internal_ffmpeg)
+	{
+		if (auto* d = ffi_decoder_or_null(m_pFFiSource))
+			return CString(d->video_colorspace_name().c_str());
+	}
+	return _T("");
+}
+
 CString CDShow::get_audio_channel_layout()
 {
 	if (m_use_internal_ffmpeg)
@@ -2918,6 +2958,78 @@ int CDShow::get_refresh_rate_hz()
 	if (!EnumDisplaySettings(NULL, ENUM_CURRENT_SETTINGS, &dm))
 		return 0;
 	return (int)dm.dmDisplayFrequency;
+}
+
+//20260823 by claude. 렌더러(MPC-VR)는 자기 색 변환 상태를 밖으로 노출하지 않는다(IExFilterConfig 에
+//statsEnable 같은 토글만 있고 상태 문자열이 없다). 그래서 소스의 전송함수와 디스플레이 HDR 상태로 판정한다.
+//렌더러는 디스플레이가 HDR 이면 그대로 내보내고(passthrough), 아니면 SDR 로 톤매핑한다.
+bool CDShow::is_display_hdr_enabled()
+{
+	//영상 창이 놓인 모니터의 GDI device name (\\.\DISPLAY1 등) — 여러 모니터 중 그 화면만 판정한다.
+	CString target_device;
+	HWND hwnd = m_pParent ? m_pParent->GetSafeHwnd() : NULL;
+	HMONITOR hmon = ::MonitorFromWindow(hwnd ? hwnd : ::GetDesktopWindow(), MONITOR_DEFAULTTOPRIMARY);
+	MONITORINFOEX mi;
+	ZeroMemory(&mi, sizeof(mi));
+	mi.cbSize = sizeof(mi);
+	if (::GetMonitorInfo(hmon, &mi))
+		target_device = mi.szDevice;
+
+	UINT32 path_count = 0;
+	UINT32 mode_count = 0;
+	if (::GetDisplayConfigBufferSizes(QDC_ONLY_ACTIVE_PATHS, &path_count, &mode_count) != ERROR_SUCCESS)
+		return false;
+
+	std::vector<DISPLAYCONFIG_PATH_INFO> paths(path_count);
+	std::vector<DISPLAYCONFIG_MODE_INFO> modes(mode_count);
+	if (::QueryDisplayConfig(QDC_ONLY_ACTIVE_PATHS, &path_count, paths.data(),
+			&mode_count, modes.data(), NULL) != ERROR_SUCCESS)
+		return false;
+
+	for (UINT32 i = 0; i < path_count; i++)
+	{
+		DISPLAYCONFIG_SOURCE_DEVICE_NAME src;
+		ZeroMemory(&src, sizeof(src));
+		src.header.type = DISPLAYCONFIG_DEVICE_INFO_GET_SOURCE_NAME;
+		src.header.size = sizeof(src);
+		src.header.adapterId = paths[i].sourceInfo.adapterId;
+		src.header.id = paths[i].sourceInfo.id;
+		if (::DisplayConfigGetDeviceInfo(&src.header) != ERROR_SUCCESS)
+			continue;
+
+		if (!target_device.IsEmpty() && target_device.CompareNoCase(src.viewGdiDeviceName) != 0)
+			continue;
+
+		DISPLAYCONFIG_GET_ADVANCED_COLOR_INFO adv;
+		ZeroMemory(&adv, sizeof(adv));
+		adv.header.type = DISPLAYCONFIG_DEVICE_INFO_GET_ADVANCED_COLOR_INFO;
+		adv.header.size = sizeof(adv);
+		adv.header.adapterId = paths[i].targetInfo.adapterId;
+		adv.header.id = paths[i].targetInfo.id;
+		if (::DisplayConfigGetDeviceInfo(&adv.header) == ERROR_SUCCESS)
+			return adv.advancedColorEnabled != 0;
+	}
+
+	return false;
+}
+
+CString CDShow::get_video_color_convert_label()
+{
+	//전송함수는 내장 경로에서만 알 수 있다. LAV 경로는 우리 색공간 코드를 지나지 않으므로 표기하지 않는다.
+	auto* d = ffi_decoder_or_null(m_pFFiSource);
+	if (!d)
+		return _T("");
+
+	const int trc = d->video_color_trc();
+	CString source;
+	if (trc == AVCOL_TRC_SMPTE2084)
+		source = _T("HDR 2084");
+	else if (trc == AVCOL_TRC_ARIB_STD_B67)
+		source = _T("HLG");
+	else
+		return _T("");
+
+	return source + (is_display_hdr_enabled() ? _T(" passthrough") : _T(" to SDR"));
 }
 
 CString CDShow::get_video_output_subtype()

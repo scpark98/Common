@@ -1095,9 +1095,59 @@ namespace ffi
 		return buf;
 	}
 
+	//ASCII 로만 오는 FFmpeg 이름을 wstring 으로.
+	static std::wstring to_wide(const char* name)
+	{
+		std::wstring out;
+		if (!name)
+			return out;
+		while (*name)
+			out += (wchar_t)(unsigned char)(*name++);
+		return out;
+	}
+
+	std::wstring CDecoder::video_color_range_name() const
+	{
+		if (!m_video_ctx || m_video_ctx->color_range == AVCOL_RANGE_UNSPECIFIED)
+			return L"";
+		return to_wide(av_color_range_name(m_video_ctx->color_range));
+	}
+
+	std::wstring CDecoder::video_color_primaries_name() const
+	{
+		if (!m_video_ctx || m_video_ctx->color_primaries == AVCOL_PRI_UNSPECIFIED)
+			return L"";
+		return to_wide(av_color_primaries_name(m_video_ctx->color_primaries));
+	}
+
+	std::wstring CDecoder::video_color_transfer_name() const
+	{
+		if (!m_video_ctx || m_video_ctx->color_trc == AVCOL_TRC_UNSPECIFIED)
+			return L"";
+		return to_wide(av_color_transfer_name(m_video_ctx->color_trc));
+	}
+
+	std::wstring CDecoder::video_colorspace_name() const
+	{
+		if (!m_video_ctx || m_video_ctx->colorspace == AVCOL_SPC_UNSPECIFIED)
+			return L"";
+		return to_wide(av_color_space_name(m_video_ctx->colorspace));
+	}
+
 	std::wstring CDecoder::video_pixel_format_name() const
 	{
 		AVPixelFormat fmt = (AVPixelFormat)video_pixel_format();
+
+		//20260823 by claude. HW 가속 중이면 pix_fmt 는 프레임 *컨테이너* 타입(d3d11/dxva2_vld 등)이라
+		//소스가 무슨 포맷인지 알려주지 못한다. 그 경우 sw_pix_fmt(실제 소스 포맷, yuv420p10le 등)를 쓴다.
+		//PotPlayer 도 소스 포맷을 표기한다.
+		if (m_video_ctx && fmt != AV_PIX_FMT_NONE)
+		{
+			const AVPixFmtDescriptor* desc = av_pix_fmt_desc_get(fmt);
+			if (desc && (desc->flags & AV_PIX_FMT_FLAG_HWACCEL) && m_video_ctx->sw_pix_fmt != AV_PIX_FMT_NONE)
+				fmt = m_video_ctx->sw_pix_fmt;
+		}
+
 		if (fmt == AV_PIX_FMT_NONE)
 			return L"";
 		const char* name = av_get_pix_fmt_name(fmt);

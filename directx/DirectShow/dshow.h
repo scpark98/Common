@@ -121,8 +121,17 @@ public:
 	int64_t			get_audio_bit_rate();       //bps. 0 이면 unknown.
 
 	CString			get_video_pixel_format();   //"yuv420p" / "nv12" 등. 없으면 빈 문자열.
-	CString			get_video_hw_accel_name();  //"D3D11VA" / "DXVA2" 등 — HW 미사용 시 빈 문자열.
+	CString			get_video_hw_accel_name();
+	//렌더러가 수행하는 색 변환 표기 — PotPlayer 의 "Color Convert: HDR 2084 to SDR" 과 같은 자리.
+	//소스가 HDR(PQ/HLG) 이 아니거나 색공간 정보를 모르면 빈 문자열.
+	//디스플레이가 HDR 로 켜져 있으면 렌더러가 톤매핑 없이 그대로 내보내므로 passthrough 로 표기한다.
+	CString			get_video_color_convert_label();  //"D3D11VA" / "DXVA2" 등 — HW 미사용 시 빈 문자열.
 	CString			get_video_chroma_location();//"left"/"center"/"topleft" 등 — unspecified/없으면 빈 문자열.
+	//색공간 표기 — "tv"/"bt2020"/"smpte2084"/"bt2020nc". 내장 경로에서만, 표기 없으면 빈 문자열.
+	CString			get_video_color_range();
+	CString			get_video_color_primaries();
+	CString			get_video_color_transfer();
+	CString			get_video_colorspace();
 	CString			get_audio_channel_layout(); //"stereo" / "5.1" 등.
 
 	//graph filter 측 — decoder / renderer 이름 (filter 의 표시 이름).
@@ -366,6 +375,8 @@ public:
 	void			repaint_video(HDC hdc);
 private:
 	void			repaint_for_procamp_change();	//paused 상태에서 ProcAmp 변경을 즉시 반영시키기 위한 redraw.
+	//영상 창이 있는 모니터가 HDR(Advanced Color) 로 켜져 있는지. 조회 실패 시 false(SDR 로 간주).
+	bool			is_display_hdr_enabled();
 	void			restore_display_after_capture();//캡처 직후 화면 복구 — 렌더러별 수단 분기.
 public:
 

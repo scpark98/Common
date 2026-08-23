@@ -149,6 +149,11 @@ namespace ffi
 		CFFiAudioStream(HRESULT* phr, CFFiSource* pParent, LPCWSTR pPinName);
 		~CFFiAudioStream();
 
+		//20260823 by claude. video 가 세그먼트 기준점을 다시 잡았을 때 호출 — audio 도 offset 을 다시 잡는다.
+		//audio 는 offset 을 자기 첫 frame 에서 *한 번만* 잡으므로, 그 캡처가 video 재앵커보다 먼저 끝났으면
+		//오염된 기준을 계속 쓴다(실측: 영상은 정상인데 오디오만 수 초 밀림).
+		void			request_reanchor() { m_reanchor_pending.store(true); }
+
 		HRESULT FillBuffer(IMediaSample* pSample) override;
 		HRESULT GetMediaType(CMediaType* pMediaType) override;
 		HRESULT CheckMediaType(const CMediaType* pmt) override;
@@ -201,6 +206,8 @@ namespace ffi
 		//의 *미디어 시점이 정렬* → sync 정확.
 		REFERENCE_TIME	m_audio_offset_rt = 0;
 		bool			m_audio_offset_set = false;
+		//video 재앵커 신호. 다음 FillBuffer 가 offset 을 다시 잡는다.
+		std::atomic<bool> m_reanchor_pending{ false };
 
 		//NOPTS audio 의 audio_sync delay<0(빠르게) 적용 — frame pts 가 없어 anchor pts 비교(시점 skip)를 못 하므로
 		//segment 시작부터 |delay| 만큼의 frame 을 sample-count 로 누적 skip 한다. on_seek_flush 에서 0 reset —

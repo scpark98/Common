@@ -840,6 +840,28 @@ namespace ffi
 				dec.set_video_first_emit_pts_rt(video_first);
 			}
 			rtStart = frame_pts_rt - video_first;
+
+			//20260823 by claude. 세그먼트 기준점 오염 자기교정.
+			//seek 직후 첫 emit 가 *이전 위치* 의 frame 이면(디코더 내부/전달 경로 어딘가의 경합으로 실측 발생)
+			//그 pts 가 anchor 로 굳어, 바로 다음 frame 의 rtStart 가 두 위치의 시간차만큼 미래로 뛴다.
+			//렌더러는 그 시각까지 기다리므로 영상·오디오가 함께 수 초간 멎는다(실측 2.4~3.6초).
+			//세그먼트 시작 직후에 rtStart 가 한 프레임 간격을 크게 넘으면 anchor 가 틀린 것이 확정적이므로,
+			//이 frame 으로 다시 anchor 를 잡는다. audio 도 같은 값을 reference 로 쓰므로 A/V 정렬은 함께 복구된다.
+			//정상 재생은 프레임 간격(수십 ms)이라 이 분기에 걸리지 않는다.
+			static const REFERENCE_TIME anchor_sanity_rt = 5000000;	//500ms
+			if (m_sample_count <= 2 && rtStart > anchor_sanity_rt)
+			{
+				logWrite(_T("[ffi/src/video/seekgap] anchor 재설정 — sample #%lld 의 rtStart=%lldms 는 비정상(이전 위치 frame 이 anchor 가 됨)"),
+					(long long)m_sample_count, (long long)(rtStart / 10000));
+				video_first = frame_pts_rt;
+				dec.set_video_first_emit_pts_rt(video_first);
+				rtStart = 0;
+
+				//audio 는 이 값을 자기 첫 frame 에서 한 번만 캡처해 offset 으로 굳힌다. 그 캡처가 이미 끝났다면
+				//오염된 기준을 계속 쓰므로(영상만 복구되고 오디오는 수 초 밀림 — 실측) 다시 잡게 한다.
+				if (m_pSource && m_pSource->audio_stream())
+					m_pSource->audio_stream()->request_reanchor();
+			}
 		}
 		else
 		{
@@ -1116,6 +1138,7 @@ namespace ffi
 		//새 atempo sample 분포에 stale baseline 적용 → 점진적 sync 어긋남.
 		m_audio_offset_rt = 0;
 		m_audio_offset_set = false;
+		m_reanchor_pending.store(false);
 	}
 
 	bool CFFiAudioStream::update_audio_filter_rate(double rate)
@@ -1134,6 +1157,7 @@ namespace ffi
 		m_sample_count = 0;
 		m_audio_offset_rt = 0;
 		m_audio_offset_set = false;
+		m_reanchor_pending.store(false);
 
 		//m_pending_segment_stop 미초기화 시 duration fallback. video pin 과 동일.
 		if (m_pSource && m_pending_segment_stop <= 0)
@@ -1570,6 +1594,13 @@ namespace ffi
 		REFERENCE_TIME rtStart;
 		if (m_filter_graph || (frame->pts != AV_NOPTS_VALUE && !dec.unreliable_video_pts()))
 		{
+			//20260823 by claude. video 가 기준점을 다시 잡았으면 audio 도 다시 잡는다.
+			if (m_reanchor_pending.exchange(false))
+			{
+				logWrite(_T("[ffi/src/audio/seekgap] anchor 재설정 요청 수신 — offset 재계산"));
+				m_audio_offset_set = false;
+			}
+
 			if (!m_audio_offset_set && dec.unreliable_video_pts())
 			{
 				//unreliable_video_pts: video_first(garbage) 기준 offset 은 음수 rtStart→폭주. offset=0 → sample_count 만으로 진행.
@@ -1928,6 +1959,7 @@ namespace ffi
 		m_sample_count = 0;
 		m_audio_offset_rt = 0;
 		m_audio_offset_set = false;	  //다음 FillBuffer 첫 frame 시 video_first_emit_pts_rt 와 비교 후 set.
+		m_reanchor_pending.store(false);
 		m_avsync_anchor_apts_rt = LLONG_MIN;	//(측정) drift anchor — seek 마다 재설정.
 		m_audio_sync_skipped_rt = 0;  //NOPTS audio_sync 빠르게-skip 누적 — 새 segment 시작이므로 재계산.
 		//logWrite(_T("[ffi/src/audio/sync] on_seek_flush reset sample_count=0 (athr=%d, post-Stop)"), athr ? 1 : 0);

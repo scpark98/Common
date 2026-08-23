@@ -573,6 +573,19 @@ void CDShow::teardown_subtitle_grabber()
 //Video TimeScale 도 LAV path 한정 동시 setup — audio TimeStretch 와 동일 rate 적용을 위해.
 void CDShow::setup_audio_filter_chain()
 {
+	//20260822 by claude. [진단] SC 오디오 체인을 빼고 재생해 보기 위한 스위치.
+	//레지스트리 setting\audio_filter_chain = 0 이면 체인을 끼우지 않는다(기본 1 = 기존 동작).
+	//배속 재생 문제(claude.md)와 같은 성격의 선례가 있다 — 모든 체인 차원의 측정값이 정상인데도
+	//DSound 가 오동작했고, 원인 지점은 끝내 못 짚었으며, 체인을 빼면 결정적으로 정상이었다.
+	//지금의 무음도 같은 모양이다(렌더러 Running, 링 90%, 슬레이브 아님, 그런데 재생 커서만 정지).
+	//끄면 AGC / 컴프레서 / 오디오 싱크가 함께 비활성된다 — 진단 목적의 임시 설정이다.
+	if (AfxGetApp() && AfxGetApp()->GetProfileInt(_T("setting"), _T("audio_filter_chain"), 1) == 0)
+	{
+		logWrite(_T("[AudioFilter] SC 오디오 체인 비활성 (audio_filter_chain=0) — 진단용"));
+		setup_video_time_scale_filter();
+		return;
+	}
+
 	setup_audio_gain_filter();
 	setup_video_time_scale_filter();
 }
@@ -1434,6 +1447,12 @@ void CDShow::close_media()
 	m_audio_stat_silence = 0;
 	m_audio_stat_discont = 0;
 	m_audio_stat_dropwrite = 0;
+	m_audio_ring_empty_tick = 0;
+	m_pAudioClock.Release();
+	m_audio_clock_last = 0;
+	m_audio_clock_tick = 0;
+	m_audio_mute_start_tick = 0;
+	m_pAudioRendererFilter.Release();
 
 	m_pVMRWC.Release();
 	m_pVMRFC.Release();
@@ -1684,7 +1703,7 @@ int CDShow::load_media(CString sfile, CWnd* pParent, bool auto_render)
 			m_media_info.Open(wFileName);
 			m_media_info.Option(__T("Complete"));
 			m_media_info_string = m_media_info_string + _T("\r\n\r\n") + m_media_info.Inform().c_str();
-			m_frame_rate = get_frame_rate();
+			m_frame_rate = get_frame_rate_from_media_info();
 			if (m_frame_rate <= 1.0)
 			{
 				m_frame_rate = 29.97;
@@ -2162,7 +2181,7 @@ int CDShow::load_media(CString sfile, CWnd* pParent, bool auto_render)
 	return 1;
 }
 
-double CDShow::get_frame_rate()
+double CDShow::get_frame_rate_from_media_info()
 {
 	int pos0 = m_media_info_string.Find(_T("Frame rate"));
 	int pos1 = m_media_info_string.Find(_T("FPS"));
@@ -2731,6 +2750,8 @@ void CDShow::log_audio_renderer_stats()
 		if (!pRenderer)
 			return;
 		pRenderer->QueryInterface(IID_PPV_ARGS(&m_pAudioStats));
+		pRenderer->QueryInterface(IID_PPV_ARGS(&m_pAudioClock));
+		m_pAudioRendererFilter = pRenderer;
 		pRenderer->Release();
 		if (!m_pAudioStats)
 			return;
@@ -2742,22 +2763,125 @@ void CDShow::log_audio_renderer_stats()
 	DWORD discont = 0;
 	DWORD dropwrite = 0;
 	DWORD slave_mode = 0;
+	DWORD fullness = 0;
 	m_pAudioStats->GetStatParam(AM_AUDREND_STAT_PARAM_BREAK_COUNT, &br, &dev);
 	m_pAudioStats->GetStatParam(AM_AUDREND_STAT_PARAM_SILENCE_DUR, &silence, &dev);
 	m_pAudioStats->GetStatParam(AM_AUDREND_STAT_PARAM_DISCONTINUITIES, &discont, &dev);
 	m_pAudioStats->GetStatParam(AM_AUDREND_STAT_PARAM_SLAVE_DROPWRITE_DUR, &dropwrite, &dev);
 	m_pAudioStats->GetStatParam(AM_AUDREND_STAT_PARAM_SLAVE_MODE, &slave_mode, &dev);
+	m_pAudioStats->GetStatParam(AM_AUDREND_STAT_PARAM_BUFFERFULLNESS, &fullness, &dev);
+
+	//20260822 by claude. DirectSound 링의 잔량(%)이 바닥난 구간의 길이 = 실제로 소리가 안 나는 시간.
+	//렌더러의 SILENCE_DUR 은 "렌더러가 채워 넣은 무음" 만 세므로, 링이 그냥 말라버린 경우는 안 잡힌다
+	//(2.6 초 정지 때 break/silence 모두 0 이었다). 그래서 잔량을 직접 본다.
+	const DWORD tick = ::GetTickCount();
+
+	//20260822 by claude. 렌더러 시계가 실제 시간만큼 안 굴러가면 = 그 구간에는 소리가 안 나온 것이다.
+	//링 잔량은 두 경우를 구분하지 못한다 — "차 있고 잘 나온다" 와 "찬 채로 재생이 멈췄다" 가 같은 값이다.
+	//이 시계는 DirectSound 재생 위치가 원본이라 두 경우가 정반대로 나온다.
+	if (m_pAudioClock)
+	{
+		REFERENCE_TIME now_rt = 0;
+		if (SUCCEEDED(m_pAudioClock->GetTime(&now_rt)))
+		{
+			if (m_audio_clock_tick != 0)
+			{
+				const long wall_ms = (long)(tick - m_audio_clock_tick);
+				const long clock_ms = (long)((now_rt - m_audio_clock_last) / 10000);
+				if (wall_ms >= 80)
+				{
+					//실제 시간의 절반도 못 굴렀다 = 재생이 멈춰 있다.
+					const bool stalled = (clock_ms * 2 < wall_ms);
+					if (stalled)
+					{
+						if (m_audio_mute_start_tick == 0)
+							m_audio_mute_start_tick = m_audio_clock_tick;
+
+						//무음이 *진행 중일 때* 의 상태를 잡아둔다. 회복 후에 물으면 이미 Running 으로
+						//돌아와 있어 아무것도 알 수 없다.
+						FILTER_STATE fs_rend = State_Stopped;
+						if (m_pAudioRendererFilter && SUCCEEDED(m_pAudioRendererFilter->GetState(0, &fs_rend)))
+							m_audio_mute_state_rend = (int)fs_rend;
+						else
+							m_audio_mute_state_rend = -2;
+						OAFilterState fs_graph = -1;
+						if (m_pMC)
+							m_pMC->GetState(0, &fs_graph);
+						m_audio_mute_state_graph = (int)fs_graph;
+						m_audio_mute_fullness = fullness;
+					}
+					else if (m_audio_mute_start_tick != 0)
+					{
+						const DWORD mute_ms = tick - m_audio_mute_start_tick;
+						m_audio_mute_start_tick = 0;
+						if (mute_ms >= 150)
+						{
+							//20260822 by claude. 슬레이브 모드 렌더러는 자기 재생위치와 그래프 클럭의 오차를
+							//보정하다가 임계를 넘으면 버퍼를 세우고 재동기한다. 무음의 모양이 정확히 그렇다.
+							//오차 관련 값을 *무음이 잡힌 그 순간에* 함께 남겨 그 가설을 확인한다.
+							DWORD d2 = 0;
+							DWORD accum = 0;
+							DWORD highest = 0;
+							DWORD last_err = 0;
+							DWORD jitter = 0;
+							DWORD rate = 0;
+							m_pAudioStats->GetStatParam(AM_AUDREND_STAT_PARAM_SLAVE_ACCUMERROR, &accum, &d2);
+							m_pAudioStats->GetStatParam(AM_AUDREND_STAT_PARAM_SLAVE_HIGHLOWERROR, &highest, &d2);
+							m_pAudioStats->GetStatParam(AM_AUDREND_STAT_PARAM_SLAVE_LASTHIGHLOWERROR, &last_err, &d2);
+							m_pAudioStats->GetStatParam(AM_AUDREND_STAT_PARAM_JITTER, &jitter, &d2);
+							m_pAudioStats->GetStatParam(AM_AUDREND_STAT_PARAM_SLAVE_RATE, &rate, &d2);
+							DWORD last_buf = 0;
+							m_pAudioStats->GetStatParam(AM_AUDREND_STAT_PARAM_LAST_BUFFER_DUR, &last_buf, &d2);
+
+							//"무음 중" 값은 stalled 분기에서 잡아둔 것을 쓴다 — 여기서 물으면 이미 회복돼 있다.
+							//20260822 by claude. 무음에는 두 종류가 섞인다. 눈으로 가리지 말고 로그가 분류한다.
+							//  seek 직후 재충전 — 버퍼를 비웠으니 잠깐 비는 게 정상. 링 잔량이 낮다.
+							//  버그 — 링에 데이터를 쥔 채 재생 커서만 멈춘다. 잔량이 높은데도 소리가 없다.
+							//둘은 물리적으로 다른 현상이라 잔량으로 갈린다. 길이는 참고값.
+							const bool bug_signature = (m_audio_mute_fullness >= 60);
+							const TCHAR* verdict = bug_signature
+								? (mute_ms >= 800 ? _T("[버그] 링 보유 중 재생 정지") : _T("[버그신호(짧음)] 링 보유 중 재생 정지"))
+								: _T("[정상] seek 직후 재충전");
+
+							logWrite(_T("[audio/rstat] %s — 무음 %lums | 무음중: fullness=%lu%% 렌더러상태=%d 그래프상태=%d | 회복후: slave=%lu rate=%lu accum_err=%lu highest_err=%lu jitter=%lu fullness=%lu%% last_buf=%lu"),
+								verdict, mute_ms, m_audio_mute_fullness, m_audio_mute_state_rend, m_audio_mute_state_graph,
+								slave_mode, rate, accum, highest, jitter, fullness, last_buf);
+						}
+					}
+					m_audio_clock_last = now_rt;
+					m_audio_clock_tick = tick;
+				}
+			}
+			else
+			{
+				m_audio_clock_last = now_rt;
+				m_audio_clock_tick = tick;
+			}
+		}
+	}
+	if (fullness <= 10)
+	{
+		if (m_audio_ring_empty_tick == 0)
+			m_audio_ring_empty_tick = tick;
+	}
+	else if (m_audio_ring_empty_tick != 0)
+	{
+		const DWORD empty_ms = tick - m_audio_ring_empty_tick;
+		m_audio_ring_empty_tick = 0;
+		if (empty_ms >= 150)
+			logWrite(_T("[audio/rstat] 링 고갈 %lums (이 구간이 실제 무음) → 회복 fullness=%lu%%"), empty_ms, fullness);
+	}
 
 	if (br == m_audio_stat_break && silence == m_audio_stat_silence
 		&& discont == m_audio_stat_discont && dropwrite == m_audio_stat_dropwrite)
 		return;
 
-	logWrite(_T("[audio/rstat] break=%lu(+%ld) silence_ms=%lu(+%ld) discont=%lu(+%ld) dropwrite_ms=%lu(+%ld) slave=%lu"),
+	logWrite(_T("[audio/rstat] break=%lu(+%ld) silence_ms=%lu(+%ld) discont=%lu(+%ld) dropwrite_ms=%lu(+%ld) slave=%lu fullness=%lu%%"),
 		br, (long)(br - m_audio_stat_break),
 		silence, (long)(silence - m_audio_stat_silence),
 		discont, (long)(discont - m_audio_stat_discont),
 		dropwrite, (long)(dropwrite - m_audio_stat_dropwrite),
-		slave_mode);
+		slave_mode, fullness);
 
 	m_audio_stat_break = br;
 	m_audio_stat_silence = silence;
@@ -3154,7 +3278,15 @@ int CDShow::load_media_internal_ffmpeg(CString sfile, CWnd* pParent)
 	//클럭이 자유 진행하면 기다리던 시각이 실제로 도래해 교착이 풀린다.
 	//(한 차례 원복했던 이유는 트랙이동 잡음 악화였는데, 그 평가 구간이 전부 seek 당 48 줄을 워커 스레드에서
 	// 디스크로 flush 하던 진단 로그가 켜져 있던 때였다. 그 로그를 제거한 뒤 재평가한다.)
-	set_graph_reference_clock_to_system();
+	//20260822 by claude. 위 재평가 결과 — 이 교체는 무음을 잡지 못했고, 대신 다른 무음을 만들었다.
+	//SystemClock 을 마스터로 두면 오디오 렌더러가 슬레이브가 되어 자기 재생위치와 그래프 클럭의 오차를
+	//리샘플링으로 계속 보정한다. 트랙이동을 반복하면 그 오차가 쌓이다가 임계를 넘고, 렌더러는 버퍼를
+	//세우고 재동기한다 — 링이 가득 찬 채로(fullness=90%) 재생만 멈추므로 그동안 완전 무음이다.
+	//실측(22:15:02): 렌더러 시계 정지 1328ms, 그 순간 accum_err=1270 highest_err=1280 — 두 값이 일치한다.
+	//부수 피해로 rate 가 47625~48600 을 오간다 = 48000Hz 를 ±1% 로 상시 리샘플링.
+	//오디오 렌더러의 클럭만이 실제 재생 하드웨어에 묶여 있다. DirectShow 의 기본값이 그것인 이유다.
+	//되돌린다 — 이 줄을 다시 켜기 전에 위 accum_err 실측부터 반박할 것.
+	//set_graph_reference_clock_to_system();
 
 	//새 renderer 인스턴스의 surface position 설정 — OnSize 가 fire 안 되는 미디어 전환 (mkv→mp4 등) 케이스에서
 	//MPCVR 의 SetWindowPosition / SetDestinationPosition 이 한 번도 안 호출되어 surface 표시 안 되는 결함 fix.
@@ -3669,6 +3801,14 @@ double CDShow::get_track_pos()
 	if (!m_pGB || !m_pMP)
 		return 0.0;
 
+	//20260823 by claude. frame step 진행 중(anchor 유효)이면 anchor 가 표시 위치의 단일 진실이다.
+	//IVideoFrameStep::Step 은 1프레임을 그리려고 그래프를 잠깐 Running 으로 만드는데, 그 순간 이 함수가
+	//아래 "재생 중" 분기를 타면 *일시정지로 멈춰 있는* 오디오 PTS 로 m_last_track_pos_ms 를 덮어쓴다.
+	//실측(2026-08-23): 표시 프레임 9683 인데 pos=404321(프레임 9694)이 15스텝 동안 고정 — OSD 가 굳고
+	//11프레임 앞을 가리켰다. backward(put_CurrentPosition)는 Step 을 안 써서 이 증상이 없었다.
+	if (m_step_anchor_ms >= 0.0)
+		return m_step_anchor_ms;
+
 	//일시정지/transition 중에는 seek·step 목표(m_last_track_pos_ms)를 그대로 반환 — 표시 프레임 = 그 목표다.
 	//위치 source(video pin last_emitted, graph GetCurrentPosition)는 둘 다 *렌더러에 deliver 된* 프레임 기준이라,
 	//seek 후 디코더가 렌더러 큐를 채우면(decode-ahead) 표시 프레임보다 큐 깊이(예: 15프레임=1초)만큼 앞선 값을 준다.
@@ -3963,10 +4103,21 @@ void CDShow::step_frame(bool forward)
 	if (get_play_state() == State_Stopped)
 		return;
 
+	//20260823 by claude. [진단] 1프레임 이동이 어긋나는 지점 추적. 진입 시점의 모든 입력값을 남긴다 —
+	//m_frame_rate 는 open 시 한 번 정해지고(LAV=미디어정보 파싱, 내장=디코더), get_video_fps() 는 매번
+	//질의한다. 둘이 어긋나면 step 간격과 OSD 프레임 번호가 다른 기준을 쓰게 되므로 나란히 남겨 비교한다.
+	ffi::CFFiVideoStream* vs_log = m_pFFiSource ? ((ffi::CFFiSource*)m_pFFiSource)->video_stream() : nullptr;
+	const double anchor_enter = m_step_anchor_ms;
+	const int	 state_enter = (int)get_play_state();
+	logWrite(_T("[step] ==== %s 진입 | state=%d anchor=%.1f last_track=%.1f last_emit=%lld | fps: m_frame_rate=%.6f get_video_fps=%.6f"),
+		forward ? _T("FORWARD") : _T("BACKWARD"), state_enter, anchor_enter, m_last_track_pos_ms,
+		(long long)(vs_log ? vs_log->last_emitted_pts_ms() : -1), m_frame_rate, get_video_fps());
+
 	if (get_play_state() == State_Running)
 	{
 		play(State_Paused);
 		m_step_anchor_ms = -1.0;	//재생 중이었으면 step anchor 무효 — 현재 표시 위치에서 새로 시작.
+		logWrite(_T("[step] Running→Paused, anchor 무효화"));
 	}
 
 	double interval_ms = 1000.0 / m_frame_rate;
@@ -3984,13 +4135,19 @@ void CDShow::step_frame(bool forward)
 	if (m_step_anchor_ms < 0)
 	{
 		m_step_anchor_ms = get_track_pos();
+		double from_track_pos = m_step_anchor_ms;
+		int64_t v_seed = -1;
 		if (m_pFFiSource)
 		{
 			ffi::CFFiSource* src = (ffi::CFFiSource*)m_pFFiSource;
 			int64_t v = src->video_stream() ? src->video_stream()->last_emitted_pts_ms() : -1;
+			v_seed = v;
 			if (v >= 0)
 				m_step_anchor_ms = (double)v - interval_ms;
 		}
+		//20260823 by claude. [진단] fresh seed 의 출처와 결과. 여기서 어긋나면 첫 스텝부터 밀린다.
+		logWrite(_T("[step] fresh seed: track_pos=%.1f last_emit=%lld interval=%.3f → anchor=%.1f"),
+			from_track_pos, (long long)v_seed, interval_ms, m_step_anchor_ms);
 	}
 
 	//forward step: IVideoFrameStep (MPC-VR / EVR 지원) — graph clock 진행 없이 *다음 sample 1 개* 표시.
@@ -3998,8 +4155,10 @@ void CDShow::step_frame(bool forward)
 	if (forward)
 	{
 		CComQIPtr<IVideoFrameStep> pFrameStep(m_pGB);
-		if (pFrameStep && pFrameStep->CanStep(0, NULL) == S_OK)
+		HRESULT hr_can = pFrameStep ? pFrameStep->CanStep(0, NULL) : E_NOINTERFACE;
+		if (pFrameStep && hr_can == S_OK)
 		{
+			int64_t emit_before = vs_log ? vs_log->last_emitted_pts_ms() : -1;
 			HRESULT hr = pFrameStep->Step(1, NULL);
 			if (SUCCEEDED(hr))
 			{
@@ -4007,8 +4166,26 @@ void CDShow::step_frame(bool forward)
 				//(IVideoFrameStep 중 audio 가 video 를 못 따라와 stale → 다음 backward 가 stale 위치로 점프하던 원인).
 				m_step_anchor_ms += interval_ms;
 				m_last_track_pos_ms = m_step_anchor_ms;	//일시정지 표시 위치 = 스텝 목표 (get_track_pos 가 paused 시 반환).
+				//20260823 by claude. [진단] IVideoFrameStep 은 실제 착지를 확인하지 않고 anchor 를 +interval 로
+				//가정한다. emit_after 가 emit_before 와 같으면 실제로는 프레임이 안 넘어간 것 — OSD 만 1 증가한다.
+				::Sleep(0);
+				int64_t emit_after = vs_log ? vs_log->last_emitted_pts_ms() : -1;
+				logWrite(_T("[step] FORWARD IVideoFrameStep OK | anchor %.1f→%.1f (+%.3f) | emit %lld→%lld (Δ%lld)"),
+					m_step_anchor_ms - interval_ms, m_step_anchor_ms, interval_ms,
+					(long long)emit_before, (long long)emit_after, (long long)(emit_after - emit_before));
+				if (anchor_enter >= 0.0)
+					logWrite(_T("[step] ==== 종료 | anchor=%.1f 이동=%.2f프레임"),
+						m_step_anchor_ms, (m_step_anchor_ms - anchor_enter) / interval_ms);
+				else
+					logWrite(_T("[step] ==== 종료 | anchor=%.1f (fresh 진입 — 이동량 기준 없음)"), m_step_anchor_ms);
 				return;
 			}
+			logWrite(_T("[step] FORWARD IVideoFrameStep Step 실패 hr=0x%08x → seek 경로로 대체"), hr);
+		}
+		else
+		{
+			logWrite(_T("[step] FORWARD IVideoFrameStep 사용 불가 (ptr=%p CanStep=0x%08x) → seek 경로로 대체"),
+				(void*)(IVideoFrameStep*)pFrameStep, hr_can);
 		}
 	}
 
@@ -4027,14 +4204,24 @@ void CDShow::step_frame(bool forward)
 
 	if (closed_loop)
 	{
-		//현재 표시 frame PTS — fresh(재생→일시정지 직후)는 렌더러가 lookahead 1프레임 보유 → last_emitted - interval.
-		//이후 step 은 seek 으로 큐가 비워져 last_emitted == 표시 frame (settle 로 보장).
-		double displayed = fresh ? (m_step_anchor_ms) : (double)vstream->last_emitted_pts_ms();
+		//20260823 by claude. 표시 frame PTS = m_step_anchor_ms. 이전엔 last_emitted_pts_ms() 를 썼는데,
+		//그건 *렌더러에 deliver 된* 프레임이라 MPC-VR 의 lookahead 1프레임만큼 표시보다 앞선다. 직전 동작이
+		//forward(IVideoFrameStep)면 큐가 안 비어 last_emitted = 표시 + 1프레임 → target 이 반 프레임 앞으로
+		//밀려 자기 자신에 재착지, B 한 번이 통째로 먹혔다(실측 2026-08-23: 이동=0.01프레임).
+		//anchor 는 forward 가 +interval, backward 가 착지 PTS 로 유지하는 표시 위치라 두 경우 모두 정확하다.
+		//(backward→backward 는 seek 이 큐를 비워 last_emitted == anchor 였으므로 그 경로의 동작은 불변.)
+		double displayed = m_step_anchor_ms;
 		m_step_anchor_ms = displayed - 1.5 * interval_ms;	//직전 frame 에 결정적 착지(첫 pts ≥ target = prev).
+		//20260823 by claude. [진단] backward 는 displayed 를 무엇으로 잡았는지가 전부다. fresh 가 아닌데
+		//last_emitted 가 렌더러 큐만큼 앞서 있으면 그 차이만큼 과도하게 뒤로 점프한다.
+		logWrite(_T("[step] BACKWARD closed-loop | fresh=%d displayed=%.1f (last_emit=%lld) → target=%.1f (-1.5×%.3f)"),
+			(int)fresh, displayed, (long long)vstream->last_emitted_pts_ms(), m_step_anchor_ms, interval_ms);
 	}
 	else
 	{
 		m_step_anchor_ms += forward ? interval_ms : -interval_ms;
+		logWrite(_T("[step] %s open-loop (vstream=%p) | anchor → %.1f"),
+			forward ? _T("FORWARD") : _T("BACKWARD"), (void*)vstream, m_step_anchor_ms);
 	}
 	if (m_step_anchor_ms < 0)
 		m_step_anchor_ms = 0;
@@ -4045,7 +4232,7 @@ void CDShow::step_frame(bool forward)
 	bool restore_kf = false;
 	if (src)
 	{
-		//frame step seek 표시 — FillBuffer 의 latency budget 비활성(정확 target 까지 skip, 화면 튐 방지).
+		//frame step 표시 — FillBuffer 의 latency budget 비활성(정확 target 까지 skip, 화면 튐 방지).
 		src->set_frame_step_mode(true);
 		//keyframe 모드면 정확 모드로 우회 (GOP 시작 키프레임 점프 방지). on_change_start/decoder.seek 가 동기 스냅샷.
 		if (src->seek_keyframe_mode())
@@ -4056,8 +4243,12 @@ void CDShow::step_frame(bool forward)
 	}
 
 	int64_t seq0 = vstream ? vstream->emit_seq() : 0;
-	m_pMP->put_CurrentPosition(m_step_anchor_ms / 1000.0);
+	ULONGLONG t_seek0 = GetTickCount64();
+	HRESULT hr_seek = m_pMP->put_CurrentPosition(m_step_anchor_ms / 1000.0);
 	m_last_track_pos_ms = m_step_anchor_ms;	//일시정지 표시 위치 = 스텝 목표 (put_CurrentPosition 은 m_last_track_pos_ms 갱신 안 함).
+	//20260823 by claude. [진단] seek 자체의 성공 여부와 소요. 실패하면 anchor 만 움직이고 화면은 그대로다.
+	logWrite(_T("[step] put_CurrentPosition(%.3fs) hr=0x%08x %llums | keyframe 우회=%d frame_step_mode=1"),
+		m_step_anchor_ms / 1000.0, hr_seek, GetTickCount64() - t_seek0, (int)restore_kf);
 
 	if (src)
 	{
@@ -4071,11 +4262,25 @@ void CDShow::step_frame(bool forward)
 	//put_CurrentPosition 의 pre-set(target)을 실제 착지 PTS 로 대체할 때까지. bound 250ms(보통 1프레임 디코드 < 33ms).
 	if (closed_loop && vstream)
 	{
-		for (int waited = 0; waited < 250 && vstream->emit_seq() == seq0; waited++)
+		int waited = 0;
+		for (; waited < 250 && vstream->emit_seq() == seq0; waited++)
 			::Sleep(1);
+		double target_before_settle = m_step_anchor_ms;
 		m_step_anchor_ms = (double)vstream->last_emitted_pts_ms();	//실제 착지 frame → 다음 step 의 표시 PTS source.
 		m_last_track_pos_ms = m_step_anchor_ms;
+		//20260823 by claude. [진단] settle 이 timeout(250ms) 이면 emit 을 못 기다린 것 — 그 경우 last_emitted 는
+		//*이전* frame 이라 anchor 가 뒤로 안 가고 제자리(또는 역행)가 된다. "값이 변하지 않는" 증상의 유력 후보.
+		logWrite(_T("[step] settle: %dms %s | seq %lld→%lld | target=%.1f → landed=%.1f (오차 %.1fms)"),
+			waited, (waited >= 250) ? _T("TIMEOUT") : _T("ok"),
+			(long long)seq0, (long long)vstream->emit_seq(),
+			target_before_settle, m_step_anchor_ms, m_step_anchor_ms - target_before_settle);
 	}
+
+	if (anchor_enter >= 0.0)
+		logWrite(_T("[step] ==== 종료 | anchor=%.1f 이동=%.2f프레임"),
+			m_step_anchor_ms, (m_step_anchor_ms - anchor_enter) / interval_ms);
+	else
+		logWrite(_T("[step] ==== 종료 | anchor=%.1f (fresh 진입 — 이동량 기준 없음)"), m_step_anchor_ms);
 }
 
 void CDShow::select_stream(bool video, int index)
@@ -4325,6 +4530,31 @@ static void normalize_captured_to_native(CSCGdiplusBitmap& bmp, int native_w, in
 		bmp.resize(native_w, native_h);
 }
 
+//20260823 by claude. 캡처 직후의 화면 복구.
+//VMR9 의 windowless GetCurrentImage 는 일시정지 상태에서 표시 프레임을 blank 시킨다. 그래서 화면을
+//되살리려고 1프레임 전진(step_frame)시켜 왔는데, 그 부작용으로 *캡처할 때마다 위치가 한 프레임씩 밀렸다*.
+//MPC-VR 은 IBasicVideo::GetCurrentImage 로 경로가 완전히 달라 그 blank 증상이 없고, 재그리기가 필요해도
+//cmd_redraw 로 충분하다 — 위치를 건드리지 않는다(회전/resize/seek 의 paused 갱신과 같은 수단).
+//VMR9/EVR 경로는 종전 동작 그대로 둔다.
+void CDShow::restore_display_after_capture()
+{
+	if (get_play_state() != State_Paused)
+		return;
+
+	if (m_use_mpcvr)
+	{
+		if (m_VMR)
+		{
+			CComQIPtr<IExFilterConfig> pCfg(m_VMR);
+			if (pCfg)
+				pCfg->Flt_SetBool("cmd_redraw", true);
+		}
+		return;
+	}
+
+	step_frame(true);
+}
+
 bool CDShow::capture_frame(CString sfile)
 {
 	if (!is_media_opened() || !m_VMR || (!m_pVMRWC && !m_pVDC && !m_use_mpcvr))
@@ -4347,14 +4577,13 @@ bool CDShow::capture_frame(CString sfile)
 		normalize_captured_to_native(bmp, m_video_size.cx, m_video_size.cy);
 	bool saved = ok && bmp.save(sfile);
 
-	if (get_play_state() == State_Paused)
-		step_frame(true);
+	restore_display_after_capture();
 
 	CoTaskMemFree(lpDib);
 	return saved;
 }
 
-bool CDShow::capture_frame(CSCGdiplusBitmap& out, bool step_when_paused)
+bool CDShow::capture_frame(CSCGdiplusBitmap& out, bool restore_display_when_paused)
 {
 	if (!is_media_opened() || !m_VMR || (!m_pVMRWC && !m_pVDC && !m_use_mpcvr))
 		return false;
@@ -4374,8 +4603,8 @@ bool CDShow::capture_frame(CSCGdiplusBitmap& out, bool step_when_paused)
 	if (ok)
 		normalize_captured_to_native(out, m_video_size.cx, m_video_size.cy);
 
-	if (step_when_paused && get_play_state() == State_Paused)
-		step_frame(true);
+	if (restore_display_when_paused)
+		restore_display_after_capture();
 
 	CoTaskMemFree(lpDib);
 	return ok;

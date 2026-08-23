@@ -93,7 +93,12 @@ public:
 
 	MediaInfo		m_media_info;
 	CString			get_media_info_string() { return m_media_info_string; }
-	double			get_frame_rate();
+private:
+	//20260823 by claude. MediaInfo 출력 문자열(m_media_info_string)에서 "Frame rate" 항목을 파싱한다.
+	//LAV 경로가 m_frame_rate 를 시드할 때만 쓰는 내부 함수 — 내장 FFmpeg 경로는 그 문자열을 채우지 않아
+	//여기서 0 이 나온다. 영상 fps 가 필요하면 경로 무관 접근자인 get_video_fps() 를 쓸 것.
+	double			get_frame_rate_from_media_info();
+public:
 
 	//---- UI 표시용 codec/format info — graph (LAV) + decoder context (internal FFmpeg) 직접 query.
 	//path-agnostic. m_use_internal_ffmpeg 가 true 면 ffi::CDecoder 측 호출, false 면 m_video_stream / m_audio_stream
@@ -105,7 +110,9 @@ public:
 	int				get_video_bit_depth();      //0 이면 unknown.
 	int64_t			get_video_bit_rate();       //bps. 0 이면 unknown.
 	CString			get_video_aspect_ratio();   //"16:9" / "1.85:1" 등.
-	double			get_video_fps();            //avg fps. 0 이면 unknown.
+	//avg fps. 0 이면 unknown. *영상 fps 의 단일 공개 접근자* — 내장 FFmpeg 경로면 디코더에서, 아니면
+	//m_frame_rate 에서 가져온다. 호출측은 경로를 신경 쓸 필요가 없다.
+	double			get_video_fps();
 
 	CString			get_audio_codec_name();
 	int				get_audio_sample_rate();    //Hz
@@ -229,7 +236,10 @@ public:
 	//현재 video frame 을 in-memory CSCGdiplusBitmap 으로 캡처. 북마크 thumbnail 등에 사용.
 	//step_when_paused=true(기본): paused 상태에서 캡처 후 한 프레임 전진(프레임 스텝 UI 용). false: 전진 없이 현재 프레임만 캡처
 	//  — 같은 위치를 반복 캡처(스냅샷 seek 착지 폴링 등)할 때 위치가 밀리지 않아야 하는 호출부에서 사용.
-	bool			capture_frame(CSCGdiplusBitmap& out, bool step_when_paused = true);
+	//restore_display_when_paused: 일시정지 상태에서 캡처가 흐트러뜨린 화면을 되살릴지. 렌더러에 따라
+	//수단이 다르다 — MPC-VR 은 재그리기(위치 유지), VMR9/EVR 은 1프레임 전진(위치가 밀린다).
+	//false 면 아무 것도 하지 않는다(연속 폴링처럼 위치가 절대 변하면 안 되는 용도).
+	bool			capture_frame(CSCGdiplusBitmap& out, bool restore_display_when_paused = true);
 
 	//트랙 hover 프리뷰용 — 메인 재생과 무관하게 독립 디코더로 time_ms 의 키프레임 1장을 target_width 폭 비트맵으로.
 	//재생 상태를 바꾸지 않음. 성공 시 true. (정확 위치가 아닌 직전 키프레임 — 프리뷰엔 충분.)
@@ -356,6 +366,7 @@ public:
 	void			repaint_video(HDC hdc);
 private:
 	void			repaint_for_procamp_change();	//paused 상태에서 ProcAmp 변경을 즉시 반영시키기 위한 redraw.
+	void			restore_display_after_capture();//캡처 직후 화면 복구 — 렌더러별 수단 분기.
 public:
 
 	int				get_volume() { return m_volume; }
@@ -449,6 +460,19 @@ protected:
 	DWORD			m_audio_stat_silence	= 0;
 	DWORD			m_audio_stat_discont	= 0;
 	DWORD			m_audio_stat_dropwrite	= 0;
+	DWORD			m_audio_ring_empty_tick	= 0;	//링 잔량이 바닥난 시각(GetTickCount). 0 = 바닥 아님.
+
+	//20260822 by claude. 오디오 렌더러 자신의 시계 — DirectSound 재생 위치로 굴러가므로, 이게 멈추면
+	//링 잔량과 무관하게 실제로 소리가 안 나고 있다는 뜻이다. 링 잔량만으로는 "차 있는데 재생이 멈춘"
+	//경우와 "차 있고 잘 나오는" 경우를 구분할 수 없어 이 시계를 함께 본다.
+	CComPtr<IReferenceClock>	m_pAudioClock;
+	REFERENCE_TIME	m_audio_clock_last = 0;
+	DWORD			m_audio_clock_tick = 0;
+	DWORD			m_audio_mute_start_tick = 0;
+	CComPtr<IBaseFilter>	m_pAudioRendererFilter;	//무음 순간의 필터 상태 조회용.
+	int				m_audio_mute_state_rend	= -1;	//무음 진행 중에 잡은 렌더러/그래프 상태·링 잔량.
+	int				m_audio_mute_state_graph = -1;
+	DWORD			m_audio_mute_fullness	= 0;
 
 
 	//VMR관련

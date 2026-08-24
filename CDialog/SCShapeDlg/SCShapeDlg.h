@@ -119,7 +119,9 @@ public:
 	void			show_window(int nCmdShow);
 
 	//gdiplus를 이용한 text 출력. create()없이 호출되면 자동 생성 후 텍스트 윈도우를 출력함.
-	//default는 hide 상태로 시작되므로 set_text()로 세팅한 후 ShowWindow(SW_SHOW)를 호출해야 함.
+	//create() 된 창은 WS_VISIBLE 없이 만들어지므로 "최초 1회" 는 ShowWindow(SW_SHOW) 또는 fade_in() 이 필요하다.
+	//set_text() 자체는 표시 상태를 건드리지 않는다 — 이미 떠 있는 창에 호출하면 내용만 갱신되고 계속 보인다.
+	//(set_text_color(), set_round(), set_thickness() 등이 내부에서 set_text() 로 다시 그리는 구조이므로 그래야만 한다.)
 	//font_name을 지정하지 않으면 mainDlg에 설정된 font를 사용함.
 	//shadow_depth: 0 = shadow 사용 안 함, > 0 = 해당 픽셀만큼 offset, < 0 = 텍스트 height/thickness 에 비례하여 자동 계산.
 	CSCShapeDlgTextSetting*	set_text(CWnd* parent, CString text,
@@ -185,11 +187,12 @@ public:
 	void			set_line_spacing_factor(float f) { m_line_spacing_factor = f; }
 	float			get_line_spacing_factor() { return m_line_spacing_factor; }
 
-	//show상태로 만들고 time후에 hide된다.
+	//[미구현] timeout <= 0 일 때 그냥 ShowWindow 하는 것 외에 본문이 비어 있다.
+	//timeout > 0 으로 호출하면 아무 일도 일어나지 않는다 — 자동 hide 를 기대하지 말 것.
+	//같은 동작이 필요하면 fade_in(fadein ? 10 : 0, time * 1000, fadeout) 을 직접 호출한다.
 	void			time_out(int time, bool fadein, bool fadeout);
 
-	//set_image(), set_text()를 호출해도 아직 hide상태다.
-	//ShowWindow()시키거나 fadein()으로 보여지게 한다.
+	//create() 직후의 창은 아직 hide 상태다. ShowWindow() 시키거나 fade_in() 으로 보여지게 한다.
 	//0 ~ 255까지 5간격으로 alpha를 변경한다.
 	//hide_after_ms, fadeout 파라미터는 fade_in에서만 사용된다.
 	void			fade_in(int fade_in_delay_ms = 10, int hide_after_ms = 0, bool fadeout = false, int fade_out_delay_ms = 10);

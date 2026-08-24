@@ -11,8 +11,8 @@
 	- html과 같이 tagged text를 지원하기 위해 제작.
 	- CSCShapeDlg, CSCParagraphStatic 등에서 사용되며 html, smi 등의 tagged text를 표현할 수 있다.
 
-	태그는 소문자로, 컬러값은 Gdiplus::Color에 정의된 이름(web color와 naming이 동일함)을 사용해야 한다.
-	컬러 이름은 대소문자를 구분하지 않는다. ("red", "Red", "RED" 모두 동일함)
+	태그명과 컬러 이름 모두 대소문자를 구분하지 않는다. 파서가 태그명을 MakeLower() 하고 컬러는 _stricmp 로 비교한다.
+	("<b>" == "<B>", "red" == "Red" == "RED")
 	태그명(= '=' 앞부분)에 공백, 하이픈, underscore는 모두 무시된다. 값에서는 하이픈이 유지되므로 <sp=-2> 같은 음수도 쓸 수 있다.
 	닫는 태그는 "자기가 담당하는 속성"만 직전 값으로 되돌린다(속성별 스택).
 	따라서 <b><cr=red>This</b></cr> 처럼 교차 중첩된 기존 문서도 그대로 동작하고,
@@ -80,11 +80,13 @@
 
 	ex. "<b><cr=red>This</b></cr > is a <ct=blue><i>sample</i> <b>paragraph</b>."
 
-	- cr은 Gdiplus::Color에 명시된 컬러 외에 다음 형식들도 지원한다.
+	- cr은 Gdiplus::Color에 명시된 컬러 외에 다음 형식들도 지원한다. (get_color(CString) 참조)
+	  <cr=red>					//컬러 이름. _stricmp 비교라 대소문자 무관. 목록에 없는 이름이면 조용히 Black 이 된다.
 	  <cr=#RRGGBB>,				//#으로 시작되는 16진수값. 6자리는 alpha = 255.
 	  <cr=#AARRGGBB>,			//20260721 by claude. 8자리는 alpha 가 **앞**에 온다 (get_gcolor_from_hexa_str). RRGGBBAA 아님.
+	  <cr=FFA500>				//# 없는 6/8자리 hex 도 hex 로 해석한다 (SMI/SAMI 자막이 prefix 를 생략하므로).
 	  <cr=123,45,67,128>		//rgba, 숫자로만 3자리 또는 4자리를 콤마로 구분한다.
-	  <cr=h90,30,100>,		//hsi, h로 시작되고 콤마로 구분한다.
+	  <cr=h90,30,100>			//[미구현] hsi 로 쓰려던 형식. get_color() 의 'h' 분기가 비어 있어 현재는 Black 이 된다.
 
 [코드 흐름]
 	- set_text()			: tag를 허용하는 텍스트를 설정한다.

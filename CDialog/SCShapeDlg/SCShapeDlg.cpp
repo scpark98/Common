@@ -866,8 +866,9 @@ void CSCShapeDlg::time_out(int timeout, bool fadein, bool fadeout)
 }
 
 #if 1
-//set_image(), set_text()를 호출해도 아직 hide상태다.
-//ShowWindow()시키거나 fadein()으로 보여지게 한다.
+//create() 직후의 창은 hide 상태이므로 set_image() / set_text() 만으로는 보이지 않는다.
+//(set_image()/set_text() 가 창을 숨기는 것이 아니라, 아직 한 번도 show 하지 않았기 때문이다.)
+//ShowWindow() 시키거나 이 함수로 보여지게 한다.
 //0 ~ 255까지 25간격으로 alpha를 변경한다.
 //hide_after_ms, fadeout 파라미터는 fade_in에서만 사용된다.
 void CSCShapeDlg::fade_in(int fade_in_delay_ms, int hide_after_ms, bool fadeout, int fade_out_delay_ms)

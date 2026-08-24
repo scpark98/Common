@@ -1027,8 +1027,8 @@ protected:
 	void			init_auto_scroll_button();
 
 //popup(context) menu
-	//true=자체 내장 컨텍스트 메뉴 표시, false=parent(OnContextMenu)로 위임. default = true
-	bool			m_use_own_context_menu = true;
+	//20260824 by claude. true=자체 내장 컨텍스트 메뉴 표시, false=parent(OnContextMenu)로 위임. default = false
+	bool			m_use_own_context_menu = false;
 	//자체 내장 메뉴 command id. 범용 컨트롤이므로 파일 개념 없는 범용 항목만 제공.
 	//ON_COMMAND_RANGE(menu_select_all, menu_copy) 로 묶여 있으므로 항목 추가는 반드시 맨 뒤에.
 	enum CVTLISTCTRLEX_POPUP_MENU

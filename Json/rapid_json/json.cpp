@@ -378,6 +378,14 @@ bool Json::array_to_map(CString src, std::string arr_name, std::vector<std::map<
 			case kStringType:
 				value.Format(_T("%s"), it->value.GetCString());
 				break;
+			//20260824 by claude. bool 은 이전에 default 로 떨어져 ""이 되었다. "값 없음"과 false 가 구분되지 않아
+			//_ttoi() 로 읽는 쪽에서 true 를 영영 볼 수 없었다(LmmCSManager 의 flag_df_group).
+			case kTrueType:
+				value = _T("1");
+				break;
+			case kFalseType:
+				value = _T("0");
+				break;
 			default:
 				value = _T("");
 			}

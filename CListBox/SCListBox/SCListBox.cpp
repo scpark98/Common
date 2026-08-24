@@ -1312,7 +1312,9 @@ void CSCListBox::OnContextMenu(CWnd* pWnd, CPoint point)
 
 	if (!m_use_own_context_menu)
 	{
-		::PostMessage(GetParent()->GetSafeHwnd(), WM_CONTEXTMENU, (WPARAM)m_hWnd, MAKELPARAM(point.x, point.y));
+		CWnd* parent = GetParent();
+		if (parent)
+			::PostMessage(parent->GetSafeHwnd(), WM_CONTEXTMENU, (WPARAM)m_hWnd, MAKELPARAM(point.x, point.y));
 		return;
 	}
 

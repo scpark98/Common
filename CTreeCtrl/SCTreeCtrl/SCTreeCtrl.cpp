@@ -64,6 +64,7 @@ BEGIN_MESSAGE_MAP(CSCTreeCtrl, CTreeCtrl)
 	ON_WM_ACTIVATE()
 	ON_WM_ERASEBKGND()
 	ON_WM_KEYDOWN()
+	ON_WM_GETDLGCODE()
 	//ON_WM_PAINT()
 	ON_NOTIFY_REFLECT_EX(TVN_SELCHANGING, &CSCTreeCtrl::OnTvnSelchanging)
 	ON_NOTIFY_REFLECT_EX(TVN_SELCHANGED, &CSCTreeCtrl::OnTvnSelchanged)
@@ -238,8 +239,13 @@ BOOL CSCTreeCtrl::PreTranslateMessage(MSG* pMsg)
 			{
 				//20260708 by claude. 편집을 컨트롤 자체에서 시작(리스트와 동일). 보호폴더 차단·드라이브 접미 제거는 edit_item 내부 가드가 담당하고,
 				//커밋·통지(MoveFile/SetVolumeLabel/message_path_changed/message_drive_volume_changed/TVN_ENDLABELEDIT)는 edit_end 가 자체 수행한다.
-				//표시≠편집 레이블(예: "이름 (개수)")이 필요한 앱은 TVN_ENDLABELEDIT 통지로 후처리하면 된다(예전 message_edit_item 왕복 불필요).
-				edit_item();
+				//20260824 by claude. 위 변경으로 message_edit_item 통지가 사라지면서, 표시≠편집 레이블을 쓰는 앱(LMM CSManager 의
+				//"그룹명 (개수)")에서 개수가 그룹명에 눌러붙어 서버 데이터가 오염됐다. edit_item_by_user 로 통지를 되살린다.
+				//편집이 시작됐으면 F2 를 소비해야 한다. 소비하지 않으면 편집기가 포커스를 가진 뒤에도
+				//이 F2 가 트리로 디스패치돼 편집기가 포커스를 잃고 edit_end 로 즉시 닫힌다.
+				if (edit_item_by_user())
+					return TRUE;
+
 				return FALSE;
 			}
 
@@ -3790,6 +3796,78 @@ BOOL CSCTreeCtrl::OnTvnEndlabeledit(NMHDR* pNMHDR, LRESULT* pResult)
 }
 
 
+//20260824 by claude. 선택 배경색만 테마와 다르게 지정. set_color_theme() 뒤에 호출해야 한다.
+void CSCTreeCtrl::set_selected_back_color(Gdiplus::Color back_color)
+{
+	m_theme.cr_back_selected = back_color;
+
+	//선택 항목 위 hover — 원래 테마와 동일하게 선택색에서 살짝 밝힌 값으로 파생시킨다.
+	m_theme.cr_back_selected_hover = get_color(back_color, 16);
+
+	//포커스 없는 선택 — 테마 규칙(선택색을 회색화)을 그대로 적용.
+	//set_keep_selected_color_inactive(true) 면 쓰이지 않지만, 옵션을 끄더라도 색이 튀지 않게 맞춰둔다.
+	m_theme.cr_back_selected_inactive = get_gray_color(back_color);
+
+	//선택 배경이 어두우면 흰 글자, 밝으면 검은 글자. 테마가 선택 텍스트색을 정하는 규칙과 동일.
+	m_theme.cr_text_selected = (get_luminance(back_color) < 128) ? Gdiplus::Color::White : Gdiplus::Color::Black;
+
+	Invalidate();
+}
+
+//20260824 by claude. 방향키를 트리가 소비한다고 다이얼로그에 알린다.
+//이걸 요구하지 않으면 IsDialogMessage 가 위/아래 키를 컨트롤 간 포커스 이동으로 해석해,
+//트리에서 노드 이동이 안 되고 엉뚱한 컨트롤로 포커스가 넘어간다.
+//DLGC_WANTALLKEYS 는 주지 않는다 — Tab / Enter 의 다이얼로그 기본 동작은 그대로 두어야 한다.
+UINT CSCTreeCtrl::OnGetDlgCode()
+{
+	return (UINT)Default() | DLGC_WANTARROWS | DLGC_WANTCHARS;
+}
+
+//20260824 by claude. 레이블 오른쪽에 표시할 개수 문자열. parent 가 훅을 등록했으면 그 값을,
+//아니면 자식 노드 수를 쓴다. 빈 문자열이면 표시하지 않는다.
+CString CSCTreeCtrl::get_node_count_text(HTREEITEM hItem)
+{
+	if (function_get_node_count_text)
+		return function_get_node_count_text(this, hItem);
+
+	int count = 0;
+
+	for (HTREEITEM h = GetChildItem(hItem); h != NULL; h = GetNextSiblingItem(h))
+		count++;
+
+	if (count == 0)
+		return _T("");
+
+	//배지 안에 그려지므로 괄호 같은 장식은 붙이지 않는다.
+	return i2S(count, true);
+}
+
+//20260824 by claude. 사용자 조작(F2 / 지연 클릭)으로 편집을 시작하는 단일 진입점.
+//편집 박스는 항목의 표시 텍스트로 seed 되는데(edit_item 의 m_edit_old_text = GetItemText),
+//표시 텍스트와 실제 이름이 다른 앱(LMM CSManager 의 "그룹명 (개수)")은 그대로 커밋하면 이름이 오염된다.
+//그래서 부모에게 message_edit_item 을 먼저 통지해 부모가 표시 텍스트를 실제 이름으로 바꾼 뒤
+//edit_item() 을 직접 호출할 기회를 준다. 부모가 1 을 리턴하면 처리된 것이므로 여기서는 시작하지 않는다.
+//message_edit_item 을 처리하지 않는 앱은 0 이 리턴되어 기존과 동일하게 동작한다.
+bool CSCTreeCtrl::edit_item_by_user(HTREEITEM hItem)
+{
+	if (hItem == NULL)
+		hItem = GetSelectedItem();
+
+	if (hItem == NULL)
+		return false;
+
+	CWnd* parent = GetParent();
+
+	if (parent && parent->SendMessage(Message_CSCTreeCtrl,
+			(WPARAM) & (CSCTreeCtrlMessage(this, message_edit_item)), (LPARAM)hItem) != 0)
+		return true;
+
+	edit_item(hItem);
+
+	//edit_item 은 m_allow_edit / 보호 항목 가드로 편집을 시작하지 않을 수 있다.
+	return m_in_editing;
+}
+
 void CSCTreeCtrl::edit_item(HTREEITEM hItem)
 {
 	//20260714 by claude. 기본은 rename 편집. '새 폴더 생성' 편집은 add_new_item 이 이 호출 뒤에 true 로 표시한다(stale 방지).
@@ -4428,7 +4506,7 @@ void CSCTreeCtrl::OnNMCustomDraw(NMHDR* pNMHDR, LRESULT* pResult)
 			{
 				state_highlight = true;
 				bool hot_too = (pNMCustomDraw->uItemState & CDIS_HOT) || hItem == m_hot_item;
-				if (GetFocus() == this || m_in_editing || m_in_context_menu)
+				if (GetFocus() == this || m_in_editing || m_in_context_menu || m_keep_selected_color_inactive)
 				{
 					crText = m_theme.cr_text_selected;
 					crBack = hot_too ? m_theme.cr_back_selected_hover : m_theme.cr_back_selected;
@@ -4487,16 +4565,42 @@ void CSCTreeCtrl::OnNMCustomDraw(NMHDR* pNMHDR, LRESULT* pResult)
 			int right_limit = rcClient.right - (m_scrollbar_setup && m_v_visible_state ? m_scrollbar.get_width() : 0);
 			CRect rcFill(rcClient.left, rcRow.top, right_limit, rcRow.bottom);
 
+			//20260824 by claude. 강조(선택/hover/drop) 배경의 세로 범위.
+			//m_item_height_fit_text 면 글자 높이 + 여백으로 제한해, SetItemHeight 로 노드 간격을 넓혔을 때
+			//강조 막대만 과하게 두꺼워지는 것을 막는다. 항목 높이를 키우지 않은 트리에서는 조건이 성립하지
+			//않아 그대로다. per-item override 배경(state_highlight=false)은 강조가 아니라 배경이므로 풀행 유지.
+			CRect rcBand = rcFill;
+
+			if (m_item_height_fit_text && state_highlight)
+			{
+				TEXTMETRIC tm_band;
+				dc.GetTextMetrics(&tm_band);
+				//여백을 절대 픽셀로 두면 폰트 크기가 바뀔 때 비율이 깨진다 — 글자 높이에 비례시킨다.
+				//20% 는 Segoe UI 9pt(tmHeight≈15)에서 위아래 3px 로, 기존 절대값과 같은 결과가 나오는 비율이다.
+				int band_pad = max(2, tm_band.tmHeight * 20 / 100);
+				int band_h = tm_band.tmHeight + band_pad * 2;
+
+				if (band_h < rcRow.Height())
+				{
+					rcBand.top = rcRow.CenterPoint().y - band_h / 2;
+					rcBand.bottom = rcBand.top + band_h;
+				}
+			}
+
 			//TVS_FULLROWSELECT on → 강조도 풀폭. off → 일반 배경만 풀폭으로 칠하고 selection/hover/drop 강조는 라벨(rcText) 영역만.
 			//per-item override 배경(state_highlight=false)은 selection 과 무관하므로 옵션과 관계없이 풀폭 유지.
 			if ((GetStyle() & TVS_FULLROWSELECT) || !state_highlight)
 			{
-				dc.FillSolidRect(&rcFill, crBack.ToCOLORREF());
+				//강조 높이를 줄인 경우 위아래 남는 띠를 일반 배경으로 먼저 채운다.
+				if (rcBand.Height() < rcFill.Height())
+					dc.FillSolidRect(&rcFill, m_theme.cr_back.ToCOLORREF());
+
+				dc.FillSolidRect(&rcBand, crBack.ToCOLORREF());
 			}
 			else
 			{
 				dc.FillSolidRect(&rcFill, m_theme.cr_back.ToCOLORREF());
-				CRect rcLabel(rcText.left - 2, rcRow.top, rcText.right + 2, rcRow.bottom);
+				CRect rcLabel(rcText.left - 2, rcBand.top, rcText.right + 2, rcBand.bottom);
 				dc.FillSolidRect(&rcLabel, crBack.ToCOLORREF());
 			}
 
@@ -4509,8 +4613,8 @@ void CSCTreeCtrl::OnNMCustomDraw(NMHDR* pNMHDR, LRESULT* pResult)
 				(GetFocus() == this || m_in_context_menu))
 			{
 				CRect rcSelBorder = ((GetStyle() & TVS_FULLROWSELECT) || !state_highlight)
-					? rcFill
-					: CRect(rcText.left - 2, rcRow.top, rcText.right + 2, rcRow.bottom);
+					? rcBand
+					: CRect(rcText.left - 2, rcBand.top, rcText.right + 2, rcBand.bottom);
 				draw_rect(&dc, rcSelBorder, m_theme.cr_selected_border, Gdiplus::Color::Transparent,
 					1, Gdiplus::PenAlignmentInset, Gdiplus::DashStyleSolid);
 			}
@@ -4652,8 +4756,108 @@ void CSCTreeCtrl::OnNMCustomDraw(NMHDR* pNMHDR, LRESULT* pResult)
 
 			dc.DrawText(text, &rcDraw, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
 
+			//개수 위치는 실제로 그려진 레이블 폭 기준이어야 하므로 item_font 가 아직 select 된 상태에서 잰다.
+			CSize sz_label = dc.GetTextExtent(text);
+
 			if (old_font)
 				dc.SelectObject(old_font);
+
+			//6. node count 배지. 레이블 문자열이 아니라 별도 요소로 그린다 — 항목 텍스트는 항상 순수한 이름으로 남는다.
+			//chevron 과 동일하게 "라벨 강조영역 밖"이므로 선택/hover 배경이 배지를 덮지 않는다.
+			if (m_show_node_count)
+			{
+				CString count_text = get_node_count_text(hItem);
+
+				if (!count_text.IsEmpty())
+				{
+					//개수는 작고 짧아서 본문 굵기로는 얇아 보인다. base 폰트에서 weight 만 한 단계 올려 그린다.
+					//측정(GetTextExtent)·메트릭도 이 폰트 기준이어야 하므로 먼저 select 한다.
+					LOGFONT lf_badge = {};
+					CFont* base_font_badge = GetFont();
+					if (base_font_badge)
+						base_font_badge->GetLogFont(&lf_badge);
+					//FW_MEDIUM(500)은 Segoe UI 에 해당 페이스가 없어 GDI 가 Regular(400)로 내려 매핑한다
+					//(레이블과 굵기가 같아져 보정 효과가 사라진다). 맑은 고딕은 400/700 뿐이라 600 을 요청하면
+					//Bold 로 올라가 더 두꺼워진다. 굵기는 600 으로 두고 무게감은 크기와 색으로 낮춘다.
+					lf_badge.lfWeight = FW_SEMIBOLD;
+
+					//배지 숫자는 레이블보다 한 단계 작게 — 참조 디자인들의 관례이고, semi-bold 를 유지하면서도
+					//전체 무게감이 내려간다. lfHeight 는 문자 높이 기준이라 보통 음수이므로 부호에 맞춰 절대값을 줄인다.
+					if (lf_badge.lfHeight < 0)
+						lf_badge.lfHeight += 1;
+					else if (lf_badge.lfHeight > 1)
+						lf_badge.lfHeight -= 1;
+
+					CFont font_badge;
+					CFont* old_font_badge = nullptr;
+					if (font_badge.CreateFontIndirect(&lf_badge))
+						old_font_badge = dc.SelectObject(&font_badge);
+
+					CSize sz_count = dc.GetTextExtent(count_text);
+
+					TEXTMETRIC tm;
+					dc.GetTextMetrics(&tm);
+
+					//여백·간격·최소너비를 절대 픽셀로 두면 폰트 크기가 바뀔 때 비율이 깨진다(큰 폰트는 답답하고
+					//작은 폰트는 헐렁해진다). 모두 글자 높이에 비례시키고, 아주 작은 폰트에서 0 이 되지 않도록 하한만 둔다.
+					//비율은 Segoe UI 9pt(tmHeight≈15)에서 기존 절대값(6/8/4/26)과 같은 결과가 나오도록 잡았다.
+					//레이블과의 간격. 선택/hover 강조 배경이 레이블보다 2px 더 오른쪽까지 칠해지므로
+					//체감 간격은 이 값보다 2px 작다 — 그만큼을 포함해 잡는다.
+					const int badge_gap = max(5, tm.tmHeight * 67 / 100);
+					const int badge_pad_x = max(4, tm.tmHeight * 53 / 100);
+					const int badge_pad_y = max(2, tm.tmHeight * 27 / 100);		//글자 영역(cap 높이) 위아래 여백
+					//한 자리 숫자가 좁은 원처럼 보이지 않도록 최소 너비를 준다.
+					const int badge_min_width = max(14, tm.tmHeight * 173 / 100);
+
+					//세로 범위를 레이블과 똑같이 잡고 숫자도 DT_VCENTER 로 그린다.
+					CRect rc_badge = rcDraw;
+					rc_badge.left = rcDraw.left + sz_label.cx + badge_gap;
+					rc_badge.right = rc_badge.left + max(sz_count.cx + badge_pad_x * 2, badge_min_width);
+
+					if (rc_badge.right <= right_limit)
+					{
+						//알약을 "계산해서 중앙에 맞추는" 방식은 반올림이 0.5px 경계에 걸려 폰트·크기마다
+						//1px 씩 어긋난다. 대신 숫자가 실제로 차지하는 영역을 먼저 구하고 그 위아래로 같은
+						//여백을 더해 알약을 만든다 — 반올림이 개입하지 않으므로 항상 정중앙이 된다.
+						//
+						//숫자는 디센더를 쓰지 않으므로 실제 글자 영역은 [baseline - cap높이, baseline] 이다.
+						//DT_VCENTER 가 놓는 줄 상자 위치에서 baseline 을 역산한다.
+						int line_top = rc_badge.top + (rc_badge.Height() - tm.tmHeight) / 2;
+						int baseline = line_top + tm.tmAscent;
+						int cap_h = tm.tmAscent - tm.tmInternalLeading;
+
+						//높이가 항목 높이(SetItemHeight)와 무관해진다 — 노드 간격을 넓혀도 알약은 그대로다.
+						CRect rc_pill;
+						rc_pill.left = rc_badge.left;
+						rc_pill.right = rc_badge.right;
+						rc_pill.bottom = baseline + badge_pad_y;
+						rc_pill.top = baseline - cap_h - badge_pad_y;
+
+						//Gdiplus::Graphics 가 같은 HDC 에 살아있는 동안 GDI 로 그리면 그 출력이 유실된다.
+						//hover 등으로 다시 그릴 때 숫자만 사라지던 원인 → 블록으로 감싸 먼저 소멸시킨다.
+						{
+							Gdiplus::Graphics g(dc.m_hDC);
+							g.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
+
+							//radius = -1 이면 draw_round_rect 가 height/2 를 적용해 양끝이 반원인 pill 이 된다.
+							//stroke alpha 0 = 테두리 없이 채움만. 외곽선은 작은 크기에서 노이즈가 되어
+							//배지가 이름보다 더 눈에 띄게 만든다 — 배경보다 살짝 밝은 면으로 조용히 처리한다.
+							//채움색은 LmmCSManager 리스트 헤더와 동일한 톤. 앱 고유색이므로 확정 후 m_theme 로 옮긴다.
+							draw_round_rect(&g,
+								Gdiplus::Rect(rc_pill.left, rc_pill.top, rc_pill.Width(), rc_pill.Height()),
+								Gdiplus::Color(0, 0, 0, 0), Gdiplus::Color(255, 54, 59, 64), -1);
+						}
+
+						//개수는 이름보다 부차적인 정보이므로 흰색보다 낮춘 회색으로 그린다.
+						//굵기가 600 이라 색까지 밝으면 이름보다 배지가 먼저 읽힌다.
+						dc.SetTextColor(RGB(155, 162, 175));
+						dc.DrawText(count_text, &rc_badge, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+					}
+
+					if (old_font_badge)
+						dc.SelectObject(old_font_badge);
+				}
+			}
 
 			*pResult = CDRF_SKIPDEFAULT;
 			break;
@@ -4864,7 +5068,7 @@ void CSCTreeCtrl::OnTimer(UINT_PTR nIDEvent)
 		m_pending_edit_item = NULL;
 
 		if (h != NULL && h == GetSelectedItem() && !m_in_editing)
-			edit_item(h);
+			edit_item_by_user(h);
 		return;
 	}
 	else if (nIDEvent == timer_drag_auto_scroll)
@@ -5086,15 +5290,18 @@ void CSCTreeCtrl::OnContextMenu(CWnd* pWnd, CPoint point)
 	ScreenToClient(&pt);
 	hItem = HitTest(pt, &uFlags);
 
-	if (hItem == NULL)
-		return;
-
-	SelectItem(hItem);
-	//드래그가 아닌 우클릭/메뉴키 진입이므로, 혹시 남아있을 drop-hilight 를 제거해 selected 색으로 표시(방어).
-	SelectDropTarget(NULL);
+	if (hItem != NULL)
+	{
+		SelectItem(hItem);
+		//드래그가 아닌 우클릭/메뉴키 진입이므로, 혹시 남아있을 drop-hilight 를 제거해 selected 색으로 표시(방어).
+		SelectDropTarget(NULL);
+	}
 
 	//자체 popup 사용 안 하면 parent 로 forward — wParam = source hwnd 로 parent OnContextMenu 가
 	//pWnd 로 tree/thumb 구분 가능.
+	//20260824 by claude. 항목이 없는 빈 영역 우클릭도 forward 한다. 예전에는 HitTest 실패 시 곧바로
+	//return 해서 아무 일도 일어나지 않았는데, 배경 컨텍스트 메뉴("최상위에 새 항목" 등)를 띄우려면
+	//부모가 그 클릭을 알아야 한다. 빈 영역인지는 부모가 다시 HitTest 해서 판단한다.
 	if (!m_use_own_context_menu)
 	{
 		CWnd* parent = GetParent();
@@ -5106,11 +5313,15 @@ void CSCTreeCtrl::OnContextMenu(CWnd* pWnd, CPoint point)
 			parent->SendMessage(WM_CONTEXTMENU, (WPARAM)GetSafeHwnd(), MAKELPARAM(point.x, point.y));
 			m_in_context_menu = false;
 			CRect rc_item;
-			if (GetItemRect(hItem, &rc_item, FALSE))
+			if (hItem != NULL && GetItemRect(hItem, &rc_item, FALSE))
 				InvalidateRect(rc_item, FALSE);
 		}
 		return;
 	}
+
+	//자체 내장 메뉴는 대상 항목이 있어야 의미가 있다.
+	if (hItem == NULL)
+		return;
 
 	LANGID langID = GetSystemDefaultUILanguage();
 

@@ -187,7 +187,8 @@ public:
 		menu_delete_selected,
 	};
 
-	bool		m_use_own_context_menu = true;
+	//20260824 by claude. true=자체 내장 컨텍스트 메뉴 표시, false=parent(OnContextMenu)로 위임. default = false
+	bool		m_use_own_context_menu = false;
 	void		set_use_own_context_menu(bool use = true) { m_use_own_context_menu = use; }
 	void		OnPopupMenu(UINT nID);
 

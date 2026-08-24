@@ -310,6 +310,11 @@ public:
 	void		set_color_theme(const CSCColorTheme& theme, bool invalidate = true);
 	void		set_text_color(Gdiplus::Color text_color) { m_theme.cr_text = text_color; Invalidate(); }
 	void		set_back_color(Gdiplus::Color back_color) { m_theme.cr_back = back_color; Invalidate(); }
+	//20260824 by claude. 선택 배경색만 테마와 다르게 지정한다. 테마의 선택색이 그 앱에서 약할 때 쓴다.
+	//반드시 set_color_theme() 뒤에 호출해야 한다 — 테마 적용이 이 값을 덮어쓴다.
+	//selected_hover / selected_inactive 도 함께 파생시킨다. cr_back_selected 만 바꾸면 선택 항목에
+	//마우스를 올리거나 포커스를 잃었을 때 테마의 원래 색으로 되돌아가 색이 튄다.
+	void		set_selected_back_color(Gdiplus::Color back_color);
 	//CTreeCtrl에서 지원하는 기본 함수 override
 	void		SetTextColor(Gdiplus::Color text_color) { set_text_color(text_color); }
 	void		SetBkColor(Gdiplus::Color back_color) { set_back_color(back_color); }
@@ -369,6 +374,12 @@ public:
 //편집 관련
 	void			allow_edit(bool allow) { m_allow_edit = allow; }
 	void			edit_item(HTREEITEM hItem = NULL);
+	//20260824 by claude. 사용자 조작(F2 / 지연 클릭)으로 편집을 시작할 때 쓴다. 부모에게 message_edit_item 을 먼저 통지하고,
+	//부모가 1 을 리턴하면(직접 처리함) 여기서는 편집을 시작하지 않는다. 0 이면 edit_item() 을 그대로 호출한다.
+	//표시 레이블과 실제 이름이 다른 앱(예: "그룹명 (개수)")이 편집 대상 텍스트를 바로잡을 수 있게 하기 위한 것.
+	//처리됐으면(편집 시작 또는 부모가 직접 처리) true — 키 핸들러는 이 값이 true 면 메시지를 소비해야 한다.
+	//F2 를 소비하지 않으면 편집기가 포커스를 가진 뒤에도 그 F2 가 트리로 디스패치돼 편집기가 포커스를 잃고 즉시 닫힌다.
+	bool			edit_item_by_user(HTREEITEM hItem = NULL);
 	void			edit_end(bool valid = true);
 	HTREEITEM		get_recent_edit_item() { return m_edit_item; }
 	CString			get_edit_old_text() { return m_edit_old_text; }		//편집 후 텍스트
@@ -411,6 +422,30 @@ public:
 	//이 함수를 parent에서 호출하면서 판별함수를 지정할 수 있다. (LMM CSManager에서 속한 device가 없는 그룹의 색상을 dim color로 처리)
 	bool			(*function_check_is_dim_text)(CWnd* pTree, HTREEITEM hItem) = NULL;
 	void			set_function_check_is_dim_text(bool (*func)(CWnd* pTree, HTREEITEM hItem)) { function_check_is_dim_text = func; }
+
+	//20260824 by claude. 레이블 오른쪽에 개수를 흐린 색으로 별도 표시. 항목 텍스트에 개수를 문자열로 붙이면
+	//편집 시 그 개수가 실제 이름으로 커밋되어 데이터가 오염된다(LMM CSManager 에서 서버 그룹명이 "기본그룹 (10)"이 된 사고).
+	//레이블 강조영역 밖에 그리므로 선택/hover 배경도 개수를 덮지 않는다.
+	//20260824 by claude. 선택/hover/drop 강조 배경의 높이를 글자 높이에 맞춘다. default = true.
+	//treectrl 은 SetItemHeight 로 항목 높이를 키우면 라벨 rect 도 같이 커진다. 노드 간격만 넓히려 한
+	//경우에도 강조 막대가 글자보다 과하게 두꺼워져 보기 나쁘다. false 면 예전처럼 행 전체 높이로 칠한다.
+	//항목 높이를 키우지 않은 트리에서는 글자 높이 + 여백이 이미 행 높이 이상이므로 아무 변화가 없다.
+	void			set_item_height_fit_text(bool fit = true) { m_item_height_fit_text = fit; if (GetSafeHwnd()) Invalidate(); }
+	bool			get_item_height_fit_text() { return m_item_height_fit_text; }
+
+	//20260824 by claude. 선택 항목을 포커스 유무와 무관하게 항상 active 선택색으로 표시. default = false.
+	//기본은 탐색기와 동일하게 포커스가 없으면 약한 inactive 색으로 바뀌는데, 트리의 선택이 다른 컨트롤(목록 등)의
+	//내용을 결정하는 탐색용 패널에서는 포커스가 목록으로 넘어간 뒤에도 선택이 계속 또렷해야 한다.
+	void			set_keep_selected_color_inactive(bool keep = true) { m_keep_selected_color_inactive = keep; if (GetSafeHwnd()) Invalidate(); }
+	bool			get_keep_selected_color_inactive() { return m_keep_selected_color_inactive; }
+
+	void			show_node_count(bool show = true) { m_show_node_count = show; if (GetSafeHwnd()) Invalidate(); }
+	bool			get_show_node_count() { return m_show_node_count; }
+	//표시할 문자열을 parent 가 결정한다. 등록하지 않으면 자식 노드 수를 쓴다.
+	//빈 문자열을 리턴하면 그 항목은 표시하지 않는다(LMM CSManager 의 0개 그룹).
+	CString			(*function_get_node_count_text)(CWnd* pTree, HTREEITEM hItem) = NULL;
+	void			set_function_get_node_count_text(CString (*func)(CWnd* pTree, HTREEITEM hItem)) { function_get_node_count_text = func; }
+	CString			get_node_count_text(HTREEITEM hItem);
 
 	//가상 루트 항목 설정.
 	//가상 루트가 없는 상태에서 노드들이 추가된 경우, 가상 루트를 새로 추가할 경우
@@ -551,8 +586,15 @@ protected:
 		menu_refresh,
 		menu_favorite,
 	};
+	bool			m_item_height_fit_text = true;	//강조 배경 높이를 글자 높이에 맞출지. default = true
+	bool			m_keep_selected_color_inactive = false;	//포커스 없어도 active 선택색 유지. default = false
+	bool			m_show_node_count = false;	//레이블 오른쪽 개수 표시 여부. default = false
 	CSCMenu			m_menu;
-	bool			m_use_own_context_menu = true;	//true=자체 내장 컨텍스트 메뉴 표시, false=parent(OnContextMenu)로 위임. default = true
+	//20260824 by claude. true=자체 내장 컨텍스트 메뉴 표시, false=parent(OnContextMenu)로 위임. default = false
+	//"새 항목/이름 변경/삭제" 류는 흔해 보여도 앱마다 필요한 조합이 제각각이라, 내장 메뉴에서 항목을
+	//빼고 넣는 방식이 오히려 비효율적이다. 기본은 parent 로 넘기고 앱이 직접 띄우게 한다.
+	//내장 메뉴가 필요하면 set_use_own_context_menu() 를 명시적으로 호출한다.
+	bool			m_use_own_context_menu = false;
 	void			OnPopupMenu(UINT nID);
 	LRESULT			OnMessageCSCMenu(WPARAM wParam, LPARAM lParam);
 
@@ -711,6 +753,7 @@ public:
 	afx_msg void OnActivate(UINT nState, CWnd* pWndOther, BOOL bMinimized);
 	afx_msg BOOL OnEraseBkgnd(CDC* pDC);
 	afx_msg void OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags);
+	afx_msg UINT OnGetDlgCode();
 	afx_msg void OnPaint();
 	afx_msg BOOL OnTvnSelchanging(NMHDR* pNMHDR, LRESULT* pResult);
 	afx_msg BOOL OnTvnSelchanged(NMHDR* pNMHDR, LRESULT* pResult);

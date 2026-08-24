@@ -335,7 +335,8 @@ protected:
 		idRemoveAll,
 		idProperty,
 	};
-	bool			m_use_own_context_menu = true;
+	//20260824 by claude. true=자체 내장 컨텍스트 메뉴 표시, false=parent(OnContextMenu)로 위임. default = false
+	bool			m_use_own_context_menu = false;
 	void			on_context_menu(UINT nID);
 
 	void			on_menu_delete();

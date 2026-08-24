@@ -4805,7 +4805,7 @@ void CSCTreeCtrl::OnNMCustomDraw(NMHDR* pNMHDR, LRESULT* pResult)
 					//체감 간격은 이 값보다 2px 작다 — 그만큼을 포함해 잡는다.
 					const int badge_gap = max(5, tm.tmHeight * 67 / 100);
 					const int badge_pad_x = max(4, tm.tmHeight * 53 / 100);
-					const int badge_pad_y = max(2, tm.tmHeight * 27 / 100);		//글자 영역(cap 높이) 위아래 여백
+					const int badge_pad_y = max(2, tm.tmHeight * 34 / 100);		//글자 영역(cap 높이) 위아래 여백
 					//한 자리 숫자가 좁은 원처럼 보이지 않도록 최소 너비를 준다.
 					const int badge_min_width = max(14, tm.tmHeight * 173 / 100);
 

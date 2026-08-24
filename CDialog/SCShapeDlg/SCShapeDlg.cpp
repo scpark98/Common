@@ -383,42 +383,41 @@ CSCShapeDlgTextSetting* CSCShapeDlg::set_text(CWnd* parent, CString text,
 	//shadow_depth < 0 (자동) 인 경우 SCParagraph::draw_text 의 자동 계산식과 같은 추정으로 여유를 잡는다.
 	//<st>/<sd>/<sb>/<glow>/<style> 로 run 마다 base 설정보다 두꺼운 외곽선·그림자·발광이 섞일 수 있다.
 	//base(text_prop) 값만 보고 여백을 잡으면 그런 run 이 캔버스 밖으로 잘리므로 전 run 의 최대값을 쓴다.
+	//그림자·발광은 <ts> 든 <sd>/<glow> 든 결국 get_shadow_list() 한 곳으로 모이므로 그 결과만 보면 된다.
+	//(자동 offset 인 shadow_depth < 0 도 여기서 이미 실제 픽셀 값으로 풀려 나온다.)
 	float max_thickness = m_text_setting.text_prop.thickness;
-	float max_shadow_depth = fabs(m_text_setting.text_prop.shadow_depth);
-	float max_sigma = 0.0f;
+	float shadow_extra = 0.0f;
+	float blur_extra = 0.0f;
+
+	std::vector<CSCTextShadow> shadow_list;
 
 	for (auto& line : m_para)
 	{
 		for (auto& run : line)
 		{
 			max_thickness = max(max_thickness, run.text_prop.thickness);
-			max_shadow_depth = max(max_shadow_depth, fabs(run.text_prop.shadow_depth));
 
-			if (run.text_prop.shadow_depth != 0.0f)
-				max_sigma = max(max_sigma, run.text_prop.shadow_blur_sigma);
+			run.get_shadow_list(shadow_list);
+			for (auto& s : shadow_list)
+			{
+				shadow_extra = max(shadow_extra, max(fabs(s.dx), fabs(s.dy)));
 
-			//glow 는 offset 없이 사방으로 sigma 만큼 번지므로 같은 여백이 필요하다.
-			if (run.text_prop.cr_glow.GetA() > 0)
-				max_sigma = max(max_sigma, run.text_prop.glow_sigma);
+				//blur 는 sigma 만큼, spread 는 광원 자체를 굵힌 만큼 사방으로 더 번진다.
+				blur_extra = max(blur_extra, s.blur + s.spread);
+			}
 		}
 	}
-
-	float shadow_extra = 0.0f;
-	if (max_shadow_depth != 0.0f)
-	{
-		//shadow_depth < 0 (자동) 인 경우 SCParagraph::draw_text 의 자동 계산식과 같은 추정으로 여유를 잡는다.
-		shadow_extra = max((float)r.Height() / 30.0f, 2.0f);
-		shadow_extra = max(shadow_extra, max_shadow_depth);
-	}
-
-	//Gaussian blur 그림자·발광이 활성화되어 있으면 sigma 만큼 번지므로 그만큼 추가 여유를 준다.
-	float blur_extra = max_sigma;
 
 	//thickness 는 GDI+ Pen LineJoinRound + anti-alias 로 stroke 가 path 양쪽 외부에까지 번진다.
 	//calc_text_rect 가 path bounds 보다 약간 좁게 잡는 경우 글자 위/아래 디센더가 잘리는 회귀가 있어 +6 의 여유 추가.
 	int extra = (int)(max_thickness + shadow_extra + blur_extra) + 6;
+
+	//세로 여백은 예전부터 가로의 절반이었다. 외곽선만 있을 땐 충분하지만 blur/spread 가 크면 모자라
+	//글자 위아래로 번진 그림자·발광이 잘린다 — 번지는 양은 세로에도 그대로 필요하다.
+	int extra_v = max(extra / 2, (int)(shadow_extra + blur_extra) + 3);
+
 	if (extra > 0)
-		r.InflateRect(extra, extra / 2);
+		r.InflateRect(extra, extra_v);
 	//호출자가 SetWindowPos 시 글자 첫 픽셀 정렬을 위해 보정할 수 있도록 노출.
 	m_text_left_padding = (extra > 0) ? extra : 0;
 

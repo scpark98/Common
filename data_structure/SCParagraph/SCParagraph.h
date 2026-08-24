@@ -4,6 +4,7 @@
 #include <afxwin.h>
 #include <gdiplus.h>
 #include <deque>
+#include <vector>
 
 /*
 [태그된 텍스트 지원]
@@ -38,10 +39,17 @@
 	[외곽선 / 그림자 / 발광]
 	<st=4> = <stroke=4>		//외곽선 두께. 펜이 path 중앙 정렬이라 눈에 보이는 두께는 이 값의 절반이다.
 	<cs=black>				//외곽선 색
-	<sd=3> = <shadow=3>		//그림자 offset(px). 0 = 없음, 음수 = 글자 높이에 비례한 자동값.
+	<ts=0,4,6,black; 0,0,14,gold>
+							//그림자 목록. 한 항목은 "x,y,blur,색[,spread]" 로 CSS text-shadow 와 같은 의미이고,
+							//세미콜론으로 여러 개를 쌓는다. 앞쪽 항목이 글자에 더 가깝게(위에) 그려진다 — CSS 와 동일.
+							//spread 는 CSS 에 없는 확장으로, 광원 path 를 그 두께의 pen 으로 한 번 더 그려 바깥으로 넓힌다.
+							//아래 네 태그는 전부 이 리스트의 축약 표기이며 렌더는 항상 리스트 하나로 처리된다.
+							//<ts> 를 쓰면 아래 네 개는 무시된다.
+	<sd=3> = <shadow=3>		//그림자 offset(px). 0 = 없음, 음수 = 글자 높이에 비례한 자동값. = <ts=n,n,sb값,csh값>
 	<csh=dimgray>			//그림자 색
 	<sb=3>					//그림자 blur sigma. 0 이면 blur 없이 하드 엣지 offset 그림자.
-	<glow=aqua,14>			//외곽 발광(색, sigma). 그림자와 달리 offset 0 이라 글자 사방으로 퍼진다.
+							//blur 그림자는 모든 음절을 한 레이어에 모아 한 번에 처리하므로 sigma 는 라인/문단 최대값이 쓰인다.
+	<glow=aqua,14>			//외곽 발광(색, sigma). = <ts=0,0,sigma,색,sigma> 와 같다. offset 0 이라 글자 사방으로 퍼진다.
 
 	[줄 / 배치]
 	<br>					//line break — 줄 "종결자"다. 진행 중인 텍스트가 있으면 그 줄을 확정만 하므로
@@ -90,6 +98,19 @@
 */
 
 class CSCGdiplusBitmap;
+
+//<ts=x,y,blur,색[,spread]> 한 항목. 의미는 CSS text-shadow 와 같고 spread 만 확장이다.
+//spread > 0 이면 광원 path 를 그 두께의 pen 으로 한 번 더 그려 바깥으로 넓힌다 — 이게 glow 표현이다.
+//리스트에서 앞쪽 항목이 글자에 더 가깝게(위에) 그려진다. CSS 와 동일.
+class CSCTextShadow
+{
+public:
+	float			dx = 0.0f;
+	float			dy = 0.0f;
+	float			blur = 0.0f;
+	float			spread = 0.0f;
+	Gdiplus::Color	color = Gdiplus::Color::Transparent;
+};
 
 //기존 LOGFONT는 GDI용이고 fontsize가 int만 지원되거나, lfFaceName이 TCHAR [] 등
 //불편한 점이 많으므로 Gdi+에서도 사용할 수 있도록 CSCTextProperty 클래스를 정의함.
@@ -146,6 +167,10 @@ public:
 
 	//<nowrap> 구간 — word wrap 이 이 run 을 쪼개지 않는다.
 	bool		nowrap = false;
+
+	//<ts=...> 로 지정한 그림자 목록. 비어 있으면 위의 shadow_* / cr_glow / glow_sigma 로부터 합성된다.
+	//즉 <sd>/<csh>/<sb>/<glow> 는 이 리스트의 축약 표기이고, 실제 렌더는 항상 이 리스트 하나로 돈다.
+	std::vector<CSCTextShadow> shadows;
 
 	//<ruby=주석> 의 주석 글자 크기 배율(본문 대비)과 색.
 	//cr_ruby 가 Transparent 면 본문 색(cr_text)을 그대로 쓴다. <cru=색> 으로 따로 지정.
@@ -219,6 +244,11 @@ public:
 
 	//이 paragraph의 CSCTextProperty 설정에 맞는 Gdiplus::Font를 구한다.
 	void			get_paragraph_font(Gdiplus::Graphics& g, Gdiplus::Font** font);
+
+	//이 run 에 실제로 적용할 그림자 목록을 만든다.
+	//<ts> 가 지정돼 있으면 그대로 쓰고, 없으면 <sd>/<csh>/<sb>/<glow> 필드로부터 합성한다.
+	//shadow_depth < 0 (자동 offset) 은 r.Height() 가 필요해 여기서 해석되므로 run 단위 함수다.
+	void			get_shadow_list(std::vector<CSCTextShadow>& out) const;
 
 	//<style=이름> 으로 한 번에 적용할 속성 묶음을 등록한다. 태그를 길게 나열하는 대신
 	//register_style(_T("title"), prop) 후 "<style=title>제목</style>" 로 쓴다.

@@ -428,6 +428,47 @@ void CSCParagraph::build_paragraph_str(CString& text, std::deque<std::deque<CSCP
 			para_temp.text_prop.shadow_blur_sigma = pop_attr(_T("sb")).shadow_blur_sigma;
 		}
 
+		//---- 그림자 목록 (CSS text-shadow 형식) ----
+		//<ts=x,y,blur,색[,spread]; x,y,blur,색[,spread]; ...> — 세미콜론으로 여러 개를 쌓는다.
+		//앞쪽 항목이 글자에 더 가깝다(CSS 와 동일). <sd>/<csh>/<sb>/<glow> 는 이것의 축약 표기다.
+		else if (name == _T("ts"))
+		{
+			push_attr(_T("ts"));
+			para_temp.text_prop.shadows.clear();
+
+			int start = 0;
+			while (start <= value.GetLength())
+			{
+				int semi = value.Find(_T(';'), start);
+				CString item = (semi < 0) ? value.Mid(start) : value.Mid(start, semi - start);
+
+				item.Trim();
+				if (!item.IsEmpty())
+				{
+					CSCTextShadow s;
+					s.dx = (float)_tstof(arg(item, 0));
+					s.dy = (float)_tstof(arg(item, 1));
+					s.blur = (float)_tstof(arg(item, 2));
+					s.color = get_color(arg(item, 3));
+
+					CString spread = arg(item, 4);
+					if (!spread.IsEmpty())
+						s.spread = (float)_tstof(spread);
+
+					if (s.color.GetA() > 0)
+						para_temp.text_prop.shadows.push_back(s);
+				}
+
+				if (semi < 0)
+					break;
+				start = semi + 1;
+			}
+		}
+		else if (name == _T("/ts"))
+		{
+			para_temp.text_prop.shadows = pop_attr(_T("ts")).shadows;
+		}
+
 		//---- 외곽 발광 ----
 		else if (name == _T("glow"))
 		{
@@ -1594,6 +1635,50 @@ void CSCParagraph::get_paragraph_font(Gdiplus::Graphics& g, Gdiplus::Font** font
 	*font = ff->Clone();
 }
 
+void CSCParagraph::get_shadow_list(std::vector<CSCTextShadow>& out) const
+{
+	out.clear();
+
+	//<ts> 로 명시했으면 그대로 쓴다.
+	if (!text_prop.shadows.empty())
+	{
+		out = text_prop.shadows;
+		return;
+	}
+
+	//기존 태그로부터 합성. glow 를 먼저 담는 이유는 CSS 규칙상 리스트 앞쪽이 글자에 더 가깝기 때문이며,
+	//그 결과 그리는 순서가 기존과 같은 "그림자 → glow → 글자" 가 된다.
+	if (text_prop.cr_glow.GetA() > 0 && text_prop.glow_sigma > 0.0f)
+	{
+		CSCTextShadow s;
+		s.blur = text_prop.glow_sigma;
+		s.spread = text_prop.glow_sigma;	//광원 path 를 굵혀 사방으로 더 멀리 번지게 하는 것이 glow 의 실체.
+		s.color = text_prop.cr_glow;
+		out.push_back(s);
+	}
+
+	if (text_prop.shadow_depth != 0.0f && text_prop.cr_shadow.GetA() > 0)
+	{
+		CSCTextShadow s;
+
+		if (text_prop.shadow_depth > 0.0f)
+		{
+			s.dx = s.dy = text_prop.shadow_depth;
+		}
+		else
+		{
+			//자동 offset — 글자 높이에 비례하되 외곽선 두께보다는 커야 외곽선에 묻히지 않는다.
+			float d = max((float)r.Height() / 30.0f, 2.0f);
+			d = max(d, text_prop.thickness / 1.4f);
+			s.dx = s.dy = d;
+		}
+
+		s.blur = text_prop.shadow_blur_sigma;
+		s.color = text_prop.cr_shadow;
+		out.push_back(s);
+	}
+}
+
 /*
 //ex. add("<font size=12><font bold = 1>first line") 입력된 후
 //add("second line")이면 이 때 스타일은 전 스타일값을 그대로 유지한다.
@@ -1765,55 +1850,88 @@ CRect CSCParagraph::draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCPar
 	//따라서 calc_text_rect()에서 max height를 모든 paragraph에 적용했으며
 	//여기서도 배경색으로 칠한 뒤 텍스트를 표시한다.
 
-	//Gaussian blur 그림자 사전 패스.
-	//음절별 단순 offset fillpath 가 아닌, 모든 음절을 별도 layer 에 모아 한 번 blur 하면
-	//음절 사이가 자연스럽게 번지고 가장자리도 부드럽다. para[0][0] 의 sigma/weight 를 대표값으로 사용한다.
-	float global_blur_sigma = 0.0f;
+	//그림자 / 외곽 발광 사전 패스.
+	//그림자와 glow 는 "offset + blur 된 광원" 이라는 같은 것이므로 (CSS text-shadow) 한 경로로 처리한다.
+	//항목마다 캔버스 크기 레이어에 모든 음절의 광원을 모아 한 번 blur 한 뒤 합성한다 —
+	//음절별로 따로 그리는 것보다 음절 사이가 자연스럽게 번지고, 반투명 색이 겹쳐 진해지지도 않는다.
 	float global_gray_weight = 1.0f;
 	if (!para.empty() && !para[0].empty())
-	{
-		global_blur_sigma = para[0][0].text_prop.shadow_blur_sigma;
 		global_gray_weight = para[0][0].text_prop.shadow_gray_weight;
-	}
 
-	//20260823 by claude. 그림자를 실제로 쓰는 run 이 하나도 없으면 이 패스 전체를 건너뛴다.
-	//이전엔 sigma(기본 3.0)만 보고 진입해서, 그림자가 없는 텍스트에서도 캔버스 전체 레이어 생성 +
-	//box blur ×3 + 전체 합성이 매번 돌았다. 안쪽 루프가 run 을 건너뛰므로 결과는 빈 레이어였고,
-	//빈 레이어를 blur 해서 합성하는 것은 화면상 아무 변화가 없다 — 순수 낭비다.
-	//(바로 아래 glow 패스는 has_glow 로 이미 이렇게 사전 검사한다. 그림자 쪽에만 빠져 있었다.)
-	bool has_shadow = false;
-	for (i = 0; i < para.size() && !has_shadow; i++)
 	{
-		for (j = 0; j < (int)para[i].size(); j++)
+		//run 마다 목록이 다를 수 있으므로 항목 수의 최대치를 먼저 구한다.
+		//목록 자체는 값이 몇 개 안 되는 vector 라 필요할 때마다 다시 만드는 편이 2차원으로 들고 있는 것보다 간단하다.
+		std::vector<CSCTextShadow> list;
+		int shadow_layers = 0;
+
+		for (i = 0; i < para.size(); i++)
 		{
-			if (para[i][j].text_prop.shadow_depth != 0.0f && para[i][j].text_prop.cr_shadow.GetA() > 0)
+			for (j = 0; j < (int)para[i].size(); j++)
 			{
-				has_shadow = true;
-				break;
+				para[i][j].get_shadow_list(list);
+				shadow_layers = MAX(shadow_layers, (int)list.size());
 			}
 		}
-	}
 
-	if (global_blur_sigma > 0.0f && has_shadow)
-	{
 		Gdiplus::RectF clip;
 		g.GetVisibleClipBounds(&clip);
 		int layer_w = (int)ceil(clip.X + clip.Width);
 		int layer_h = (int)ceil(clip.Y + clip.Height);
 
-		if (layer_w > 0 && layer_h > 0)
+		//CSS 와 같이 리스트 앞쪽 항목이 글자에 더 가깝다 → 뒤 항목부터 그려야 앞 항목이 위에 온다.
+		for (int k = shadow_layers - 1; k >= 0 && layer_w > 0 && layer_h > 0; k--)
 		{
-			CSCGdiplusBitmap shadow_layer(layer_w, layer_h, Gdiplus::Color::Transparent, PixelFormat32bppARGB);
-			Gdiplus::Graphics gs(shadow_layer.m_pBitmap);
-			gs.SetSmoothingMode(Gdiplus::SmoothingMode::SmoothingModeAntiAlias);
-			gs.SetTextRenderingHint(Gdiplus::TextRenderingHintAntiAlias);
+			//한 레이어는 blur 를 한 번만 걸 수 있으므로 sigma 가 다른 run 을 같이 담으면 안 된다.
+			//(그렇게 하면 <sb=0> 하드 엣지 그림자가 옆 run 의 큰 sigma 로 같이 흐려진다.)
+			//이 index 에서 쓰이는 sigma 들을 모아 값마다 레이어를 따로 만든다. 실제로는 1~2 개다.
+			std::vector<float> sigmas;
+
+			for (i = 0; i < para.size(); i++)
+			{
+				for (j = 0; j < (int)para[i].size(); j++)
+				{
+					para[i][j].get_shadow_list(list);
+					if (k >= (int)list.size() || list[k].color.GetA() == 0 || para[i][j].text.IsEmpty())
+						continue;
+
+					bool found = false;
+					for (auto v : sigmas)
+					{
+						if (fabs(v - list[k].blur) < 0.01f)
+						{
+							found = true;
+							break;
+						}
+					}
+
+					if (!found)
+						sigmas.push_back(list[k].blur);
+				}
+			}
+
+			//흐린 것부터 깔아야 선명한 그림자가 위에 온다.
+			std::sort(sigmas.begin(), sigmas.end(), std::greater<float>());
+
+			for (auto sigma : sigmas)
+			{
+			CSCGdiplusBitmap layer(layer_w, layer_h, Gdiplus::Color::Transparent, PixelFormat32bppARGB);
+			Gdiplus::Graphics gl(layer.m_pBitmap);
+			gl.SetSmoothingMode(Gdiplus::SmoothingMode::SmoothingModeAntiAlias);
+			gl.SetTextRenderingHint(Gdiplus::TextRenderingHintAntiAlias);
 
 			for (i = 0; i < para.size(); i++)
 			{
 				for (j = (int)para[i].size() - 1; j >= 0; j--)
 				{
-					if (para[i][j].text_prop.shadow_depth == 0)
-						continue;
+					para[i][j].get_shadow_list(list);
+						if (k >= (int)list.size() || list[k].color.GetA() == 0 || para[i][j].text.IsEmpty())
+							continue;
+
+						//이 레이어의 sigma 와 다른 run 은 다음(또는 이전) 레이어가 담당한다.
+						if (fabs(list[k].blur - sigma) >= 0.01f)
+							continue;
+
+					const CSCTextShadow& s = list[k];
 
 					Gdiplus::FontFamily* ff = new Gdiplus::FontFamily((WCHAR*)(const WCHAR*)CStringW(para[i][j].text_prop.name));
 					if (!ff->IsAvailable())
@@ -1823,32 +1941,25 @@ CRect CSCParagraph::draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCPar
 					}
 
 					float emSize = fDpiY * para[i][j].text_prop.size * para[i][j].text_prop.script_scale / 72.0f;
-
-					CPoint off;
-					if (para[i][j].text_prop.shadow_depth > 0)
-					{
-						off.x = (LONG)para[i][j].text_prop.shadow_depth;
-						off.y = (LONG)para[i][j].text_prop.shadow_depth;
-					}
-					else
-					{
-						off.x = (LONG)max((float)para[i][j].r.Height() / 30.0f, 2.0f);
-						off.x = max(off.x, (LONG)(para[i][j].text_prop.thickness / 1.4f));
-						off.y = (LONG)max((float)para[i][j].r.Height() / 30.0f, 2.0f);
-						off.y = max(off.y, (LONG)(para[i][j].text_prop.thickness / 1.4f));
-					}
-
 					CPoint pt_base = para[i][j].get_text_origin();
 
-					Gdiplus::GraphicsPath shadow_path;
-					shadow_path.SetFillMode(Gdiplus::FillModeWinding);
-					shadow_path.AddString(CStringW(para[i][j].text), para[i][j].text.GetLength(), ff,
+					Gdiplus::GraphicsPath path;
+					path.SetFillMode(Gdiplus::FillModeWinding);
+					path.AddString(CStringW(para[i][j].text), para[i][j].text.GetLength(), ff,
 						para[i][j].text_prop.style, emSize,
-						Gdiplus::Point(pt_base.x + off.x, pt_base.y + off.y),
+						Gdiplus::Point(pt_base.x + (int)s.dx, pt_base.y + (int)s.dy),
 						sf.GenericTypographic());
 
-					Gdiplus::SolidBrush br_shadow(para[i][j].text_prop.cr_shadow);
-					gs.FillPath(&br_shadow, &shadow_path);
+					Gdiplus::SolidBrush br(s.color);
+					gl.FillPath(&br, &path);
+
+					//spread 는 광원 자체를 굵혀 더 멀리·진하게 번지게 한다. glow 가 이걸로 표현된다.
+					if (s.spread > 0.0f)
+					{
+						Gdiplus::Pen pen(s.color, s.spread);
+						pen.SetLineJoin(Gdiplus::LineJoinRound);
+						gl.DrawPath(&pen, &path);
+					}
 
 					delete ff;
 				}
@@ -1856,84 +1967,14 @@ CRect CSCParagraph::draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCPar
 
 			//order 는 box blur 반복 횟수. 1 이면 단일 box 라 감쇠가 직선이고 끝이 각져 "원뿔" 처럼 보인다.
 			//3 이면 box*3 이 Gaussian 에 수렴해 글자 주변 감쇠가 부드러워진다 (비용은 여전히 O(n)).
-			shadow_layer.blur(global_blur_sigma, 3);
+			//blur 가 0 이면 하드 엣지 offset 그림자 — blur 를 건너뛰기만 하면 된다.
+			if (sigma > 0.0f)
+				layer.blur(sigma, 3);
+
 			if (global_gray_weight > 0.0f && global_gray_weight < 1.0f)
-				shadow_layer.gray(global_gray_weight);
+				layer.gray(global_gray_weight);
 
-			g.DrawImage(shadow_layer.m_pBitmap, 0, 0);
-		}
-	}
-
-	//<glow=색,sigma> 외곽 발광 사전 패스.
-	//그림자와 구조는 같지만 offset 0 이고, 글자를 fill 한 뒤 같은 path 를 굵은 pen 으로 한 번 더 그려
-	//광원을 글자 바깥으로 넓힌 다음 blur 한다. 그림자 위, 글자 아래에 깔린다.
-	{
-		bool has_glow = false;
-		float glow_sigma_max = 0.0f;
-
-		for (i = 0; i < para.size() && !has_glow; i++)
-		{
-			for (j = 0; j < (int)para[i].size(); j++)
-			{
-				if (para[i][j].text_prop.cr_glow.GetA() > 0 && para[i][j].text_prop.glow_sigma > 0.0f)
-				{
-					has_glow = true;
-					glow_sigma_max = max(glow_sigma_max, para[i][j].text_prop.glow_sigma);
-					break;
-				}
-			}
-		}
-
-		if (has_glow)
-		{
-			Gdiplus::RectF clip;
-			g.GetVisibleClipBounds(&clip);
-			int layer_w = (int)ceil(clip.X + clip.Width);
-			int layer_h = (int)ceil(clip.Y + clip.Height);
-
-			if (layer_w > 0 && layer_h > 0)
-			{
-				CSCGdiplusBitmap glow_layer(layer_w, layer_h, Gdiplus::Color::Transparent, PixelFormat32bppARGB);
-				Gdiplus::Graphics gg(glow_layer.m_pBitmap);
-				gg.SetSmoothingMode(Gdiplus::SmoothingMode::SmoothingModeAntiAlias);
-
-				for (i = 0; i < para.size(); i++)
-				{
-					for (j = (int)para[i].size() - 1; j >= 0; j--)
-					{
-						if (para[i][j].text_prop.cr_glow.GetA() == 0 || para[i][j].text_prop.glow_sigma <= 0.0f)
-							continue;
-
-						Gdiplus::FontFamily* ff = new Gdiplus::FontFamily((WCHAR*)(const WCHAR*)CStringW(para[i][j].text_prop.name));
-						if (!ff->IsAvailable())
-						{
-							delete ff;
-							ff = Gdiplus::FontFamily::GenericSansSerif()->Clone();
-						}
-
-						float emSize = fDpiY * para[i][j].text_prop.size * para[i][j].text_prop.script_scale / 72.0f;
-
-						CPoint pt_base = para[i][j].get_text_origin();
-
-						Gdiplus::GraphicsPath glow_path;
-						glow_path.SetFillMode(Gdiplus::FillModeWinding);
-						glow_path.AddString(CStringW(para[i][j].text), para[i][j].text.GetLength(), ff,
-							para[i][j].text_prop.style, emSize,
-							Gdiplus::Point(pt_base.x, pt_base.y), sf.GenericTypographic());
-
-						Gdiplus::SolidBrush br_glow(para[i][j].text_prop.cr_glow);
-						Gdiplus::Pen pen_glow(para[i][j].text_prop.cr_glow, para[i][j].text_prop.glow_sigma);
-						pen_glow.SetLineJoin(Gdiplus::LineJoinRound);
-
-						gg.FillPath(&br_glow, &glow_path);
-						gg.DrawPath(&pen_glow, &glow_path);
-
-						delete ff;
-					}
-				}
-
-				glow_layer.blur(glow_sigma_max, 3);
-				g.DrawImage(glow_layer.m_pBitmap, 0, 0);
+			g.DrawImage(layer.m_pBitmap, 0, 0);
 			}
 		}
 	}
@@ -2039,11 +2080,10 @@ CRect CSCParagraph::draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCPar
 			else
 			{
 				float emSize = fDpiY * para[i][j].text_prop.size * para[i][j].text_prop.script_scale / 72.0;
-				Gdiplus::GraphicsPath str_path, shadow_path;
+				Gdiplus::GraphicsPath str_path;
 
 				//겹치는 부분을 반전시키지 않는다. FillModeAlternate는 반전시킴.
 				str_path.SetFillMode(Gdiplus::FillModeWinding);
-				shadow_path.SetFillMode(Gdiplus::FillModeWinding);
 
 				//AddString() 파라미터 중 출력위치를 줄 때 Gdiplus::Rect() 또는 Gdiplus::Point()로 줄 수 있는데
 				//stroke 또는 shadow가 추가되어 r이 작으면 텍스트가 출력되지 않는 현상이 있다.
@@ -2056,36 +2096,13 @@ CRect CSCParagraph::draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCPar
 				str_path.AddString(CStringW(para[i][j].text), para[i][j].text.GetLength(), fontFamily,
 					para[i][j].text_prop.style, emSize, Gdiplus::Point(r.left, r.top), sf.GenericTypographic());
 
-				//20260718 by claude. 반투명(글자 alpha<255)+외곽선 글자는 아래 if(ss_translucent) 에서 그림자·외곽선·fill 을
-				//한 임시 비트맵에 SS 배로 그린 뒤 고품질 축소해 AA 를 얻는다(그림자도 그 안에서). 그래서 여기 1x 그림자는 건너뛴다.
+				//20260718 by claude. 반투명(글자 alpha<255)+외곽선 글자는 아래 if(ss_translucent) 에서 외곽선·fill 을
+				//한 임시 비트맵에 SS 배로 그린 뒤 고품질 축소해 AA 를 얻는다.
 				bool ss_translucent = (para[i][j].text_prop.thickness > 0.0f && para[i][j].text_prop.cr_text.GetA() < 255);
 
-				//사전 패스에서 blur 그림자를 이미 그렸다면 음절 단위 하드 엣지 그림자는 건너뛴다.
-				if (!ss_translucent && para[i][j].text_prop.shadow_depth != 0 && global_blur_sigma <= 0.0f)
-				{
-					Gdiplus::SolidBrush br_shadow(para[0][0].text_prop.cr_shadow);
-
-					CPoint pt_shadow_offset;
-					if (para[i][j].text_prop.shadow_depth > 0)
-					{
-						pt_shadow_offset.x = (LONG)para[i][j].text_prop.shadow_depth;
-						pt_shadow_offset.y = (LONG)para[i][j].text_prop.shadow_depth;
-					}
-					else
-					{
-						//자동 계산: 텍스트 height에 비례하고 stroke thickness 유무와도 관계있다.
-						pt_shadow_offset.x = max((float)(para[i][j].r.Height()) / 30.0f, 2.0f);
-						pt_shadow_offset.x = max(pt_shadow_offset.x, para[i][j].text_prop.thickness / 1.4f);
-						pt_shadow_offset.y = max((float)(para[i][j].r.Height()) / 30.0f, 2.0f);
-						pt_shadow_offset.y = max(pt_shadow_offset.y, para[i][j].text_prop.thickness / 1.4f);
-					}
-					r.OffsetRect(pt_shadow_offset.x, pt_shadow_offset.y);
-
-					shadow_path.AddString(CStringW(para[i][j].text), para[i][j].text.GetLength(), fontFamily,
-						para[i][j].text_prop.style, emSize, Gdiplus::Point(r.left, r.top), sf.GenericTypographic());
-
-					g.FillPath(&br_shadow, &shadow_path);
-				}
+				//그림자는 blur 유무와 관계없이 위 사전 패스가 전부 처리하므로 여기서 그릴 것이 없다.
+				//(예전엔 sigma == 0 인 하드 엣지 그림자만 음절 단위로 따로 그렸는데, 사전 패스가 blur 를
+				// 건너뛰기만 하면 같은 결과라 경로를 하나로 합쳤다.)
 
 				Gdiplus::Pen   pen(para[i][j].text_prop.cr_stroke, para[i][j].text_prop.thickness);
 				Gdiplus::SolidBrush solid_brush(para[i][j].text_prop.cr_text);
@@ -2121,33 +2138,14 @@ CRect CSCParagraph::draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCPar
 				{
 					const int SS = 3;
 
-					//그림자 오프셋(1x 경로와 동일 계산).
-					float shx = 0.0f, shy = 0.0f;
-					bool has_shadow = (para[i][j].text_prop.shadow_depth != 0 && global_blur_sigma <= 0.0f);
-					if (has_shadow)
-					{
-						if (para[i][j].text_prop.shadow_depth > 0)
-						{
-							shx = shy = para[i][j].text_prop.shadow_depth;
-						}
-						else
-						{
-							shx = max((float)(para[i][j].r.Height()) / 30.0f, 2.0f);
-							shx = max(shx, para[i][j].text_prop.thickness / 1.4f);
-							shy = shx;
-						}
-					}
-
-					//글자(외곽선 포함) + 그림자 오프셋을 아우르는 bounds.
+					//그림자는 사전 패스가 이미 g 에 그려 뒀으므로 여기서는 글자(외곽선 포함)만 감싸면 된다.
 					Gdiplus::RectF gb;
 					str_path.GetBounds(&gb, NULL, &pen);
 					const float margin = 2.0f;
 					float minx = gb.X - margin;
 					float miny = gb.Y - margin;
-					float maxx = gb.X + gb.Width + shx + margin;
-					float maxy = gb.Y + gb.Height + shy + margin;
-					int bw = (int)ceil(maxx - minx);
-					int bh = (int)ceil(maxy - miny);
+					int bw = (int)ceil(gb.Width + margin * 2);
+					int bh = (int)ceil(gb.Height + margin * 2);
 
 					if (bw > 0 && bh > 0)
 					{
@@ -2157,20 +2155,6 @@ CRect CSCParagraph::draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCPar
 						gt.SetTextRenderingHint(g.GetTextRenderingHint());
 						gt.ScaleTransform((Gdiplus::REAL)SS, (Gdiplus::REAL)SS);
 						gt.TranslateTransform(-minx, -miny);
-
-						//그림자(오프셋 위치).
-						if (has_shadow)
-						{
-							Gdiplus::GraphicsPath sp;
-							sp.SetFillMode(Gdiplus::FillModeWinding);
-							CRect rs = para[i][j].r;
-							rs.MoveToXY(para[i][j].get_text_origin());
-							rs.OffsetRect((int)shx, (int)shy);
-							sp.AddString(CStringW(para[i][j].text), para[i][j].text.GetLength(), fontFamily,
-								para[i][j].text_prop.style, emSize, Gdiplus::Point(rs.left, rs.top), sf.GenericTypographic());
-							Gdiplus::SolidBrush br_shadow(para[0][0].text_prop.cr_shadow);
-							gt.FillPath(&br_shadow, &sp);
-						}
 
 						//외곽선(밑) → 내부 SourceCopy 교체(안쪽 외곽선/그림자 제거) → 바깥 외곽선만 남음.
 						gt.DrawPath(&pen, &str_path);

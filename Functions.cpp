@@ -3161,6 +3161,12 @@ void request_url(CRequestUrlParams* params, bool check_server_reachable)
 {
 	long t0 = clock();
 
+	//20260825 by claude. 같은 params 를 재사용해 다시 호출하는 경우가 있으므로 이전 결과를 먼저 지운다.
+	//아래 실패 경로들은 status 를 건드리지 않고 error 만 채우기 때문에, 지우지 않으면 이전 요청의 status 가
+	//그대로 남아 실패를 성공으로 읽게 된다.
+	params->status = -1;
+	params->error = request_url_error_none;
+
 	//ip에 http://인지 https://인지가 명시되어 있다면 이는 명확하므로
 	//이를 판단하여 params->is_https값을 재설정한다.
 	//포트번호로 https를 판별하는 것은 한계가 있으므로 ip에 명시하든, params->is_https에 정확히 명시하여 사용한다.
@@ -3206,7 +3212,7 @@ void request_url(CRequestUrlParams* params, bool check_server_reachable)
 	// is_server_reachable()은 매 요청마다 별도의 TCP 소켓을 열고 닫는 단점이 있다.
 	if (check_server_reachable && !is_server_reachable(params->ip, params->port, 2000))
 	{
-		params->status = ERROR_HOST_UNREACHABLE;
+		params->error = request_url_error_host_unreachable;
 		params->result = _T("서버에 연결할 수 없습니다.");
 		return;
 	}
@@ -3219,7 +3225,7 @@ void request_url(CRequestUrlParams* params, bool check_server_reachable)
 	if (params->ip.GetLength() < 7)
 	{
 		params->result = _T("Invalid IP address = ") + params->ip;
-		params->status = -1;
+		params->error = request_url_error_invalid_ip;
 		TRACE(_T("result = %s\n"), params->result);
 		return;
 	}
@@ -3230,7 +3236,8 @@ void request_url(CRequestUrlParams* params, bool check_server_reachable)
 	params->verb.MakeUpper();
 	if (!is_one_of(params->verb, _T("GET"), _T("PUT"), _T("POST"), _T("DELETE")))
 	{
-		params->status = HTTP_STATUS_BAD_METHOD;
+		//요청을 보내지도 않았으므로 405 를 담아서는 안 된다 — 서버가 405 를 응답한 것처럼 보인다.
+		params->error = request_url_error_invalid_verb;
 		params->result = _T("Unknown HTTP Request method(\"") + params->verb + _T("\")");
 		TRACE(_T("result = %s\n"), params->result);
 		return;
@@ -3244,7 +3251,7 @@ void request_url(CRequestUrlParams* params, bool check_server_reachable)
 	HINTERNET hInternetRoot = InternetOpen(_T("request_url"), INTERNET_OPEN_TYPE_PRECONFIG/* | INTERNET_OPEN_TYPE_DIRECT*/, NULL, NULL, 0);
 	if (hInternetRoot == NULL)
 	{
-		params->status = GetLastError();
+		params->error = GetLastError();
 		params->result = _T("InternetOpen() failed.");
 		TRACE(_T("result = %s\n"), params->result);
 		return;
@@ -3272,7 +3279,7 @@ void request_url(CRequestUrlParams* params, bool check_server_reachable)
 	if (hInternetConnect == NULL)
 	{
 		params->result = _T("hInternetConnect() failed.");
-		params->status = GetLastError();
+		params->error = GetLastError();
 		TRACE(_T("result = %s\n"), params->result);
 		return;
 	}
@@ -3373,7 +3380,7 @@ void request_url(CRequestUrlParams* params, bool check_server_reachable)
 	if (!res)
 	{
 		DWORD dwError = GetLastError();
-		params->status = dwError;
+		params->error = dwError;
 		params->result.Format(_T("HttpSendRequest failed. elapsed = %ldms. error code = %d(%s)"), clock() - t0, dwError, get_error_str(dwError));
 		TRACE(_T("result = %s\n"), params->result);
 
@@ -3408,12 +3415,13 @@ void request_url(CRequestUrlParams* params, bool check_server_reachable)
 	// 연결정보 확인
 
 	ret = HttpQueryInfo(hOpenRequest, HTTP_QUERY_STATUS_CODE, (LPVOID)&query_buffer, &query_buffer_size, NULL);
-	params->status = _ttol(query_buffer);
 
 	if (!ret)
 	{
+		//20260825 by claude. 대입을 이 검사보다 앞에 두면 실패했을 때 빈 버퍼를 파싱한 0 이 status 에 남는다.
+		//status 는 -1(응답 없음) 그대로 두고 원인만 남긴다.
 		params->result = _T("HttpQueryInfo(HTTP_QUERY_STATUS_CODE) failed.");
-		//params->status = GetLastError();
+		params->error = request_url_error_no_status;
 		TRACE(_T("result = %s\n"), params->result);
 
 		SAFE_DELETE_ARRAY(jsonData);
@@ -3428,6 +3436,9 @@ void request_url(CRequestUrlParams* params, bool check_server_reachable)
 
 		return;
 	}
+
+	//여기까지 왔으면 서버가 준 상태 코드가 확실하다.
+	params->status = _ttol(query_buffer);
 
 	//20250819 scpark. status가 200이 아니라도 api에서 result에 세부 에러를 담아서 리턴하는 경우도 있으므로
 	//여기서 무조건 리턴해서는 안된다.
@@ -3478,8 +3489,9 @@ void request_url(CRequestUrlParams* params, bool check_server_reachable)
 		//버퍼 크기가 1K면 너무 빈번한 read가 발생하여 느리지만 4K이상이면 큰 차이는 발생하지 않는다.
 		if (!InternetReadFile(hOpenRequest, buffer, buffer_size, &dwRead))
 		{
+			//20260825 by claude. 서버가 준 status 는 이미 확정됐다 — 여기서 -1 로 덮으면 그 정보가 사라진다.
 			params->result = _T("InternetReadFile() failed.");
-			params->status = -1;
+			params->error = request_url_error_read_failed;
 
 			if (hOpenRequest) InternetCloseHandle(hOpenRequest);
 			if (hInternetConnect) InternetCloseHandle(hInternetConnect);
@@ -3517,8 +3529,9 @@ void request_url(CRequestUrlParams* params, bool check_server_reachable)
 						if (h) InternetCloseHandle(h);
 					}
 
+					//20260825 by claude. 서버 응답과 무관한 로컬 파일 실패다. status(서버가 준 코드)는 그대로 둔다.
 					params->result = _T("error=") + params->local_file_path + _T("\n\nfail to DeleteFile().");
-					params->status = -1;
+					params->error = request_url_error_file_delete;
 					TRACE(_T("result = %s\n"), params->result);
 					return;
 				}
@@ -3537,7 +3550,7 @@ void request_url(CRequestUrlParams* params, bool check_server_reachable)
 					}
 
 					params->result = _T("error=") + params->local_file_path + _T("\n\nfail to CreateFile().");
-					params->status = -1;
+					params->error = request_url_error_file_create;
 					TRACE(_T("result = %s\n"), params->result);
 					return;
 				}
@@ -3556,7 +3569,7 @@ void request_url(CRequestUrlParams* params, bool check_server_reachable)
 					if (h) InternetCloseHandle(h);
 				}
 				params->result = _T("error=") + params->local_file_path + _T("\n\nfail to WriteFile().");
-				params->status = -1;
+				params->error = request_url_error_file_write;
 				TRACE(_T("result = %s\n"), params->result);
 				return;
 			}

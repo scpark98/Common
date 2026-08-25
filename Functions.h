@@ -3185,6 +3185,22 @@ private:
 	std::set<CRequestUrlParams*> m_pending;
 };
 
+//20260825 by claude. request_url() 이 스스로 판정하는 실패 원인.
+//CRequestUrlParams::error 는 Win32/WinInet GetLastError() 값(양수)도 담으므로, 부호로 두 체계를 구분한다.
+//따라서 이 값들은 반드시 음수여야 한다.
+enum request_url_error
+{
+	request_url_error_none				= 0,	//에러 없음
+	request_url_error_invalid_ip		= -1,	//ip 형식이 잘못됨. 요청을 보내지 않았다
+	request_url_error_invalid_verb		= -2,	//GET/PUT/POST/DELETE 외의 메서드. 요청을 보내지 않았다
+	request_url_error_host_unreachable	= -3,	//사전 도달성 검사 실패. 요청을 보내지 않았다
+	request_url_error_no_status			= -4,	//응답은 왔으나 상태 코드를 읽지 못했다
+	request_url_error_read_failed		= -5,	//본문 수신 실패. cancel() 로 취소한 경우도 여기로 온다
+	request_url_error_file_delete		= -6,	//기존 로컬 파일 삭제 실패
+	request_url_error_file_create		= -7,	//로컬 파일 생성 실패
+	request_url_error_file_write		= -8,	//로컬 파일 쓰기 실패
+};
+
 class CRequestUrlParams
 {
 public:
@@ -3216,6 +3232,7 @@ public:
 		: use_thread(other.use_thread)
 		, request_id(other.request_id)
 		, status(other.status)
+		, error(other.error)
 		, ip(other.ip)
 		, port(other.port)
 		, sub_url(other.sub_url)
@@ -3246,6 +3263,7 @@ public:
 		use_thread = other.use_thread;
 		request_id = other.request_id;
 		status = other.status;
+		error = other.error;
 		ip = other.ip;
 		port = other.port;
 		sub_url = other.sub_url;
@@ -3286,6 +3304,7 @@ public:
 	void		reset(bool sub_url_reset = false)
 	{
 		status = -1;
+		error = request_url_error_none;
 		full_url.Empty();	//full_url 멤버값이 채워져있으면 그 문자열을 파싱하여 ip, port, sub_url로 분리하므로 reset()할 경우는 반드시 비워줘야 한다.
 		body.Empty();
 		result.Empty();
@@ -3315,8 +3334,21 @@ public:
 	//m_request_id로 해당 작업이 무엇인지 구분한다.
 	int			request_id = -1;
 
-	//200, 404...와 같은 HTTP_STATUS를 담지만 invalid address 등과 같은 에러코드도 담기 위해 int로 사용한다. 0보다 작을 경우는 result 문자열에 에러 내용이 담겨있다.
+	//20260825 by claude. 서버가 응답한 HTTP 상태 코드만 담는다(200, 404...). HTTP 응답까지 도달하지 못했으면 -1 이다.
+	//예전에는 Win32 에러코드나 로컬 파일 실패까지 이 한 값에 섞어 담았는데, 그러면 status == 234 를 받았을 때
+	//HTTP 2xx 인지 ERROR_MORE_DATA 인지 호출자가 구분할 수 없고, 서버가 200 을 준 다운로드에서 디스크 쓰기가
+	//실패하면 진짜 HTTP 결과가 -1 로 지워졌다. 그런 원인은 아래 error 로 분리했다.
 	int			status = -1;
+
+	//20260825 by claude. 실패 원인. status 와 독립이다 — 서버는 200 을 줬는데 로컬 파일 쓰기가 실패할 수 있다.
+	//  0      : 에러 없음
+	//  0 초과 : Win32 / WinInet GetLastError() 값 (get_error_str() 로 문자열화 가능)
+	//  0 미만 : request_url() 자체 판정. request_url_error 참조
+	//세부 내용은 언제나 result 문자열에 함께 담긴다.
+	int			error = request_url_error_none;
+
+	//요청이 실패했는지. 어떤 HTTP 코드를 성공으로 볼지는 API 마다 다르므로(200/201/204) status 판단은 호출자 몫이다.
+	bool		has_error() const { return error != request_url_error_none; }
 
 	//포트로 http와 https를 구분하는 것은 위험하다. m_isHttps=true 또는 ip에 "https://"가 포함되어 있으면 m_isHttps가 자동 true로 설정된다.
 	CString		ip = _T("");

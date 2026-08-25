@@ -358,10 +358,24 @@ public:
 
 	void			set_use_own_context_menu(bool use = true) { m_use_own_context_menu = use; }
 
-	//드래그앤드롭 기능을 사용할 것인지. 드래그앤드롭 기능이 false이면 순서 변경도 의미가 없다.
-	bool			get_use_drag_and_drop() { return m_use_drag_and_drop; }
-	void			set_use_drag_and_drop(bool use_drag = true) { m_use_drag_and_drop = use_drag; }
-	//순서도 변경 가능하도록 할것인지. m_use_drag_and_drop = false이면 무의미하다.
+	//20260825 by claude. 드래그 소스와 드롭 대상을 나눈다. 예전엔 한 플래그가 둘 다 통제해서
+	//"노드끼리는 못 옮기지만 다른 컨트롤에서 끌어온 것은 받는" 트리를 표현할 수 없었다
+	//(LMM CSManager 의 그룹 트리 — 그룹 이동 API 가 없어 노드 드래그는 막아야 하지만
+	//에이전트 목록에서 그룹으로 끌어다 놓는 것은 되어야 한다).
+	//반대 조합(끌어내기만 되고 받지는 않는 목록 패널)도 이걸로 표현된다.
+
+	//이 트리의 항목을 끌어서 옮길 수 있는지(드래그 시작 허용). false 면 TVN_BEGINDRAG 에서 바로 막는다.
+	bool			get_use_drag_source() { return m_use_drag_source; }
+	void			set_use_drag_source(bool use = true) { m_use_drag_source = use; }
+
+	//이 트리에 놓을 수 있는지(드롭 하이라이트 표시 + hover 자동 확장). 드래그 소스가 어느 컨트롤이든 무관하다.
+	bool			get_use_drop_target() { return m_use_drop_target; }
+	void			set_use_drop_target(bool use = true) { m_use_drop_target = use; }
+
+	//둘 다 한 번에 설정. 기존 호출부 호환용이며, 한쪽만 필요하면 위의 개별 함수를 쓴다.
+	bool			get_use_drag_and_drop() { return m_use_drag_source && m_use_drop_target; }
+	void			set_use_drag_and_drop(bool use_drag = true) { m_use_drag_source = use_drag; m_use_drop_target = use_drag; }
+	//순서도 변경 가능하도록 할것인지. 드래그 소스가 false이면 무의미하다.
 	bool			get_use_rearrange_order() { return m_use_rearrange_order; }
 	void			set_use_rearrange_order(bool use_rearrange = true) { m_use_rearrange_order = use_rearrange; }
 	HTREEITEM		m_DragItem = NULL;			//drag되는 아이템
@@ -546,6 +560,8 @@ protected:
 	bool			m_use_root = false;
 	HTREEITEM		m_root_item = NULL;
 	TV_INSERTSTRUCT m_root_tvItem;		//기억시켜놔야 DeleteAllItem()후에도 다시 추가할 수 있다.
+	//20260825 by claude. m_root_tvItem.item.pszText 가 가리킬 실체. 인자를 그대로 가리키면 dangling 이 된다.
+	CString			m_root_label;
 
 
 	enum TIMER_ID
@@ -669,7 +685,9 @@ protected:
 		drop_after_item,		// 노드 뒤에 놓기 → 같은 레벨에서 순서 변경
 	};
 
-	bool			m_use_drag_and_drop = false;	//노드 이동기능 사용여부. default = false
+	//20260825 by claude. 드래그 소스 / 드롭 대상 분리. 자세한 설명은 set_use_drag_source() 선언부 참조.
+	bool			m_use_drag_source = false;		//이 트리의 항목을 끌어낼 수 있는지. default = false
+	bool			m_use_drop_target = false;		//이 트리에 놓을 수 있는지. default = false
 	bool			m_use_rearrange_order = false;	//노드 위치조정기능 사용여부. default = false
 	CWnd*			m_pDragWnd = nullptr;		//Which wnd we are dragging FROM
 	CWnd*			m_pDropWnd = nullptr;		//Which wnd we are dropping ON

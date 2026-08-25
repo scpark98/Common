@@ -2006,7 +2006,8 @@ BOOL CSCTreeCtrl::OnTvnBegindrag(NMHDR* pNMHDR, LRESULT* pResult)
 		m_pending_edit_item = NULL;
 	}
 
-	if (!m_use_drag_and_drop)// || !m_is_shell_treectrl)
+	//드래그를 시작하는 쪽이므로 드래그 소스 설정만 본다. 드롭 대상 여부와는 무관하다.
+	if (!m_use_drag_source)// || !m_is_shell_treectrl)
 		return FALSE;
 
 	CRect	rc;
@@ -2470,8 +2471,12 @@ void CSCTreeCtrl::OnMouseMove(UINT nFlags, CPoint point)
 	//full-row hot tracking — Y 좌표 기준 row 찾고 m_hot_item 갱신. native TVS_TRACKSELECT 의 CDIS_HOT 가 label 영역에서만 발사되는 한계를 보완.
 	//[중요] 드래그 중에는 hot-tracking 금지 — SetCapture 로 커서가 다른 컨트롤(원격 트리 등) 위에 있어도 이 트리의
 	//OnMouseMove 가 계속 불려, point.y 가 자기 항목 행에 매핑되면 엉뚱하게 자기 항목에 hover 가 표시되는 버그 방지.
+	//20260825 by claude. 드래그가 막힌 트리(set_use_drag_source(false))는 m_bDragging 이 서지 않아, 버튼을 누른 채
+	//끌어도 hover 가 계속 따라다녔다. 실제로는 아무것도 옮겨지지 않는데 반응만 있어 옮겨지는 중이라는 오해를 준다.
+	//왼쪽 버튼을 누르고 있는 동안은 드래그 시도 구간이므로 드래그 지원 여부와 무관하게 hover 를 갱신하지 않는다
+	//(드래그가 실제로 시작된 뒤는 m_bDragging 이 같은 일을 한다).
 	HTREEITEM new_hot = NULL;
-	if (!m_bDragging)
+	if (!m_bDragging && !(nFlags & MK_LBUTTON))
 	{
 		HTREEITEM cur = GetFirstVisibleItem();
 		while (cur)
@@ -3591,9 +3596,11 @@ void CSCTreeCtrl::ensure_visible_cache()
 	m_visible_items.reserve(count);
 
 	//펼쳐진 항목을 display 순서로 1회만 순회(O(n)). 이후 모든 스크롤 매핑은 vector/map 으로 O(1).
+	//20260825 by claude. 예전엔 가상 루트를 목록에서 제외했다. 그러나 이 캐시는 스크롤 계산 전용이고
+	//(sync_scrollbar 의 range/pos, 휠, 스크롤바 메시지) 가상 루트도 화면에서 한 행을 차지한다.
+	//제외하면 전체 개수가 1 모자라고 루트의 index 가 -1 이 되어, 스크롤 위치가 실제와 한 행씩 어긋난다
+	//— 맨 위인데 썸이 내려가 있고, 항목 선택 시 트리가 한 행 밀려 루트가 화면 밖으로 사라졌다.
 	HTREEITEM cur = GetRootItem();
-	if (m_use_root && cur == m_root_item)
-		cur = GetChildItem(cur);
 	while (cur)
 	{
 		m_visible_index[cur] = (int)m_visible_items.size();
@@ -4533,7 +4540,7 @@ void CSCTreeCtrl::OnNMCustomDraw(NMHDR* pNMHDR, LRESULT* pResult)
 			//드롭 하이라이트: 이 트리가 직접 드래그 중이 아니어도(local tree→remote tree 처럼 *다른 컨트롤*이 드래그 소스로
 			//이 트리 위에 드롭하려는 경우) DropHilightItem 이 설정돼 있으면 표시한다. 기존 m_bDragging 조건은 자기 트리 내
 			//드래그만 커버해, cross-control 드롭 시 대상 트리에 하이라이트가 전혀 안 뜨던 원인.
-			if (m_use_drag_and_drop && GetDropHilightItem() != NULL && hItem == GetDropHilightItem())
+			if (m_use_drop_target && GetDropHilightItem() != NULL && hItem == GetDropHilightItem())
 			{
 				//20260704 by claude. drop-hilight 항목이 그려지는 동안(드래그로 폴더 위 hover) 1초 뒤 자동 확장 타이머 무장.
 				//m_bDragging 으로 가드하지 않는다 — cross-control 드래그(리스트→트리)에서는 대상 트리의 m_bDragging 이 false 라
@@ -4842,7 +4849,17 @@ void CSCTreeCtrl::OnNMCustomDraw(NMHDR* pNMHDR, LRESULT* pResult)
 					//세로 범위를 레이블과 똑같이 잡고 숫자도 DT_VCENTER 로 그린다.
 					CRect rc_badge = rcDraw;
 					rc_badge.left = rcDraw.left + sz_label.cx + badge_gap;
-					rc_badge.right = rc_badge.left + max(sz_count.cx + badge_pad_x * 2, badge_min_width);
+
+					int badge_width = max(sz_count.cx + badge_pad_x * 2, badge_min_width);
+
+					//20260825 by claude. DT_CENTER 는 (배지너비 - 글자너비) / 2 를 버림하므로, 그 차가 홀수면
+					//글자가 정확히 가운데가 아니라 1px 왼쪽으로 치우친다. 최소 너비가 적용되는 한 자리 숫자에서만
+					//차가 홀수가 되어, 자릿수에 따라 어떤 배지만 어긋나 보였다(사용자 지적).
+					//배지를 1px 넓혀 차를 짝수로 맞추면 반올림 없이 정확히 중앙에 온다.
+					if ((badge_width - sz_count.cx) % 2 != 0)
+						badge_width++;
+
+					rc_badge.right = rc_badge.left + badge_width;
 
 					if (rc_badge.right <= right_limit)
 					{
@@ -4961,7 +4978,7 @@ void CSCTreeCtrl::OnNMCustomDraw_old(NMHDR* pNMHDR, LRESULT* pResult)
 			
 			//우선순위: CDIS_DROPHILITED > CDIS_SELECTED > CDIS_HOT. selected 항목 위 hover 가 와도 selected 색 유지.
 			//else if (pNMCustomDraw->uItemState & CDIS_DROPHILITED)	//이건 동작안한다.
-			if (m_use_drag_and_drop && m_bDragging && (hItem == GetDropHilightItem()))// */pNMCustomDraw->uItemState & CDIS_DROPHILITED)
+			if (m_use_drop_target && m_bDragging && (hItem == GetDropHilightItem()))// */pNMCustomDraw->uItemState & CDIS_DROPHILITED)
 			{
 				//TRACE(_T("%s, CDIS_DROPHILITED\n"), GetItemText(hItem));
 				//drop을 위해 폴더위에 머무를 경우 해당 폴더가 expand가 아니면 expand시켜준다.
@@ -6145,16 +6162,19 @@ LRESULT CSCTreeCtrl::on_message_CSCScrollbar(WPARAM wParam, LPARAM lParam)
 //반드시 set_imagelist()로 이미지들을 지정한 후에 호출해야 한다.
 void CSCTreeCtrl::set_root_item(CString label, int image_index, int selected_image_index)
 {
-	//이미 가상 루트를 설정한 상태라면 label과 img만 변경시킨다.
+	//인자 없이 부르면 DeleteAllItems() 로 사라진 가상 루트를 저장해둔 정보로 되살린다.
+	//20260825 by claude. 예전엔 InsertItem 결과를 버려서, 되살린 뒤에도 m_root_item 이 이미 삭제된 옛 핸들을
+	//들고 있었다. get_root_item() 이 그 죽은 핸들을 돌려주므로 그것을 부모로 넣은 자식들은 트리에 붙지 못한다.
+	//pszText 도 매번 다시 지정해야 한다 — 예전엔 호출 시점의 지역 인자(label)를 가리켜 함수를 벗어나면 dangling 이었다.
 	if (label.IsEmpty())
 	{
-		if (m_use_root && m_root_item)
-			InsertItem(&m_root_tvItem);
-		return;
-	}
-	else
-	{
+		if (m_use_root)
+		{
+			m_root_tvItem.item.pszText = (LPTSTR)(LPCTSTR)m_root_label;
+			m_root_item = InsertItem(&m_root_tvItem);
+		}
 
+		return;
 	}
 
 	HTREEITEM hItem = GetRootItem();
@@ -6179,7 +6199,10 @@ void CSCTreeCtrl::set_root_item(CString label, int image_index, int selected_ima
 
 	m_root_tvItem.hInsertAfter = TVI_FIRST;
 	m_root_tvItem.hParent = TVI_ROOT;
-	m_root_tvItem.item.pszText = (LPTSTR)(LPCTSTR)label;
+	//20260825 by claude. 레이블을 멤버에 보관하고 그 버퍼를 가리킨다. 인자를 그대로 가리키면 함수를 벗어나는 순간
+	//dangling 이 되어, 인자 없는 재삽입 경로에서 쓰레기 문자열이 들어간다.
+	m_root_label = label;
+	m_root_tvItem.item.pszText = (LPTSTR)(LPCTSTR)m_root_label;
 	//기존에 노드들이 존재했다면 확장버튼을 표시한다.
 	m_root_tvItem.item.cChildren = 1;// (GetRootItem() != NULL);
 	m_root_item = InsertItem(&m_root_tvItem);

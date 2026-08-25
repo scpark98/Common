@@ -12,6 +12,7 @@
 #include "../../colors.h"
 #include "../../MemoryDC.h"
 #include "Common/drag_scroll_message.h"	//20260707 by claude. SCTreeCtrl 드래그 자동스크롤 위임 메시지 수신용.
+#include "Common/drop_target_message.h"	//20260825 by claude. 드롭 대상 hit-test·수용여부 위임 메시지 수신용.
 #include <afxvslistbox.h>
 
 #define IDC_EDIT_CELL	1001
@@ -106,6 +107,8 @@ BEGIN_MESSAGE_MAP(CSCListCtrl, CListCtrl)
 	ON_WM_MOUSEHWHEEL()
 	ON_REGISTERED_MESSAGE(Message_CSCScrollbar, &CSCListCtrl::on_message_CSCScrollbar)
 	ON_REGISTERED_MESSAGE(Message_DragScrollBy, &CSCListCtrl::on_message_DragScrollBy)
+	ON_REGISTERED_MESSAGE(Message_DropHitTest, &CSCListCtrl::on_message_DropHitTest)
+	ON_REGISTERED_MESSAGE(Message_QueryAcceptDrop, &CSCListCtrl::on_message_QueryAcceptDrop)
 	ON_WM_TIMER()
 END_MESSAGE_MAP()
 
@@ -6153,6 +6156,31 @@ LRESULT CSCListCtrl::on_message_DragScrollBy(WPARAM wParam, LPARAM lParam)
 {
 	drag_scroll_by((int)wParam, (int)lParam);
 	return 1;
+}
+
+//20260825 by claude. 드래그 소스가 우리 타입을 몰라도 되도록 hit-test 를 메시지로 제공한다.
+//native HitTest 는 스무스 스크롤(m_scroll_y)을 무시해 커서 밑과 다른 행을 짚으므로 자체 계산값을 돌려준다.
+LRESULT CSCListCtrl::on_message_DropHitTest(WPARAM wParam, LPARAM lParam)
+{
+	const POINT* pt = (const POINT*)wParam;
+	int* out_index = (int*)lParam;
+
+	if (pt == NULL || out_index == NULL)
+		return 0;
+
+	int item = -1;
+	int sub_item = -1;
+
+	hit_test(CPoint(pt->x, pt->y), item, sub_item, true);
+	*out_index = item;
+
+	return 1;
+}
+
+//20260825 by claude. 이 리스트가 드롭을 받는지. 드래그 자동스크롤 대상 선정에 쓰인다.
+LRESULT CSCListCtrl::on_message_QueryAcceptDrop(WPARAM wParam, LPARAM lParam)
+{
+	return get_use_drag_and_drop() ? 1 : 0;
 }
 
 void CSCListCtrl::OnTimer(UINT_PTR nIDEvent)

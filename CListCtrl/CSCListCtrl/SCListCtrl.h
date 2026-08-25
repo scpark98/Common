@@ -841,6 +841,9 @@ public:
 	void			drag_scroll_by(int dx_px, int dy_lines);
 	//20260707 by claude. SCTreeCtrl 등에서 드래그 자동스크롤이 이 리스트로 위임될 때 받는 메시지 핸들러. drag_scroll_by 후 1 반환.
 	afx_msg LRESULT	on_message_DragScrollBy(WPARAM wParam, LPARAM lParam);
+	//20260825 by claude. 드롭 대상 위임 메시지 수신(drop_target_message.h). 드래그 소스가 우리 타입을 몰라도 되게 한다.
+	afx_msg LRESULT	on_message_DropHitTest(WPARAM wParam, LPARAM lParam);
+	afx_msg LRESULT	on_message_QueryAcceptDrop(WPARAM wParam, LPARAM lParam);
 
 	//text = "     some text"일 경우 앞의 공백을 들여쓰기 용도로 사용한다.
 	//"     " 만큼 들여써서 "some text"를 출력한다. 아이콘도 함께 적용된다.

@@ -439,6 +439,20 @@ public:
 	bool			(*function_check_is_dim_text)(CWnd* pTree, HTREEITEM hItem) = NULL;
 	void			set_function_check_is_dim_text(bool (*func)(CWnd* pTree, HTREEITEM hItem)) { function_check_is_dim_text = func; }
 
+	//20260825 by claude. 항목별로 드롭을 받을지 판별한다. 어떤 노드가 드롭 대상이 될 수 있는지는 앱의 의미이므로
+	//(LMM CSManager: 가상 루트 "그룹 관리"와 "모든 에이전트"는 실체가 없어 이동 대상이 될 수 없다) 판별을 앱에 맡긴다.
+	//드래그 소스가 이 값을 물어 드롭 하이라이트를 표시할지 정한다 — 받을 수 없는 노드에 하이라이트가 뜨면
+	//놓을 수 있다는 잘못된 신호를 준다. 미지정이면 모든 항목이 드롭 가능(기존 동작).
+	bool			(*function_check_can_drop)(CWnd* pTree, HTREEITEM hItem) = NULL;
+	void			set_function_check_can_drop(bool (*func)(CWnd* pTree, HTREEITEM hItem)) { function_check_can_drop = func; }
+	bool			can_drop_item(HTREEITEM hItem)
+	{
+		if (hItem == NULL)
+			return false;
+
+		return (function_check_can_drop == NULL) ? true : function_check_can_drop(this, hItem);
+	}
+
 	//20260824 by claude. 레이블 오른쪽에 개수를 흐린 색으로 별도 표시. 항목 텍스트에 개수를 문자열로 붙이면
 	//편집 시 그 개수가 실제 이름으로 커밋되어 데이터가 오염된다(LMM CSManager 에서 서버 그룹명이 "기본그룹 (10)"이 된 사고).
 	//레이블 강조영역 밖에 그리므로 선택/hover 배경도 개수를 덮지 않는다.

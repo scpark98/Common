@@ -7,7 +7,7 @@
 #include "../../MemoryDC.h"
 #include "../../SCGdiPlusBitmap.h"
 #include "Common/drag_scroll_message.h"		//20260707 by claude. 드래그 자동스크롤을 대상 타입 무관 메시지로 위임 — CVtListCtrlEx 하드 의존 제거(점진 이행용).
-#include "Common/CListCtrl/CSCListCtrl/SCListCtrl.h"	//20260713 by claude. 트리→리스트 드롭 시 대상 리스트의 smooth-aware hit_test 사용(native HitTest 는 스크롤 무시).
+#include "Common/drop_target_message.h"		//20260825 by claude. 드롭 대상의 hit-test·수용여부를 메시지로 위임 — CSCListCtrl 하드 의존 제거.
 
 #include <fstream>
 // CSCTreeCtrl
@@ -2556,12 +2556,13 @@ void CSCTreeCtrl::OnMouseMove(UINT nFlags, CPoint point)
 			// Get the item that is below cursor
 			//20260713 by claude. native HitTest 는 smooth 스크롤(m_scroll_y)을 무시하고 클라이언트 Y 를 top(0번 행) 기준으로 매핑해,
 			//리스트가 스크롤돼 있으면 커서 밑과 다른 행을 짚어 드롭 하이라이트·드롭 대상이 어긋났다 → CSCListCtrl 은 smooth-aware hit_test 사용.
-			if (pDropWnd->IsKindOf(RUNTIME_CLASS(CSCListCtrl)))
-			{
-				int di = -1, ds = -1;
-				((CSCListCtrl*)pDropWnd)->hit_test(point, di, ds, true);
+			//20260825 by claude. 대상의 구체 타입을 묻지 않고 메시지로 위임한다(Message_DragScrollBy 와 동일 취지).
+			//예전엔 CSCListCtrl 을 직접 참조해, 트리만 쓰는 프로젝트도 SCListCtrl.cpp 를 링크해야 했다.
+			int di = -1;
+			POINT pt_client = point;
+
+			if (pDropWnd->SendMessage(Message_DropHitTest, (WPARAM)&pt_client, (LPARAM)&di) != 0)
 				m_nDropIndex = di;
-			}
 			else
 				m_nDropIndex = ((CListCtrl*)pDropWnd)->HitTest(point, &uFlags);
 			TRACE(_T("nDropIndex in ListCtrl = %d\n"), m_nDropIndex);
@@ -5220,11 +5221,10 @@ void CSCTreeCtrl::update_drag_auto_scroll(CPoint screen_pt)
 	//진행 중 스크롤을 끊던 방식 폐기 — 전환은 오직 '드롭 가능한 다른 컨트롤 위'일 때만.)
 	if (m_pDropWnd)
 	{
-		if (m_pDropWnd->IsKindOf(RUNTIME_CLASS(CSCListCtrl)))
-		{
-			if (((CSCListCtrl*)m_pDropWnd)->get_use_drag_and_drop())
-				m_drag_scroll_target = m_pDropWnd;
-		}
+		//20260825 by claude. 드롭 수용 여부도 메시지로 묻는다 — 리스트 클래스를 하드 참조하지 않기 위해.
+		//트리는 예전처럼 타입만 보고 대상으로 삼는다(자기 계열이라 메시지 없이도 판단 가능).
+		if (m_pDropWnd->SendMessage(Message_QueryAcceptDrop, 0, 0) != 0)
+			m_drag_scroll_target = m_pDropWnd;
 		else if (m_pDropWnd->IsKindOf(RUNTIME_CLASS(CTreeCtrl)))
 			m_drag_scroll_target = m_pDropWnd;
 	}

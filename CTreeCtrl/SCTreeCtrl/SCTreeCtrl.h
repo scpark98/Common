@@ -382,7 +382,9 @@ public:
 	bool			edit_item_by_user(HTREEITEM hItem = NULL);
 	void			edit_end(bool valid = true);
 	HTREEITEM		get_recent_edit_item() { return m_edit_item; }
-	CString			get_edit_old_text() { return m_edit_old_text; }		//편집 후 텍스트
+	CString			get_edit_old_text() { return m_edit_old_text; }		//편집 전 텍스트
+	//20260825 by claude. Escape 로 취소하면 편집 전 텍스트와 같은 값이 온다(edit_end 가 정규화).
+	//따라서 old 와 같으면 '변경 없음 또는 취소' 이고, 별도의 취소 플래그를 볼 필요가 없다.
 	CString			get_edit_new_text() { return m_edit_new_text; }		//편집 후 텍스트
 	void			undo_edit_label();									//편집 전의 텍스트로 되돌린다.(예를 들어 편집 레이블이 파일명이고 파일명 변경이 실패한 경우 쓸 수 있다.)
 	//CSCStaticEdit 으로 통일 — 본 컨트롤은 base CTreeCtrl 의 native edit 을 안 쓰고 자체 m_pEdit 만 운용.
@@ -432,6 +434,10 @@ public:
 	//항목 높이를 키우지 않은 트리에서는 글자 높이 + 여백이 이미 행 높이 이상이므로 아무 변화가 없다.
 	void			set_item_height_fit_text(bool fit = true) { m_item_height_fit_text = fit; if (GetSafeHwnd()) Invalidate(); }
 	bool			get_item_height_fit_text() { return m_item_height_fit_text; }
+
+	//20260825 by claude. rc 를 글자 높이에 맞춘 세로 범위로 줄인다(중앙 유지). 강조 배경과 편집기가 같은 값을 써야
+	//편집에 들어가는 순간 높이가 튀지 않으므로 계산을 여기 한 곳에 둔다. pDC 에는 항목 폰트가 선택돼 있어야 한다.
+	void			fit_rect_to_text_height(CDC* pDC, CRect& rc);
 
 	//20260824 by claude. 선택 항목을 포커스 유무와 무관하게 항상 active 선택색으로 표시. default = false.
 	//기본은 탐색기와 동일하게 포커스가 없으면 약한 inactive 색으로 바뀌는데, 트리의 선택이 다른 컨트롤(목록 등)의

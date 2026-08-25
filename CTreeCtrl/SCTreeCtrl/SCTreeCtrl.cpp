@@ -3842,6 +3842,31 @@ CString CSCTreeCtrl::get_node_count_text(HTREEITEM hItem)
 	return i2S(count, true);
 }
 
+//20260825 by claude. 강조 배경(custom draw)과 편집기(edit_item)가 공유하는 세로 범위 계산.
+//두 곳이 따로 계산하면 편집에 들어가는 순간 높이가 달라져 레이블이 커지는 것처럼 보인다.
+void CSCTreeCtrl::fit_rect_to_text_height(CDC* pDC, CRect& rc)
+{
+	if (!m_item_height_fit_text)
+		return;
+
+	TEXTMETRIC tm;
+	pDC->GetTextMetrics(&tm);
+
+	//여백을 절대 픽셀로 두면 폰트 크기가 바뀔 때 비율이 깨진다 — 글자 높이에 비례시킨다.
+	//20% 는 Segoe UI 9pt(tmHeight≈15)에서 위아래 3px 로, 기존 절대값과 같은 결과가 나오는 비율이다.
+	int pad = max(2, tm.tmHeight * 20 / 100);
+	int h = tm.tmHeight + pad * 2;
+
+	//항목 높이를 키우지 않은 트리는 이미 글자 높이에 맞아 있다 — 늘리지는 않는다.
+	if (h >= rc.Height())
+		return;
+
+	int center_y = rc.CenterPoint().y;
+
+	rc.top = center_y - h / 2;
+	rc.bottom = rc.top + h;
+}
+
 //20260824 by claude. 사용자 조작(F2 / 지연 클릭)으로 편집을 시작하는 단일 진입점.
 //편집 박스는 항목의 표시 텍스트로 seed 되는데(edit_item 의 m_edit_old_text = GetItemText),
 //표시 텍스트와 실제 이름이 다른 앱(LMM CSManager 의 "그룹명 (개수)")은 그대로 커밋하면 이름이 오염된다.
@@ -3999,6 +4024,17 @@ void CSCTreeCtrl::edit_item(HTREEITEM hItem)
 	//(CSCStaticEdit 기본 m_border_width=1. 트리는 border width 를 변경하지 않는다.)
 	r.left -= 1;
 
+	//20260825 by claude. 편집기 높이를 강조 배경과 동일하게 글자 높이에 맞춘다.
+	//GetItemRect 는 항목 높이(=SetItemHeight 로 넓힌 line height)를 그대로 주므로, 그대로 쓰면 편집에 들어가는
+	//순간 레이블만 갑자기 두꺼워진다. 그리기와 같은 함수를 쓰므로 배경과 편집기의 높이가 어긋날 수 없다.
+	{
+		//GetTextMetrics 는 DC 에 선택된 폰트를 따르므로 항목 폰트를 명시적으로 선택해야 한다.
+		CClientDC dc_fit(this);
+		CFont* old_font_fit = dc_fit.SelectObject(&m_font);
+		fit_rect_to_text_height(&dc_fit, r);
+		dc_fit.SelectObject(old_font_fit);
+	}
+
 	if (m_pEdit == NULL)
 	{
 		m_pEdit = new CSCStaticEdit;
@@ -4011,7 +4047,7 @@ void CSCTreeCtrl::edit_item(HTREEITEM hItem)
 	m_pEdit->MoveWindow(r);
 	m_pEdit->SetFont(&m_font, true);
 	m_pEdit->set_line_align(DT_VCENTER);
-	//셀 편집기 — 항목 높이 = edit 높이 이므로 자체 padding 을 2px 로 줄여 텍스트가 위/아래로 자연스럽게 채워지게.
+	//셀 편집기 — edit 높이가 글자 높이 + 여백에 딱 맞으므로 자체 padding 을 2px 로 줄여 텍스트가 위/아래로 자연스럽게 채워지게.
 	//0 으로 두면 선택 하이라이트가 보더에 붙어 일반 edit 컨트롤 외관과 어긋남.
 	m_pEdit->set_padding(2);
 
@@ -4054,6 +4090,13 @@ void CSCTreeCtrl::edit_end(bool valid)
 
 	m_pEdit->GetWindowText(m_edit_new_text);
 	m_pEdit->ShowWindow(SW_HIDE);
+
+	//20260825 by claude. Escape 는 편집 결과가 없다는 뜻이다. 편집 박스에 남아 있던 텍스트를 그대로 두면
+	//TVN_ENDLABELEDIT 를 받은 부모가 old != new 만 보고 확정으로 오인해, 취소했는데도 rename 같은
+	//되돌릴 수 없는 처리를 한다(실제로 그런 경로가 있었다).
+	//취소를 '변경 없음' 으로 정규화하면 호출자는 기존 old/new 비교만으로 옳게 동작한다.
+	if (!valid)
+		m_edit_new_text = m_edit_old_text;
 
 	//valid==false (Escape) 또는 텍스트 미변경 → rename / SetItemText 모두 건너뜀. 외부 클릭으로 들어온 commit
 	//의 경우 텍스트 미변경이면 MoveFile(same, same) 이 실패하고 아래 edit_item() 재진입 경로로 빠져 마치
@@ -4571,21 +4614,8 @@ void CSCTreeCtrl::OnNMCustomDraw(NMHDR* pNMHDR, LRESULT* pResult)
 			//않아 그대로다. per-item override 배경(state_highlight=false)은 강조가 아니라 배경이므로 풀행 유지.
 			CRect rcBand = rcFill;
 
-			if (m_item_height_fit_text && state_highlight)
-			{
-				TEXTMETRIC tm_band;
-				dc.GetTextMetrics(&tm_band);
-				//여백을 절대 픽셀로 두면 폰트 크기가 바뀔 때 비율이 깨진다 — 글자 높이에 비례시킨다.
-				//20% 는 Segoe UI 9pt(tmHeight≈15)에서 위아래 3px 로, 기존 절대값과 같은 결과가 나오는 비율이다.
-				int band_pad = max(2, tm_band.tmHeight * 20 / 100);
-				int band_h = tm_band.tmHeight + band_pad * 2;
-
-				if (band_h < rcRow.Height())
-				{
-					rcBand.top = rcRow.CenterPoint().y - band_h / 2;
-					rcBand.bottom = rcBand.top + band_h;
-				}
-			}
+			if (state_highlight)
+				fit_rect_to_text_height(&dc, rcBand);
 
 			//TVS_FULLROWSELECT on → 강조도 풀폭. off → 일반 배경만 풀폭으로 칠하고 selection/hover/drop 강조는 라벨(rcText) 영역만.
 			//per-item override 배경(state_highlight=false)은 selection 과 무관하므로 옵션과 관계없이 풀폭 유지.

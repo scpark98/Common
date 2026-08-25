@@ -374,4 +374,11 @@ public:
 protected:
 };
 
+//20260825 by claude. JSON 문자열 값 하나를 안전하게 만든다. 따옴표는 붙이지 않는다 — Format 의 "%s" 자리에 그대로 넣는다.
+//  CString body;
+//  body.Format(_T("{\"name\":\"%s\"}"), json_escape(user_text));
+//사용자가 입력한 텍스트로 body 를 조립할 때 이 함수를 거치지 않으면 이름에 " 하나만 들어가도 요청 전체가 깨진다.
+//RFC 8259 가 요구하는 최소 집합만 처리한다 — " \ 와 제어문자(U+0000~U+001F).
+CString		json_escape(const CString& src);
+
 #endif

@@ -430,3 +430,43 @@ CString	Json::get_CString(std::string member, CString default_value)
 
 	return doc[member].GetCString();
 }
+
+//20260825 by claude. 선언부(json.h)의 설명 참조.
+CString json_escape(const CString& src)
+{
+	CString dst;
+
+	//최악의 경우(전부 제어문자) 문자당 6자로 늘어난다. 재할당을 피하려고 미리 잡는다.
+	dst.Preallocate(src.GetLength() * 6 + 1);
+
+	for (int i = 0; i < src.GetLength(); i++)
+	{
+		TCHAR c = src[i];
+
+		switch (c)
+		{
+		case _T('\"'):	dst += _T("\\\"");	break;
+		case _T('\\'):	dst += _T("\\\\");	break;
+		case _T('\b'):	dst += _T("\\b");	break;
+		case _T('\f'):	dst += _T("\\f");	break;
+		case _T('\n'):	dst += _T("\\n");	break;
+		case _T('\r'):	dst += _T("\\r");	break;
+		case _T('\t'):	dst += _T("\\t");	break;
+		default:
+			//'/' 는 이스케이프해도 되고 안 해도 되므로 가독성을 위해 그대로 둔다.
+			if ((unsigned int)c < 0x20)
+			{
+				CString esc;
+				esc.Format(_T("\\u%04x"), (unsigned int)c);
+				dst += esc;
+			}
+			else
+			{
+				dst += c;
+			}
+			break;
+		}
+	}
+
+	return dst;
+}

@@ -47,15 +47,19 @@ namespace dwm
     //  - XP/Vista/7/8/10 : no-op (dwmapi 미존재 또는 attribute 미지원, E_INVALIDARG 반환되며 무시)
     //  - Win11+          : 둥근 모서리 적용
     //SDK 7.1A 에 DWMWA_WINDOW_CORNER_PREFERENCE / DWMWCP_ROUND 가 없으므로 값(33, 2)을 직접 정의.
-    inline void set_window_corner_round(HWND hwnd)
+    //20260826 by claude. use_small_radius=true 는 DWMWCP_ROUNDSMALL(작은 반경) — 툴팁·팝업처럼 작은 창용.
+    //(파라미터명을 small 로 두면 rpcndr.h 의 #define small char 와 충돌해 컴파일되지 않는다.)
+    //반환값 true = 실제로 적용됨(Win11+). false = 미지원(창은 각진 그대로) — 호출측이 자체 모서리 처리를
+    //할지 판단할 수 있어야 해서 void 에서 bool 로 바꿨다(기존 호출부는 반환값을 무시하므로 영향 없음).
+    inline bool set_window_corner_round(HWND hwnd, bool use_small_radius = false)
     {
         const DWORD attr_corner_pref = 33;  //DWMWA_WINDOW_CORNER_PREFERENCE
-        const DWORD pref_round       = 2;   //DWMWCP_ROUND
+        const DWORD pref_round       = use_small_radius ? 3 : 2;   //DWMWCP_ROUNDSMALL : DWMWCP_ROUND
 
         auto pfn = _get_set_attr();
-        if (!pfn) return;
+        if (!pfn) return false;
         DWORD v = pref_round;
-        pfn(hwnd, attr_corner_pref, &v, sizeof(v));
+        return SUCCEEDED(pfn(hwnd, attr_corner_pref, &v, sizeof(v)));
     }
 
     //Win10 Build 17763+ / Win11 : immersive dark mode 적용.

@@ -1470,6 +1470,9 @@ void CSCColorTheme::set_color_theme(int color_theme)
 	cr_progress_active			= Gdiplus::Color::Transparent;
 	cr_progress_active_selected	= Gdiplus::Color::Transparent;
 
+	//20260826 by claude. 툴팁 배경도 같은 이유로 Transparent 리셋 후 말미에서 자동 산출한다.
+	cr_tooltip_back				= Gdiplus::Color::Transparent;
+
 	switch (color_theme)
 	{
 		case color_theme_linkmemine :
@@ -2706,6 +2709,14 @@ void CSCColorTheme::set_color_theme(int color_theme)
 	//20260723 by claude. 격자선은 테마별 정의 없이 cr_back 에서 파생한다. apply_theme_level *뒤* 에
 	//산출해야 leveled cr_back 기준이 되어, apply_theme_level 목록에 따로 넣지 않아도 항상 일치한다.
 	cr_gridlines = get_weak_color(cr_back, 16);
+
+	//20260826 by claude. 툴팁 배경 — 테마가 명시하지 않았으면(alpha 0) 여기서 산출한다.
+	//밝은 테마는 cr_back(대개 240,240,240 회색)을 그대로 쓰면 dlg 배경과 거의 같은 색이라 툴팁이 떠 보이지 않는다.
+	//FloralWhite(#FFFCF0)로 한 톤 띄워 어떤 밝은 테마에서도 "종이 조각" 처럼 보이게 한다.
+	//어두운 테마는 이미 cr_back 자체가 주변과 구분되므로 그대로 둔다.
+	//cr_gridlines 와 같은 이유로 apply_theme_level *뒤* 에 둔다 — leveled cr_back 으로 밝기를 판정해야 한다.
+	if (cr_tooltip_back.GetA() == 0)
+		cr_tooltip_back = (get_luminance(cr_back) >= 128) ? gRGB(255, 252, 240) : cr_back;
 }
 
 Gdiplus::Color get_sys_color(int index)

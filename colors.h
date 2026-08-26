@@ -574,6 +574,7 @@ public:
 
 		cr_edit_text				= src.cr_edit_text;
 		cr_edit_back				= src.cr_edit_back;
+		cr_tooltip_back				= src.cr_tooltip_back;
 		cr_button_text				= src.cr_button_text;
 		cr_button_back				= src.cr_button_back;
 		cr_button_border			= src.cr_button_border;
@@ -637,6 +638,12 @@ public:
 	// input.foreground 슬롯과 직접 매핑된다.)
 	Gdiplus::Color	cr_edit_text = gRGB(32, 32, 32);
 	Gdiplus::Color	cr_edit_back = Gdiplus::Color::White;
+
+	//20260826 by claude. 툴팁(CSCToolTipCtrl) 배경. 미지정(alpha=0)이면 set_color_theme 말미에서 산출한다 —
+	//밝은 테마는 FloralWhite 계열 #FFFCF0, 어두운 테마는 cr_back 그대로.
+	//밝은 테마의 cr_back 은 대개 (240,240,240) 회색이라 그대로 쓰면 툴팁이 배경 dlg 에 묻혀 떠 있는 느낌이 사라진다.
+	//(VSCode 의 editorHoverWidget.background 슬롯과 매핑.)
+	Gdiplus::Color	cr_tooltip_back = Gdiplus::Color::Transparent;
 
 	//CGdiButton 의 primary action button 색. default = Transparent (alpha=0) 이면
 	//set_color_theme 안에서 cr_back luma 기반 Win11 push-button 자동 산출 경로 사용.

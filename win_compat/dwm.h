@@ -83,12 +83,14 @@ namespace dwm
     //  - DWMWA_COLOR_NONE 으로 끄면 DWM border 자체 그리지 않음.
     //  - WS_THICKFRAME borderless 윈도우의 deactivate 시 흰 frame 차단에 사용.
     //  - XP/Vista/7/8/10 : no-op
-    inline void set_border_color(HWND hwnd, COLORREF cr)
+    //20260826 by claude. 반환값 true = 실제로 적용됨(Win11+). false = 미지원 → 호출측이 직접 테두리를 그릴지 판단.
+    //(set_window_corner_round 와 같은 이유로 void 에서 bool 로. 기존 호출부는 반환값을 무시하므로 영향 없음.)
+    inline bool set_border_color(HWND hwnd, COLORREF cr)
     {
         const DWORD attr_border_color = 34;  //DWMWA_BORDER_COLOR
         auto pfn = _get_set_attr();
-        if (!pfn) return;
-        pfn(hwnd, attr_border_color, &cr, sizeof(cr));
+        if (!pfn) return false;
+        return SUCCEEDED(pfn(hwnd, attr_border_color, &cr, sizeof(cr)));
     }
 
     inline void disable_border_color(HWND hwnd)

@@ -640,6 +640,11 @@ protected:
 	bool			m_is_hovering = false;
 	HTREEITEM		m_hot_item = NULL;	//Y 좌표 기준 row 의 어디든 hover 시 hot 으로 인식 — native HitTest 가 label 외 영역에서 hItem 반환 안 하는 케이스 보완.
 
+	//20260826 by claude. hover 강조 사용 여부. PreSubclassWindow 에서 리소스 에디터의
+	//Track Select(TVS_TRACKSELECT) 설정을 읽어 채운다 — 리소스에서 정한 속성이 우선이다.
+	//동적 생성 시에는 Create() 에 넘긴 스타일이 그대로 기준이 된다.
+	bool			m_use_hover = false;
+
 
 //들여쓰기 크기
 	int				m_indent_size = 16;

@@ -157,6 +157,12 @@ void CSCLog::write_start_log()
 	CTime t = GetFileLastModifiedTime(get_exe_filename(true));
 	logWrite(_T("built datetime = %s"), get_datetime_str(t));
 
+#ifdef _DEBUG
+	logWrite(_T("build type = Debug"));
+#else
+	logWrite(_T("build type = Release"));
+#endif
+
 	logWrite(_T("log path = %s"), get_log_full_path());
 }
 

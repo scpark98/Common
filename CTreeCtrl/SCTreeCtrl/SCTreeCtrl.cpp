@@ -115,10 +115,16 @@ void CSCTreeCtrl::PreSubclassWindow()
 	DWORD dwStyle = GetStyle();
 	DWORD exStyle = GetExStyle();
 
-	//native TVS_TRACKSELECT(hot-tracking) 제거 — 이 스타일이 켜져 있으면 native 컨트롤이 hover 항목을
-	//하이퍼링크처럼 밑줄(underline) 로 그린다. 커스텀 드로우가 보통은 CDRF_SKIPDEFAULT 로 억제하지만,
-	//부분 invalidate 로 item rc 가 빈 순간 CDRF_DODEFAULT 로 빠지면 native 밑줄이 새어 보인다(hover 시 간헐 underline).
-	//hover 강조는 이 컨트롤이 m_hot_item(full-row) 으로 직접 처리하므로 native hot-track 은 불필요 → 제거.
+	//20260826 by claude. 리소스 에디터의 Track Select(TVS_TRACKSELECT)를 hover 강조 사용 여부로 읽는다.
+	//전에는 이 스타일을 제거하기만 하고 hover 는 무조건 그렸다. 그래서 리소스에서 Track Select 를 꺼도
+	//hover 가 동작했다 — 리소스 에디터에서 정한 속성이 우선이어야 하므로 그 값을 그대로 따른다.
+	//dwStyle 은 아래 ModifyStyle 이전에 읽어둔 값이라 리소스 원본 설정을 담고 있다.
+	m_use_hover = (dwStyle & TVS_TRACKSELECT) != 0;
+
+	//값을 읽은 뒤 스타일 자체는 제거한다 — 켜져 있으면 native 컨트롤이 hover 항목을 하이퍼링크처럼
+	//밑줄(underline) 로 그린다. 커스텀 드로우가 보통은 CDRF_SKIPDEFAULT 로 억제하지만, 부분 invalidate 로
+	//item rc 가 빈 순간 CDRF_DODEFAULT 로 빠지면 native 밑줄이 새어 보인다(hover 시 간헐 underline).
+	//hover 강조는 이 컨트롤이 m_hot_item(full-row) 으로 직접 그리므로 native hot-track 은 필요 없다.
 	ModifyStyle(TVS_TRACKSELECT, 0);
 
 	//분명 WS_BORDER 스타일이 있음에도 불구하고 (GetStyle() & WS_BORDER) 값은 false로 나온다.
@@ -2475,8 +2481,11 @@ void CSCTreeCtrl::OnMouseMove(UINT nFlags, CPoint point)
 	//끌어도 hover 가 계속 따라다녔다. 실제로는 아무것도 옮겨지지 않는데 반응만 있어 옮겨지는 중이라는 오해를 준다.
 	//왼쪽 버튼을 누르고 있는 동안은 드래그 시도 구간이므로 드래그 지원 여부와 무관하게 hover 를 갱신하지 않는다
 	//(드래그가 실제로 시작된 뒤는 m_bDragging 이 같은 일을 한다).
+	//20260826 by claude. m_use_hover 는 리소스의 Track Select 설정이다(PreSubclassWindow 참조).
+	//꺼져 있으면 m_hot_item 이 계속 NULL 로 남고, 커스텀 드로우의 hover 분기도 성립하지 않는다
+	//(native TVS_TRACKSELECT 를 제거했으므로 CDIS_HOT 도 서지 않는다).
 	HTREEITEM new_hot = NULL;
-	if (!m_bDragging && !(nFlags & MK_LBUTTON))
+	if (m_use_hover && !m_bDragging && !(nFlags & MK_LBUTTON))
 	{
 		HTREEITEM cur = GetFirstVisibleItem();
 		while (cur)

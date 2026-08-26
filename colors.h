@@ -575,6 +575,7 @@ public:
 		cr_edit_text				= src.cr_edit_text;
 		cr_edit_back				= src.cr_edit_back;
 		cr_tooltip_back				= src.cr_tooltip_back;
+		cr_tooltip_border			= src.cr_tooltip_border;
 		cr_button_text				= src.cr_button_text;
 		cr_button_back				= src.cr_button_back;
 		cr_button_border			= src.cr_button_border;
@@ -644,6 +645,11 @@ public:
 	//밝은 테마의 cr_back 은 대개 (240,240,240) 회색이라 그대로 쓰면 툴팁이 배경 dlg 에 묻혀 떠 있는 느낌이 사라진다.
 	//(VSCode 의 editorHoverWidget.background 슬롯과 매핑.)
 	Gdiplus::Color	cr_tooltip_back = Gdiplus::Color::Transparent;
+
+	//20260826 by claude. 툴팁 테두리. 미지정(alpha=0)이면 cr_tooltip_back 과 같이 set_color_theme 말미에서 산출한다.
+	//일반 컨트롤 테두리(cr_border_inactive)를 그대로 쓰면 안 된다 — 그건 배경보다 *밝은* 테마가 많아
+	//툴팁이 "테두리 있는 상자" 로 보이고 떠 있는 느낌이 나지 않는다. 툴팁 테두리는 배경보다 어두워야 한다.
+	Gdiplus::Color	cr_tooltip_border = Gdiplus::Color::Transparent;
 
 	//CGdiButton 의 primary action button 색. default = Transparent (alpha=0) 이면
 	//set_color_theme 안에서 cr_back luma 기반 Win11 push-button 자동 산출 경로 사용.

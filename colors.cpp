@@ -1470,8 +1470,9 @@ void CSCColorTheme::set_color_theme(int color_theme)
 	cr_progress_active			= Gdiplus::Color::Transparent;
 	cr_progress_active_selected	= Gdiplus::Color::Transparent;
 
-	//20260826 by claude. 툴팁 배경도 같은 이유로 Transparent 리셋 후 말미에서 자동 산출한다.
+	//20260826 by claude. 툴팁 배경·테두리도 같은 이유로 Transparent 리셋 후 말미에서 자동 산출한다.
 	cr_tooltip_back				= Gdiplus::Color::Transparent;
+	cr_tooltip_border			= Gdiplus::Color::Transparent;
 
 	switch (color_theme)
 	{
@@ -2710,13 +2711,28 @@ void CSCColorTheme::set_color_theme(int color_theme)
 	//산출해야 leveled cr_back 기준이 되어, apply_theme_level 목록에 따로 넣지 않아도 항상 일치한다.
 	cr_gridlines = get_weak_color(cr_back, 16);
 
-	//20260826 by claude. 툴팁 배경 — 테마가 명시하지 않았으면(alpha 0) 여기서 산출한다.
-	//밝은 테마는 cr_back(대개 240,240,240 회색)을 그대로 쓰면 dlg 배경과 거의 같은 색이라 툴팁이 떠 보이지 않는다.
-	//FloralWhite(#FFFCF0)로 한 톤 띄워 어떤 밝은 테마에서도 "종이 조각" 처럼 보이게 한다.
-	//어두운 테마는 이미 cr_back 자체가 주변과 구분되므로 그대로 둔다.
+	//20260826 by claude. 툴팁 배경·테두리 — 테마가 명시하지 않았으면(alpha 0) 여기서 산출한다.
+	//툴팁은 dlg 위에 *떠 있는 면* 이므로 채움은 바탕보다 밝고 테두리는 바탕보다 어둡다.
+	//수치는 VS 2026 dark 툴팁 실측을 따랐다 — 앱 배경 (28,28,28) / 채움 (44,44,44) / 테두리 (20,20,20).
+	//즉 채움은 +16 뿐이고, 툴팁처럼 보이게 만드는 것은 밝기 차가 아니라 *어두운 테두리* 다.
+	//cr_border_inactive 를 쓰면 안 되는 이유가 여기 있다 — 그건 배경보다 밝은 테마가 많다
+	//(dark_gray = get_weak_color(cr_back, 64) = (128,128,128)).
 	//cr_gridlines 와 같은 이유로 apply_theme_level *뒤* 에 둔다 — leveled cr_back 으로 밝기를 판정해야 한다.
+	const bool light_theme = (get_luminance(cr_back) >= 128);
+
 	if (cr_tooltip_back.GetA() == 0)
-		cr_tooltip_back = (get_luminance(cr_back) >= 128) ? gRGB(255, 252, 240) : cr_back;
+	{
+		//밝은 테마는 FloralWhite(#FFFCF0) — 어떤 밝은 테마에서도 "종이 조각" 처럼 보인다.
+		//어두운 테마는 get_weak_color 가 어두운 기준색을 offset 만큼 밝게 돌려준다(배경 계열 한 톤 파생 용도).
+		cr_tooltip_back = light_theme ? gRGB(255, 252, 240) : get_weak_color(cr_back, 16);
+	}
+
+	if (cr_tooltip_border.GetA() == 0)
+	{
+		//밝은 테마에서 어두운 테마와 같은 폭(-12)으로 낮추면 240 vs 228 이라 거의 보이지 않는다.
+		//어두운 배경일수록 같은 차이가 크게 인지되므로(밝을수록 둔감) 밝은 쪽에 더 큰 폭을 준다.
+		cr_tooltip_border = get_color(cr_back, light_theme ? -40 : -12);
+	}
 }
 
 Gdiplus::Color get_sys_color(int index)

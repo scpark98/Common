@@ -60,9 +60,8 @@ public:
 	void			set_line_spacing(float spacing);
 
 	//20260826 by claude. 나타나고 사라질 때 윈도우 기본 툴팁과 같은 fade 애니메이션을 쓸지 여부.
-	//on(기본) : 부드럽게 뜨고 사라진다. 대신 fade 가 끝날 때까지(수백 ms) 글자가 약간 흐리다.
-	//off      : 즉시 뜨고 사라지는 대신 처음부터 글자가 또렷하다.
-	//(사유는 .cpp 의 on_show 주석 참조 — fade 에 필요한 WS_EX_LAYERED 가 ClearType 을 막는다.)
+	//on(기본) : comctl32 의 fade 를 그대로 쓴다. 글자 품질은 fade 와 무관하다(측정 — .cpp 의 on_show 주석 참조).
+	//off      : 표시 직전에 WS_EX_LAYERED 를 벗겨 즉시 뜨게 한다.
 	void			set_fade(bool on);
 
 	//20260807 by claude. dlg 의 PreTranslateMessage 에서 매 메시지를 그대로 넘겨준다.
@@ -86,12 +85,6 @@ protected:
 	//배경·테두리·본문을 직접 그린다.
 	afx_msg void	on_custom_draw(NMHDR* nmhdr, LRESULT* result);
 
-	//20260826 by claude. 툴팁 창이 숨겨지기 직전. fade-out 을 위해 WS_EX_LAYERED 를 되돌려준다.
-	afx_msg void	on_pop(NMHDR* nmhdr, LRESULT* result);
-
-	//fade-in 이 끝나는 시점에 WS_EX_LAYERED 를 벗겨 글자를 또렷하게 되돌린다.
-	afx_msg void	OnTimer(UINT_PTR nIDEvent);
-
 	//배경 지우기를 막는다(깜빡임 방지). on_custom_draw 가 클라이언트 전체를 칠한다.
 	afx_msg BOOL	OnEraseBkgnd(CDC* pDC);
 
@@ -100,6 +93,9 @@ protected:
 protected:
 	//현재 표시하려는 툴팁 문자열을 TTM_GETTEXT 로 얻는다.
 	CString			get_current_text();
+
+	//20260826 by claude. 툴팁 창 클래스에 CS_DROPSHADOW 를 켠다(프로세스당 1회, 시스템 설정이 켜져 있을 때만).
+	void			apply_drop_shadow();
 
 	//text 를 파싱해 m_para 를 채우고 그려질 크기를 돌려준다.
 	//dc 는 폭 계산에 필요하다(NULL 이면 이 컨트롤의 DC 를 쓴다).
@@ -120,15 +116,14 @@ protected:
 	bool			m_auto_font_quality = true;
 	int				m_AA_from_pt = 14;
 
-	//20260826 by claude. DWM 이 실제로 모서리를 잘라줬는지(Win11+). 테두리를 라운드로 그릴지 사각으로 그릴지를 정한다.
-	bool			m_dwm_round = false;
+	//20260826 by claude. DWM 이 테두리를 그려주는지(Win11+). true 면 우리는 테두리를 그리지 않는다(이중선 방지).
+	bool			m_dwm_border = false;
 
-	//20260826 by claude. fade 애니메이션 사용 여부. fade 종료 판정은 시간이 아니라 창의 현재 알파로 하고,
-	//알파를 읽을 수 없는 경우에만 fade_max_wait 에서 끊는다(OnTimer 참조).
-	//timer_unlayer 는 comctl32 가 이 창에서 쓰는 내부 타이머 id(작은 값)와 겹치지 않도록 큰 값을 쓴다.
+	//클래스 스타일은 프로세스 전체가 공유하므로 한 번만 손대면 된다.
+	bool			m_shadow_applied = false;
+
+	//20260826 by claude. fade 애니메이션 사용 여부. 켜져 있으면 아무것도 하지 않고 comctl32 에 맡긴다.
 	bool			m_fade = true;
-	int				m_fade_elapsed = 0;
-	enum { timer_unlayer = 0x5C10, fade_poll_interval = 30, fade_max_wait = 800 };
 
 	//on_show 에서 계산한 크기를 on_custom_draw 가 다시 쓰기 위해 보관한다.
 	CSize			m_sz_content;

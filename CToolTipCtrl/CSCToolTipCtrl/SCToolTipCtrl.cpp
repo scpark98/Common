@@ -11,9 +11,7 @@ IMPLEMENT_DYNAMIC(CSCToolTipCtrl, CToolTipCtrl)
 BEGIN_MESSAGE_MAP(CSCToolTipCtrl, CToolTipCtrl)
 	//툴팁은 자신의 알림을 부모에게 보내므로 파생 클래스에서 받으려면 reflect 를 써야 한다.
 	ON_NOTIFY_REFLECT(TTN_SHOW, &CSCToolTipCtrl::on_show)
-	ON_NOTIFY_REFLECT(TTN_POP, &CSCToolTipCtrl::on_pop)
 	ON_NOTIFY_REFLECT(NM_CUSTOMDRAW, &CSCToolTipCtrl::on_custom_draw)
-	ON_WM_TIMER()
 	ON_WM_ERASEBKGND()
 END_MESSAGE_MAP()
 
@@ -142,22 +140,15 @@ CRect CSCToolTipCtrl::build(CString text, CDC* dc)
 void CSCToolTipCtrl::on_show(NMHDR* nmhdr, LRESULT* result)
 {
 	//comctl32 는 fade 애니메이션을 위해 툴팁 창에 WS_EX_LAYERED 를 붙인다.
-	//20260826 by claude. layered 인 동안 그린 글자는 흐리게 나온다(실측). 확실한 제약은 per-pixel alpha 표면
-	//(UpdateLayeredWindow)에 ClearType 을 못 쓴다는 것이고, 상수 알파인 이 경로까지 강등되는지는 문서로 확인 못 했다.
-	//다만 원인이 무엇이든 결과는 같다 — NM_CUSTOMDRAW 는 표시 시작 시 1회뿐이라, 그때 그린 픽셀이 계속 화면에 남는다.
-	//따라서 layered 를 벗기는 것만으로는 부족하고 반드시 다시 그려야 한다(아래 OnTimer 의 Invalidate).
-	//표시 직전에 벗기면 글자는 또렷해지지만 fade 가 통째로 사라져 툴팁이 "쑥" 나타난다.
-	//그래서 fade 가 켜져 있으면 지금은 그대로 두고, fade 가 끝날 시점에 타이머로 벗긴다 —
-	//애니메이션은 시스템 것을 그대로 쓰고 정지 상태에서만 ClearType 을 되찾는다.
-	if (m_fade)
-	{
-		m_fade_elapsed = 0;
-		SetTimer(timer_unlayer, fade_poll_interval, NULL);
-	}
-	else
-	{
+	//20260826 by claude. 한때 이 스타일이 ClearType 을 죽인다고 보고 표시 후 벗겼다가 되붙이는 처리를 했었다.
+	//픽셀로 측정해보니 사실이 아니다 — layered 상태로 그린 글자와 벗기고 다시 그린 글자의 서브픽셀 프린지 수가
+	//완전히 동일했다(281/199 vs 281/199, 469/351 vs 469/351 …). 즉 상수 알파 layered 는 글자 품질과 무관하다.
+	//(문서화된 제약은 per-pixel alpha 표면(UpdateLayeredWindow)에 ClearType 을 못 쓴다는 것이고 이 경로가 아니다.)
+	//그래서 layered 는 건드리지 않는다. fade 는 comctl32 가 처음부터 끝까지 알아서 하고,
+	//우리가 스타일을 토글하며 만들던 여분의 재그리기(어두운 테마에서 펄럭임으로 보이던)도 함께 사라진다.
+	//fade 를 끄고 싶을 때만 표시 직전에 벗긴다 — layered 가 없으면 comctl32 는 알파를 올릴 대상이 없어 즉시 뜬다.
+	if (!m_fade)
 		ModifyStyleEx(WS_EX_LAYERED, 0);
-	}
 
 	CString text = get_current_text();
 
@@ -200,7 +191,15 @@ void CSCToolTipCtrl::on_show(NMHDR* nmhdr, LRESULT* result)
 	if (tip.top < work.top)
 		tip.OffsetRect(0, work.top - tip.top);
 
-	SetWindowPos(NULL, tip.left, tip.top, size.cx, size.cy, SWP_NOZORDER | SWP_NOACTIVATE);
+	//20260826 by claude. SWP_NOCOPYBITS 가 없으면 시스템이 *기존 클라이언트 내용을 복사해* 새 위치에 되붙인다.
+	//툴팁은 창을 새로 만들지 않고 같은 창을 옮겨 쓰므로, 이미 떠 있는 상태에서 다른 컨트롤로 옮겨갈 때
+	//직전 툴팁의 픽셀이 새 위치·새 크기로 한 프레임 보였다가 우리 그리기에 덮인다 — 그게 펄럭임이다.
+	//복사를 막고 전체를 무효화해 새 내용으로만 한 번 그리게 한다(내용은 위 build 에서 이미 새것으로 바뀌어 있다).
+	SetWindowPos(NULL, tip.left, tip.top, size.cx, size.cy, SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOCOPYBITS);
+
+	Invalidate(FALSE);
+
+	apply_drop_shadow();
 
 	//20260826 by claude. 모서리 라운드는 우리가 그리지 않고 DWM 에 맡긴다.
 	//이 창은 불투명한 사각형이라 라운드 사각형만 그리면 모서리 바깥 픽셀을 칠할 방법이 없고
@@ -208,62 +207,38 @@ void CSCToolTipCtrl::on_show(NMHDR* nmhdr, LRESULT* result)
 	//SetWindowRgn 으로 잘라내는 방법은 클리핑이 하드 에지라 안티에일리어싱된 테두리가 같이 잘려 계단이 진다.
 	//DWM 은 합성 단계에서 알파와 함께 잘라내므로 잔상도 계단도 없다 — Win11 네이티브 툴팁과 같은 방식.
 	//Win11 미만은 false 를 돌려주고 창은 각진 그대로다(그 OS 의 기본 툴팁과 같은 모양).
-	m_dwm_round = (m_round > 0) && win_compat::dwm::set_window_corner_round(m_hWnd, true);
+	bool dwm_round = (m_round > 0) && win_compat::dwm::set_window_corner_round(m_hWnd, true);
+
+	//20260826 by claude. DWM 은 모서리를 자르면서 자기 테두리도 1px 그린다(실측: 우리 테두리 *바깥* 에 밝은 선이
+	//하나 더 있어 이중선으로 보였다). 그 색을 우리 테마 색으로 지정하고 우리는 그리지 않는다 —
+	//라운드를 따라 정확히 한 줄만 남고, 우리가 그릴 때 생기던 곡선-클리핑 어긋남도 없다.
+	m_dwm_border = dwm_round && win_compat::dwm::set_border_color(m_hWnd, m_theme.cr_tooltip_border.ToCOLORREF());
 
 	//TRUE 를 돌려주면 시스템이 크기·위치를 다시 잡지 않는다.
 	*result = TRUE;
 }
 
-void CSCToolTipCtrl::on_pop(NMHDR* nmhdr, LRESULT* result)
+void CSCToolTipCtrl::apply_drop_shadow()
 {
-	KillTimer(timer_unlayer);
-
-	//20260826 by claude. fade-in 이 끝나며 벗겨둔 WS_EX_LAYERED 를 되돌려준다 — 이게 없으면
-	//comctl32 가 알파를 낮출 대상이 없어 사라질 때만 "툭" 끊긴다.
-	//붙이기만 하면 알파가 미정이라 창이 사라져 보이므로 곧바로 불투명으로 고정한다.
-	if (m_fade && (GetExStyle() & WS_EX_LAYERED) == 0)
-	{
-		ModifyStyleEx(0, WS_EX_LAYERED);
-		::SetLayeredWindowAttributes(m_hWnd, 0, 255, LWA_ALPHA);
-	}
-
-	*result = 0;
-}
-
-void CSCToolTipCtrl::OnTimer(UINT_PTR nIDEvent)
-{
-	if (nIDEvent == timer_unlayer)
-	{
-		m_fade_elapsed += fade_poll_interval;
-
-		//20260826 by claude. fade 가 끝났는지를 시간이 아니라 창의 현재 알파로 판정한다.
-		//고정 시간으로 끊으면 아직 알파가 올라가는 중에 벗겨져 그 순간 불투명으로 튀어(깜빡) 보인다.
-		//알파를 읽을 수 없는 경우(comctl32 가 SetLayeredWindowAttributes 가 아닌 방식으로 애니메이션)는
-		//최대 대기시간에서 끊는다 — 그때까지 못 끝났으면 애초에 알파 기반이 아니라는 뜻이다.
-		BYTE alpha = 255;
-		DWORD flags = 0;
-		COLORREF cr_key = 0;
-		bool alpha_readable = (::GetLayeredWindowAttributes(m_hWnd, &cr_key, &alpha, &flags) != FALSE) && (flags & LWA_ALPHA);
-
-		if (alpha_readable && alpha < 255 && m_fade_elapsed < fade_max_wait)
-			return;
-
-		KillTimer(timer_unlayer);
-
-		//fade 가 끝났으므로 이제 벗겨서 ClearType 을 되찾는다. 이미 알파 255 라 밝기 변화는 없고 글자만 또렷해진다.
-		//SWP_FRAMECHANGED 를 주면 프레임 재계산과 함께 시스템이 한 번 더 그려 그 프레임이 깜빡임으로 보인다.
-		//exstyle 만 지우면 충분하므로 flags 를 주지 않는다.
-		ModifyStyleEx(WS_EX_LAYERED, 0);
-
-		//Invalidate() 는 (1) 기본값이 배경 지우기라 툴팁 기본 배경이 한 프레임 스치고
-		//(2) WM_PAINT 를 큐에 넣기만 해서, 그리기 전까지 layered 를 막 벗긴 창이 빈 상태로 보인다.
-		//지우지 않고(RDW_NOERASE) 이 자리에서 즉시(RDW_UPDATENOW) 다시 그려 그 틈을 없앤다.
-		RedrawWindow(NULL, NULL, RDW_INVALIDATE | RDW_UPDATENOW | RDW_NOERASE);
+	//20260826 by claude. 툴팁이 어떤 배경 위에서도 분리돼 보이는 진짜 이유는 배경색이 아니라 그림자다.
+	//배경색만으로 띄우면 테마마다 대비를 다시 맞춰야 하지만 그림자는 배경과 무관하게 성립한다.
+	//CS_DROPSHADOW 는 창이 아니라 *클래스* 속성이라 한 번만 켜면 되고, 이 프로세스가 공유하는
+	//tooltips_class32 의 다른 툴팁(표준 CToolTipCtrl 포함)에도 함께 적용된다 — 윈도우 기본 툴팁이
+	//원래 이 스타일을 쓰므로 그쪽도 네이티브에 가까워질 뿐 어긋나지 않는다.
+	//시스템 설정(SPI_GETDROPSHADOW)이 꺼져 있으면 스타일이 있어도 그려지지 않으니 그때는 건드리지 않는다.
+	//XP 부터 있는 스타일이라 XP 호환에 문제 없다.
+	if (m_shadow_applied || m_hWnd == NULL)
 		return;
-	}
 
-	//comctl32 가 이 창에서 쓰는 내부 타이머(표시 지연·자동 감춤 등)는 그대로 넘겨야 한다.
-	CToolTipCtrl::OnTimer(nIDEvent);
+	m_shadow_applied = true;
+
+	BOOL shadow_enabled = FALSE;
+	if (!::SystemParametersInfo(SPI_GETDROPSHADOW, 0, &shadow_enabled, 0) || !shadow_enabled)
+		return;
+
+	ULONG_PTR style = ::GetClassLongPtr(m_hWnd, GCL_STYLE);
+	if ((style & CS_DROPSHADOW) == 0)
+		::SetClassLongPtr(m_hWnd, GCL_STYLE, (LONG_PTR)(style | CS_DROPSHADOW));
 }
 
 BOOL CSCToolTipCtrl::OnEraseBkgnd(CDC* pDC)
@@ -295,17 +270,10 @@ void CSCToolTipCtrl::on_custom_draw(NMHDR* nmhdr, LRESULT* result)
 	Gdiplus::SolidBrush brush(m_theme.cr_tooltip_back);
 	g.FillRectangle(&brush, rc.left, rc.top, rc.Width(), rc.Height());
 
-	//DWM 이 잘라줄 때만 라운드 테두리를 그린다 — 잘라내지 않는 OS 에서 라운드로 그리면 모서리 바깥에
-	//채움색이 그대로 남아 테두리만 안쪽으로 들어간 이상한 모양이 된다.
-	if (m_dwm_round)
-	{
-		draw_round_rect(&g, Gdiplus::Rect(rc.left, rc.top, rc.Width() - 1, rc.Height() - 1),
-			m_theme.cr_border_inactive, Gdiplus::Color::Transparent, m_round);
-	}
-	else
-	{
-		draw_rect(g, rc, m_theme.cr_border_inactive);
-	}
+	//DWM 이 테두리를 그려주는 환경(Win11+)에서는 우리가 그리면 그 안쪽에 겹쳐 이중선이 된다(on_show 참조).
+	//DWM 이 안 그리는 OS 에서는 창이 각지므로 사각 테두리를 직접 그린다.
+	if (!m_dwm_border)
+		draw_rect(g, rc, m_theme.cr_tooltip_border);
 
 	if (!m_para.empty())
 	{
@@ -331,6 +299,35 @@ void CSCToolTipCtrl::on_custom_draw(NMHDR* nmhdr, LRESULT* result)
 			g.SetTextRenderingHint(Gdiplus::TextRenderingHintClearTypeGridFit);
 
 		CSCParagraph::draw_text(g, m_para, m_auto_font_quality ? m_AA_from_pt : 0, dark_background);
+
+		//20260826 by claude. [진단] "layered 면 ClearType 이 죽는다" 를 눈짐작이 아니라 픽셀로 확정한다.
+		//ClearType 은 서브픽셀 커버리지를 R/G/B 에 나눠 쓰므로 글리프 가장자리에 R!=G!=B 인 색 프린지가 남는다.
+		//grayscale AA 면 모든 안티에일리어싱 픽셀이 R==G==B 다. 그래서 fringe 개수가 그대로 판정이 된다.
+		//2026-08-26 측정 결과 : layered=1 과 layered=0 의 프린지 수가 완전히 동일 → layered 는 글자 품질과 무관.
+		//visible / rc 도 같이 찍으므로 "보이지 않는 그리기" 나 "빈 프레임" 추적에도 그대로 쓸 수 있다.
+		//주석 처리 상태 유지 — 재조사 시 이 블록과 파일 상단 SCLog include 만 풀면 된다.
+		//{
+		//	HDC hdc = custom_draw->nmcd.hdc;
+		//	int fringe = 0;
+		//	int aa = 0;
+		//	COLORREF cr_bg = m_theme.cr_tooltip_back.ToCOLORREF();
+		//	for (int y = m_padding_cy; y < min(m_padding_cy + 20, rc.bottom); y++)
+		//	{
+		//		for (int x = m_padding_cx; x < min(m_padding_cx + 260, rc.right); x++)
+		//		{
+		//			COLORREF cr = ::GetPixel(hdc, x, y);
+		//			if (cr == cr_bg || cr == CLR_INVALID)
+		//				continue;
+		//			aa++;
+		//			if (GetRValue(cr) != GetGValue(cr) || GetGValue(cr) != GetBValue(cr))
+		//				fringe++;
+		//		}
+		//	}
+		//	logWrite(_T("[tooltip] layered=%d visible=%d rc=%dx%d 비배경=%d 색프린지=%d"),
+		//		(::GetWindowLong(m_hWnd, GWL_EXSTYLE) & WS_EX_LAYERED) ? 1 : 0,
+		//		IsWindowVisible() ? 1 : 0, rc.Width(), rc.Height(), aa, fringe);
+		//
+		//}
 	}
 
 	//배경부터 본문까지 전부 직접 그렸으므로 기본 그리기를 막는다.

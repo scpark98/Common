@@ -29,6 +29,11 @@ CSCToolTipCtrl::~CSCToolTipCtrl()
 {
 }
 
+BOOL CSCToolTipCtrl::Create(CWnd* pParentWnd, DWORD dwStyle)
+{
+	return CToolTipCtrl::Create(pParentWnd, dwStyle | TTS_NOPREFIX);
+}
+
 void CSCToolTipCtrl::set_color_theme(CSCColorTheme theme)
 {
 	m_theme = theme;
@@ -132,9 +137,104 @@ CRect CSCToolTipCtrl::build(CString text, CDC* dc)
 
 	CSCParagraph::calc_text_rect(rc, dc, m_para, DT_NOCLIP, m_max_width);
 
+	//20260828 by claude. <al=center|right> 는 넘겨받은 rc 폭을 기준으로 라인을 민다.
+	//툴팁은 내용에 맞춰 줄어드는 창이라 첫 패스의 rc(=m_max_width)를 그대로 두면 가운데 정렬한 줄이
+	//m_max_width 한가운데로 밀려 (a) 툴팁이 그만큼 넓어지고 (b) on_custom_draw 는 para 좌표를 0 기준으로
+	//보고 그리므로 본문이 그 offset 만큼 오른쪽으로 벗어난다. 그래서 실제 내용 폭으로 한 번 더 계산해
+	//정렬 기준이 툴팁 자신이 되게 한다. <al> 을 쓰지 않은 툴팁은 이 분기에 들어오지 않는다.
+	bool has_line_align = false;
+
+	for (auto& line : m_para)
+	{
+		if (!line.empty() && line[0].line_h_align != (DWORD)-1)
+		{
+			has_line_align = true;
+			break;
+		}
+	}
+
+	if (has_line_align)
+	{
+		//라인의 내용 폭은 정렬 offset 이 라인 전체에 같은 값으로 더해지므로 첫 패스 뒤에도 그대로 남아 있다.
+		//<indent>/<hang> 은 그 offset 에 섞여 폭에서 빠지므로 여기서 도로 더한다.
+		int content_width = 0;
+
+		for (auto& line : m_para)
+		{
+			if (line.empty())
+				continue;
+
+			int width = line.back().r.right - line.front().r.left + (int)line.front().line_indent;
+
+			if (line.front().wrap_continuation)
+				width += (int)line.front().line_hang;
+
+			content_width = max(content_width, width);
+		}
+
+		//같은 폭으로 다시 계산하므로 word-wrap 위치는 바뀌지 않는다 — 폭이 가장 넓은 라인의 실제 폭이고
+		//wrap 판정이 '>' 라 딱 맞는 라인은 쪼개지지 않는다.
+		CSCParagraph::calc_text_rect(CRect(0, 0, content_width, 0), dc, m_para, DT_NOCLIP, content_width);
+	}
+
 	//calc_text_rect 직후는 줄 간격 1.0 상태다. 이 호출이 m_line_spacing 을 적용하고 <ls=값> 태그도 여기서 반영된다.
 	//CSCStatic 은 rebuild_layout 에서 같은 일을 reapply_line_spacings 로 한다(그쪽은 라인별 override 를 지원하기 때문).
-	return CSCParagraph::set_line_spacing(m_para, m_line_spacing);
+	CSCParagraph::set_line_spacing(m_para, m_line_spacing);
+
+	//20260828 by claude. on_custom_draw 는 para 좌표계의 원점이 (0,0) 이라고 보고 padding 만큼만 옮겨 그린다.
+	//그런데 실제로 그려지는 영역의 원점은 0 이 아닐 수 있다 — <box> 의 배경은 run 의 r 밖으로 box_pad 만큼 번져
+	//그려지고, <sup>·<tab>·<al=right> 도 원점을 옮긴다. 그대로 두면 그 차이만큼 내용이 창 밖으로 나가 잘렸다
+	//(<box> 로 시작하는 툴팁에서 그 배경이 왼쪽·위 테두리를 뚫고 나갔던 것이 이 경우다).
+	//그래서 문단 전체를 원점으로 당겨놓고 크기만 돌려준다 — 그리는 쪽은 항상 (0,0) 을 믿어도 된다.
+	//set_line_spacing 의 반환값을 쓰지 않는 이유도 같다. 그쪽은 "가장 넓은 라인의 첫/마지막 run" 기준이라
+	//라인마다 시작 x 가 다르거나 배경이 번지는 경우를 담지 못한다.
+	CRect bounds = CSCParagraph::get_bounding_rect(m_para);
+
+	//20260828 by claude. <glow>/<ts>/<sd> 는 글자 바깥으로 번지는데 레이아웃은 그 공간을 잡지 않는다.
+	//툴팁은 내용에 딱 맞춰 줄어드는 창이라 그대로 두면 번진 부분이 테두리에서 잘려, 사방으로 고르게
+	//퍼져야 할 glow 가 한쪽만 잘린 것처럼 보인다.
+	//창 전체를 일률적으로 넓히면 안 된다 — 그림자가 없는 툴팁과 여백이 달라 보인다.
+	//번지는 run 의 rect 만 부풀려 union 에 넣어, 실제로 테두리에 닿는 쪽만 넓어지게 한다.
+	//반경 = offset + spread 의 절반(펜이 path 중앙 정렬이라 바깥으로는 절반만 나간다) + blur 1.5σ.
+	//1.5σ 인 이유 : 이 blur 는 3-pass box blur 라 지원 반경이 2σ 근처인데(σ=4 → 3+3+4=10px),
+	//바깥 절반은 알파가 10% 아래라 눈에 띄지 않는다. 2σ 를 다 잡으면 창만 커진다.
+	//그리고 그 반경을 통째로 더하면 안 된다 — 번짐은 이미 비어 있는 padding 위로 퍼져도 되므로
+	//padding 을 넘어서는 만큼만 확보한다. 안 그러면 아래쪽이 reach + padding 이 되어 위아래가 크게 어긋난다.
+	std::vector<CSCTextShadow> shadows;
+
+	for (auto& line : m_para)
+	{
+		for (auto& run : line)
+		{
+			run.get_shadow_list(shadows);
+
+			for (auto& s : shadows)
+			{
+				if (s.color.GetA() == 0 || run.text.IsEmpty())
+					continue;
+
+				float dx = (s.dx < 0.0f) ? -s.dx : s.dx;
+				float dy = (s.dy < 0.0f) ? -s.dy : s.dy;
+				int reach = (int)(((dx > dy) ? dx : dy) + s.spread / 2.0f + s.blur * 1.5f + 0.5f);
+
+				CRect r = run.r;
+				r.InflateRect(max(0, reach - m_padding_cx), max(0, reach - m_padding_cy));
+
+				bounds.left = min(bounds.left, r.left);
+				bounds.top = min(bounds.top, r.top);
+				bounds.right = max(bounds.right, r.right);
+				bounds.bottom = max(bounds.bottom, r.bottom);
+			}
+		}
+	}
+
+	for (auto& line : m_para)
+	{
+		for (auto& run : line)
+			run.r.OffsetRect(-bounds.left, -bounds.top);
+	}
+
+	return CRect(0, 0, bounds.Width(), bounds.Height());
 }
 
 void CSCToolTipCtrl::on_show(NMHDR* nmhdr, LRESULT* result)

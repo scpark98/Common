@@ -37,6 +37,13 @@ public:
 	CSCToolTipCtrl();
 	virtual ~CSCToolTipCtrl();
 
+	//20260828 by claude. TTS_NOPREFIX 를 항상 붙인다. 이 스타일이 없으면 툴팁 컨트롤이 문자열에서
+	//'&' 를 제거해 버린다(메뉴 항목 문자열을 툴팁에 그대로 쓰라고 만들어진 옛 동작).
+	//그러면 "A & B" 의 & 가 사라지고, &lt; 같은 엔티티도 lt; 가 되어 태그를 글자로 보여줄 수 없다.
+	//호출측이 dwStyle 에 무엇을 주든 이 스타일은 항상 켜진다 — 어느 사용처에서나 같은 문제라서
+	//각자 기억해서 붙이게 두지 않는다.
+	virtual BOOL	Create(CWnd* pParentWnd, DWORD dwStyle = 0);
+
 	//배경·글자·테두리 색을 한 번에 지정한다. 개별 setter 대신 이것을 쓴다.
 	void			set_color_theme(CSCColorTheme theme);
 

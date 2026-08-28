@@ -1166,6 +1166,11 @@ Common 은 여러 프로젝트 (Endorphin2 / SCDeskTools / Test_* / ASee 등) �
 
 5. **다른 세션의 작업분도 push 명령 시 함께 push (sync commit 분리)** — 본인 (현재 세션) 이 수정하지 않은 변경이 git status 에 있어도, 사용자가 push 를 지시하면 *별도 commit* 으로 분리해 함께 push 한다. commit 본문 끝에 `(타 세션 작업분 — 이 commit 은 sync 목적, 메시지 부정확할 수 있음.)` 한 줄 명시. (이전엔 "해당 프로젝트가 알아서 push" 로 남겨뒀으나, 그 '해당 프로젝트' 에 현재 프로젝트도 포함됨 — 2026-06-04 정정.)
    - **Common 이 clean 으로 나오는 경우 = 정상** — 다른 프로젝트가 이미 그 Common 변경을 commit·push 했으면 이 프로젝트 working tree 엔 Common 변경이 안 보인다 (clean). 이때는 push 할 것이 없다. `git pull` 로 최신만 받으면 됨. clean 인데 억지로 만들 필요 없음.
+   - **내가 만들지 않은 파일은 staging 상태가 곧 사용자의 의사표시다 (강제, 2026-08-28)** — working tree 에 Claude 가 만들지 않은 파일이 있을 때 포함 여부를 Claude 가 판단하지 않는다.
+     - **staged (`A`/`M` — 사용자가 `git add` 해둠)** → 사용자가 포함하겠다고 이미 표시한 것이다. **그대로 commit·push 한다.** 내용이 개발환경 의존적이라거나 하는 이유로 빼지 않는다.
+     - **untracked (`??`) 또는 unstaged 인 채로 둔 것** → 사용자가 아직 포함하지 않기로 한 것이다. **건드리지 않는다.** `git add` 하지도, 빼겠다고 보고하지도 않는다.
+     - 애매하면 묻는다. 임의로 정하고 사후 보고하지 말 것.
+     - **Why:** 2026-08-28, 사용자가 참조용으로 Common 에 넣어둔 `CommonLib.props` + 설명 pdf 를 Claude 가 "환경마다 값이 달라 커밋하지 않는 게 낫다" 는 자기 판단으로 제외하고 결과만 보고했다. 그 근거는 *부모 폴더의 실제 props* 에 해당하는 얘기였고 참조용 사본과는 무관했다. 사용자 지적 — *"내가 분명히 tracking file 로 처리하고자 git add 까지 했는데 그걸 물어보지도 않고 untracked file 로 처리한 것은 문제다. 차라리 처리하기 전에 물어보던가."* 이어서 규칙 확정 — *"내가 add 햇다면 같이 푸시하면 되고 내가 add 안한채로 그대로 둔 파일이면 푸시안하면 된다."*
 
 6. **commit subject 는 사용자 인지 가능한 한국어 요약 (강제)** — 기술 세부 (함수명·내부 메커니즘·thread context 등) 만 적힌 subject 는 *git log 훑을 때 어떤 변경인지 직관적으로 알 수 없음*. **사용자가 요청한 요구사항의 처리 내용** 을 *간략히 한 줄* 로 표현. 기술 세부는 body 에.
    - X: `[playback_rate] get_track_pos 를 audio decoder input PTS 기반으로 — rate 무관 미디어 시점` (기술 세부만 — 사용자가 어떤 user-facing 변경인지 모름)

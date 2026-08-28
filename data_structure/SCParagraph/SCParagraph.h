@@ -33,8 +33,15 @@
 	[색]
 	<cr=red> = <ct=red>		//cr_text
 	<crb=Blue> = <cb=Blue>	//cr_back (run 영역 사각형)
-	<grad=gold,orangered>	//글자를 cr_text → 지정색 그라디언트로 채운다. 세 번째 인자 h 를 주면 가로 방향.
-	<box=royalblue,12,7>	//run 단위 라운드 배경(색, 반지름, 여백). cr_back 의 사각형과 달리 "태그 칩" 모양.
+	<grad=orangered>		//글자를 cr_text → 지정색 그라디언트로 채운다. 인자는 도착색 하나다(출발색은 그 구간의 cr_text).
+							//20260828 by claude. 두 번째 인자에 h 를 주면 가로 방향 — <grad=orangered,h>.
+							//(예전 예시가 <grad=gold,orangered> 였는데 파서는 두 번째를 방향으로 읽으므로 gold 세로 그라디언트가 된다.)
+	<box=royalblue,12,7>	//run 단위 라운드 배경(색, 반지름, 여백). CSS 의 background + padding + border-radius 에 해당한다.
+							//위 <crb>/<cb> 와 같은 "글자 뒤 배경" 이지만 그쪽은 run 박스 그대로의 사각형(여백 0, 라운드 0)이다.
+							//둘을 같이 주면 cr_back 을 칠한 뒤 그 위에 이 라운드 사각형을 덮는다.
+							//20260828 by claude. 여백은 글리프가 아니라 글자 박스(폰트 line box) 기준으로 붙는다.
+							//그래서 한 글자짜리 run 을 감싸면 폭보다 높이가 훨씬 커져 세로로 긴 알약이 된다 —
+							//단어 단위로 감싸는 것이 자연스럽다. (HTML 의 inline span padding 과 같은 동작.)
 
 	[외곽선 / 그림자 / 발광]
 	<st=4> = <stroke=4>		//외곽선 두께. 펜이 path 중앙 정렬이라 눈에 보이는 두께는 이 값의 절반이다.
@@ -85,7 +92,11 @@
 	  <cr=#RRGGBB>,				//#으로 시작되는 16진수값. 6자리는 alpha = 255.
 	  <cr=#AARRGGBB>,			//20260721 by claude. 8자리는 alpha 가 **앞**에 온다 (get_gcolor_from_hexa_str). RRGGBBAA 아님.
 	  <cr=FFA500>				//# 없는 6/8자리 hex 도 hex 로 해석한다 (SMI/SAMI 자막이 prefix 를 생략하므로).
-	  <cr=123,45,67,128>		//rgba, 숫자로만 3자리 또는 4자리를 콤마로 구분한다.
+	  <cr=123,45,67>			//콤마 3개는 rgb. alpha = 255.
+	  <cr=128,123,45,67>		//콤마 4개는 rgba 가 아니라 **argb** 다. Gdiplus::Color(a,r,g,b) 생성자에 그대로 넘기므로 #AARRGGBB 와 alpha 위치가 같다.
+								//3개 -> 4개로 늘리면 앞 세 값의 의미가 밀린다. "123,45,67" 에 alpha 128 을 주려면 "128,123,45,67".
+								//콤마 개수가 2개(값 3개) 또는 3개(값 4개)가 아니면 Black 이 된다.
+								//<ts>/<glow>/<grad>/<box> 는 콤마를 인자 구분자로 쓰므로 이 형식을 못 쓴다. 컬러 이름이나 #hex 로 지정할 것.
 	  <cr=h90,30,100>			//[미구현] hsi 로 쓰려던 형식. get_color() 의 'h' 분기가 비어 있어 현재는 Black 이 된다.
 
 [코드 흐름]
@@ -291,6 +302,12 @@ public:
 	//이미 1 글자 이하인 run 은 그대로 두고, 다중 글자 run 만 분해.
 	static void		split_runs_per_char(std::deque<std::deque<CSCParagraph>>& para);
 	static int		get_max_width_line(std::deque<std::deque<CSCParagraph>>& para);
+
+	//20260828 by claude. 모든 run 의 union 으로 문단이 실제로 그려지는 영역을 구한다.
+	//특정 라인의 첫/마지막 run 만 보면 안 된다 — <tab>/<indent>/<al> 로 라인마다 시작 x 가 다르고,
+	//<box> 의 배경은 run 의 r 밖으로 box_pad 만큼 번져 그려지기 때문이다.
+	//내용에 맞춰 창 크기를 정하는 쪽(툴팁 등)은 이 값을 써야 잘리지 않는다.
+	static CRect	get_bounding_rect(std::deque<std::deque<CSCParagraph>>& para);
 
 	//각 paragraph의 r이 계산된 후에 줄 간격을 spacing 배수로 조정한다. spacing이 1.0f이면 기본 줄 간격, 2.0f이면 줄 간격이 2배가 된다.
 	//wrap_continuation_delta != 0 이면 wrap 연속 라인 (line[0].wrap_continuation == true) 위 간격에 (spacing + wrap_continuation_delta) 적용. 음수 = 좁힘.

@@ -442,6 +442,8 @@ Gdiplus::Color get_color(CString cr_str)
 	}
 	else if (get_char_count(cr_str, ',') >= 2)
 	{
+		//값 3개 = rgb, 값 4개 = argb (rgba 아님). Gdiplus::Color 생성자 오버로드가 (r,g,b) / (a,r,g,b) 라
+		//토큰을 그대로 넘기면 alpha 가 맨 앞이 되고, #AARRGGBB · get_color_str(cr, true) 와 순서가 일치한다.
 		std::deque<CString> token;
 		get_token_str(cr_str, token, _T(","), false);
 		if (token.size() == 3)

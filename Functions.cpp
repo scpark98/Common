@@ -10195,6 +10195,19 @@ void get_tag_str(CString& src, std::deque<CString>& tags)
 
 	tags.clear();
 
+	//20260828 by claude. 태그를 글자 그대로 보여야 할 때 쓰는 HTML 엔티티. 텍스트 조각에만 적용한다.
+	//'&' 는 태그 구분자가 아니므로 기존 문장에는 영향이 없다 — "&lt;" 라고 적힌 기존 텍스트가 없는 한 안전하다.
+	//&amp; 를 마지막에 푸는 이유 : 먼저 풀면 "&amp;lt;" 가 "&lt;" 를 거쳐 "<" 까지 가버린다.
+	auto decode_entity = [](CString& text)
+	{
+		if (text.Find(_T('&')) < 0)
+			return;
+
+		text.Replace(_T("&lt;"), _T("<"));
+		text.Replace(_T("&gt;"), _T(">"));
+		text.Replace(_T("&amp;"), _T("&"));
+	};
+
 	//line break는 모두 <br>로 변경한다.
 	src.Replace(_T("\r\n"), _T("<br>"));
 	src.Replace(_T("\r"), _T("<br>"));
@@ -10209,6 +10222,7 @@ void get_tag_str(CString& src, std::deque<CString>& tags)
 			if (str.GetLength() > 0)
 			{
 				//태그가 아닌 일반 텍스트가 저장된다.
+				decode_entity(str);
 				tags.push_back(str);
 				str.Empty();
 			}
@@ -10251,7 +10265,10 @@ void get_tag_str(CString& src, std::deque<CString>& tags)
 
 	//맨 마지막까지 잔여 텍스트가 있다면 모두 넣어줘야 한다.
 	if (str.GetLength() > 0)
+	{
+		decode_entity(str);
 		tags.push_back(str);
+	}
 }
 
 //간혹 \r, \n, \t, \\등의 문자를 그대로 확인할 필요가 있다.

@@ -656,9 +656,9 @@ non-empty 결과가 있으면 **편집 시작 전에** 사용자에게 통지:
 
 **한계 — `.rc` 가 include 하는 `.h` 는 변환하면 안 된다 (2026-06-19)**: 훅은 UTF-16 인 `.rc`/`resource.h` 만 스킵할 뿐, **`.rc` 가 `#include` 하는 평범한 `.h`(대표적으로 `targetver.h`)는 한글이 들어 있으면 UTF-8 BOM 으로 변환한다.** 그런데 rc.exe 는 이 헤더도 읽으므로, 변환된 헤더 상단의 doxygen 주석 `@file`/`@brief` 의 `@` 가 `unknown character '0x40'` 로 떠 RC 전처리가 중단되고(`RC terminating after preprocessor errors`), 그 여파로 `CMFCOutlookBarTabCtrl 정의되지 않음` 같은 연쇄 에러가 따라온다. (cl.exe 는 UTF-8 BOM 을 잘 처리하지만 rc.exe 는 민감하다.) **조치**: ① 훅에 `$skipNames = @('targetver.h')` 추가 — 이름이 일치하는 RC-include 헤더는 인코딩 불문 변환 제외. ② 이미 깨진 `targetver.h` 는 표준 형태의 **pure ASCII** 로 되돌리면(한글 주석 제거) 훅이 자동 스킵(순수 ASCII)하고 rc.exe 도 영구 안전. 사례: 2026-06-19 `KoinoViewer\targetver.h`.
 
-### 설치 방식 두 가지 — 상황에 따라 선택
+### 설치 방식 — 상황에 따라 선택
 
-이 한글 손상은 특정 머신·특정 사람 문제가 아니다. 한국어 Windows 에서 CP949 소스를 Claude 로 편집하는 **누구에게나** 발생한다 — 집/회사 머신, 그리고 **다른 개발자 PC** 모두. 두 가지 배포 방식이 있다:
+이 한글 손상은 특정 머신·특정 사람 문제가 아니다. 한국어 Windows 에서 CP949 소스를 Claude 로 편집하는 **누구에게나** 발생한다 — 집/회사 머신, 그리고 **다른 개발자 PC** 모두.
 
 | 방식 | 적용 범위 | 배포 | 적합 |
 |---|---|---|---|
@@ -681,123 +681,11 @@ non-empty 결과가 있으면 **편집 시작 전에** 사용자에게 통지:
 
 **Claude 자동 부트스트랩 (사용자 수동 실행 불필요)**: 이 `Common/claude.md` 가 로드된 세션을 시작할 때, `~/.claude/settings.json` 이 아직 Common hook(`...\Common\hooks\ensure-cpp-encoding.ps1`)을 가리키지 않으면 Claude 가 위 `install-hook.ps1` 을 한 번 실행해 등록을 맞춘다. 등록은 *다음* 세션의 SessionStart 부터 효력이 생긴다(현 세션의 SessionStart 는 이미 지난 뒤). 단 이 지시는 **이 파일이 import 되어 로드된 프로젝트에서만** 작동하므로(프로젝트 루트 claude.md 의 `@../../../Common/claude.md` 등), Common 을 import 하지 않는 프로젝트에서는 위 설치 명령을 1회 수동 실행한다.
 
-#### 방식 A — user-scope (머신마다 1회, `~/.claude` 는 git 동기화 안 됨)
+#### 방식 A — user-scope (구 방식, 방식 C 가 대체)
 
-경로의 `scpar` 는 **본인 Windows 사용자명**(`%USERPROFILE%` 로 확인)에 맞게 바꾼다.
+`~/.claude/hooks/` 에 스크립트를 두고 `~/.claude/settings.json` 에 등록하던 방식. `~/.claude` 가 git 동기화되지 않아 머신마다 스크립트를 따로 관리해야 해서 방식 C 로 옮겼다. **새로 설치할 일이 있으면 C 를 쓴다.** 스크립트 본문은 `Common\hooks\ensure-cpp-encoding.ps1`, settings.json 등록은 `install-hook.ps1` 이 대신한다.
 
-**1) 훅 스크립트** — `%USERPROFILE%\.claude\hooks\ensure-cpp-encoding.ps1` (예: `C:\Users\scpar\.claude\hooks\ensure-cpp-encoding.ps1`) 생성:
-
-```powershell
-# SessionStart hook: make VS C++ projects safe from Korean (CP949) corruption.
-$ErrorActionPreference = 'SilentlyContinue'
-
-$proj = (Get-Location).Path
-try {
-    $raw = [Console]::In.ReadToEnd()
-    if ($raw) { $j = $raw | ConvertFrom-Json; if ($j.cwd) { $proj = $j.cwd } }
-} catch {}
-if (-not (Test-Path -LiteralPath $proj)) { exit 0 }
-
-$vcx = Get-ChildItem -LiteralPath $proj -Filter *.vcxproj -File -ErrorAction SilentlyContinue
-if (-not $vcx) { exit 0 }
-
-$actions = @()
-
-$ecPath = Join-Path $proj '.editorconfig'
-if (-not (Test-Path -LiteralPath $ecPath)) {
-    $ec = @'
-root = true
-
-[*.{cpp,h,hpp,c,cc,cxx,inl,ipp}]
-charset = utf-8-bom
-end_of_line = crlf
-indent_style = tab
-tab_width = 4
-insert_final_newline = true
-
-[*.{rc,rc2}]
-charset = utf-16le
-end_of_line = crlf
-
-[*.md]
-charset = utf-8
-end_of_line = crlf
-'@
-    [IO.File]::WriteAllText($ecPath, $ec, (New-Object Text.UTF8Encoding($false)))
-    $actions += '.editorconfig'
-}
-
-$exts = @('.cpp', '.h', '.hpp', '.c', '.cc', '.cxx', '.inl', '.ipp')
-$skipDirs = @('\x64\', '\win32\', '\debug\', '\release\', '\.vs\', '\ipch\', '\obj\')
-$bom = [byte[]](0xEF, 0xBB, 0xBF)
-$utf8Strict = New-Object Text.UTF8Encoding($false, $true)
-$cp949 = [Text.Encoding]::GetEncoding(949)
-$converted = 0
-
-$files = Get-ChildItem -LiteralPath $proj -Recurse -File -ErrorAction SilentlyContinue |
-    Where-Object { $exts -contains $_.Extension.ToLower() }
-
-foreach ($f in $files) {
-    $low = $f.FullName.ToLower()
-    $skip = $false
-    foreach ($d in $skipDirs) { if ($low.Contains($d)) { $skip = $true; break } }
-    if ($skip) { continue }
-
-    $bytes = [IO.File]::ReadAllBytes($f.FullName)
-    if ($bytes.Length -lt 1) { continue }
-    if ($bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF) { continue }
-    if ($bytes.Length -ge 2 -and (($bytes[0] -eq 0xFF -and $bytes[1] -eq 0xFE) -or ($bytes[0] -eq 0xFE -and $bytes[1] -eq 0xFF))) { continue }
-
-    $hasHigh = $false
-    foreach ($b in $bytes) { if ($b -ge 0x80) { $hasHigh = $true; break } }
-    if (-not $hasHigh) { continue }
-
-    $isUtf8 = $true
-    try { [void]$utf8Strict.GetString($bytes) } catch { $isUtf8 = $false }
-
-    if ($isUtf8) {
-        $out = New-Object byte[] ($bom.Length + $bytes.Length)
-        [Array]::Copy($bom, 0, $out, 0, $bom.Length)
-        [Array]::Copy($bytes, 0, $out, $bom.Length, $bytes.Length)
-    } else {
-        $text = $cp949.GetString($bytes)
-        $u = ([Text.UTF8Encoding]::new($false)).GetBytes($text)
-        $out = New-Object byte[] ($bom.Length + $u.Length)
-        [Array]::Copy($bom, 0, $out, 0, $bom.Length)
-        [Array]::Copy($u, 0, $out, $bom.Length, $u.Length)
-    }
-    [IO.File]::WriteAllBytes($f.FullName, $out)
-    $converted++
-}
-if ($converted -gt 0) { $actions += "converted $converted file(s) to UTF-8 BOM" }
-
-if ($actions.Count -gt 0) {
-    $msg = "ensure-cpp-encoding [$proj]: " + ($actions -join '; ')
-    (@{ systemMessage = $msg } | ConvertTo-Json -Compress)
-}
-exit 0
-```
-
-**2) settings.json** — `C:\Users\scpar\.claude\settings.json` 의 최상위에 `hooks` 키 병합 (기존 키 보존):
-
-```json
-"hooks": {
-  "SessionStart": [
-    {
-      "hooks": [
-        {
-          "type": "command",
-          "command": "powershell -NoProfile -ExecutionPolicy Bypass -File \"C:\\Users\\scpar\\.claude\\hooks\\ensure-cpp-encoding.ps1\"",
-          "timeout": 15,
-          "statusMessage": "Checking C++ encoding protection"
-        }
-      ]
-    }
-  ]
-}
-```
-
-설치 후 `/hooks` 를 한 번 열거나 Claude Code 를 재시작하면 다음 세션부터 작동. (검증: 2026-06-10 회사 머신 설치, CP949/UTF-8무BOM/ASCII/UTF-8BOM/UTF-16/빌드폴더 6 케이스 모두 정상 처리 확인.)
+(검증 이력: 2026-06-10 회사 머신 설치 후 CP949 / UTF-8 무BOM / ASCII / UTF-8 BOM / UTF-16 / 빌드폴더 6 케이스 모두 정상 처리 확인.)
 
 #### 방식 B — project-scope (repo 에 커밋, 다른 개발자 자동 적용)
 
@@ -805,7 +693,7 @@ exit 0
 
 프로젝트 루트에:
 
-1. **`.claude/hooks/ensure-cpp-encoding.ps1`** — 방식 A 의 동일한 스크립트를 그대로 커밋.
+1. **`.claude/hooks/ensure-cpp-encoding.ps1`** — `Common\hooks\ensure-cpp-encoding.ps1` 을 복사해 커밋.
 2. **`.claude/settings.json`** — command 를 **상대 경로**로 지정 (SessionStart 훅은 프로젝트 폴더에서 실행되므로 상대 경로가 각 개발자 머신에서 그대로 해석됨):
 
 ```json
@@ -828,9 +716,9 @@ exit 0
 ```
 
 주의:
-- 각 개발자가 그 repo 를 처음 열 때 Claude Code 가 프로젝트 `.claude/settings.json` 의 훅 실행을 신뢰할지 한 번 확인할 수 있다 (정상 — 승인하면 이후 자동).
-- 상대 경로 `.claude/hooks/...` 는 훅 실행 시 cwd(프로젝트 루트) 기준. 혹시 해석이 안 되는 환경이면 절대 경로 대신 스크립트 첫 줄에서 stdin 의 `cwd` 로 재구성하는 방식 A 스크립트가 이미 그 cwd 를 쓰므로, command 의 `-File` 경로만 맞으면 된다.
-- 한국어 개발자가 아닌 팀원(CP949 소스를 안 만드는)에게도 무해 — non-ASCII 없는 파일은 스킵하므로 아무것도 바꾸지 않는다.
+- 각 개발자가 그 repo 를 처음 열 때 Claude Code 가 훅 실행을 신뢰할지 한 번 물을 수 있다 (정상 — 승인하면 이후 자동).
+- 상대 경로 `.claude/hooks/...` 는 cwd(프로젝트 루트) 기준이다.
+- 한국어 개발자가 아닌 팀원에게도 무해 — non-ASCII 없는 파일은 스킵한다.
 
 ## 2B.3 파일 쓰기 시 인코딩 명시 — ANSI 기본값 cmdlet 금지 (강제, 최우선)
 
@@ -930,9 +818,9 @@ MFC 다이얼로그/컨트롤의 `PreTranslateMessage(MSG* pMsg)` 반환 의미:
 
 ---
 
-## 5B-0. 테스트 요청 전 반드시 빌드(링크까지) 완료 (강제)
+## 5B-0. 빌드는 사용자가 한다 — Claude 는 지시받았을 때만 (강제)
 
-> **⚠ 이 절은 보류 상태다 — 기본값은 "Claude 는 빌드하지 않는다" (강제, 모든 프로젝트·모든 세션)**
+> **⚠ 기본값은 "Claude 는 빌드하지 않는다" (강제, 모든 프로젝트·모든 세션)**
 > 2026-08-25 *"앞으로 빌드는 내가 하마."* → 2026-08-28 재지시로 **전 프로젝트 기본값으로 확정.**
 >
 > **기본 동작**: 코드를 수정한 뒤 **빌드하지 않는다.** 수정 내용과 *무엇을 빌드·테스트해야 하는지* 만 보고한다.
@@ -956,26 +844,16 @@ MFC 다이얼로그/컨트롤의 `PreTranslateMessage(MSG* pMsg)` 반환 의미:
 > 내가 하는게 빠르므로 너는 빌드하지 마라."* (2026-08-25 에 이어 **두 번째 지적** — 그때는 한 프로젝트
 > 한정으로 읽고 다른 프로젝트에서 계속 빌드했다. 이 규칙은 프로젝트를 가리지 않는다.)
 >
-> 아래 본문은 사용자가 빌드를 명시적으로 맡겼을 때의 절차이므로 그대로 보존한다.
+> 아래 본문과 §5B-0.1 은 **빌드를 맡았을 때에만** 적용되는 절차다.
 
-사용자에게 *"리빌드 후 테스트해달라"* / *"재현해달라"* 를 요청하기 전에 **Claude 가 먼저 전체 빌드(컴파일 + 링크)를 성공시켜 놓아야 한다.** 산출물(exe/dll)이 실제로 생성된 것까지 확인한 뒤 요청한다.
+**아래는 사용자가 빌드를 명시적으로 맡겼을 때만 적용된다.**
 
-**X — 절대 금지:**
-- `-t:ClCompile` 등 **컴파일만** 돌려놓고 "빌드 후 테스트해주세요" 요청 — 링크 에러가 사용자에게 떠넘겨진다.
-- 빌드를 아예 안 돌리고 "수정했으니 테스트해주세요".
-- 산출물 타임스탬프를 확인하지 않고 "최신 빌드로 테스트하시면 됩니다".
+1. **빌드 전에 구성을 확인한다.** `.suo` 의 `ActiveCfg` 를 읽고, `.vcxproj` 의 `ProjectConfiguration` 목록과 툴셋을 본다. 프로젝트마다 실제 배포 구성과 미사용 잔재 구성이 섞여 있어(§5-1), 짐작으로 고르면 그 구성에서만 나는 에러를 원인이라 착각한다. (2026-07-21 LMMHost — 배포 구성 `Release_Lmm10`(v140_xp) 대신 미사용 `Release`(v145)로 빌드해 `d2d1effects_2.h` C1083 을 좇음. 배포 구성은 `_USING_V110_SDK71_` 로 그 include 를 스킵해 정상이었다.)
+2. **컴파일이 아니라 링크까지 성공시킨다.** `-t:ClCompile` 로 끝내고 "컴파일 통과" 라고 보고하지 말 것 — 정적 lib 의 CRT 불일치 등은 링크에서만 드러난다. 산출물(exe/dll)이 실제로 생성된 것을 타임스탬프로 확인한다.
+3. **링크를 막는 프로세스는 강제 종료한다** (§5B-0.1). 출력 경로가 배포 폴더면 실행 중인 exe 잠금으로 LNK1104/LNK1168 이 난다.
+4. 빌드가 깨지면 고쳐서 성공시킨 뒤 보고한다. 못 고치면 그 사실을 먼저 알린다.
 
-**O:**
-- 전체 빌드(기본 타깃) 성공 → 산출물 경로·타임스탬프 확인 → 그 다음 테스트 요청.
-- 빌드가 깨지면 **고쳐서 성공시킨 뒤** 요청. 못 고치면 그 사실을 먼저 보고.
-
-**Why:** 2026-07-16 filetransfer_lmm 에서 Claude 가 `-t:ClCompile` 로 컴파일만 확인해놓고 "컴파일 통과"라고 보고한 뒤 리빌드+재현을 요청. 사용자 지적 — *"빌드까지 성공적으로 완료한 후 부탁하는거 맞냐?"*, *"수정후엔 반드시 빌드까지 완료한 후 테스트 요청하라."* 컴파일 통과는 링크 성공을 보장하지 않는다(정적 lib 의 CRT 불일치 등). 사용자가 링크 에러를 대신 만나는 건 Claude 가 할 일을 넘긴 것.
-
-**How to apply:** 소스 수정 → 전체 빌드 → 산출물 생성 확인 → (필요시 인코딩/BOM 검사) → 테스트 요청. 배포본 경로를 덮어쓰는 게 우려되면 그 사실을 *보고*하되, 빌드를 생략하는 근거로 삼지 말 것. §5B(검증 없이 단정 금지)와 짝 — 5B 가 "안 해본 걸 했다고 하지 마라", 이건 "내가 할 수 있는 검증은 내가 끝내고 넘겨라".
-
-**반복 지적 (2026-07-21, LMMHost)** — *"수정후에는 반드시 빌드까지 한 후 테스트 요청하라."* 2026-07-16 에 이어 **두 번째**. 이 세션에서 추가로 드러난 실패 패턴 두 가지:
-- **구성(Configuration)을 확인하지 않고 빌드** — 프로젝트에 실제 배포 구성(`Release_Lmm10` 등)과 미사용 구성(`Release`, `*|x64`)이 섞여 있으면 미사용 구성으로 빌드해 *엉뚱한 에러*(SDK 헤더 없음 등)를 만들고 원인 분석에 시간을 쓴다. 실제로 `Release` 구성(v145)으로 빌드해 `d2d1effects_2.h` C1083 이 났고, 배포 구성(`v140_xp`)에서는 `_USING_V110_SDK71_` 로 그 include 가 스킵되어 정상이었다. **빌드 전 `.vcxproj` 의 `ProjectConfiguration` 목록과 툴셋을 먼저 확인**할 것.
-- **링크 실패를 "컴파일은 통과"로 넘기기** — 출력 경로가 배포 폴더면 실행 중인 exe 잠금으로 LNK1104 가 난다. 이때는 사용자에게 프로세스 종료를 요청해 **링크까지 끝낸 뒤** 테스트를 요청한다.
+§5B(검증 없이 단정 금지)와 짝이다 — 5B 가 "안 해본 걸 했다고 하지 마라", 이건 "빌드를 맡았으면 링크까지 끝내고 넘겨라".
 
 ### 5B-0.1 빌드를 막는 실행 중 프로세스는 묻지 말고 강제 종료 (강제)
 

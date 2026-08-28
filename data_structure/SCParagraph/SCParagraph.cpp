@@ -1188,6 +1188,25 @@ CRect CSCParagraph::calc_text_rect(CRect rc, CDC* pDC, std::deque<std::deque<CSC
 				para[i][j].ink_height += (float)ruby_h;
 			}
 
+			//20260828 by claude. <box=색,반지름,여백> — 그리기는 이 run 의 r 을 box_pad 만큼 사방으로 부풀려 배경을 그리는데,
+			//레이아웃이 그 여백을 잡아주지 않아 배경이 앞뒤 run 과 윗줄을 덮었고, 내용에 맞춰 줄어드는 창(툴팁)에서는
+			//창 밖으로 나가 잘렸다. <sup> 의 line_rise 와 같은 방식으로 흡수한다 —
+			//좌우는 advance 로, 위쪽은 라인 전체를 내려서(line_rise), 아래쪽은 라인 높이로.
+			//늘어난 높이는 ruby 와 같은 이유로 ink 로 친다 — 배경이 쓰는 공간이지 줄 여백이 아니므로
+			//set_line_spacing 이 <ls> 배율로 늘였다 줄였다 하면 안 된다.
+			if (para[i][j].text_prop.cr_box.GetA() > 0)
+			{
+				int box_pad = para[i][j].text_prop.box_pad;
+
+				para[i][j].r.OffsetRect(box_pad, 0);
+				para[i][j].ink_height += box_pad * 2;
+
+				sz.cx += box_pad * 2;
+				sz.cy += box_pad;
+
+				line_rise = MAX(line_rise, box_pad);
+			}
+
 			//TRACE(_T("[%d][%d] text = %s, sz = %dx%d, r = %s\n"), i, j, para[i][j].text, sz.cx, sz.cy, get_rect_info_string(para[i][j].r));
 			sz_text.cx += sz.cx;
 
@@ -1349,25 +1368,11 @@ CRect CSCParagraph::calc_text_rect(CRect rc, CDC* pDC, std::deque<std::deque<CSC
 		//"최대 넓이 라인의 첫/마지막 run" 만 보면 <tab>/<indent> 로 시작 x 가 0 이 아닌 라인에서
 		//그 앞 여백이 폭에서 빠져 캔버스가 좁게 잡히고 오른쪽 끝 글자가 잘린다.
 		//라인마다 <al> 정렬이 다를 수 있는 것도 같은 이유로 union 이 맞다.
-		bool first_run = true;
+		//20260828 by claude. 세로는 아래 total_text_height 기준을 유지하므로 좌우만 가져다 쓴다.
+		CRect bounds = get_bounding_rect(para);
 
-		for (i = 0; i < (int)para.size(); i++)
-		{
-			for (j = 0; j < (int)para[i].size(); j++)
-			{
-				if (first_run)
-				{
-					rect_text.left = para[i][j].r.left;
-					rect_text.right = para[i][j].r.right;
-					first_run = false;
-				}
-				else
-				{
-					rect_text.left = MIN(rect_text.left, para[i][j].r.left);
-					rect_text.right = MAX(rect_text.right, para[i][j].r.right);
-				}
-			}
-		}
+		rect_text.left = bounds.left;
+		rect_text.right = bounds.right;
 
 		rect_text.top = para[0][0].r.top;					//최상단 항목의 top
 		rect_text.bottom = para[0][0].r.top + total_text_height;	//최상단 항목의 top + 전체 텍스트 높이
@@ -1470,6 +1475,39 @@ int CSCParagraph::get_max_width_line(std::deque<std::deque<CSCParagraph>>& para)
 	}
 
 	return max_width_line;
+}
+
+CRect CSCParagraph::get_bounding_rect(std::deque<std::deque<CSCParagraph>>& para)
+{
+	CRect rect_text(0, 0, 0, 0);
+	bool first_run = true;
+
+	for (int i = 0; i < (int)para.size(); i++)
+	{
+		for (int j = 0; j < (int)para[i].size(); j++)
+		{
+			//<box> 의 배경은 그리기가 r 을 box_pad 만큼 사방으로 부풀리므로 그만큼 포함시킨다.
+			int box_pad = (para[i][j].text_prop.cr_box.GetA() > 0) ? para[i][j].text_prop.box_pad : 0;
+
+			CRect r = para[i][j].r;
+			r.InflateRect(box_pad, box_pad);
+
+			if (first_run)
+			{
+				rect_text = r;
+				first_run = false;
+			}
+			else
+			{
+				rect_text.left = MIN(rect_text.left, r.left);
+				rect_text.top = MIN(rect_text.top, r.top);
+				rect_text.right = MAX(rect_text.right, r.right);
+				rect_text.bottom = MAX(rect_text.bottom, r.bottom);
+			}
+		}
+	}
+
+	return rect_text;
 }
 
 //calc_text_rect()로 각 paragraph의 r이 결정된 이후에 호출.
@@ -1873,10 +1911,18 @@ CRect CSCParagraph::draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCPar
 			}
 		}
 
+		//20260828 by claude. 레이어는 clip 의 원점이 음수일 수 있다는 것까지 반영해야 한다.
+		//호출자가 g 에 TranslateTransform 을 걸어두면(툴팁은 padding 만큼 옮겨 그린다) clip.X/Y 가 음수가 되는데,
+		//예전 식(ceil(X+Width))은 그 음수만큼 레이어를 오히려 줄이고 (0,0) 에 붙여 그렸다.
+		//그래서 문단 원점보다 왼쪽·위로 번진 그림자와 glow 가 통째로 잘렸다 —
+		//첫 글자의 왼쪽 halo 만 직선으로 잘려 나가던 것이 이 경우다.
+		//(clip.X/Y 가 0 인 기존 호출은 아래 식이 예전과 같은 값을 낸다.)
 		Gdiplus::RectF clip;
 		g.GetVisibleClipBounds(&clip);
-		int layer_w = (int)ceil(clip.X + clip.Width);
-		int layer_h = (int)ceil(clip.Y + clip.Height);
+		int layer_x = (int)floor(clip.X);
+		int layer_y = (int)floor(clip.Y);
+		int layer_w = (int)ceil(clip.X + clip.Width) - layer_x;
+		int layer_h = (int)ceil(clip.Y + clip.Height) - layer_y;
 
 		//CSS 와 같이 리스트 앞쪽 항목이 글자에 더 가깝다 → 뒤 항목부터 그려야 앞 항목이 위에 온다.
 		for (int k = shadow_layers - 1; k >= 0 && layer_w > 0 && layer_h > 0; k--)
@@ -1918,6 +1964,10 @@ CRect CSCParagraph::draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCPar
 			Gdiplus::Graphics gl(layer.m_pBitmap);
 			gl.SetSmoothingMode(Gdiplus::SmoothingMode::SmoothingModeAntiAlias);
 			gl.SetTextRenderingHint(Gdiplus::TextRenderingHintAntiAlias);
+
+			//아래 광원 path 는 문단 좌표 그대로 그린다. 레이어 원점이 (layer_x, layer_y) 이므로 그만큼 당겨야
+			//문단 좌표가 레이어 안의 제 위치에 떨어진다. 합성할 때 같은 값으로 되돌려 놓는다.
+			gl.TranslateTransform((Gdiplus::REAL)-layer_x, (Gdiplus::REAL)-layer_y);
 
 			for (i = 0; i < para.size(); i++)
 			{
@@ -1974,7 +2024,7 @@ CRect CSCParagraph::draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCPar
 			if (global_gray_weight > 0.0f && global_gray_weight < 1.0f)
 				layer.gray(global_gray_weight);
 
-			g.DrawImage(layer.m_pBitmap, 0, 0);
+			g.DrawImage(layer.m_pBitmap, layer_x, layer_y);
 			}
 		}
 	}
@@ -2002,14 +2052,29 @@ CRect CSCParagraph::draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCPar
 			//text 배경색을 칠하고
 			draw_rect(g, para[i][j].r, Gdiplus::Color::Transparent, para[i][j].text_prop.cr_back);
 
-			//<box=색,radius,pad> — run 단위 라운드 배경. 사각형인 cr_back 과 달리 "태그 칩" 모양이 된다.
+			//<box=색,radius,pad> — run 단위 라운드 배경. 위 cr_back 이 run 박스 그대로의 사각형인 것과 달리
+			//pad 만큼 부풀린 라운드 사각형이라, 둘 다 지정하면 cr_back 위에 이것이 덮인다.
 			if (para[i][j].text_prop.cr_box.GetA() > 0)
 			{
 				CRect rb = para[i][j].r;
 				rb.InflateRect(para[i][j].text_prop.box_pad, para[i][j].text_prop.box_pad);
+
+				//20260828 by claude. 작은 라운드 사각형은 SmoothingMode 만으로는 곡선 경계에 계단이 보인다.
+				//PixelOffsetMode 기본값은 픽셀 중심을 정수 좌표로 보므로 AA 커버리지가 반 픽셀 어긋난 채 계산되는데,
+				//Half 로 두면 커버리지를 픽셀 중심 기준으로 잡아 같은 AA 라도 경계가 눈에 띄게 부드러워진다.
+				//호출자가 어떤 상태로 넘겨주든 결과가 같도록 여기서 켜고 되돌린다(draw_check_box 와 같은 방식).
+				Gdiplus::SmoothingMode old_smoothing = g.GetSmoothingMode();
+				Gdiplus::PixelOffsetMode old_pixel_offset = g.GetPixelOffsetMode();
+
+				g.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
+				g.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHalf);
+
 				draw_round_rect(&g, Gdiplus::Rect(rb.left, rb.top, rb.Width(), rb.Height()),
 					Gdiplus::Color::Transparent, para[i][j].text_prop.cr_box,
 					(int)para[i][j].text_prop.box_round, 0);
+
+				g.SetPixelOffsetMode(old_pixel_offset);
+				g.SetSmoothingMode(old_smoothing);
 			}
 
 			//<img=...> run — 계산된 r 에 이미지를 그리고 끝낸다.

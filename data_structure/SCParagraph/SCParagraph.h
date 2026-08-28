@@ -85,6 +85,14 @@
 	<style=title> </style>	//CSCParagraph::register_style() 로 등록해 둔 속성 묶음을 통째로 적용
 	<id=score>				//다음 run 에 이름을 붙인다. 렌더에는 영향 없고 호출자가 특정 run 을 찾아 갱신/hit-test 하는 용도.
 
+	[태그를 글자 그대로 쓰기 — HTML 엔티티]
+	&lt; &gt; &amp;			//20260828 by claude. 각각 < > & 로 출력된다. 태그 문법 자체를 글로 설명할 때(툴팁·도움말) 쓴다.
+							//ex. "&lt;br&gt; 에 의해 줄이 바뀐다" → "<br> 에 의해 줄이 바뀐다" (줄바꿈은 일어나지 않는다)
+							//태그가 아닌 텍스트 구간에만 적용되므로 <cr=...> 같은 실제 태그는 영향받지 않는다.
+							//&amp; 를 마지막에 푸는 순서라 "&amp;lt;" 는 "&lt;" 로 남는다(엔티티 자체를 보여줄 때).
+							//따옴표로 감싸는 방식은 쓰지 않는다 — 자막 대사처럼 따옴표를 문장부호로 쓴 텍스트의
+							//태그가 통째로 죽어버리기 때문이다. ("Apple is <cr=red>Red</cr>" 의 빨간색이 사라진다.)
+
 	ex. "<b><cr=red>This</b></cr > is a <ct=blue><i>sample</i> <b>paragraph</b>."
 
 	- cr은 Gdiplus::Color에 명시된 컬러 외에 다음 형식들도 지원한다. (get_color(CString) 참조)

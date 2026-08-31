@@ -144,6 +144,7 @@ BEGIN_MESSAGE_MAP(CSCComboBox, CComboBox)
 	ON_WM_DRAWITEM()
 	ON_WM_TIMER()
 	ON_WM_CTLCOLOR_REFLECT()
+	ON_WM_MOUSEWHEEL()		//20260831 by claude. 휠로 항목이 바뀔 때 edit 텍스트가 통째로 선택되는 것을 지운다.
 END_MESSAGE_MAP()
 
 
@@ -851,6 +852,37 @@ BOOL CSCComboBox::OnEraseBkgnd(CDC* pDC)
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
 	return FALSE;
 	return CComboBox::OnEraseBkgnd(pDC);
+}
+
+//20260831 by claude. 휠로 항목을 넘길 때 edit 의 글자가 통째로 파랗게 선택되던 것을 없앤다.
+//
+//포커스 문제가 아니다. 콤보는 현재 선택이 바뀔 때마다 그 항목의 글자를 edit 에 새로 넣으면서
+//전체를 선택 상태로 만든다(CB_SETCURSEL 의 표준 동작). 목록에서 마우스로 고를 때는 그게 자연스럽지만,
+//휠로 연속해 넘길 때는 매 칸마다 선택 블록이 번쩍여 거슬린다.
+//CBS_DROPDOWNLIST 에 이 현상이 없는 것은 edit 자체가 없기 때문이다.
+//
+//기본 처리를 그대로 두고(항목 이동은 comctl32 가 한다) 그 직후 선택만 지운다.
+//자식 edit 의 휠은 subclass 가 이 콤보로 넘기므로(sccombo_edit_subclass) 두 경로가 여기로 모인다.
+BOOL CSCComboBox::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
+{
+	Default();
+
+	//드롭다운이 펼쳐진 동안은 listbox 가 스크롤할 뿐 edit 은 건드리지 않는다.
+	if (GetDroppedState())
+		return TRUE;
+
+	COMBOBOXINFO info = { 0 };
+	info.cbSize = sizeof(info);
+
+	if (GetComboBoxInfo(&info) && info.hwndItem && info.hwndItem != m_hWnd)
+	{
+		//캐럿을 글자 끝에 두고 선택은 없앤다. EM_SETSEL 에 -1 을 쓰는 방식은 문서마다 해석이 갈려
+		//길이를 직접 구해 (len, len) 으로 명시한다.
+		int len = (int)::SendMessage(info.hwndItem, WM_GETTEXTLENGTH, 0, 0);
+		::SendMessage(info.hwndItem, EM_SETSEL, (WPARAM)len, (LPARAM)len);
+	}
+
+	return TRUE;
 }
 
 

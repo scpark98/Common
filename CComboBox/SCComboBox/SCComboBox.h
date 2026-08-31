@@ -182,6 +182,8 @@ public:
 	virtual void PreSubclassWindow();
 	afx_msg void OnPaint();
 	afx_msg BOOL OnEraseBkgnd(CDC* pDC);
+	//20260831 by claude. 휠로 항목이 바뀔 때 edit 글자가 전체 선택되던 것을 지운다. 근거는 .cpp 주석.
+	afx_msg BOOL OnMouseWheel(UINT nFlags, short zDelta, CPoint pt);
 	afx_msg void OnCbnSetfocus();
 	afx_msg void OnCbnKillfocus();
 	afx_msg BOOL OnCbnSelchange();

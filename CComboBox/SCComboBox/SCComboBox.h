@@ -174,6 +174,10 @@ protected:
 	enum { TIMER_FONT_APPLY = 0x5C02 };
 	bool			m_in_wheel = false;
 
+	//콤보가 선택/폰트를 바꾸면 자식 Edit 의 글자가 통째로 선택 상태가 된다(CB_SETCURSEL·WM_SETFONT 의 표준 동작).
+	//선택을 지우고 캐럿만 글자 끝에 둔다. CBS_DROPDOWNLIST 면 자식 Edit 이 없어 아무 일도 하지 않는다.
+	void			clear_edit_selection();
+
 	DECLARE_MESSAGE_MAP()
 public:
 	virtual void DrawItem(LPDRAWITEMSTRUCT /*lpDrawItemStruct*/);

@@ -867,6 +867,23 @@ BOOL CSCComboBox::OnEraseBkgnd(CDC* pDC)
 	return CComboBox::OnEraseBkgnd(pDC);
 }
 
+//20260831 by claude. 콤보가 선택이나 폰트를 바꾸면 자식 Edit 의 글자가 통째로 선택 상태가 된다
+//(CB_SETCURSEL 이 글자를 새로 넣으면서, WM_SETFONT 도 같은 경로를 탄다 — 둘 다 표준 동작).
+//선택만 지우고 캐럿은 글자 끝에 둔다.
+//EM_SETSEL 에 -1 을 넘기는 방식은 문서마다 해석이 갈려 길이를 직접 구해 (len, len) 으로 명시한다.
+void CSCComboBox::clear_edit_selection()
+{
+	COMBOBOXINFO info = { 0 };
+	info.cbSize = sizeof(info);
+
+	//DROPDOWNLIST 는 hwndItem 이 콤보 자신이다 — 자식 Edit 이 없어 할 일이 없다.
+	if (!GetComboBoxInfo(&info) || info.hwndItem == NULL || info.hwndItem == m_hWnd)
+		return;
+
+	int len = (int)::SendMessage(info.hwndItem, WM_GETTEXTLENGTH, 0, 0);
+	::SendMessage(info.hwndItem, EM_SETSEL, (WPARAM)len, (LPARAM)len);
+}
+
 //20260831 by claude. 휠로 항목을 넘길 때 edit 의 글자가 통째로 파랗게 선택되던 것을 없앤다.
 //
 //포커스 문제가 아니다. 콤보는 현재 선택이 바뀔 때마다 그 항목의 글자를 edit 에 새로 넣으면서
@@ -909,15 +926,10 @@ BOOL CSCComboBox::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
 	Default();
 	m_in_wheel = false;
 
-	if (h_edit)
-	{
-		//캐럿을 글자 끝에 두고 선택은 없앤다. EM_SETSEL 에 -1 을 쓰는 방식은 문서마다 해석이 갈려
-		//길이를 직접 구해 (len, len) 으로 명시한다.
-		int len = (int)::SendMessage(h_edit, WM_GETTEXTLENGTH, 0, 0);
-		::SendMessage(h_edit, EM_SETSEL, (WPARAM)len, (LPARAM)len);
+	clear_edit_selection();
 
+	if (h_edit)
 		::SendMessage(h_edit, WM_SETREDRAW, TRUE, 0);
-	}
 	SetRedraw(TRUE);
 
 	//SetRedraw(FALSE) 동안 쌓인 무효화는 버려지므로 직접 무효화하고 그 자리에서 그린다.
@@ -1363,10 +1375,31 @@ void CSCComboBox::OnCbnEditchange()
 void CSCComboBox::OnTimer(UINT_PTR nIDEvent)
 {
 	//20260831 by claude. 휠이 멈췄다 — 미뤄둔 폰트를 이제 한 번만 적용한다(OnCbnSelchange 주석 참조).
+	//폰트 적용도 재그리기와 선택 상태를 만드므로 휠 때와 똑같이 보호한다.
+	//콤보에 WM_SETFONT 가 가면 comctl32 가 자식 Edit 의 글자를 다시 세팅하면서 전체를 선택 상태로 만든다.
 	if (nIDEvent == TIMER_FONT_APPLY)
 	{
 		KillTimer(TIMER_FONT_APPLY);
+
+		COMBOBOXINFO info = { 0 };
+		info.cbSize = sizeof(info);
+
+		HWND h_edit = NULL;
+		if (GetComboBoxInfo(&info) && info.hwndItem && info.hwndItem != m_hWnd)
+			h_edit = info.hwndItem;
+
+		SetRedraw(FALSE);
+		if (h_edit)
+			::SendMessage(h_edit, WM_SETREDRAW, FALSE, 0);
+
 		reconstruct_font();
+		clear_edit_selection();
+
+		if (h_edit)
+			::SendMessage(h_edit, WM_SETREDRAW, TRUE, 0);
+		SetRedraw(TRUE);
+
+		RedrawWindow(NULL, NULL, RDW_INVALIDATE | RDW_ALLCHILDREN | RDW_UPDATENOW);
 		return;
 	}
 

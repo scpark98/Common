@@ -168,6 +168,12 @@ protected:
 	enum { TIMER_INPUT_FILTER = 0x5C01 };
 	void			apply_filter_now();
 
+	//20260831 by claude. 폰트 콤보에서 휠로 항목을 넘기는 동안은 폰트 적용(reconstruct_font)을 미룬다.
+	//폰트 재생성은 SetFont → native EDIT 재그리기를 부르는 무거운 동작이라, 한 칸마다 하면 깜빡인다.
+	//휠이 멈추면 그때 한 번만 적용한다. 목록에서 마우스로 고르는 경우는 미루지 않는다(즉시 적용).
+	enum { TIMER_FONT_APPLY = 0x5C02 };
+	bool			m_in_wheel = false;
+
 	DECLARE_MESSAGE_MAP()
 public:
 	virtual void DrawItem(LPDRAWITEMSTRUCT /*lpDrawItemStruct*/);

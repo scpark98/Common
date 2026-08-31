@@ -903,7 +903,11 @@ BOOL CSCComboBox::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
 	if (h_edit)
 		::SendMessage(h_edit, WM_SETREDRAW, FALSE, 0);
 
+	//20260831 by claude. Default() 안에서 CBN_SELCHANGE 가 반사돼 OnCbnSelchange 가 돈다.
+	//폰트 콤보라면 거기서 폰트 적용을 미루도록 이 플래그를 본다(휠이 멈춘 뒤 한 번만).
+	m_in_wheel = true;
 	Default();
+	m_in_wheel = false;
 
 	if (h_edit)
 	{
@@ -983,7 +987,22 @@ BOOL CSCComboBox::OnCbnSelchange()
 		{
 			_tcscpy_s(m_lf.lfFaceName, _countof(m_lf.lfFaceName), (LPCTSTR)font_name);
 			m_lf.lfCharSet = DEFAULT_CHARSET;
-			reconstruct_font();
+
+			//20260831 by claude. 휠로 연속해 넘기는 동안은 폰트 적용을 미룬다.
+			//reconstruct_font 는 폰트 핸들을 새로 만들고 SetFont 로 native EDIT 을 다시 그리게 하는
+			//무거운 동작이라, 한 칸마다 하면 그 재그리기가 깜빡임으로 보인다.
+			//휠이 멈춘 뒤 한 번만 적용한다 — 굴리는 동안에는 항목 이름만 바뀌고, 멈추면 그 폰트가 된다.
+			//목록에서 마우스로 고르거나 키보드로 바꾸는 경우는 미루지 않는다(즉시 적용).
+			//m_lf 는 위에서 이미 갱신했으므로 get_font_name() 등은 미루는 동안에도 새 값을 돌려준다.
+			if (m_in_wheel)
+			{
+				KillTimer(TIMER_FONT_APPLY);
+				SetTimer(TIMER_FONT_APPLY, 120, NULL);
+			}
+			else
+			{
+				reconstruct_font();
+			}
 		}
 	}
 
@@ -1343,6 +1362,14 @@ void CSCComboBox::OnCbnEditchange()
 
 void CSCComboBox::OnTimer(UINT_PTR nIDEvent)
 {
+	//20260831 by claude. 휠이 멈췄다 — 미뤄둔 폰트를 이제 한 번만 적용한다(OnCbnSelchange 주석 참조).
+	if (nIDEvent == TIMER_FONT_APPLY)
+	{
+		KillTimer(TIMER_FONT_APPLY);
+		reconstruct_font();
+		return;
+	}
+
 	if (nIDEvent == TIMER_INPUT_FILTER)
 	{
 		KillTimer(TIMER_INPUT_FILTER);

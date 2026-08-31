@@ -858,8 +858,43 @@ void CSCComboBox::OnPaint()
 	CRect rc;
 	GetClientRect(rc);
 
-	//dc.FillSolidRect(rc, RGB(255, 0, 0));
-	//draw_rectangle(&dc, rc, gGRAY(192), m_crBack);
+	//20260831 by claude. Default() 에서 comctl32 가 그린 테마 프레임을 지우고 우리 테두리로 바꾼다.
+	//
+	//comctl32 는 같은 콤보라도 스타일에 따라 다른 테마 파트로 프레임을 그린다 —
+	//CBS_DROPDOWN 은 편집 컨트롤 테두리, CBS_DROPDOWNLIST 는 목록/버튼 테두리다.
+	//그래서 같은 CSCComboBox 인데 리소스 스타일만 다르면 테두리 모양·두께가 달라 보였다.
+	//(CSCEdit 은 같은 문제를 PreSubclassWindow 에서 WS_BORDER/WS_EX_CLIENTEDGE 를 떼어 푼다.
+	// 콤보의 프레임은 스타일 비트가 아니라 comctl32 의 그리기라 그 방법을 쓸 수 없어 덮어 지운다.)
+	//
+	//선택영역(자식 Edit 또는 DrawItem 이 칠하는 칸)은 client 안쪽으로 inset 만큼 들어가 있으므로,
+	//그 바깥 링만 배경색으로 덮으면 내용은 건드리지 않고 프레임만 사라진다.
+	//inset 은 상수로 박지 않고 GetComboBoxInfo 로 실측한다(측정값 3px, 테마·DPI 에 따라 달라진다).
+	int inset = 3;
+	{
+		COMBOBOXINFO info = { 0 };
+		info.cbSize = sizeof(info);
+		if (GetComboBoxInfo(&info) && info.rcItem.top > 0)
+			inset = info.rcItem.top;
+		if (inset < 1)
+			inset = 1;
+		if (inset > 4)
+			inset = 4;
+	}
+
+	CRgn rgn_outer;
+	CRgn rgn_inner;
+	rgn_outer.CreateRectRgn(rc.left, rc.top, rc.right, rc.bottom);
+	rgn_inner.CreateRectRgn(rc.left + inset, rc.top + inset, rc.right - inset, rc.bottom - inset);
+	rgn_outer.CombineRgn(&rgn_outer, &rgn_inner, RGN_DIFF);
+
+	CBrush br_back(m_theme.cr_back.ToCOLORREF());
+	dc.FillRgn(&rgn_outer, &br_back);
+
+	//지운 자리에 우리 테두리를 그린다. 색 선택 기준은 OnNcPaint 와 동일하게 맞춘다
+	//(자식 Edit 이 포커스를 가진 경우도 콤보가 포커스인 것으로 본다 — CBS_DROPDOWN).
+	bool focused = (GetFocus() == this) || (GetFocus() != nullptr && IsChild(GetFocus()));
+	CBrush br_border(focused ? m_theme.cr_border_active.ToCOLORREF() : m_theme.cr_border_inactive.ToCOLORREF());
+	dc.FrameRect(rc, &br_border);
 
 	//owner draw fixed, has string 때문인지 dropdown 버튼이 표시되지 않는다.
 	//우선 수동으로 그려준다.

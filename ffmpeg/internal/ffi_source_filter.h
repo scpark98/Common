@@ -253,6 +253,12 @@ namespace ffi
 		long long				m_playrate_qpc_last = 0;
 		long long				m_playrate_clock_last = 0;
 
+		//20260831 by claude. [lead cap] 렌더러에 *미디어 시간상* 얼마나 앞서 밀어 넣을지의 상한(ms).
+		//0 이면 제한 없음(종전 동작). open 시 레지스트리 setting\audio_lead_cap_ms 에서 읽는다.
+		int						m_lead_cap_ms = 0;
+		//상한에 걸려 대기한 구간을 한 번만 로그로 남기기 위한 상태(매 샘플 로그는 노이즈).
+		bool					m_lead_capped = false;
+
 		//20260817 by claude. 마지막 seek 의 첫 delivery 시점에 그래프 클럭이 샘플 표시시각보다 앞선 양(ms).
 		//renderer_pacing 은 Deliver 블록을 재므로 이 현상을 원리적으로 못 잡는다 — 별도 채널이 필요하다.
 		std::atomic<long long>	m_clock_ahead_ms{ LLONG_MIN };

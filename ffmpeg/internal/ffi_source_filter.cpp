@@ -969,6 +969,11 @@ namespace ffi
 		: CSourceStream(NAME("CFFiAudioStream"), phr, pParent, pPinName)
 		, m_pSource(pParent)
 	{
+		//20260831 by claude. [lead cap] 0 = 제한 없음(기본, 종전 동작). 재빌드 없이 값을 바꿔 볼 수 있게
+		//레지스트리에서 읽는다 — 임계가 얼마여야 하는지는 실측으로만 정할 수 있다.
+		if (AfxGetApp())
+			m_lead_cap_ms = AfxGetApp()->GetProfileInt(_T("setting"), _T("audio_lead_cap_ms"), 0);
+
 		//output format: S16, **STEREO 강제 downmix**.
 		//이유: DSound 의 plain WAVEFORMATEX 는 mono/stereo PCM 만 받음. 5.1ch 등은 WAVEFORMATEXTENSIBLE 필요.
 		//DTS 6ch / AC3 6ch 등 multi-channel 미디어에서 DSound 가 Render(pin) 시 0x80040200 (VFW_E_INVALIDMEDIATYPE) reject → audio 무음.
@@ -1799,6 +1804,58 @@ namespace ffi
 						}
 					}
 
+					//20260831 by claude. [lead cap] 샘플을 렌더러에 넘기기 전에, 그 표시시각이 그래프 클럭보다
+					//얼마나 앞서는지(lead) 를 보고 상한을 넘으면 그만큼 대기한다.
+					//
+					//교착의 실측 형태(22:45:38~40): 클럭이 1575ms 에 못 박힌 채 lead 가 254→1345ms 로 계속
+					//커졌다. 렌더러는 Receive 안에서 그 샘플의 표시시각까지 기다리는데, 그 시각을 알려줄
+					//클럭이 렌더러 자신의 재생 위치다. 한 번 멎으면 기다리는 시각이 영영 오지 않는다.
+					//lead 가 초 단위로 벌어지는 것은 체인(필터당 16버퍼 × 2단 = 32개, 샘플당 ~100ms → 약 3초)이
+					//seek 직후 앞서 채워지기 때문이다. 앞서는 양을 묶으면 렌더러가 초 단위 미래 샘플을
+					//손에 쥐지 않는다.
+					//
+					//cBuffers 를 줄이는 방식과는 다르다 — 그건 버퍼 *용량* 을 깎아 seek 직후 underrun 을
+					//만들었다(2026-08-17 실측, 잡음 악화). 여기서는 용량은 그대로 두고 *미디어 시간상 선행량* 만
+					//제한한다.
+					//
+					//0(기본) = 제한 없음 = 종전 동작. 값은 레지스트리 setting\audio_lead_cap_ms 로 조절한다.
+					if (m_lead_cap_ms > 0)
+					{
+						const REFERENCE_TIME cap_rt = (REFERENCE_TIME)m_lead_cap_ms * 10000;
+						REFERENCE_TIME rt_s_cap = 0, rt_e_cap = 0;
+						pSample->GetTime(&rt_s_cap, &rt_e_cap);
+
+						ULONGLONG wait0_cap = GetTickCount64();
+						while (!CheckRequest(&com))
+						{
+							CRefTime rt_clk;
+							if (FAILED(m_pFilter->StreamTime(rt_clk)))
+								break;
+							if (rt_s_cap - (REFERENCE_TIME)rt_clk <= cap_rt)
+								break;
+							//상한을 넘어도 무한정 잡고 있지 않는다 — 클럭이 이미 멎은 상태에서 여기서
+							//대기하면 그 교착을 소스 쪽으로 옮길 뿐이다.
+							if (GetTickCount64() - wait0_cap >= 500)
+								break;
+							Sleep(5);
+						}
+
+						const ULONGLONG waited_cap = GetTickCount64() - wait0_cap;
+						if (waited_cap >= 20 && !m_lead_capped)
+						{
+							m_lead_capped = true;
+							CRefTime rt_clk_now;
+							m_pFilter->StreamTime(rt_clk_now);
+							logWrite(_T("[ffi/src/audio/leadcap] 선행 제한 %dms — %llums 대기 후 lead=%lldms (이후 이 구간은 로그 생략)"),
+								m_lead_cap_ms, waited_cap,
+								(long long)((rt_s_cap - (REFERENCE_TIME)rt_clk_now) / 10000));
+						}
+						else if (waited_cap < 20)
+						{
+							m_lead_capped = false;
+						}
+					}
+
 					//20260822 by claude. [stall] 렌더러(CBaseRenderer)는 Receive 안에서 그 샘플의 표시시각까지
 					//블록한다. 따라서 Deliver 가 오래 막히면 원인은 둘 중 하나다 —
 					//  (1) 샘플 타임스탬프가 그래프 클럭보다 그만큼 앞서 있다(lead ≈ block).
@@ -1815,7 +1872,19 @@ namespace ffi
 					ULONGLONG t_dlv_ms = GetTickCount64() - t_dlv0;
 					m_audio_loop_state.store(0);
 					if (t_dlv_ms > 50)
-						logWrite(_T("[ffi/src/audio/diag] Deliver BLOCKED %llums (DSound input 큐 full = 오디오 렌더러/클럭 stall 신호)"), t_dlv_ms);
+					{
+						//20260831 by claude. lead 를 같이 남긴다 — 무음(클럭 정지) 구간에서 렌더러가
+						//*미래* 샘플을 기다리는지(lead>0 = 교착: 클럭이 안 가니 표시시각도 안 온다)
+						//*지각* 샘플을 받고 있는지(lead<0 = 체인 지연으로 늦게 닿음) 를 가른다.
+						//이 둘은 대책이 정반대라 값 없이는 진행할 수 없다.
+						CRefTime rt_dbg_now;
+						m_pFilter->StreamTime(rt_dbg_now);
+						logWrite(_T("[ffi/src/audio/diag] Deliver BLOCKED %llums | rtStart=%lldms clk_before=%lldms lead=%lldms clk_after=%lldms"),
+							t_dlv_ms, (long long)(rt_dbg_s / 10000),
+							(long long)((REFERENCE_TIME)rt_dbg_before / 10000),
+							(long long)((rt_dbg_s - (REFERENCE_TIME)rt_dbg_before) / 10000),
+							(long long)((REFERENCE_TIME)rt_dbg_now / 10000));
+					}
 
 					//30 초 이상은 일시정지 구간이라 증상과 무관 — 로그에서 뺀다.
 					if (t_dlv_ms > 300 && t_dlv_ms < 30000)

@@ -424,6 +424,41 @@ D2D1::ColorF get_d2color(Gdiplus::Color cr)
 }
 #endif
 
+//20260826 by claude. get_color() 의 분기와 1:1 로 맞춘다 — 여기서 true 면 get_color 가 문자열의 alpha 를
+//쓰고, false 면 alpha=255 를 채워 넣는다. 두 함수가 어긋나면 "명시했는데 무시" 하거나 그 반대가 된다.
+bool color_str_has_alpha(CString cr_str)
+{
+	cr_str.Trim();
+	if (cr_str.IsEmpty())
+		return false;
+
+	//"r,g,b" = 3 토큰(미명시) / "a,r,g,b" = 4 토큰(명시).
+	if (get_char_count(cr_str, ',') >= 2)
+	{
+		std::deque<CString> token;
+		get_token_str(cr_str, token, _T(","), false);
+		return token.size() == 4;
+	}
+
+	//hex — '#' 유무와 무관하게 8 자리일 때만 alpha 를 담는다(6 자리는 get_gcolor_from_hexa_str 가 255 로 채움).
+	if (cr_str[0] == _T('#'))
+		cr_str = cr_str.Mid(1);
+
+	if (cr_str.GetLength() != 8)
+		return false;
+
+	for (int k = 0; k < 8; k++)
+	{
+		TCHAR c = cr_str[k];
+		if (!((c >= _T('0') && c <= _T('9')) ||
+			  (c >= _T('A') && c <= _T('F')) ||
+			  (c >= _T('a') && c <= _T('f'))))
+			return false;
+	}
+
+	return true;
+}
+
 Gdiplus::Color get_color(CString cr_str)
 {
 	Gdiplus::Color cr = Gdiplus::Color::Black;

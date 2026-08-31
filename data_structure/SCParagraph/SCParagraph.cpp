@@ -342,7 +342,18 @@ void CSCParagraph::build_paragraph_str(CString& text, std::deque<std::deque<CSCP
 		else if (name == _T("cr") || name == _T("ct"))
 		{
 			push_attr(_T("cr"));
-			para_temp.text_prop.cr_text = get_color(value);
+
+			//20260826 by claude. 태그가 alpha 를 명시하지 않았으면 *현재 alpha 를 유지* 한다.
+			//자막 글자색을 반투명(예: a=180)으로 설정해 두고 본문에 <cr=red> 같은 태그가 오면, 그 구간만
+			//alpha=255 로 덮여 불투명하게 튀었다(SMI 의 <font color=red> 가 이 태그로 변환된다).
+			//색만 바꾸라는 태그이므로 투명도는 바깥에서 물려받는 것이 맞다.
+			//alpha 를 쓰려면 태그에 명시하면 된다 — "#80FF0000" / "128,255,0,0".
+			Gdiplus::Color cr_tag = get_color(value);
+			if (!color_str_has_alpha(value))
+				cr_tag = Gdiplus::Color(para_temp.text_prop.cr_text.GetA(),
+					cr_tag.GetR(), cr_tag.GetG(), cr_tag.GetB());
+
+			para_temp.text_prop.cr_text = cr_tag;
 		}
 		else if (name == _T("/cr") || name == _T("/ct"))
 		{

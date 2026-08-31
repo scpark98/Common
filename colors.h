@@ -299,6 +299,12 @@ Gdiplus::Color	get_leveled_color(Gdiplus::Color cr, float level);
 //컬러 이름으로 Gdiplus::Color를 리턴한다. 대소문자를 구분하지 않으며 이름이 없으면 검정색을 리턴한다.
 //get_color("red") 또는 get_color(_T("Red")) -> Gdiplus::Color(255, 255, 0, 0);
 Gdiplus::Color	get_color(CString cr_str);
+//20260826 by claude. 색 문자열이 alpha 를 *명시했는지*. get_color() 의 파싱 분기와 같은 기준이다.
+//  명시 : "#AARRGGBB", "AARRGGBB", "a,r,g,b"
+//  미명시: "#RRGGBB", "RRGGBB", "r,g,b", "red" 같은 이름 (get_color 는 이때 alpha=255 로 채운다)
+//태그로 색만 바꿀 때 기존 alpha 를 유지할지 판단하는 데 쓴다 — 미명시인데 255 로 덮으면
+//반투명 설정이 그 구간만 불투명해진다.
+bool			color_str_has_alpha(CString cr_str);
 Gdiplus::Color	get_color(std::string cr_name);
 
 #ifndef _USING_V110_SDK71_

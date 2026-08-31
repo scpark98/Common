@@ -179,9 +179,28 @@ void CSCEdit::reconstruct_font()
 
 	BOOL bCreated = m_font.CreateFontIndirect(&m_lf);
 
-	CEdit::SetFont(&m_font, TRUE);
+	//20260831 by claude. 폰트를 바꿀 때 깜빡이던 원인 — 여기서 native EDIT 이 *두 번* 다시 그려진다.
+	//  SetFont(&m_font, TRUE)  → 재그리기 1회
+	//  set_line_align()        → 그 안의 SetRect(EM_SETRECT) 가 재그리기 1회 더
+	//각각의 지우기+그리기가 그대로 화면에 나가 두 번 번쩍인다.
+	//(CSCStaticEdit 은 CStatic 파생이라 OnPaint 를 직접 그려 이 경로가 없다 — 그래서 깜빡임이 없었다.)
+	//둘을 묶어 멈춘 뒤 최종 상태로 한 번만 그린다.
+	bool alive = (::IsWindow(m_hWnd) != FALSE);
+
+	if (alive)
+		SetRedraw(FALSE);
+
+	CEdit::SetFont(&m_font, FALSE);		//어차피 아래에서 한 번에 그린다.
 
 	set_line_align(m_valign);
+
+	if (alive)
+	{
+		//SetRedraw(FALSE) 동안 쌓인 무효화는 버려지므로 직접 무효화하고 그 자리에서 그린다.
+		//native EDIT 은 배경을 WM_ERASEBKGND 로 칠하므로 RDW_ERASE 가 필요하다.
+		SetRedraw(TRUE);
+		RedrawWindow(NULL, NULL, RDW_INVALIDATE | RDW_ERASE | RDW_UPDATENOW);
+	}
 
 	ASSERT(bCreated);
 }

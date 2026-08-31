@@ -45,7 +45,14 @@ public:
 	virtual BOOL	Create(CWnd* pParentWnd, DWORD dwStyle = 0);
 
 	//배경·글자·테두리 색을 한 번에 지정한다. 개별 setter 대신 이것을 쓴다.
-	void			set_color_theme(CSCColorTheme theme);
+	//20260831 by claude. 다른 SC 컨트롤 19개와 시그니처를 맞춘다(예전엔 이 클래스만 값 전달이었다).
+	void			set_color_theme(const CSCColorTheme& theme);
+
+	//20260831 by claude. 서식이 아니라 *글자 그대로* 보여줘야 하는 문자열을 감싼다.
+	//파일명·셀 값처럼 사용자 데이터를 툴팁에 넣을 때 필수다 — 데이터에 '<' 가 있으면 태그로 파싱돼
+	//그 뒤 문장이 통째로 사라지거나 엉뚱한 색이 된다.
+	//'<' '>' '&' 세 글자만 특수하므로 그것만 엔티티로 바꾼다.
+	static CString	escape_tags(const CString& text);
 
 	//본문과 툴팁 경계 사이의 여백(px).
 	void			set_padding(int cx, int cy);

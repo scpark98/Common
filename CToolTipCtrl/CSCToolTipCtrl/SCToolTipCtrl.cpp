@@ -34,9 +34,23 @@ BOOL CSCToolTipCtrl::Create(CWnd* pParentWnd, DWORD dwStyle)
 	return CToolTipCtrl::Create(pParentWnd, dwStyle | TTS_NOPREFIX);
 }
 
-void CSCToolTipCtrl::set_color_theme(CSCColorTheme theme)
+void CSCToolTipCtrl::set_color_theme(const CSCColorTheme& theme)
 {
 	m_theme = theme;
+}
+
+CString CSCToolTipCtrl::escape_tags(const CString& text)
+{
+	CString out = text;
+
+	//'&' 를 먼저 바꿔야 한다. get_tag_str 의 디코딩이 &amp; 를 *마지막* 에 풀기 때문에,
+	//원문에 있던 "&lt;" 는 여기서 "&amp;lt;" 가 되었다가 디코딩 후 다시 "&lt;" 로 정확히 복원된다.
+	//순서를 바꾸면 원문의 엔티티가 태그 기호로 둔갑한다.
+	out.Replace(_T("&"), _T("&amp;"));
+	out.Replace(_T("<"), _T("&lt;"));
+	out.Replace(_T(">"), _T("&gt;"));
+
+	return out;
 }
 
 void CSCToolTipCtrl::set_padding(int cx, int cy)

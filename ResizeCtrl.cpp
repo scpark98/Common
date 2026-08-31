@@ -24,6 +24,8 @@
 #ifndef __AFXTEMPL_H__
 #include <afxtempl.H>
 #endif
+#include <vector>
+#include "Functions.h"		//20260831 by claude. move_windows_together.
 
 
 
@@ -403,8 +405,14 @@ void CResizeCtrl::Resize(int cx, int cy)
 
 			if(deltaX != 0 || deltaY != 0)
 			{
+				//20260831 by claude. 예전엔 여기서 곧바로 DeferWindowPos(SWP_NOZORDER 만) 로 옮기고 끝냈다.
+				//그러면 창을 조금만 빨리 리사이즈해도 (a) 리스트/트리에 이전 픽셀이 밀려 남고
+				//(b) 새로 드러난 부모 배경이 한동안 검게 보였다. 이유와 해법은 move_windows_together 주석 참조.
+				//여기서는 새 위치만 모아 넘긴다.
+				std::vector<sc_window_move> moves;
+				moves.reserve(upperBound + 1);
+
 				CRPItemState * items = m_array->GetData();
-				HDWP  hdwp = ::BeginDeferWindowPos(0);
 				for(int current = 0; current <= upperBound; current++, items++)
 				{
 					RECT rcItem;
@@ -423,13 +431,20 @@ void CResizeCtrl::Resize(int cx, int cy)
 
 					if(changed)
 					{
-						hdwp = ::DeferWindowPos(hdwp, items->handle, NULL,
-							rcItem.left, rcItem.top,
-							rcItem.right, rcItem.bottom, SWP_NOZORDER	);
+						//rcItem 의 right/bottom 은 위에서 width/height 로 바뀌어 있다.
+						sc_window_move m;
+						m.hwnd = items->handle;
+						m.rect = CRect(rcItem.left, rcItem.top,
+									   rcItem.left + rcItem.right, rcItem.top + rcItem.bottom);
+						moves.push_back(m);
 					}
 
 				}
-				::EndDeferWindowPos(hdwp);
+
+				//moves 가 비어도(모든 컨트롤이 고정 앵커) 호출한다 — 새로 드러난 부모 배경을
+				//그 자리에서 그려야 검게 남지 않는다.
+				move_windows_together(m_hWndParent, moves);
+
 				m_size.cx = cx;
 				m_size.cy = cy;
 			}

@@ -29,9 +29,16 @@
 //
 // 값 재할당 히스토리 (통합 시점):
 //   - 1.0 이 이미 108/109 를 P2P_EXECUTE_OK / CONFIG_CHANGED 로 실사용 중.
-//   - 3.0 SE 는 109/110 자리에 MESSAGEBOX / URL_OPEN 을 두었으나 소스 상
-//     주석 상태로만 존재 (활성 송신 지점 없음, 3.0 조사 결과).
+//   - 3.0 SE 는 109~113 자리에 MESSAGEBOX ~ LOGIN_FAILED 를 두고 있었다.
 //   - 따라서 1.0 값을 유지하고 3.0 SE 계열을 110~ 로 이동.
+//
+//   20260831 정정: 최초 기록은 "3.0 SE 에 활성 송신 지점이 없어 wire 호환성 영향 없음"
+//   이라고 적었으나 사실이 아니다. MESSAGEBOX / URL_OPEN 은 실제로 주석 상태지만,
+//   LOGIN_ID_IS_EMPTY 와 LOGIN_FAILED 는 3.0 SE 의 ConnectionThread 에서 실제로 송신한다.
+//   그럼에도 재할당이 안전한 이유는 다르다 — 옛 SE 저장소의 LMMLgiMgr(자체 LmmProto.h,
+//   111/112/113)은 더 이상 사용하지 않고, 통합 에이전트는 이 헤더를 함께 쓰는 통합
+//   LMMLgiMgr 과만 짝을 이루기 때문이다. 옛 SE LgiMgr 을 되살릴 일이 생기면 값이
+//   하나씩 어긋난다는 점을 기억할 것.
 // ============================================================================
 
 enum lm_agent_cmd
@@ -47,7 +54,8 @@ enum lm_agent_cmd
     LM_AGENT_CONFIG_CHANGED      = 109,
 
     // 3.0 SE 유래 — 원래 109~113. 108/109 충돌 회피로 110~ 재할당.
-    // 3.0 SE 활성 송신은 없었으므로 프로덕션 wire 호환성 영향 없음.
+    // LOGIN_ID_IS_EMPTY / LOGIN_FAILED 는 3.0 에서 실제 송신된다(위 정정 참조).
+    // 통합 LMMLgiMgr 은 LOGIN_FAILED 를 ID_PASS_FAIL 과 같은 처리로 받는다.
     LM_AGENT_MESSAGEBOX          = 110,
     LM_AGENT_URL_OPEN            = 111,
     LM_AGENT_LOGIN_ID_IS_EMPTY   = 112,

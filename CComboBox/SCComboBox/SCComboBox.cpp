@@ -1008,8 +1008,14 @@ BOOL CSCComboBox::OnCbnSelchange()
 			//m_lf 는 위에서 이미 갱신했으므로 get_font_name() 등은 미루는 동안에도 새 값을 돌려준다.
 			if (m_in_wheel)
 			{
+				//지연을 길게 잡으면 "멈춘 뒤 적용"으로 또렷이 보이고, 짧게 잡으면 휠 간격에 가까워져
+				//직전 폰트 → 새 폰트로 두 번 그리는 것이 거의 인지되지 않는다. 깜빡임은 어느 쪽이든
+				//돌아오지 않는다 — 타이머 경로가 SetRedraw 로 묶어 한 번에 그리기 때문이다.
+				//0 에 가깝게 두면 사실상 매 칸 적용이라 폰트 재생성만 늘고 얻는 것이 없다.
+				static constexpr UINT font_apply_delay_ms = 50;
+
 				KillTimer(TIMER_FONT_APPLY);
-				SetTimer(TIMER_FONT_APPLY, 120, NULL);
+				SetTimer(TIMER_FONT_APPLY, font_apply_delay_ms, NULL);
 			}
 			else
 			{

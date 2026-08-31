@@ -2,6 +2,7 @@
 
 #include <deque>
 #include <list>
+#include <set>
 #include <functional>
 #include <Afxwin.h>
 //20260707 by claude. HeaderCtrlEx/list_data 세트를 CSCListCtrl 폴더로 복사(HeaderCtrlEx→SCHeaderCtrl, class CSCHeaderCtrl).
@@ -15,6 +16,7 @@
 #include "../../system/ShellImageList/ShellImageList.h"
 #include "../../CEdit/CSCStaticEdit/SCStaticEdit.h"
 #include "../../CScrollbar/SCScrollbar/SCScrollbar.h"
+#include "../../CToolTipCtrl/CSCToolTipCtrl/SCToolTipCtrl.h"		//20260831 by claude. 잘린 셀 툴팁.
 #include "../../CDialog/SCShapeDlg/SCShapeDlg.h"		//20260704 by claude. 드래그 이미지를 레이어드 팝업으로(깜빡임 없음)
 
 /*
@@ -769,6 +771,18 @@ public:
 	}
 	bool		is_use_gridlines() const { return (GetExtendedStyle() & LVS_EX_GRIDLINES) != 0; }
 
+	//20260831 by claude. 셀 텍스트가 컬럼 폭에 안 들어가 "..." 로 잘렸을 때, 그 셀에 마우스를 올리면
+	//전체 내용을 툴팁으로 보여준다(탐색기와 같은 동작). 잘리지 않은 셀에는 뜨지 않는다.
+	//
+	//판정은 draw_row 가 실제로 그리는 그 시점에 한다 — 그리기와 같은 폰트(셀별 bold/italic 포함)·같은
+	//textRect 를 쓰므로 레이아웃 산식을 따로 복제하지 않는다. 따라서 draw_row 가 바뀌어도 어긋나지 않는다.
+	//비용은 화면에 보이는 텍스트 셀당 GetTextExtent 1회다. 끄면 그 계산도 하지 않는다.
+	void		set_use_ellipsis_tooltip(bool use) { m_use_ellipsis_tooltip = use; }
+	bool		is_use_ellipsis_tooltip() const { return m_use_ellipsis_tooltip; }
+
+	//툴팁 외형을 다른 SC 툴팁과 맞추거나 태그 서식을 직접 손볼 때 접근한다. Create 전이면 m_hWnd 가 NULL 이다.
+	CSCToolTipCtrl*	get_tooltip() { return &m_tooltip; }
+
 	//선택항목등의 border가 아닌 ctrl 자체의 cr_border. OnNcPaint()에서 border 속성유무를 판단하여 테두리를 그린다.
 	void		set_border_color(Gdiplus::Color cr_border) { m_theme.cr_border_inactive = cr_border; Invalidate(); }
 
@@ -926,6 +940,23 @@ protected:
 
 	//마우스가 컨트롤 안에 들어온 경우 true
 	bool			m_is_hovering = false;
+
+//20260831 by claude. 잘린 셀 툴팁 (set_use_ellipsis_tooltip 참조)
+	bool			m_use_ellipsis_tooltip = true;
+	CSCToolTipCtrl	m_tooltip;
+
+	//이번 paint 에서 "그리려던 텍스트가 textRect 를 넘어 잘린" 셀들. {item, subItem} 을 담는다.
+	//화면에 보이는 셀만 들어가므로 크기는 항상 작다(hover 는 보이는 셀에서만 일어나므로 그것으로 충분).
+	//OnPaint 의 행 루프 진입 시 비운다.
+	//DWORD 하나에 MAKELONG 으로 밀어넣지 않는 이유 — 가상 리스트의 item 은 65535 를 넘을 수 있어 잘린다.
+	std::set<std::pair<int, int>>	m_clipped_cells;
+
+	//마지막으로 툴팁을 갱신한 셀. 같은 셀 위에서 마우스가 움직일 때 매번 갱신하지 않기 위한 것.
+	int				m_tip_item = -1;
+	int				m_tip_subitem = -1;
+
+	//툴팁 텍스트를 지금 hover 중인 셀에 맞춰 갱신한다. 잘리지 않은 셀이면 툴팁을 끈다.
+	void			update_ellipsis_tooltip(CPoint point);
 
 //Drag&Drop 드래깅 관련
 	bool			m_use_drag_and_drop = false;//default = false

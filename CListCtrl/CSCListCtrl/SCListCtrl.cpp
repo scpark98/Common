@@ -702,6 +702,12 @@ void CSCListCtrl::draw_row(CDC* pDC, int iItem, const CRect& row_bounds)
 				if (pStyled)
 					pOldFont = pDC->SelectObject(pStyled);
 			}
+			//20260831 by claude. [잘린 셀 툴팁] 판정을 그리기 직전 이 자리에서 한다 — DC 에 이 셀의 실제 폰트가
+			//선택돼 있고 textRect 도 확정된 상태라, 레이아웃·폰트 산식을 따로 복제하지 않아도 그리기와 항상 일치한다.
+			//DT_WORD_ELLIPSIS 가 "..." 로 줄이는 조건과 같은 비교다.
+			if (m_use_ellipsis_tooltip && !text.IsEmpty() && pDC->GetTextExtent(text).cx > textRect.Width())
+				m_clipped_cells.insert(std::make_pair(iItem, iSubItem));
+
 			pDC->DrawText(text, textRect, format);
 			if (pOldFont)
 				pDC->SelectObject(pOldFont);
@@ -1787,6 +1793,11 @@ BOOL CSCListCtrl::PreTranslateMessage(MSG* pMsg)
 	// TODO: Add your specialized code here and/or call the base class
 	// TODO: 여기에 특수화된 코드를 추가 및/또는 기본 클래스를 호출합니다.
 
+	//20260831 by claude. [잘린 셀 툴팁] 툴팁 컨트롤은 마우스 메시지를 직접 받지 못하므로 여기서 넘겨줘야
+	//표시·숨김 타이밍이 동작한다. 메시지를 소비하지 않으므로 아래 로직에는 영향이 없다.
+	if (::IsWindow(m_tooltip.GetSafeHwnd()))
+		m_tooltip.RelayEvent(pMsg);
+
 	//편집 중 (m_in_editing) 이고 메시지 target 이 내부 편집기 (m_pEdit) 이면, walk 가 부모 dialog 로
 	//계속 가서 메인 단축키 (Q~I 화질조정 / Space 재생 등) 가 발화되는 문제 차단.
 	//자체 dispatch 후 TRUE 반환 — edit 는 정상 입력 받고 부모 walk 만 멈춤.
@@ -2093,6 +2104,11 @@ void CSCListCtrl::OnPaint()
 		int scroll_y = max(0, m_scroll_y);
 		int first = scroll_y / rowH;
 		int y = rc.top - (scroll_y % rowH);
+
+		//20260831 by claude. [잘린 셀 툴팁] 이 루프는 무효 영역과 무관하게 보이는 행을 매번 전부 그리므로,
+		//여기서 비우고 draw_row 가 다시 채우면 집합이 항상 현재 화면과 일치한다.
+		m_clipped_cells.clear();
+
 		for (int i = first; i < total && y < area_bottom; i++, y += rowH)
 		{
 			CRect row_bounds(rc.left, y, rc.right, y + rowH);
@@ -2508,6 +2524,10 @@ void CSCListCtrl::set_color_theme(const CSCColorTheme& theme, bool invalidate)
 {
 	m_theme.copy_colors_from(theme);
 	m_HeaderCtrlEx.set_color(m_theme.cr_header_text, m_theme.cr_header_back);
+
+	//20260831 by claude. 잘린 셀 툴팁은 처음 필요할 때 생성되므로 아직 없을 수 있다. 있으면 같이 갈아준다.
+	if (::IsWindow(m_tooltip.GetSafeHwnd()))
+		m_tooltip.set_color_theme(m_theme);
 
 	//invalidate 를 그대로 전파 — 호출자가 true 로 호출하면 scrollbar 도 즉시 redraw 되어야 한다.
 	//(이전엔 false 하드코딩이라 색만 바뀌고 화면 갱신은 안 됐다.)
@@ -5816,6 +5836,8 @@ void CSCListCtrl::OnMouseMove(UINT nFlags, CPoint point)
 		//RedrawWindow();
 	}
 
+	//20260831 by claude. [잘린 셀 툴팁] 마우스가 어느 셀 위인지 여기서 판정한다.
+	update_ellipsis_tooltip(point);
 
 	//20260707 by claude. 드래그 제스처 감지 — 항목 위 LButton 누른 뒤 문턱 이상 이동하면 LVN_BEGINDRAG 를 합성한다.
 	//native 리스트뷰가 해주던 감지를 OnLButtonDown 이 우회 소비하므로 여기서 직접 감지한다.
@@ -6732,7 +6754,70 @@ void CSCListCtrl::OnMouseLeave()
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
 	//TRACE(_T("list. leave\n"));
 	m_is_hovering = false;
+
+	//20260831 by claude. [잘린 셀 툴팁] 컨트롤을 벗어나면 다음 진입 때 같은 셀이어도 다시 갱신되도록 기억을 지운다.
+	//지우지 않으면 나갔다 같은 셀로 돌아왔을 때 '변화 없음' 으로 판정돼 툴팁이 뜨지 않는다.
+	m_tip_item = m_tip_subitem = -1;
+	if (::IsWindow(m_tooltip.GetSafeHwnd()))
+		m_tooltip.Activate(FALSE);
+
 	CListCtrl::OnMouseLeave();
+}
+
+//20260831 by claude. hover 중인 셀이 잘려 있으면 전체 텍스트를 툴팁으로 준비하고, 아니면 툴팁을 끈다.
+//잘림 여부는 draw_row 가 그리면서 채워둔 m_clipped_cells 로 판정한다 — 여기서 레이아웃을 다시 계산하지 않는다.
+void CSCListCtrl::update_ellipsis_tooltip(CPoint point)
+{
+	if (!m_use_ellipsis_tooltip)
+		return;
+
+	//드래그·마퀴·편집 중에는 띄우지 않는다. 그 상황에서 툴팁은 조작 대상을 가리기만 한다.
+	//m_smooth_drag_pending 은 '항목 위에서 버튼을 누른 채' 상태 — 아직 드래그로 확정되기 전이라 여기서 같이 막는다.
+	if (m_bDragging || m_marquee_active || m_in_editing || m_smooth_drag_pending)
+	{
+		if (::IsWindow(m_tooltip.GetSafeHwnd()))
+			m_tooltip.Activate(FALSE);
+		m_tip_item = m_tip_subitem = -1;
+		return;
+	}
+
+	int item = -1;
+	int sub_item = -1;
+	hit_test(point, item, sub_item, true);		//include_icon=true — 아이콘 위도 그 셀로 본다(라벨과 같은 내용이므로).
+
+	//같은 셀 위를 계속 움직이는 동안은 아무것도 하지 않는다 — 매 이동마다 텍스트를 다시 넣으면 툴팁이 깜빡인다.
+	if (item == m_tip_item && sub_item == m_tip_subitem)
+		return;
+
+	m_tip_item    = item;
+	m_tip_subitem = sub_item;
+
+	bool clipped = (item >= 0 && sub_item >= 0 &&
+					m_clipped_cells.find(std::make_pair(item, sub_item)) != m_clipped_cells.end());
+
+	if (!clipped)
+	{
+		if (::IsWindow(m_tooltip.GetSafeHwnd()))
+			m_tooltip.Activate(FALSE);
+		return;
+	}
+
+	//처음 필요해진 순간에 만든다 — 잘린 셀이 한 번도 없는 리스트는 툴팁 창을 만들지 않는다.
+	if (!::IsWindow(m_tooltip.GetSafeHwnd()))
+	{
+		if (!m_tooltip.Create(this, TTS_ALWAYSTIP))
+			return;
+		m_tooltip.set_color_theme(m_theme);
+		m_tooltip.AddTool(this, _T(""));
+	}
+
+	//이미 떠 있는 툴팁은 내용을 바꿔도 크기가 이전 문자열 기준으로 남는다(크기 계산이 TTN_SHOW 에서 일어나므로).
+	//셀을 옮길 때마다 한 번 내려야 다음 표시에서 새 문자열로 다시 측정된다.
+	m_tooltip.Pop();
+
+	//셀 값은 사용자 데이터다 — '<' 가 들어 있으면 태그로 파싱되므로 반드시 이스케이프한다.
+	m_tooltip.UpdateTipText(CSCToolTipCtrl::escape_tags(get_text(item, sub_item)), this);
+	m_tooltip.Activate(TRUE);
 }
 
 //HAS_STRING, OWNER_DRAW_FIXED 속성을 가지면 CListCtrl의 Get/SetItemData() 함수를 사용할 수 없다.

@@ -1,4 +1,4 @@
-# Common 라이브러리 모듈 지도
+﻿# Common 라이브러리 모듈 지도
 
 모든 프로젝트가 재사용하는 Common 모듈의 **빠른 참조 맵**. 규칙이 아닌 *인벤토리*이므로 `claude.md` 와 분리한다. 모듈 세부를 파악할 때 먼저 이 파일을 보고, 필요한 헤더만 Read 로 확인한다.
 
@@ -100,6 +100,44 @@ Direct2D 아닌 GDI+ 기반 이미지. 독립 모듈.
 | `CSliderCtrl/SCSliderCtrl/SCSliderCtrl.h` | CSliderCtrl | 9+ 스타일 (normal/thumb/progress/track/step), 북마크, N-stop 그라디언트. 커스텀 메시지 `Message_CSCSliderCtrl` + `CSCSliderCtrlMsg{msg, pos}` 구조체. msg enum: `msg_thumb_grab/move/release/track_bottom_slide`. 이벤트 전송 스타일 timer/post/callback 선택. |
 | `CButton/SCSystemButtons/SCSystemButtons.h` | CButton | 타이틀바 minimize/maximize/close/pin/help/custom 복합. `create(parent, top, right, w, h, SC_PIN, SC_MINIMIZE, ...)` 가변 템플릿. parent 에 SC_MINIMIZE/MAXIMIZE/CLOSE(표준) + SC_PIN/SC_HELP(커스텀, WM_USER+) 전송. `CSCSystemButtonsMessage{cmd}`. |
 | `CScrollbar/SCScrollbar/SCScrollbar.h` | CWnd | 자체 그리기 스크롤바 (OS native 스크롤바 색 못 바꾸는 한계 우회, XP 호환). `create(parent, vertical/horizontal, x,y,cx,cy)`. 모델 push: `set_range/page/pos/line`, 보조 `scroll_by_lines/pages`. host 가 `Message_CSCScrollbar` 수신 — `CSCScrollbarMsg{msg, pos}` 의 msg = `msg_scrollbar_pos_changed/drag_start/drag_end`. thumb hover/pressed 색은 `cr_back ↔ cr_text` ratio 자동 derive — theme 무관. `set_show_arrows(false)` 기본 (modern minimal). |
+| `CComboBox/SCComboBox/SCComboBox.h` | CComboBox | 테마 적용 콤보. 드롭다운 리스트까지 자체 그리기. |
+| `CStatic/PathCtrl/PathCtrl.h` | CStatic | 탐색기 주소표시줄 스타일 경로 표시·이동. 세그먼트 클릭으로 상위 폴더 이동. Border 는 리소스 속성으로 켠다 — `OnPaint` 입구의 early return 때문에 path 미설정 상태에서도 그려지는지 확인할 것. |
+| `CStatic/CSCStepCtrl/SCStepCtrl.h` | CStatic | 단계 진행 표시(step indicator). `set_step_count`, `set_pos`, `step()`, `set_thumb_style(index, style)`, `set_text(index, text, cr)`. 가로/세로는 `set_style(is_horz, thumb_style)`. |
+| `CIPAddressCtrl/SCIPAddressCtrl/SCIPAddressCtrl.h` | CIPAddressCtrl | 표준 컨트롤이 안 주는 **Return 키 / KillFocus 이벤트**를 parent 에 전달. `Message_CSCIPAddressCtrl`. |
+| `CToolTipCtrl/CSCToolTipCtrl/SCToolTipCtrl.h` | CToolTipCtrl | 태그 서식(`CSCParagraph`) 툴팁 — `CSCStatic` 과 서식 결과가 항상 일치한다. `set_padding/max_width/round/line_spacing/fade`. `Create` override 가 `TTS_NOPREFIX` 를 항상 붙인다(없으면 문자열의 `&` 가 사라진다). **사용자 데이터를 넣을 땐 `static escape_tags()` 필수** — 데이터의 `<` 가 태그로 파싱된다. `relay_message(MSG*)` 는 top-level dlg 의 PreTranslateMessage 에서 호출(그래야 disabled 컨트롤에서도 뜬다). |
+
+### 3.1 목록·트리 컨트롤
+
+셋 다 **native 레이아웃을 쓰지 않고** 직접 그리며, `CSCScrollbar` 오버레이 + NC 테두리 인프라
+(`setup_scrollbar` / `sync_scrollbar` / `OnNcCalcSize` / `OnNcPaint`)를 **각자 따로** 갖고 있다.
+합계 약 1,000줄이 거의 같은 코드다 — 이 영역의 버그는 세 곳을 고쳐야 한다(공통화 미착수).
+
+| 헤더 | 기반 | 특징 |
+|---|---|---|
+| `CListCtrl/CSCListCtrl/SCListCtrl.h` | CListCtrl | `CVtListCtrlEx` 의 후계. **virtual list 단일 모드** — 데이터는 `m_list_db`(deque)가 갖고 `draw_row` 가 직접 그린다. 리소스에서 **Owner Data + Owner Draw Fixed 필수**(동적 변경 불가). `InsertItem`/`SetItemText` 대신 `insert_item`/`set_text` 계열을 쓸 것. 항목 Y 는 native 스크롤이 아니라 `header + i*row_height - m_scroll_y`(픽셀) 이며 이 산식이 20여 곳에 흩어져 있다. 셀별 색·폰트, 정렬, 인라인 편집, 마퀴 선택, 드래그&드롭, shell 모드(`set_as_shell_listctrl`), progress 셀, 잘린 셀 툴팁(`set_use_ellipsis_tooltip`). 동반 파일: `SCHeaderCtrl.h`(`CSCHeaderCtrl`), `list_data.h`. |
+| `CTreeCtrl/SCTreeCtrl/SCTreeCtrl.h` | CTreeCtrl | `OnNMCustomDraw` 로 전면 자체 그리기. chevron 은 **GDI+ 벡터로 직접** 그린다(XP 에 아이콘 폰트가 없다). 폴더 트리(`CSCTreeCtrlFolder`), 인라인 편집, 드래그&드롭 + 자동 확장/스크롤, node count 배지, 잘린 라벨 툴팁. |
+| `CListBox/SCListBox/SCListBox.h` | CListBox | `DrawItem` 자체 그리기. 거터(줄 번호), 가로 오버레이 스크롤. 큰 글씨는 GDI+ 로 그려 CJK 내장 비트맵 폰트의 톱니를 피한다(`m_text_smooth`). |
+| `CListCtrl/CVtListCtrlEx/VtListCtrlEx.h` | CListCtrl | **구 버전.** `CSCListCtrl` 의 원본이며 아직 쓰는 프로젝트가 있어 남아 있다. 신규 코드는 `CSCListCtrl` 을 쓴다. |
+
+### 3.2 메뉴·툴바·타이틀바
+
+| 헤더 | 기반 | 특징 |
+|---|---|---|
+| `CMenu/CSCMenuBar/SCMenu.h` | — | `CSCMenu` / `CSCMenuItem`. 자체 그리기 팝업 메뉴. 리소스 메뉴(`load_from_menu`)에서 nested 까지 자동 구성. 아이콘·서브 버튼·체크. 트리거를 다시 눌러 닫는 토글은 per-instance `m_dismiss_tick` 디바운스로 **모듈 안에서** 처리한다(사용처마다 반복하지 않도록). |
+| `CMenu/CSCMenuBar/SCMenuBar.h` | CDialogEx | 메뉴 버튼 줄. `init(parent, resource_menu_id, ...)`, `set_icon_and_buttons(...)` 가변 템플릿. `set_color_theme` 은 int / `const CSCColorTheme&` 두 가지. |
+| `CMenu/CSCMenuBar/SCMenuButton.h` | CGdiButton | 메뉴바의 버튼 하나 + 거기 달린 `CSCMenu`. |
+| `CToolBar/SCToolBar/SCToolBar.h` | CDialogEx | `init(parent, x, y, w, h)` → `add(caption, resource_id, button_type)` → `create()`. |
+| `ui/CSCTitleBar/SCTitleBar.h` | — | 창이 아니라 **그리기 헬퍼**. `draw(CDC*/Graphics*, rc)` 로 호스트가 자기 영역에 타이틀바를 그린다. |
+| `CButton/GdiButton/GdiButton.h` | CButton | 이미지·라운드·hover/down 파생색 버튼. `Message_CGdiButton` 로 parent 에 통지. SC 계열 버튼의 실질 베이스. |
+
+### 3.3 그 밖의 컨트롤·다이얼로그
+
+| 헤더 | 기반 | 특징 |
+|---|---|---|
+| `messagebox/CSCMessageBox/SCMessageBox.h` | CDialogEx | 테마 적용 메시지 박스. 본문에 `CSCParagraph` 태그 사용 가능. modeless 로도 띄운다. |
+| `CDialog/SCPropertyCtrl/SCPropertyCtrl.h` | CDialogEx | 속성 편집 패널. `begin()` → `section()` / `begin_row()` / `add(&변수, label, ...)` / `add_info()` → `end()` 로 **변수에 직접 바인딩**해 자식 컨트롤을 생성. 외부에서 값이 바뀌면 `refresh()`. |
+| `CDialog/CSCHeatmapCtrl/SCHeatmapCtrl.h` | CDialogEx | 히트맵 격자(`CSCHeatmapCell`). |
+| `ControlSplitter.h` | CButton | 컨트롤 사이를 드래그로 나누는 스플리터. `set_type(CS_VERT/CS_HORZ)`, `AddToTopOrLeftCtrls` / `AddToBottomOrRightCtrls` / `AddToBoth` 에 `SPF_*` 로 어느 변이 따라올지 지정. `get/set_split_offset` 으로 위치 저장·복원. 이동은 `DeferWindowPos` + `SWP_NOCOPYBITS` + `RDW_UPDATENOW` **한 묶음** — 셋 중 하나만 빠져도 빠른 드래그에서 잔상이 남는다. `set_live_resize_hook` 은 선택(리스트/트리를 드래그 동안 재우려면 app 이 연결). |
 
 ### 정책 — CSCScrollbar overlay 컨트롤의 단일 결정자 원칙
 
@@ -203,10 +241,45 @@ CFont 래핑. `SetHeight/Bold/Italic/Underline/StrikeOut/FaceName/Weight/Charset
 커스텀 InputBox. 스타일 enum: `NORMAL/MULTILINE/NUMERIC/PASSWORD/MESSAGE`. static `InputBox(title, prompt, buf, size, style, timeout_ms, parent)`. `WIN32INPUTBOX_PARAM` 구조체로 고급 옵션.
 
 ### `data_structure/SCParagraph/SCParagraph.h` — `CSCParagraph`
-태그 기반 리치 텍스트. 글자별 폰트/색/스타일.
-- `CSCTextProperty` = font name/size/style (FontStyleRegular|Bold|Italic|Underline|Strikeout) + cr_text/back/stroke/shadow + shadow_depth/thickness.
-- 태그: `<f=>`, `<sz=>`, `<b>`, `<i>`, `<u>`, `<s>`, `<cr=red>` | `<cr=#FF00AA>` | `<cr=123,45,67,255>` | `<cr=h90,30,100>` (HSI), `<ct=>`, `<crb=>`, `<cb=>`, `<br>`.
-- 파이프라인: `build_paragraph_str()` → `calc_text_rect()` → `draw_text(CDC or Graphics)`. 정적 함수.
+태그 기반 리치 텍스트. 글자별 폰트/색/스타일. `CSCStatic` · `CSCToolTipCtrl` · `CSCMessageBox` · `CSCShapeDlg` 가 공유한다.
+- `CSCTextProperty` = font name/size/style + cr_text/back/stroke/shadow + 그림자·발광 파라미터.
+- 파이프라인: `build_paragraph_str()` → `calc_text_rect()` → `draw_text(CDC or Graphics)`. 전부 static.
+- **태그 전체 목록과 정확한 인자 의미는 헤더 주석이 유일한 출처다.** 여기서는 갈래만 적는다.
+  - 폰트·스타일: `<f=> <sz=> <b> <i> <u> <s> <sup> <sub> <sp=>`
+  - 색: `<cr=>`(=`<ct=>`), `<crb=>`(=`<cb=>`), `<grad=도착색>` (인자는 **도착색 하나** — 출발색은 그 구간의 `cr_text`), `<box=색,반지름,여백>` (CSS 의 background + padding + border-radius. `<crb>` 와 달리 여백이 붙어 한 글자 run 은 세로로 긴 알약이 된다)
+  - 외곽선·그림자·발광: `<st=> <cs=> <ts=...> <sd=> <csh=> <sb=> <glow=색,sigma>` (`<glow>` 는 `<ts=0,0,σ,색,σ>` 와 같다 — 작은 글자에 큰 σ 를 주면 글자끼리 뭉친다)
+  - 줄·정렬: `<br> <ls=> <vsp=> <al=> <la=> <indent=> <hang=> <tab=> <nowrap>` (줄 단위 태그는 그 줄이 확정되면 리셋된다)
+  - 그 밖: `<ruby=> <cru=> <img=> <style=> <id=>`
+- **태그를 글자 그대로 보여주려면 HTML 엔티티** — `&lt; &gt; &amp;`. 특수한 글자는 이 셋뿐이다.
+  사용자 데이터를 넣을 땐 `CSCToolTipCtrl::escape_tags()` 를 쓴다.
+
+### `log/SCLog/SCLog.h` — `CSCLog`
+파일 로그. 출력은 `<exe_dir>\Log\<exe_title>_YYYYMMDD_HHMMSS.log` — **실행할 때마다 새 파일**이라 덮어쓰기가 없다.
+`set(folder, title, level)`, `write(...)`, `show_function_name/line_number`, `get_log_full_path()`.
+로그 파일은 배포·커밋 대상이 아니므로(.gitignore) 실제 경로·파일명이 문자열로 들어가도 된다.
+
+### `system/SCKeyBindings/SCKeyBindings.h` — `CSCKeyBindings`
+단축키를 리소스가 아니라 **런타임 테이블**로 다룬다. `seed_from_resource(accel_id)` / `seed_from_menu(HMENU)` /
+`seed_from_scmenu(CSCMenu*)` 로 기존 정의를 흡수한 뒤 `register_action`, `set_binding`, `reset_to_default`.
+사용자 변경분은 레지스트리에 `load_overrides` / `save_overrides`. 표시·파싱은 `key_to_string` / `string_to_key`.
+
+### `data_types/` — 값 타입
+- `CSCTime/SCTime.h` — `CSCTime`. `CTime` 은 ms 가 없고 `SYSTEMTIME` 은 연산자가 없으며 둘 다 **음수를 못 담는다**.
+  시각과 시간차를 한 타입으로 다루기 위해 만든 것. 연산자 오버로딩 제공.
+- `CSCGroupRect/SCGroupRect.h` — `CSCRect`(라벨 붙은 `Gdiplus::RectF`) + `CSCGroupRect`(그 묶음).
+- `CSCUIElement/SCUIElement.h` — `CSCUIElement`. 라벨 있는 사각 UI 요소의 공통 표현.
+- `data_structure/CSCBookmark/SCBookmark.h` — `CSCBookmark`. 재생 위치 + 썸네일 한 단위.
+  썸네일은 `unique_ptr` — `CSCGdiplusBitmap` 에 안전한 copy/move 가 없어 vector 에 값으로 담으면 shallow copy 위험.
+
+### `win_compat/dwm.h` — `win_compat::dwm`
+Vista+ 전용 DWM API 래퍼. XP/Vista 에서 자동 no-op 이라 **호출측에 OS 분기를 두지 않아도 된다.**
+`dwmapi`/`uxtheme` 를 직접 호출하지 말고 여기를 경유한다(SC 컨트롤은 XP 까지 지원한다).
+
+### `directx/CSCVideoWndD2/SCVideoWndD2.h` — `CSCVideoWndD2`
+Direct2D 비디오 재생 창. 구 `CVideoWnd` 대비 — 디코딩은 `ffi::CDecoder`(FFmpeg + D3D11VA/DXVA2 하드웨어),
+렌더링은 D2D `DrawBitmap`(GPU 샘플러 — 창을 키워도 비용이 거의 안 는다. GDI `StretchDIBits` 는 목적지
+픽셀 수에 비례해 CPU 를 쓴다), 프레임 페이싱은 `WM_TIMER` 가 아니라 고해상도 waitable timer pacer 스레드
+(`WM_TIMER` 는 해상도 15.6ms + 큐가 빌 때만 합성되는 최저 우선순위 메시지라 안정적 페이싱이 불가능하다).
 
 ---
 
@@ -227,4 +300,27 @@ CASeeDlg (프로젝트)
 
 컬러:  모든 커스텀 컨트롤 ── CSCColorTheme ── colors.h (gRGB, get_color 등)
 유틸:  대부분 ── Functions.h
+```
+
+파일 탐색기형 앱 (KoinoViewer / SCDeskTools 류) 의 전형적 조합:
+
+```
+Dlg (CSCThemeDlg 파생)
+ ├─ CSCMenuBar ── CSCMenuButton × N ── CSCMenu (CSCMenuItem)
+ ├─ CSCToolBar ── CGdiButton × N
+ ├─ CPathCtrl                                  ─┐
+ ├─ CSCTreeCtrl ─┬─ CSCScrollbar × 2 (v/h)      │ 셋 다 CSCScrollbar 오버레이 +
+ │               ├─ CSCStaticEdit (인라인 편집)  │ NC 테두리 인프라를 각자 구현
+ │               ├─ CSCToolTipCtrl (잘린 라벨)   │ (§3.1 — 약 1,000줄 중복)
+ │               └─ CSCShapeDlg (드래그 이미지)  │
+ ├─ ControlSplitter ── (트리 ↔ 리스트 배치)      │
+ ├─ CSCListCtrl ─┬─ CSCHeaderCtrl               │
+ │               ├─ CSCScrollbar × 2 (v/h)     ─┘
+ │               ├─ CSCStaticEdit (인라인 편집)
+ │               ├─ CSCToolTipCtrl (잘린 셀)
+ │               ├─ CShellImageList (아이콘)
+ │               └─ CSCShapeDlg (드래그 이미지)
+ └─ CSCMessageBox / CSCPropertyCtrl / CSCColorPicker
+
+서식 텍스트: CSCStatic · CSCToolTipCtrl · CSCMessageBox · CSCShapeDlg ── CSCParagraph
 ```

@@ -1170,7 +1170,7 @@ public:
 	//가로가 움직였으면 항목 영역 전체를 무효화한다(native 의 BitBlt 스크롤 잔상 제거). 근거는 .cpp 주석.
 	void			invalidate_on_h_scroll();
 	bool			m_syncing = false;			//framechange 재진입 가드 (SWP_FRAMECHANGED → OnSize → sync 재진입 차단)
-	bool			m_snapping = false;			//top 항목 헤더 스냅 재진입 가드 (Scroll → LVN_ENDSCROLL 재귀 차단)
+	//20260831 by claude. m_snapping 제거 — 그 가드가 지키던 헤더 스냅 블록을 OnLvnEndScroll 에서 삭제했다.
 	//20260722 by claude. 이 컨트롤은 픽셀 페인트 단일 모드다 — 항목을 직접 픽셀 위치에 그려 부분행/하단여백0 을 구현한다.
 	//native 위임 경로(과거 set_smooth_scroll(false))는 없앴다. native report-view 의 세로 스크롤이 whole-item 으로 양자화돼
 	//하단 여백을 못 없애는 것이 이 클래스를 만든 이유이므로, 그 경로를 남겨둘 이유가 없다.

@@ -7429,24 +7429,24 @@ void CSCListCtrl::OnLvnEndScroll(NMHDR* pNMHDR, LRESULT* pResult)
 		UpdateWindow();
 		sync_scrollbar();
 
-		//top 항목을 헤더 하단에 스냅 — header_height ≠ line_height 인 경우 native 가 클릭/EnsureVisible 시
-		//top 항목을 헤더에 딱 안 맞춰 sub-pixel 어긋남(gap/overlap)이 생긴다. 모든 scroll source 가 수렴하는
-		//이 지점에서 보정. Scroll 이 다시 LVN_ENDSCROLL 을 유발하므로 m_snapping 으로 재진입 차단(수렴 후 dy=0).
-		if (!m_snapping && m_HeaderCtrlEx.GetSafeHwnd() && GetItemCount() > 0)
-		{
-			int top = GetTopIndex();
-			CRect ri;
-			if (top >= 0 && GetItemRect(top, &ri, LVIR_BOUNDS))
-			{
-				int dy = ri.top - get_header_height();
-				if (dy != 0)
-				{
-					m_snapping = true;
-					Scroll(CSize(0, dy));
-					m_snapping = false;
-				}
-			}
-		}
+		//20260831 by claude. [삭제] 여기 있던 "top 항목을 헤더 하단에 스냅" 블록을 제거했다.
+		//
+		//	int top = GetTopIndex();
+		//	CRect ri; GetItemRect(top, &ri, LVIR_BOUNDS);
+		//	int dy = ri.top - get_header_height();
+		//	if (dy != 0) Scroll(CSize(0, dy));
+		//
+		//두 좌표계를 섞고 있었다. GetTopIndex() 는 이 클래스가 픽셀 뷰포트(m_scroll_y / row_height)로
+		//재정의한 값이고, GetItemRect() 는 재정의하지 않아 native 좌표를 돌려준다. 그래서 dy 가
+		//"우리 기준 top 항목의 native Y" 라는 뜻 없는 값이 되고, 매 스크롤마다 그만큼 Scroll(0, dy) 가
+		//화면을 세로로 BitBlt 했다 — 가로로 조금만 스크롤해도 상단 행들이 반 줄씩 겹쳐 보이던 원인이다.
+		//(BitBlt 뒤 새로 드러난 띠만 무효화되므로 나머지는 옛 픽셀 그대로 남는다.)
+		//
+		//이 블록은 애초에 if (m_scrollbar_setup) 안에만 있었다. 즉 픽셀 페인트 경로 전용인데,
+		//그 경로는 행 Y 를 전부 m_scroll_y 로 직접 계산하고 native 의 세로 위치는 아무 데서도 읽지 않는다
+		//(GetSubItemRect 에서 쓰는 것은 X 뿐이고, GetTopIndex/GetCountPerPage/IsItemVisible/EnsureVisible
+		//모두 재정의되어 있다). 스냅이 보정할 대상이 없어졌고 부작용만 남은 상태였다.
+		//주석 처리가 아니라 삭제한 이유 — 되살리려면 좌표계부터 다시 정해야 해서 그대로는 쓸 수 없다.
 	}
 
 	*pResult = 0;

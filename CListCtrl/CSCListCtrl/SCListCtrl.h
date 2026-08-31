@@ -58,7 +58,11 @@ text align과 같이 리스트의 정렬 방식과 header의 정렬 방식을 �
 <사용법 예시>
 //LVS_EX_GRIDLINES 를 주면 격자선이 그려진다(native 가 아니라 draw_row 가 직접 그린다).
 //격자선 색을 테마 파생색이 아닌 특정색으로 바꾸려면 use_gridlines(true, color) 를 쓴다.
-m_list.SetExtendedStyle(LVS_EX_FLATSB | LVS_EX_CHECKBOXES | LVS_EX_FULLROWSELECT | LVS_EX_INFOTIP | LVS_EX_GRIDLINES);
+//20260831 by claude. 예전 예시에 있던 LVS_EX_INFOTIP 은 뺐다 — 이 컨트롤에서는 켜도 아무 일이 없다.
+//native paint 를 통째로 우회하고 LVN_GETINFOTIP 핸들러도 없기 때문이다.
+//잘린 셀의 전체 내용은 set_use_ellipsis_tooltip(기본 켜짐)이 CSCToolTipCtrl 로 보여준다.
+//LVS_EX_FLATSB 도 쓰지 말 것 — CSCScrollbar 오버레이와 충돌한다(architecture.md 의 단일 결정자 원칙).
+m_list.SetExtendedStyle(LVS_EX_CHECKBOXES | LVS_EX_FULLROWSELECT | LVS_EX_GRIDLINES);
 m_list.UsePopupMenu(false);
 m_list.AllowSort();
 m_list.set_color_theme(CSCListCtrl::color_theme_dark_gray);

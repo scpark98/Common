@@ -97,6 +97,11 @@ protected:
 	//-1이면 폰트크기에 따라 자동 조정
 	int				m_line_height = -1;
 
+	//20260831 by claude. 선택영역(닫힌 콤보의 텍스트 칸) 높이의 하한 — 폰트 메트릭 기준값. reconstruct_font 가 채운다.
+	//실제 적용 높이는 sync_edit_height 가 컨트롤 높이와 비교해 정한다(컨트롤이 더 높으면 채워 글자가 세로 중앙에 오게).
+	int				m_edit_height_min = -1;
+	void			sync_edit_height();
+
 	CBrush			m_br_back;
 
 //폰트 관련
@@ -167,6 +172,7 @@ public:
 	virtual void PreSubclassWindow();
 	afx_msg void OnPaint();
 	afx_msg BOOL OnEraseBkgnd(CDC* pDC);
+	afx_msg void OnSize(UINT nType, int cx, int cy);
 	afx_msg void OnCbnSetfocus();
 	afx_msg void OnCbnKillfocus();
 	afx_msg BOOL OnCbnSelchange();

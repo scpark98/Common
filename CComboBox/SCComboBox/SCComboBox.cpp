@@ -80,6 +80,7 @@ BEGIN_MESSAGE_MAP(CSCComboBox, CComboBox)
 	ON_WM_DRAWITEM()
 	ON_WM_TIMER()
 	ON_WM_CTLCOLOR_REFLECT()
+	ON_WM_SIZE()		//20260831 by claude. 콤보 높이가 바뀌면 선택영역도 따라 채운다(sync_edit_height).
 END_MESSAGE_MAP()
 
 
@@ -483,10 +484,45 @@ void CSCComboBox::reconstruct_font()
 	}
 
 	//-1 = 선택영역(닫힌 콤보) 높이, 0 = listbox 항목 높이.
-	SetItemHeight(-1, edit_height);
+	//20260831 by claude. 선택영역은 폰트 기준값을 '최소' 로만 쓰고, 컨트롤이 그보다 높으면 채운다(sync_edit_height).
+	m_edit_height_min = edit_height;
 	SetItemHeight(0, list_height);
+	sync_edit_height();
 
 	ASSERT(bCreated);
+}
+
+//20260831 by claude. 선택영역(닫힌 콤보의 텍스트 칸) 높이를 컨트롤 높이에 맞춘다.
+//
+//예전에는 이 높이를 폰트 메트릭만으로 정했다. 그러면 리소스에서 콤보를 폰트가 필요로 하는 것보다
+//높게 잡았을 때 텍스트 칸이 위쪽에 붙은 채로 남아 글자가 위로 치우쳐 보인다(아래는 빈 공간).
+//DrawItem 은 이미 DT_VCENTER 로 그리므로, 칸이 컨트롤을 채우기만 하면 세로 중앙에 온다.
+//
+//상하 여백은 상수로 박지 않고 실측한다 — GetComboBoxInfo 의 rcItem.top 이 곧 위쪽 테두리 두께이고,
+//아래도 같다고 보면 채울 높이 = client 높이 - top*2 다. 이 값은 항목 높이와 무관하므로 순환하지 않는다.
+//폰트 기준값보다 작아지지는 않게 한다 — 콤보가 폰트보다 낮으면 글자가 잘리는 쪽이 더 나쁘다.
+void CSCComboBox::sync_edit_height()
+{
+	if (!::IsWindow(m_hWnd) || m_edit_height_min <= 0)
+		return;
+
+	int edit_height = m_edit_height_min;
+
+	CRect rc;
+	GetClientRect(rc);
+
+	COMBOBOXINFO info = { 0 };
+	info.cbSize = sizeof(info);
+
+	if (GetComboBoxInfo(&info))
+	{
+		int fill = rc.Height() - info.rcItem.top * 2;
+		if (fill > edit_height)
+			edit_height = fill;
+	}
+
+	if (GetItemHeight(-1) != edit_height)
+		SetItemHeight(-1, edit_height);
 }
 
 
@@ -675,6 +711,14 @@ BOOL CSCComboBox::OnEraseBkgnd(CDC* pDC)
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
 	return FALSE;
 	return CComboBox::OnEraseBkgnd(pDC);
+}
+
+//20260831 by claude. 리소스 편집기에서 잡은 높이든 런타임 MoveWindow 든, 컨트롤 높이가 정해지는 시점은 여기다.
+//reconstruct_font 한 번만으로는 그 이후의 높이 변경을 못 따라가므로 여기서도 맞춘다.
+void CSCComboBox::OnSize(UINT nType, int cx, int cy)
+{
+	CComboBox::OnSize(nType, cx, cy);
+	sync_edit_height();
 }
 
 

@@ -1293,6 +1293,18 @@ Confluence(`koinodoc.atlassian.net`)에 문서를 만들 때는 **무조건 라�
 
 **Why:** 사용자 명시(2026-06-24). 수정 히스토리 문서를 일반 페이지로 처음 생성한 뒤 — *"다음부터는 무조건 페이지가 아닌 라이브문서로 생성하라."* 라이브 문서는 편집·갱신이 잦은 진행성 기록(패치 히스토리, 대응 로그 등)에 적합하며 사용자의 표준 워크플로다.
 
+**목차 매크로는 갱신할 때마다 다시 넣는다 (강제).** 사용자가 `/목차`(Table of Contents) 매크로를 넣어 둔 문서를 `updateConfluencePage` 로 갱신하면, 이 API 는 부분 수정이 없어 **본문 전체를 다시 써 보내야** 하고 그 과정에서 **목차 매크로가 조용히 사라진다.** 41123842 문서에서 반복 발생했다(2026-08-31 사용자 지적 — *"클로드가 문서를 갱신하면서 자꾸 목차를 지우고 있다"*).
+
+- 갱신 전 원본을 `contentFormat: "html"` 로 받아 목차 매크로 블록이 있는지 확인하고, 새 본문에 **그대로 다시 포함**한다.
+- 원본에 없더라도 절 번호가 있는 긴 문서면 제목 아래에 넣어 준다. HTML+ 형식은 다음과 같다(`macroId` 는 넣지 않는다).
+
+```html
+<div data-type="extension" data-extension-key="toc" data-extension-type="com.atlassian.confluence.macro.core" data-layout="default" data-parameters="{&quot;macroParams&quot;:{&quot;style&quot;:{&quot;value&quot;:&quot;none&quot;}},&quot;macroMetadata&quot;:{&quot;schemaVersion&quot;:{&quot;value&quot;:&quot;1&quot;},&quot;title&quot;:&quot;Table of Contents&quot;}}"></div>
+```
+
+- **Confluence 문서 갱신은 항상 `html` 왕복으로 한다.** `markdown` 으로 받아 되쓰면 목차뿐 아니라 패널(`data-type="panel-*"`)·상태 배지(`data-type="status"`)·작업 목록이 전부 평문으로 뭉개진다. 기존 노드의 `data-local-id` 는 그대로 보존하고, 새로 만드는 노드에는 붙이지 않는다.
+- 절 번호를 바꾸는 편집을 했으면 본문의 상호 참조(`N절`, `N.M 절`)도 함께 고친다. 목차는 제목에서 자동 생성되므로 별도 갱신이 필요 없지만, 본문 참조는 자동으로 따라오지 않는다.
+
 ## 방식이 다른 알고리즘 개선 — 기존 것 유지 + 선택 가능하게 (강제, 모든 프로젝트)
 
 어떤 알고리즘/처리방식을 개선하자고 했을 때, **단순 변수 튜닝·사소한 보정이 아니라 방식 자체가 다른(접근법이 바뀌는) 개선이면 기존 알고리즘을 지우지 말고 유지한 채, 둘 다 선택해서 쓸 수 있도록** 구현한다.

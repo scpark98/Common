@@ -6,6 +6,7 @@
 #include "../../../Common/Functions.h"
 #include "../../MemoryDC.h"
 #include "../../CEdit/SCEdit/SCEdit.h"
+#include "../../log/SCLog/SCLog.h"		//20260831 by claude. [진단] 선택영역 높이/텍스트 위치 추적. 원인 확정 후 제거 예정.
 #include <imm.h>	// ImmGetCompositionString — IME 조합 중 문자열 취득 (필터링용)
 #include <commctrl.h>	// SetWindowSubclass / RemoveWindowSubclass
 #pragma comment(lib, "comctl32.lib")
@@ -157,6 +158,25 @@ void CSCComboBox::DrawItem(LPDRAWITEMSTRUCT lpDrawItemStruct)
 
 		CRect rtext = rItem;
 		rtext.DeflateRect(4, 0);
+
+		//20260831 by claude. [진단] 닫힌 콤보(선택영역)만. 텍스트가 세로 중앙에 안 오는 원인 확정용.
+		//OS 가 준 rcItem 이 컨트롤을 채우는지, 폰트 line box(tmHeight)가 그 안에서 어디에 놓이는지를 본다.
+		if (lpDrawItemStruct->itemState & ODS_COMBOBOXEDIT)
+		{
+			CRect rc_client;
+			GetClientRect(rc_client);
+
+			TEXTMETRIC tm = {};
+			dc.GetTextMetrics(&tm);
+
+			logWrite(_T("[SCComboBox] field id=%d client=(%d,%d,%d,%d) h=%d | rcItem=(%d,%d,%d,%d) h=%d | itemH(-1)=%d itemH(0)=%d | tmHeight=%d asc=%d desc=%d intLead=%d extLead=%d | text=%s"),
+				lpDrawItemStruct->itemID,
+				rc_client.left, rc_client.top, rc_client.right, rc_client.bottom, rc_client.Height(),
+				rItem.left, rItem.top, rItem.right, rItem.bottom, rItem.Height(),
+				GetItemHeight(-1), GetItemHeight(0),
+				tm.tmHeight, tm.tmAscent, tm.tmDescent, tm.tmInternalLeading, tm.tmExternalLeading,
+				(LPCTSTR)strData);
+		}
 
 		if (m_is_font_combo)
 		{
@@ -514,12 +534,23 @@ void CSCComboBox::sync_edit_height()
 	COMBOBOXINFO info = { 0 };
 	info.cbSize = sizeof(info);
 
-	if (GetComboBoxInfo(&info))
+	BOOL got = GetComboBoxInfo(&info);
+
+	if (got)
 	{
 		int fill = rc.Height() - info.rcItem.top * 2;
 		if (fill > edit_height)
 			edit_height = fill;
 	}
+
+	//20260831 by claude. [진단] 이 함수가 언제 어떤 값으로 도는지. client 높이가 이미 field 높이와 같다면
+	//"컨트롤이 field 보다 크다" 는 전제 자체가 틀린 것이므로 여기서 바로 드러난다.
+	logWrite(_T("[SCComboBox] sync_edit_height client_h=%d min=%d -> %d | cbi=%d rcItem=(%d,%d,%d,%d) h=%d | cur itemH(-1)=%d"),
+		rc.Height(), m_edit_height_min, edit_height,
+		(int)got,
+		info.rcItem.left, info.rcItem.top, info.rcItem.right, info.rcItem.bottom,
+		info.rcItem.bottom - info.rcItem.top,
+		GetItemHeight(-1));
 
 	if (GetItemHeight(-1) != edit_height)
 		SetItemHeight(-1, edit_height);

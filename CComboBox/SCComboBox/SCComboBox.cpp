@@ -861,25 +861,43 @@ BOOL CSCComboBox::OnEraseBkgnd(CDC* pDC)
 //휠로 연속해 넘길 때는 매 칸마다 선택 블록이 번쩍여 거슬린다.
 //CBS_DROPDOWNLIST 에 이 현상이 없는 것은 edit 자체가 없기 때문이다.
 //
-//기본 처리를 그대로 두고(항목 이동은 comctl32 가 한다) 그 직후 선택만 지운다.
+//눈에 보이는 순서가 [휠 → 현재 글자 전체선택 → 다음 항목 글자] 다. 즉 중간 상태가 실제로 화면에
+//한 번 나온다는 뜻이라, 다 끝난 뒤에 선택만 지우는 것으로는 번쩍임이 남는다.
+//그래서 기본 처리를 하는 동안 edit 의 그리기를 잠시 멈춰 중간 프레임이 화면에 나가지 않게 하고,
+//끝난 뒤 선택을 지운 상태로 한 번만 그린다. 항목 이동 자체는 그대로 comctl32 가 한다.
 //자식 edit 의 휠은 subclass 가 이 콤보로 넘기므로(sccombo_edit_subclass) 두 경로가 여기로 모인다.
 BOOL CSCComboBox::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
 {
-	Default();
-
 	//드롭다운이 펼쳐진 동안은 listbox 가 스크롤할 뿐 edit 은 건드리지 않는다.
 	if (GetDroppedState())
+	{
+		Default();
 		return TRUE;
+	}
 
 	COMBOBOXINFO info = { 0 };
 	info.cbSize = sizeof(info);
 
+	HWND h_edit = NULL;
 	if (GetComboBoxInfo(&info) && info.hwndItem && info.hwndItem != m_hWnd)
+		h_edit = info.hwndItem;
+
+	if (h_edit)
+		::SendMessage(h_edit, WM_SETREDRAW, FALSE, 0);
+
+	Default();
+
+	if (h_edit)
 	{
 		//캐럿을 글자 끝에 두고 선택은 없앤다. EM_SETSEL 에 -1 을 쓰는 방식은 문서마다 해석이 갈려
 		//길이를 직접 구해 (len, len) 으로 명시한다.
-		int len = (int)::SendMessage(info.hwndItem, WM_GETTEXTLENGTH, 0, 0);
-		::SendMessage(info.hwndItem, EM_SETSEL, (WPARAM)len, (LPARAM)len);
+		int len = (int)::SendMessage(h_edit, WM_GETTEXTLENGTH, 0, 0);
+		::SendMessage(h_edit, EM_SETSEL, (WPARAM)len, (LPARAM)len);
+
+		//SetRedraw(FALSE) 동안 쌓인 무효화는 버려지므로, 되켠 뒤 직접 무효화하고 그 자리에서 그린다.
+		::SendMessage(h_edit, WM_SETREDRAW, TRUE, 0);
+		::InvalidateRect(h_edit, NULL, TRUE);
+		::UpdateWindow(h_edit);
 	}
 
 	return TRUE;

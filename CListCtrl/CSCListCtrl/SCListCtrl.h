@@ -1165,6 +1165,10 @@ public:
 	bool			m_v_visible_state = false;	//세로바 필요 상태 — OnNcCalcSize 가 읽어 우측 gw 예약
 	bool			m_h_visible_state = false;	//가로바 필요 상태 — OnNcCalcSize 가 읽어 하단 gw 예약
 	int				m_bottom_reserve = 0;		//세로바 시 하단 partial row 예약 px — OnNcCalcSize 가 설정, sync(바 위치)·OnNcPaint(빈영역 fill)가 읽음
+	//20260831 by claude. 마지막으로 화면에 반영한 가로 스크롤 위치. "가로가 실제로 움직였는가" 판정용.
+	int				m_last_h_paint_pos = 0;
+	//가로가 움직였으면 항목 영역 전체를 무효화한다(native 의 BitBlt 스크롤 잔상 제거). 근거는 .cpp 주석.
+	void			invalidate_on_h_scroll();
 	bool			m_syncing = false;			//framechange 재진입 가드 (SWP_FRAMECHANGED → OnSize → sync 재진입 차단)
 	bool			m_snapping = false;			//top 항목 헤더 스냅 재진입 가드 (Scroll → LVN_ENDSCROLL 재귀 차단)
 	//20260722 by claude. 이 컨트롤은 픽셀 페인트 단일 모드다 — 항목을 직접 픽셀 위치에 그려 부분행/하단여백0 을 구현한다.

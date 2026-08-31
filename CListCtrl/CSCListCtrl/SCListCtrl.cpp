@@ -7345,6 +7345,10 @@ void CSCListCtrl::OnHScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar)
 	//우리 자체 스크롤 경로(드래그/휠/OnMouseHWheel)에는 영향이 없다.
 	m_h_scroll_pos = GetScrollPos(SB_HORZ);
 
+	//20260831 by claude. 이 경로는 base 호출 *안에서* LVN_ENDSCROLL 이 이미 지나간다. 그때는 위 미러링 전이라
+	//m_h_scroll_pos 가 아직 옛 값이어서 그쪽 판정이 "안 움직였다" 로 새어나간다. 갱신 직후 여기서 한 번 더 본다.
+	invalidate_on_h_scroll();
+
 	//20260706 by claude. [§5 폭주 완화] native 리스트뷰는 마우스 가로휠 1회를 smooth-scroll 로 풀어 WM_HSCROLL 을 수십~백여 회
 	//연속 발생시킨다. 매 스텝 full sync_scrollbar(오버레이 재배치 + 동기 RedrawWindow)는 성능 저하 요인 → ~30ms 로 스로틀하고,
 	//버스트가 멎은 뒤 trailing 타이머로 최종 위치를 한 번 더 정확히 반영한다(가로 썸·헤더 offset 정합). 스로틀은 sync 의 '빈도'만
@@ -7375,6 +7379,26 @@ void CSCListCtrl::OnVScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar)
 }
 
 
+//20260831 by claude. 가로 위치가 바뀌었으면 항목 영역 전체를 무효화한다.
+//
+//가로 스크롤은 native 가 ScrollWindow(BitBlt) 로 처리하고 *새로 드러난 띠만* 무효화한다.
+//그런데 OnPaint 는 보이는 행을 매번 처음부터 다시 그리므로 그 BitBlt 결과는 틀린 그림이다 —
+//무효화되지 않은 부분에 이전 X 위치의 픽셀이 그대로 남아 글자가 겹쳐 보였다.
+//세로는 m_scroll_y 로 직접 그리고 각 경로가 Invalidate 하므로 이 문제가 없었다. 가로만 빠져 있었다.
+//(같은 결함이 포크 원본인 CVtListCtrlEx 에도 그대로 있다 — 그쪽은 사용처 검증 없이 건드리지 않았다.)
+//
+//기준은 GetScrollPos(SB_HORZ) 가 아니라 m_h_scroll_pos 다. setup_scrollbar 가 WS_HSCROLL 을
+//떼어낸 뒤로 native 의 SB_HORZ 값은 stale 이라 자체 추적값이 유일한 진실이다(m_h_scroll_pos 선언부 참조).
+void CSCListCtrl::invalidate_on_h_scroll()
+{
+	//가로가 실제로 움직였을 때만 한다 — 세로 휠 버스트까지 매번 전체 repaint 하지 않도록.
+	if (m_h_scroll_pos == m_last_h_paint_pos)
+		return;
+
+	m_last_h_paint_pos = m_h_scroll_pos;
+	Invalidate(FALSE);
+}
+
 void CSCListCtrl::OnLvnBeginScroll(NMHDR* pNMHDR, LRESULT* pResult)
 {
 	// 이 기능을 사용하려면 Internet Explorer 5.5 이상이 필요합니다.
@@ -7398,6 +7422,10 @@ void CSCListCtrl::OnLvnEndScroll(NMHDR* pNMHDR, LRESULT* pResult)
 	//여기서 UpdateWindow + sync 강제하면 erase ↔ paint 사이 디스플레이 refresh 차단.
 	if (m_scrollbar_setup)
 	{
+		//20260831 by claude. UpdateWindow 는 *이미 무효한* 영역만 그린다. 가로 스크롤 뒤에는 그것만으로
+		//부족해서 먼저 무효화해야 한다 — 자세한 이유는 invalidate_on_h_scroll 주석 참조.
+		invalidate_on_h_scroll();
+
 		UpdateWindow();
 		sync_scrollbar();
 

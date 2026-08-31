@@ -50,6 +50,7 @@
 #include <functional>
 #include <vector>
 #include <map>
+#include <set>
 #include <unordered_map>
 
 #include "../../system/ShellImageList/ShellImageList.h"
@@ -57,6 +58,7 @@
 #include "../../CMenu/CSCMenuBar/SCMenu.h"
 #include "../../colors.h"
 #include "../../CScrollbar/SCScrollbar/SCScrollbar.h"
+#include "../../CToolTipCtrl/CSCToolTipCtrl/SCToolTipCtrl.h"		//20260831 by claude. 잘린 라벨 툴팁.
 #include "../../CEdit/CSCStaticEdit/SCStaticEdit.h"
 #include "../../Json/rapid_json/json.h"
 #include "../../CDialog/SCShapeDlg/SCShapeDlg.h"		//20260705 by claude. 드래그 이미지를 레이어드 팝업으로(깜빡임 없음 + 드래그 중 문구 동적 갱신)
@@ -639,6 +641,26 @@ protected:
 //마우스가 컨트롤 안에 들어온 경우 true
 	bool			m_is_hovering = false;
 	HTREEITEM		m_hot_item = NULL;	//Y 좌표 기준 row 의 어디든 hover 시 hot 으로 인식 — native HitTest 가 label 외 영역에서 hItem 반환 안 하는 케이스 보완.
+
+//20260831 by claude. 잘린 라벨 툴팁 — 트리 폭이 좁아 항목 이름이 잘려 보일 때 hover 하면 전체 이름을 보여준다.
+	//잘림 판정은 OnNMCustomDraw 가 라벨을 그리면서 이미 재고 있는 GetTextExtent 와 클립 폭을 비교해 채운다.
+	//따라서 별도 측정 코드도, 레이아웃 복제도 없다.
+	bool			m_use_ellipsis_tooltip = true;
+	CSCToolTipCtrl	m_tooltip;
+	//라벨이 잘린 항목들. custom draw 는 다시 그려지는 항목만 호출되므로 매번 비우지 않고
+	//"잘렸으면 넣고 아니면 뺀다" 로 자기 보정한다. 키가 HTREEITEM 이라 항목 수만큼만 커진다.
+	std::set<HTREEITEM>	m_clipped_items;
+	HTREEITEM		m_tip_item = NULL;		//마지막으로 툴팁을 갱신한 항목.
+
+	//hover 항목이 바뀔 때 호출한다. 잘린 항목이면 전체 이름을 툴팁에 싣고, 아니면 툴팁을 끈다.
+	void			update_ellipsis_tooltip();
+
+public:
+	//라벨이 잘렸을 때 hover 툴팁을 띄울지 여부. 기본 켜짐.
+	void			set_use_ellipsis_tooltip(bool use) { m_use_ellipsis_tooltip = use; }
+	bool			is_use_ellipsis_tooltip() const { return m_use_ellipsis_tooltip; }
+	CSCToolTipCtrl*	get_tooltip() { return &m_tooltip; }
+protected:
 
 	//20260826 by claude. hover 강조 사용 여부. PreSubclassWindow 에서 리소스 에디터의
 	//Track Select(TVS_TRACKSELECT) 설정을 읽어 채운다 — 리소스에서 정한 속성이 우선이다.

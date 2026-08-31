@@ -222,6 +222,11 @@ void CSCTreeCtrl::set_line_height(int height, bool invalidate)
 
 BOOL CSCTreeCtrl::PreTranslateMessage(MSG* pMsg)
 {
+	//20260831 by claude. [잘린 라벨 툴팁] 툴팁 컨트롤은 마우스 메시지를 직접 받지 못하므로 여기서 넘겨준다.
+	//메시지를 소비하지 않으므로 아래 로직에는 영향이 없다.
+	if (::IsWindow(m_tooltip.GetSafeHwnd()))
+		m_tooltip.RelayEvent(pMsg);
+
 	//20260705 by claude. 드래그 중 Ctrl/Shift 눌림·뗌 = 이동↔복사 토글 → 마우스가 안 움직여도 문구를 즉시 갱신.
 	//(GetAsyncKeyState 는 이 시점의 실시간 키 상태를 반영. 소비하지 않고 계속 진행.)
 	if ((pMsg->message == WM_KEYDOWN || pMsg->message == WM_KEYUP) &&
@@ -2510,6 +2515,9 @@ void CSCTreeCtrl::OnMouseMove(UINT nFlags, CPoint point)
 			InvalidateRect(&r, FALSE);
 	}
 
+	//20260831 by claude. [잘린 라벨 툴팁] hover 항목 추적은 위에서 이미 하고 있으므로 여기 한 줄이면 된다.
+	update_ellipsis_tooltip();
+
 	if (m_bDragging)
 	{
 		GetCursorPos(&point);
@@ -2747,7 +2755,58 @@ void CSCTreeCtrl::OnMouseLeave()
 			InvalidateRect(&r, FALSE);
 	}
 
+	//20260831 by claude. [잘린 라벨 툴팁] 나갔다 같은 항목으로 돌아왔을 때 다시 뜨도록 기억을 지운다.
+	m_tip_item = NULL;
+	if (::IsWindow(m_tooltip.GetSafeHwnd()))
+		m_tooltip.Activate(FALSE);
+
 	CTreeCtrl::OnMouseLeave();
+}
+
+//20260831 by claude. hover 항목의 라벨이 잘려 있으면 전체 이름을 툴팁으로 준비하고, 아니면 툴팁을 끈다.
+//잘림 여부는 OnNMCustomDraw 가 그리면서 채워둔 m_clipped_items 로 판정한다 — 여기서 다시 재지 않는다.
+void CSCTreeCtrl::update_ellipsis_tooltip()
+{
+	if (!m_use_ellipsis_tooltip)
+		return;
+
+	//드래그·편집 중에는 띄우지 않는다. 그 상황에서 툴팁은 조작 대상을 가리기만 한다.
+	if (m_bDragging || m_in_editing)
+	{
+		if (::IsWindow(m_tooltip.GetSafeHwnd()))
+			m_tooltip.Activate(FALSE);
+		m_tip_item = NULL;
+		return;
+	}
+
+	//같은 항목 위를 계속 움직이는 동안은 아무것도 하지 않는다 — 매번 다시 넣으면 툴팁이 깜빡인다.
+	if (m_hot_item == m_tip_item)
+		return;
+
+	m_tip_item = m_hot_item;
+
+	if (m_hot_item == NULL || m_clipped_items.find(m_hot_item) == m_clipped_items.end())
+	{
+		if (::IsWindow(m_tooltip.GetSafeHwnd()))
+			m_tooltip.Activate(FALSE);
+		return;
+	}
+
+	//처음 필요해진 순간에 만든다 — 잘린 항목이 한 번도 없는 트리는 툴팁 창을 만들지 않는다.
+	if (!::IsWindow(m_tooltip.GetSafeHwnd()))
+	{
+		if (!m_tooltip.Create(this, TTS_ALWAYSTIP))
+			return;
+		m_tooltip.set_color_theme(m_theme);
+		m_tooltip.AddTool(this, _T(""));
+	}
+
+	//이미 떠 있는 툴팁은 크기가 이전 문자열 기준으로 남으므로(측정이 TTN_SHOW 에서 일어난다) 한 번 내린다.
+	m_tooltip.Pop();
+
+	//항목 이름은 사용자 데이터다 — '<' 가 들어 있으면 태그로 파싱되므로 반드시 이스케이프한다.
+	m_tooltip.UpdateTipText(CSCToolTipCtrl::escape_tags(GetItemText(m_hot_item)), this);
+	m_tooltip.Activate(TRUE);
 }
 
 void CSCTreeCtrl::OnLButtonDown(UINT nFlags, CPoint point)
@@ -4806,6 +4865,16 @@ void CSCTreeCtrl::OnNMCustomDraw(NMHDR* pNMHDR, LRESULT* pResult)
 			//개수 위치는 실제로 그려진 레이블 폭 기준이어야 하므로 item_font 가 아직 select 된 상태에서 잰다.
 			CSize sz_label = dc.GetTextExtent(text);
 
+			//20260831 by claude. [잘린 라벨 툴팁] 바로 위에서 잰 폭을 그대로 재활용한다 — 추가 측정 비용 0.
+			//rcDraw 는 right_limit 로 이미 잘려 있으므로, 이 비교가 곧 "화면에서 잘려 보이는가" 다.
+			if (m_use_ellipsis_tooltip)
+			{
+				if (sz_label.cx > rcDraw.Width())
+					m_clipped_items.insert(hItem);
+				else
+					m_clipped_items.erase(hItem);
+			}
+
 			if (old_font)
 				dc.SelectObject(old_font);
 
@@ -5896,6 +5965,10 @@ void CSCTreeCtrl::set_color_theme(const CSCColorTheme& theme, bool invalidate)
 {
 	m_theme.copy_colors_from(theme);
 	//m_has_parent_back_color = true;
+
+	//20260831 by claude. 잘린 라벨 툴팁은 처음 필요할 때 생성되므로 아직 없을 수 있다. 있으면 같이 갈아준다.
+	if (::IsWindow(m_tooltip.GetSafeHwnd()))
+		m_tooltip.set_color_theme(m_theme);
 
 	if (::IsWindow(m_scrollbar.m_hWnd))
 		m_scrollbar.set_color_theme(m_theme, invalidate);

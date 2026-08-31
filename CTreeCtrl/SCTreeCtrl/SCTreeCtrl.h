@@ -655,9 +655,16 @@ protected:
 	//hover 항목이 바뀔 때 호출한다. 잘린 항목이면 전체 이름을 툴팁에 싣고, 아니면 툴팁을 끈다.
 	void			update_ellipsis_tooltip();
 
+	//native 트리 툴팁 on/off. 우리 툴팁과 native 가 동시에 뜨는 것을 막는다.
+	void			apply_native_tooltip(bool enable);
+	HWND			m_native_tooltip = NULL;	//끄기 전의 native 툴팁 핸들(되살릴 때 필요).
+
 public:
 	//라벨이 잘렸을 때 hover 툴팁을 띄울지 여부. 기본 켜짐.
-	void			set_use_ellipsis_tooltip(bool use) { m_use_ellipsis_tooltip = use; }
+	//켜면 native 트리 툴팁을 끈다 — 둘 다 두면 겹쳐서 뜬다. 우리 것을 남기는 이유는
+	//native 툴팁이 OS 그리기라 CSCColorTheme 을 따르지 않기 때문이다(dark 테마에 흰 툴팁).
+	//끄면 native 를 되살린다 — 끈 결과가 "툴팁이 아예 없음" 이 되지 않도록.
+	void			set_use_ellipsis_tooltip(bool use);
 	bool			is_use_ellipsis_tooltip() const { return m_use_ellipsis_tooltip; }
 	CSCToolTipCtrl*	get_tooltip() { return &m_tooltip; }
 protected:

@@ -184,7 +184,47 @@ void CSCTreeCtrl::PreSubclassWindow()
 	SendMessage(TVM_SETEXTENDEDSTYLE, TVS_EX_DOUBLEBUFFER, TVS_EX_DOUBLEBUFFER);
 	CTreeCtrl::SetBkColor(m_theme.cr_back.ToCOLORREF());
 
+	//20260831 by claude. native 트리 툴팁을 끈다. 켜두면 잘린 항목 위에서 우리 툴팁과 둘 다 떠서 겹친다.
+	//둘 중 우리 것을 남기는 이유 — native 툴팁은 OS 가 그려서 CSCColorTheme 을 따르지 않는다.
+	//dark 테마의 트리 위에 흰 툴팁이 뜬다. CSCScrollbar 가 존재하는 이유와 같은 문제다.
+	apply_native_tooltip(!m_use_ellipsis_tooltip);
+
 	setup_scrollbar();
+}
+
+//20260831 by claude. native 트리 툴팁 on/off. 되돌릴 수 있게 원래 핸들을 보관한다.
+//MFC 의 Get/SetToolTips 는 임시 CToolTipCtrl 래퍼를 오가므로 보관이 위험해 TVM_SETTOOLTIPS 를 직접 쓴다.
+void CSCTreeCtrl::apply_native_tooltip(bool enable)
+{
+	if (!::IsWindow(m_hWnd))
+		return;
+
+	if (enable)
+	{
+		ModifyStyle(TVS_NOTOOLTIPS, 0);
+		if (m_native_tooltip)
+			::SendMessage(m_hWnd, TVM_SETTOOLTIPS, (WPARAM)m_native_tooltip, 0);
+		return;
+	}
+
+	//스타일까지 함께 끄는 이유 — 아직 native 툴팁이 만들어지기 전이면 SetToolTips(NULL) 은 막을 것이 없고,
+	//나중에 트리가 필요해질 때 새로 만들어 버린다.
+	ModifyStyle(0, TVS_NOTOOLTIPS);
+
+	HWND prev = (HWND)::SendMessage(m_hWnd, TVM_SETTOOLTIPS, (WPARAM)NULL, 0);
+	if (prev)
+		m_native_tooltip = prev;
+}
+
+void CSCTreeCtrl::set_use_ellipsis_tooltip(bool use)
+{
+	m_use_ellipsis_tooltip = use;
+
+	//우리 툴팁을 끄면 native 를 되살린다 — 끈 결과가 "툴팁이 아예 없음" 이 되지 않도록.
+	apply_native_tooltip(!use);
+
+	if (!use && ::IsWindow(m_tooltip.GetSafeHwnd()))
+		m_tooltip.Activate(FALSE);
 }
 
 void CSCTreeCtrl::reconstruct_font()

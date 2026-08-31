@@ -101,6 +101,9 @@ protected:
 	//실제 적용 높이는 sync_edit_height 가 컨트롤 높이와 비교해 정한다(컨트롤이 더 높으면 채워 글자가 세로 중앙에 오게).
 	int				m_edit_height_min = -1;
 	void			sync_edit_height();
+	//CBS_DROPDOWN 의 자식 Edit 을 선택영역 안에서 세로 중앙에 놓는다(한 줄 Edit 은 글자를 위쪽에 붙여 그린다).
+	//CBS_DROPDOWNLIST 에서는 자식 Edit 이 없어 아무 일도 하지 않는다. 근거·측정값은 .cpp 주석.
+	void			center_edit_child();
 
 	CBrush			m_br_back;
 

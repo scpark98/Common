@@ -554,6 +554,78 @@ void CSCComboBox::sync_edit_height()
 
 	if (GetItemHeight(-1) != edit_height)
 		SetItemHeight(-1, edit_height);
+
+	center_edit_child();
+}
+
+//20260831 by claude. CBS_DROPDOWN 콤보의 자식 Edit 을 선택영역 안에서 세로 중앙에 놓는다.
+//
+//CBS_DROPDOWNLIST 는 닫힌 칸까지 owner-draw 라 DrawItem 이 DT_VCENTER 로 그린다 — 문제가 없다.
+//CBS_DROPDOWN 은 닫힌 칸이 진짜 자식 Edit 이라 WM_DRAWITEM 이 오지 않고, 한 줄짜리 Edit 은 글자를
+//자기 클라이언트 *위쪽* 에 붙여 그린다. EM_SETRECT 는 multiline 전용이라 세로 정렬을 지정할 방법도 없다.
+//그래서 선택영역이 글자보다 높으면 그 차이만큼 글자가 위로 치우친다.
+//
+//측정값 (Test_SCColorTheme, 2026-08-31):
+//  폰트 콤보 (CBS_DROPDOWN)     client=27 field=(3,3,..,24) h=21, tmHeight=16 → 아래 5px 가 남았다.
+//  테마 콤보 (CBS_DROPDOWNLIST) client=23 field=(3,3,..,20) h=17, tmHeight=16 → 차이가 없어 멀쩡해 보였다.
+//두 콤보의 차이는 폰트가 아니라 스타일이었다. 로그에 폰트 콤보의 DrawItem 이 한 줄도 없다는 것이 그 증거다.
+//
+//Edit 자체를 글자 높이로 줄여 선택영역 안에서 가운데로 옮긴다.
+//기준 영역은 GetComboBoxInfo 의 rcItem 이 아니라 client 와 GetItemHeight(-1) 로 잡는다 —
+//rcItem 은 곧 Edit 자신의 사각형이라, 그걸 기준으로 삼으면 한 번 줄인 뒤에는 자기 안에서 다시
+//중앙을 잡게 되어 호출할 때마다 위로 밀린다. 항목 높이는 우리가 Edit 을 옮겨도 변하지 않는다.
+void CSCComboBox::center_edit_child()
+{
+	COMBOBOXINFO info = { 0 };
+	info.cbSize = sizeof(info);
+
+	if (!GetComboBoxInfo(&info))
+		return;
+
+	//DROPDOWNLIST 는 hwndItem 이 콤보 자신이다 — 자식 Edit 이 없으므로 할 일이 없다.
+	if (info.hwndItem == NULL || info.hwndItem == m_hWnd)
+		return;
+
+	CRect rc;
+	GetClientRect(rc);
+
+	int item_h = GetItemHeight(-1);
+	if (item_h <= 0)
+		return;
+
+	//선택영역은 client 안에서 상하 같은 두께의 테두리를 두고 놓인다(측정: 27-21=6 → 위아래 3, 23-17=6 → 3).
+	int border = (rc.Height() - item_h) / 2;
+	if (border < 0)
+		border = 0;
+
+	CClientDC dc(this);
+	CFont* old_font = dc.SelectObject(&m_font);
+	TEXTMETRIC tm = {};
+	dc.GetTextMetrics(&tm);
+	dc.SelectObject(old_font);
+
+	//+2 는 Edit 내부 상하 1px 여백. reconstruct_font 의 auto 계산(edit = list + 2)과 같은 근거다.
+	int h = tm.tmHeight + 2;
+	if (h > item_h)
+		h = item_h;
+
+	int top = rc.top + border + (item_h - h) / 2;
+
+	CRect cur;
+	::GetWindowRect(info.hwndItem, &cur);
+	::MapWindowPoints(HWND_DESKTOP, m_hWnd, (LPPOINT)(LPRECT)&cur, 2);
+
+	//가로는 건드리지 않는다 — 드롭다운 버튼 폭은 테마가 정하므로 콤보가 잡아준 값을 그대로 쓴다.
+	if (cur.top == top && cur.Height() == h)
+		return;
+
+	//20260831 by claude. [진단] 자식 Edit 재배치 전후.
+	logWrite(_T("[SCComboBox] center_edit client_h=%d item_h=%d border=%d tmHeight=%d | edit cur=(%d,%d,%d,%d) h=%d -> top=%d h=%d"),
+		rc.Height(), item_h, border, tm.tmHeight,
+		cur.left, cur.top, cur.right, cur.bottom, cur.Height(), top, h);
+
+	::SetWindowPos(info.hwndItem, NULL, cur.left, top, cur.Width(), h,
+		SWP_NOZORDER | SWP_NOACTIVATE);
 }
 
 

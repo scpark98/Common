@@ -61,6 +61,13 @@ static LRESULT CALLBACK sccombo_edit_subclass(
 		LRESULT r = ::DefSubclassProc(hwnd, msg, wp, lp);
 
 		CSCComboBox* self = reinterpret_cast<CSCComboBox*>(ref_data);
+
+		//20260831 by claude. 그리기를 묶는 중이면 여기서 그리지 않는다. GetWindowDC 는 WM_SETREDRAW 와
+		//무관하게 즉시 화면에 그리므로, 억제하지 않으면 "한 번만 그리기" 가 깨진다.
+		//묶기가 끝날 때 RDW_FRAME 으로 이 NC 영역까지 함께 다시 그려진다.
+		if (self && self->is_paint_suspended())
+			return r;
+
 		if (self && (self->get_edit_pad_top() > 0 || self->get_edit_pad_bottom() > 0))
 		{
 			RECT rw;
@@ -517,7 +524,9 @@ void CSCComboBox::reconstruct_font()
 {
 	m_font.DeleteObject();
 	BOOL bCreated = m_font.CreateFontIndirect(&m_lf);
-	SetFont(&m_font, true);
+	//20260831 by claude. 묶는 중이면 bRedraw=FALSE. TRUE 면 여기서 곧바로 다시 그려 "한 번만 그리기" 가 깨진다.
+	//(묶지 않은 일반 호출은 예전처럼 TRUE 로 즉시 반영.)
+	SetFont(&m_font, m_suspend_paint ? FALSE : TRUE);
 
 	int list_height;	//dropdown listbox 각 항목 높이.
 	int edit_height;	//선택영역(닫힌 콤보의 보이는 부분) 높이.
@@ -612,8 +621,14 @@ void CSCComboBox::apply_edit_text_padding()
 	m_edit_pad_bottom = pad_bottom;
 
 	//WM_NCCALCSIZE 를 다시 태워야 새 값이 반영된다.
-	::SetWindowPos(info.hwndItem, NULL, 0, 0, 0, 0,
-		SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
+	//20260831 by claude. 묶는 중이면 SWP_NOREDRAW 를 더한다. FRAMECHANGED 는 NC 그리기를 유발하는데
+	//NC 그리기는 WM_SETREDRAW 를 통과해 그대로 화면에 나간다 — 그러면 "한 번만 그리기" 가 깨진다.
+	//NC 재계산 자체는 NOREDRAW 여도 수행되고, 화면 반영은 묶기가 끝날 때 RDW_FRAME 이 맡는다.
+	UINT swp = SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED;
+	if (m_suspend_paint)
+		swp |= SWP_NOREDRAW;
+
+	::SetWindowPos(info.hwndItem, NULL, 0, 0, 0, 0, swp);
 }
 
 
@@ -912,30 +927,33 @@ BOOL CSCComboBox::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
 	if (GetComboBoxInfo(&info) && info.hwndItem && info.hwndItem != m_hWnd)
 		h_edit = info.hwndItem;
 
-	//콤보와 자식 Edit 을 함께 멈춘다. Edit 하나만 멈춰서는 부족했다 —
-	//폰트 콤보는 선택이 바뀔 때마다 OnCbnSelchange 가 reconstruct_font() 를 부르고,
-	//그 안에서 SetFont / SetItemHeight / Edit 재배치(SWP_FRAMECHANGED)가 연쇄로 일어난다.
-	//그 각각이 중간 상태를 화면에 흘린다. 어느 것이 흘리는지 하나씩 좇는 대신 전부 묶는다.
+	//콤보와 자식 Edit 을 함께 멈춘다. Default() 안에서 항목 이동 → CBN_SELCHANGE 반사 →
+	//OnCbnSelchange → reconstruct_font(SetFont / SetItemHeight / Edit 재배치)까지 전부 일어난다.
+	//그 각각이 중간 상태를 화면에 흘리므로 하나씩 좇는 대신 전부 묶는다.
+	//
+	//20260831 by claude. m_suspend_paint 를 함께 세운다. WM_SETREDRAW 만으로는 부족했다 —
+	//SetFont(bRedraw=TRUE) / SWP_FRAMECHANGED 의 NC 그리기 / subclass 의 GetWindowDC 밴드 칠하기가
+	//그것을 통과해 화면에 나간다. 각 지점이 이 플래그를 보고 스스로 억제한다(선언부 주석 참조).
+	//덕분에 폰트를 *미루지 않고* 바로 적용해도 화면에는 최종 상태가 한 번만 나온다.
+	m_suspend_paint = true;
 	SetRedraw(FALSE);
 	if (h_edit)
 		::SendMessage(h_edit, WM_SETREDRAW, FALSE, 0);
 
-	//20260831 by claude. Default() 안에서 CBN_SELCHANGE 가 반사돼 OnCbnSelchange 가 돈다.
-	//폰트 콤보라면 거기서 폰트 적용을 미루도록 이 플래그를 본다(휠이 멈춘 뒤 한 번만).
-	m_in_wheel = true;
 	Default();
-	m_in_wheel = false;
 
 	clear_edit_selection();
 
 	if (h_edit)
 		::SendMessage(h_edit, WM_SETREDRAW, TRUE, 0);
 	SetRedraw(TRUE);
+	m_suspend_paint = false;
 
-	//SetRedraw(FALSE) 동안 쌓인 무효화는 버려지므로 직접 무효화하고 그 자리에서 그린다.
+	//묶는 동안 쌓인 무효화는 버려지므로 직접 무효화하고 그 자리에서 그린다.
+	//RDW_FRAME 을 넣는 이유 — 위에서 억제한 NC 그리기(자식 Edit 의 padding 밴드)를 여기서 함께 그린다.
 	//RDW_ERASE 는 주지 않는다 — 배경 지우기가 한 프레임 먼저 나가면 글자가 사라졌다 나타난다.
 	//콤보도 Edit 도 자기 WM_PAINT 안에서 배경까지 칠하므로 별도 erase 가 필요 없다.
-	RedrawWindow(NULL, NULL, RDW_INVALIDATE | RDW_ALLCHILDREN | RDW_UPDATENOW);
+	RedrawWindow(NULL, NULL, RDW_INVALIDATE | RDW_FRAME | RDW_ALLCHILDREN | RDW_UPDATENOW);
 
 	return TRUE;
 }
@@ -1000,27 +1018,11 @@ BOOL CSCComboBox::OnCbnSelchange()
 			_tcscpy_s(m_lf.lfFaceName, _countof(m_lf.lfFaceName), (LPCTSTR)font_name);
 			m_lf.lfCharSet = DEFAULT_CHARSET;
 
-			//20260831 by claude. 휠로 연속해 넘기는 동안은 폰트 적용을 미룬다.
-			//reconstruct_font 는 폰트 핸들을 새로 만들고 SetFont 로 native EDIT 을 다시 그리게 하는
-			//무거운 동작이라, 한 칸마다 하면 그 재그리기가 깜빡임으로 보인다.
-			//휠이 멈춘 뒤 한 번만 적용한다 — 굴리는 동안에는 항목 이름만 바뀌고, 멈추면 그 폰트가 된다.
-			//목록에서 마우스로 고르거나 키보드로 바꾸는 경우는 미루지 않는다(즉시 적용).
-			//m_lf 는 위에서 이미 갱신했으므로 get_font_name() 등은 미루는 동안에도 새 값을 돌려준다.
-			if (m_in_wheel)
-			{
-				//지연을 길게 잡으면 "멈춘 뒤 적용"으로 또렷이 보이고, 짧게 잡으면 휠 간격에 가까워져
-				//직전 폰트 → 새 폰트로 두 번 그리는 것이 거의 인지되지 않는다. 깜빡임은 어느 쪽이든
-				//돌아오지 않는다 — 타이머 경로가 SetRedraw 로 묶어 한 번에 그리기 때문이다.
-				//0 에 가깝게 두면 사실상 매 칸 적용이라 폰트 재생성만 늘고 얻는 것이 없다.
-				static constexpr UINT font_apply_delay_ms = 50;
-
-				KillTimer(TIMER_FONT_APPLY);
-				SetTimer(TIMER_FONT_APPLY, font_apply_delay_ms, NULL);
-			}
-			else
-			{
-				reconstruct_font();
-			}
+			//20260831 by claude. 즉시 적용한다. 휠 경로에서는 OnMouseWheel 이 이 호출을 그리기 묶음
+			//안에 넣어두므로, 텍스트와 폰트가 함께 확정된 뒤 한 번만 그려진다.
+			//(예전에 이것을 타이머로 미뤘더니 직전 폰트로 한 번 → 새 폰트로 또 한 번, 두 번 그려져
+			// 모핑처럼 보였다. 미루는 대신 새어나가는 그리기를 막는 쪽이 맞다 — m_suspend_paint 참조.)
+			reconstruct_font();
 		}
 	}
 
@@ -1380,35 +1382,6 @@ void CSCComboBox::OnCbnEditchange()
 
 void CSCComboBox::OnTimer(UINT_PTR nIDEvent)
 {
-	//20260831 by claude. 휠이 멈췄다 — 미뤄둔 폰트를 이제 한 번만 적용한다(OnCbnSelchange 주석 참조).
-	//폰트 적용도 재그리기와 선택 상태를 만드므로 휠 때와 똑같이 보호한다.
-	//콤보에 WM_SETFONT 가 가면 comctl32 가 자식 Edit 의 글자를 다시 세팅하면서 전체를 선택 상태로 만든다.
-	if (nIDEvent == TIMER_FONT_APPLY)
-	{
-		KillTimer(TIMER_FONT_APPLY);
-
-		COMBOBOXINFO info = { 0 };
-		info.cbSize = sizeof(info);
-
-		HWND h_edit = NULL;
-		if (GetComboBoxInfo(&info) && info.hwndItem && info.hwndItem != m_hWnd)
-			h_edit = info.hwndItem;
-
-		SetRedraw(FALSE);
-		if (h_edit)
-			::SendMessage(h_edit, WM_SETREDRAW, FALSE, 0);
-
-		reconstruct_font();
-		clear_edit_selection();
-
-		if (h_edit)
-			::SendMessage(h_edit, WM_SETREDRAW, TRUE, 0);
-		SetRedraw(TRUE);
-
-		RedrawWindow(NULL, NULL, RDW_INVALIDATE | RDW_ALLCHILDREN | RDW_UPDATENOW);
-		return;
-	}
-
 	if (nIDEvent == TIMER_INPUT_FILTER)
 	{
 		KillTimer(TIMER_INPUT_FILTER);

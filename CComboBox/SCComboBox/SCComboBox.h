@@ -98,6 +98,8 @@ public:
 	int				get_edit_pad_top() const { return m_edit_pad_top; }
 	int				get_edit_pad_bottom() const { return m_edit_pad_bottom; }
 	COLORREF		get_field_back_color() const { return m_theme.cr_back.ToCOLORREF(); }
+	//그리기를 묶는 중인지. subclass 의 WM_NCPAINT 가 이때는 직접 그리지 않는다(설명은 m_suspend_paint).
+	bool			is_paint_suspended() const { return m_suspend_paint; }
 protected:
 //design
 	//-1이면 폰트크기에 따라 자동 조정
@@ -168,11 +170,14 @@ protected:
 	enum { TIMER_INPUT_FILTER = 0x5C01 };
 	void			apply_filter_now();
 
-	//20260831 by claude. 폰트 콤보에서 휠로 항목을 넘기는 동안은 폰트 적용(reconstruct_font)을 미룬다.
-	//폰트 재생성은 SetFont → native EDIT 재그리기를 부르는 무거운 동작이라, 한 칸마다 하면 깜빡인다.
-	//휠이 멈추면 그때 한 번만 적용한다. 목록에서 마우스로 고르는 경우는 미루지 않는다(즉시 적용).
-	enum { TIMER_FONT_APPLY = 0x5C02 };
-	bool			m_in_wheel = false;
+	//20260831 by claude. 콤보와 자식 Edit 의 그리기를 한 덩어리로 묶는 동안 true.
+	//WM_SETREDRAW 는 *클라이언트* 그리기만 막는다. 다음 셋은 그것을 그대로 통과해 화면에 나가므로
+	//이 플래그를 보고 각자 억제해야 "한 번만 그리기" 가 실제로 성립한다.
+	//  - reconstruct_font 의 SetFont(bRedraw)       → FALSE 로 넘긴다
+	//  - apply_edit_text_padding 의 SetWindowPos    → SWP_NOREDRAW 를 더한다
+	//  - 자식 Edit subclass 의 WM_NCPAINT 밴드 칠하기 → 건너뛴다(GetWindowDC 는 즉시 그린다)
+	//묶기가 끝나면 RDW_FRAME 까지 포함해 한 번에 그린다.
+	bool			m_suspend_paint = false;
 
 	//콤보가 선택/폰트를 바꾸면 자식 Edit 의 글자가 통째로 선택 상태가 된다(CB_SETCURSEL·WM_SETFONT 의 표준 동작).
 	//선택을 지우고 캐럿만 글자 끝에 둔다. CBS_DROPDOWNLIST 면 자식 Edit 이 없어 아무 일도 하지 않는다.

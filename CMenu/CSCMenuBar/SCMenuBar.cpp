@@ -322,20 +322,31 @@ void CSCMenuBar::set_check(int menu_index, UINT menu_id, int sub_button_index, b
 void CSCMenuBar::set_color_theme(int theme)
 {
 	m_theme.set_color_theme(theme);
-	
+	propagate_theme();
+}
+
+//20260831 by claude. 부모가 자기 m_theme 을 그대로 내려주는 경로. copy_colors_from 은 src 가 default/windows 면
+//수신측 m_parent 기준으로 재해석하므로, int 를 넘기는 것과 결과가 같으면서 커스터마이즈된 테마도 그대로 실린다.
+void CSCMenuBar::set_color_theme(const CSCColorTheme& theme)
+{
+	m_theme.copy_colors_from(theme);
+	propagate_theme();
+}
+
+//20260831 by claude. 자식(메뉴 버튼 + 그에 달린 팝업메뉴)에 테마를 내린다.
+//예전엔 버튼에 set_text_color/set_back_color 두 개만 따로 줘서 hover/down/border 가 테마와 무관하게 남았다.
+//theme 객체를 통째로 넘기면 CGdiButton 이 자기 규칙대로 파생색까지 맞춘다(Common/claude.md §2.1).
+void CSCMenuBar::propagate_theme()
+{
 	if (!m_hWnd)
 		return;
-	
+
 	Invalidate();
 
 	for (int i = 0; i < m_menu_button.size(); i++)
 	{
-		//메뉴 버튼들의 색상 설정
-		m_menu_button[i]->set_text_color(m_theme.cr_text);
-		m_menu_button[i]->set_back_color(m_theme.cr_back);
-
-		//각 메뉴버튼에 연결된 팝업메뉴 항목들도 색상 설정
-		m_menu_button[i]->get_menu()->set_color_theme(theme);
+		m_menu_button[i]->set_color_theme(m_theme);
+		m_menu_button[i]->get_menu()->set_color_theme(m_theme);
 	}
 }
 

@@ -71,8 +71,14 @@ public:
 	void	init(CWnd* parent, UINT resource_menu_id, int x = 0, int y = 0, int menu_button_width = 0, int menu_button_height = 0);
 	void	set_check(int menu_index, UINT menu_id, int sub_button_index, bool check);
 	void	set_color_theme(int theme);
+	//20260831 by claude. 부모가 자기 m_theme 을 그대로 내려줄 수 있게 하는 오버로드. 다른 SC 컨트롤과 같은 형태다.
+	//이게 없어서 dlg 가 자식들에게 set_color_theme(m_theme) 을 뿌릴 때 메뉴바만 빠졌다.
+	void	set_color_theme(const CSCColorTheme& theme);
 	void	set_text_color(Gdiplus::Color cr_text);
 	void	set_back_color(Gdiplus::Color cr_back);
+
+	//20260831 by claude. 위 두 set_color_theme 이 공유하는 자식 전파. m_theme 을 갱신한 뒤 호출한다.
+	void	propagate_theme();
 
 	void	set_menu_line_height(int height);
 

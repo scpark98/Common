@@ -153,12 +153,6 @@ protected:
 	enum { TIMER_INPUT_FILTER = 0x5C01 };
 	void			apply_filter_now();
 
-	//20260831 by claude. [진단] 첫 그리기 뒤 자기 창을 PNG 로 덤프한다. 테두리가 몇 px 인지, 무슨 색인지를
-	//눈짐작이 아니라 픽셀로 확정하기 위한 것. 동작에는 영향이 없고 원인 확정 후 제거한다.
-	//WM_PAINT 안에서 캡처하면 우리 그리기가 화면에 합성되기 전이라 타이머로 미룬다.
-	enum { TIMER_CAPTURE_DIAG = 0x5C02 };
-	bool			m_captured_diag = false;
-
 	DECLARE_MESSAGE_MAP()
 public:
 	virtual void DrawItem(LPDRAWITEMSTRUCT /*lpDrawItemStruct*/);

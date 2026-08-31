@@ -548,10 +548,17 @@ void CSCComboBox::reconstruct_font()
 	}
 
 	//-1 = 선택영역(닫힌 콤보) 높이, 0 = listbox 항목 높이.
-	SetItemHeight(-1, edit_height);
-	SetItemHeight(0, list_height);
+	//20260831 by claude. 값이 실제로 달라질 때만 부른다. SetItemHeight 은 자식 Edit 을 재배치해
+	//NC 재계산·NC 그리기를 유발하는데, NC 그리기는 WM_SETREDRAW 로 막히지 않아 화면에 그대로 나간다.
+	//폰트 콤보는 휠로 항목을 넘길 때마다 reconstruct_font 가 돌므로, 같은 값으로 매번 부르면
+	//그 자체가 깜빡임의 원인이 된다. 대개 폰트만 바뀌고 높이는 그대로다.
+	if (GetItemHeight(-1) != edit_height)
+		SetItemHeight(-1, edit_height);
+	if (GetItemHeight(0) != list_height)
+		SetItemHeight(0, list_height);
 
-	//20260831 by claude. 선택영역 높이가 정해졌으니 자식 Edit 의 글자 세로 위치도 다시 맞춘다.
+	//선택영역 높이가 정해졌으니 자식 Edit 의 글자 세로 위치도 다시 맞춘다.
+	//(이쪽도 값이 그대로면 apply_edit_text_padding 안에서 early return 한다.)
 	apply_edit_text_padding();
 
 	ASSERT(bCreated);

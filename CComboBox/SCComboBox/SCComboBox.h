@@ -92,6 +92,12 @@ public:
 	void			set_tooltip_text(CString text);
 
 	void			add_font_list(CString font_name) { m_font_list.push_back(font_name); }
+
+	//20260831 by claude. 자식 Edit 의 subclass proc(파일 밖 static 함수)이 읽어가는 값들.
+	//설명은 m_edit_pad_top 선언부.
+	int				get_edit_pad_top() const { return m_edit_pad_top; }
+	int				get_edit_pad_bottom() const { return m_edit_pad_bottom; }
+	COLORREF		get_field_back_color() const { return m_theme.cr_back.ToCOLORREF(); }
 protected:
 //design
 	//-1이면 폰트크기에 따라 자동 조정
@@ -107,6 +113,15 @@ protected:
 
 	bool			m_is_font_combo = false;
 	std::vector<CString> m_font_list;
+
+	//20260831 by claude. CBS_DROPDOWN 의 자식 Edit 클라이언트를 위아래로 줄일 픽셀 수.
+	//한 줄 Edit 은 글자를 클라이언트 위쪽에 붙여 그리므로, 클라이언트를 글자 높이로 줄여 가운데에 두면
+	//글자가 선택영역 세로 중앙에 온다. 창 크기는 건드리지 않아 배경·클릭 범위·캐럿 높이가 그대로다.
+	//실제 적용은 subclass proc 의 WM_NCCALCSIZE / WM_NCPAINT. CBS_DROPDOWNLIST 면 0 으로 남는다
+	//(그쪽은 자식 Edit 이 없고 OnPaint 가 DT_VCENTER 로 직접 그린다).
+	int				m_edit_pad_top = 0;
+	int				m_edit_pad_bottom = 0;
+	void			apply_edit_text_padding();
 
 //편집 관련
 	//bool			m_use_edit = false;		//폴더 항목 이외의 공간 클릭시 수동 편집기능을 사용할 것인지

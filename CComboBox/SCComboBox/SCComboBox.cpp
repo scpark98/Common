@@ -31,6 +31,70 @@ static LRESULT CALLBACK sccombo_edit_subclass(
 			return ::SendMessage(combo, msg, wp, lp);
 	}
 
+	//20260831 by claude. 한 줄 Edit 은 글자를 자기 클라이언트 *위쪽* 에 붙여 그린다. EM_SETRECT 는
+	//multiline 전용이라 세로 정렬을 지정할 방법이 없다. 그래서 클라이언트를 글자 높이만큼으로 줄여
+	//선택영역 가운데에 둔다. 창 크기는 그대로라 배경·클릭 범위·캐럿 높이가 어긋나지 않는다.
+	//얼마나 줄일지는 콤보가 계산해 둔다(CSCComboBox::apply_edit_text_padding).
+	if (msg == WM_NCCALCSIZE)
+	{
+		LRESULT r = ::DefSubclassProc(hwnd, msg, wp, lp);
+
+		CSCComboBox* self = reinterpret_cast<CSCComboBox*>(ref_data);
+		if (self && (self->get_edit_pad_top() > 0 || self->get_edit_pad_bottom() > 0))
+		{
+			//wp=TRUE 면 rgrc[0], FALSE 면 lp 자체가 "창 rect → 클라이언트 rect" 자리다.
+			RECT* prc = wp ? &reinterpret_cast<NCCALCSIZE_PARAMS*>(lp)->rgrc[0] : reinterpret_cast<RECT*>(lp);
+
+			//클라이언트가 없어질 만큼 줄이지는 않는다 — 캐럿·선택이 동작하지 않는다.
+			if (prc->bottom - prc->top > self->get_edit_pad_top() + self->get_edit_pad_bottom())
+			{
+				prc->top += self->get_edit_pad_top();
+				prc->bottom -= self->get_edit_pad_bottom();
+			}
+		}
+		return r;
+	}
+
+	//떼어낸 위아래 띠는 Edit 도 콤보도 칠하지 않아 이전 픽셀이 남는다. 콤보 배경과 같은 색으로 채운다.
+	if (msg == WM_NCPAINT)
+	{
+		LRESULT r = ::DefSubclassProc(hwnd, msg, wp, lp);
+
+		CSCComboBox* self = reinterpret_cast<CSCComboBox*>(ref_data);
+		if (self && (self->get_edit_pad_top() > 0 || self->get_edit_pad_bottom() > 0))
+		{
+			RECT rw;
+			::GetWindowRect(hwnd, &rw);
+
+			RECT rc;
+			::GetClientRect(hwnd, &rc);
+
+			POINT origin = { 0, 0 };
+			::ClientToScreen(hwnd, &origin);
+
+			int off_y = origin.y - rw.top;
+			int w = rw.right - rw.left;
+			int h = rw.bottom - rw.top;
+
+			HDC hdc = ::GetWindowDC(hwnd);
+			if (hdc)
+			{
+				HBRUSH br = ::CreateSolidBrush(self->get_field_back_color());
+
+				RECT band = { 0, 0, w, off_y };
+				::FillRect(hdc, &band, br);
+
+				band.top = off_y + (rc.bottom - rc.top);
+				band.bottom = h;
+				::FillRect(hdc, &band, br);
+
+				::DeleteObject(br);
+				::ReleaseDC(hwnd, hdc);
+			}
+		}
+		return r;
+	}
+
 	LRESULT r = ::DefSubclassProc(hwnd, msg, wp, lp);
 	if (msg == WM_IME_COMPOSITION)
 	{
@@ -486,7 +550,62 @@ void CSCComboBox::reconstruct_font()
 	SetItemHeight(-1, edit_height);
 	SetItemHeight(0, list_height);
 
+	//20260831 by claude. 선택영역 높이가 정해졌으니 자식 Edit 의 글자 세로 위치도 다시 맞춘다.
+	apply_edit_text_padding();
+
 	ASSERT(bCreated);
+}
+
+//20260831 by claude. CBS_DROPDOWN 콤보의 글자를 선택영역 세로 중앙에 오게 한다.
+//
+//닫힌 칸이 진짜 자식 Edit 이라 WM_DRAWITEM 이 오지 않고, 한 줄 Edit 은 글자를 자기 클라이언트
+//위쪽에 붙여 그린다. EM_SETRECT 는 multiline 전용이라 세로 정렬을 지정할 방법도 없다.
+//실측(2026-08-31): 선택영역 21px 안에 16px 글자가 위에 붙어 아래로 5px 가 남았다.
+//
+//Edit 창 자체를 줄여 옮기지는 않는다 — 창이 선택영역보다 작아지면 클릭으로 캐럿이 잡히는 범위와
+//포커스 표시가 어긋난다. 창은 그대로 두고 *클라이언트* 만 줄인다(subclass 의 WM_NCCALCSIZE).
+//줄어든 위아래는 NC 영역이 되므로 콤보 배경과 같은 색으로 칠한다(WM_NCPAINT).
+//창 높이를 바꾸지 않으니 몇 번을 불러도 같은 값에 머문다(누적 드리프트 없음).
+void CSCComboBox::apply_edit_text_padding()
+{
+	COMBOBOXINFO info = { 0 };
+	info.cbSize = sizeof(info);
+
+	if (!GetComboBoxInfo(&info))
+		return;
+
+	//DROPDOWNLIST 는 hwndItem 이 콤보 자신이다 — 자식 Edit 이 없어 할 일이 없다.
+	if (info.hwndItem == NULL || info.hwndItem == m_hWnd)
+		return;
+
+	CRect rc_edit;
+	::GetWindowRect(info.hwndItem, &rc_edit);
+
+	CClientDC dc(this);
+	CFont* old_font = dc.SelectObject(&m_font);
+	TEXTMETRIC tm = {};
+	dc.GetTextMetrics(&tm);
+	dc.SelectObject(old_font);
+
+	int pad_top = 0;
+	int pad_bottom = 0;
+
+	if (tm.tmHeight > 0 && rc_edit.Height() > tm.tmHeight)
+	{
+		int extra = rc_edit.Height() - tm.tmHeight;
+		pad_top = extra / 2;
+		pad_bottom = extra - pad_top;
+	}
+
+	if (pad_top == m_edit_pad_top && pad_bottom == m_edit_pad_bottom)
+		return;
+
+	m_edit_pad_top = pad_top;
+	m_edit_pad_bottom = pad_bottom;
+
+	//WM_NCCALCSIZE 를 다시 태워야 새 값이 반영된다.
+	::SetWindowPos(info.hwndItem, NULL, 0, 0, 0, 0,
+		SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
 }
 
 
@@ -539,6 +658,12 @@ void CSCComboBox::PreSubclassWindow()
 	COMBOBOXINFO cbi = { sizeof(COMBOBOXINFO) };
 	if (::GetComboBoxInfo(m_hWnd, &cbi) && cbi.hwndItem)
 		::SetWindowSubclass(cbi.hwndItem, sccombo_edit_subclass, 1, (DWORD_PTR)this);
+
+	//20260831 by claude. subclass 가 붙은 뒤에 다시 계산한다 — 위 reconstruct_font 에서 이미 한 번 돌았지만
+	//그때는 WM_NCCALCSIZE 를 받아줄 subclass 가 없어 반영되지 않는다.
+	//값이 같으면 early return 하므로 강제로 다시 적용되게 초기화한 뒤 부른다.
+	m_edit_pad_top = m_edit_pad_bottom = 0;
+	apply_edit_text_padding();
 }
 
 // 필터링 결과 항목 수에 맞춰 dropdown listbox 영역 높이를 조정.

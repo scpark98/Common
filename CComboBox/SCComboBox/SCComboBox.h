@@ -92,6 +92,11 @@ public:
 	void			set_tooltip_text(CString text);
 
 	void			add_font_list(CString font_name) { m_font_list.push_back(font_name); }
+
+	//20260831 by claude. 자식 Edit 의 subclass proc(파일 밖 static 함수)이 읽어가는 값들. 설명은 m_edit_pad_top 선언부.
+	int				get_edit_pad_top() const { return m_edit_pad_top; }
+	int				get_edit_pad_bottom() const { return m_edit_pad_bottom; }
+	COLORREF		get_field_back_color() const { return m_theme.cr_back.ToCOLORREF(); }
 protected:
 //design
 	//-1이면 폰트크기에 따라 자동 조정
@@ -101,9 +106,14 @@ protected:
 	//실제 적용 높이는 sync_edit_height 가 컨트롤 높이와 비교해 정한다(컨트롤이 더 높으면 채워 글자가 세로 중앙에 오게).
 	int				m_edit_height_min = -1;
 	void			sync_edit_height();
-	//CBS_DROPDOWN 의 자식 Edit 을 선택영역 안에서 세로 중앙에 놓는다(한 줄 Edit 은 글자를 위쪽에 붙여 그린다).
-	//CBS_DROPDOWNLIST 에서는 자식 Edit 이 없어 아무 일도 하지 않는다. 근거·측정값은 .cpp 주석.
-	void			center_edit_child();
+
+	//20260831 by claude. CBS_DROPDOWN 의 자식 Edit 클라이언트를 위아래로 줄일 픽셀 수.
+	//한 줄 Edit 은 글자를 클라이언트 위쪽에 붙여 그리므로, 클라이언트를 글자 높이로 줄여 가운데에 두면
+	//글자가 선택영역 세로 중앙에 온다. 창 크기는 건드리지 않아 배경·클릭 범위·포커스 표시가 그대로다.
+	//실제 적용은 subclass proc 의 WM_NCCALCSIZE / WM_NCPAINT. CBS_DROPDOWNLIST 면 0 으로 남는다.
+	int				m_edit_pad_top = 0;
+	int				m_edit_pad_bottom = 0;
+	void			apply_edit_text_padding();
 
 	CBrush			m_br_back;
 

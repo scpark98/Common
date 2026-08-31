@@ -657,6 +657,12 @@ void CSCComboBox::PreSubclassWindow()
 
 	// 내부 edit subcontrol 을 subclass 해서 WM_IME_COMPOSITION 직접 수신.
 	COMBOBOXINFO cbi = { sizeof(COMBOBOXINFO) };
+	//20260831 by claude. OnPaint 가 client 전체를 cr_back 으로 채우는데, 이 비트가 없으면 그 채우기가
+	//자식 Edit(CBS_DROPDOWN 의 닫힌 칸) 위까지 덮는다. 콤보가 먼저 그리고 Edit 이 나중에 그리므로
+	//그 사이 한 프레임 동안 글자가 사라진 것처럼 보인다 — 휠로 항목을 넘길 때 눈에 띄던 깜빡임이 이것이다.
+	//켜두면 콤보의 그리기가 자식 영역을 아예 건드리지 않는다.
+	ModifyStyle(0, WS_CLIPCHILDREN);
+
 	if (::GetComboBoxInfo(m_hWnd, &cbi) && cbi.hwndItem)
 		::SetWindowSubclass(cbi.hwndItem, sccombo_edit_subclass, 1, (DWORD_PTR)this);
 
@@ -895,8 +901,10 @@ BOOL CSCComboBox::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
 		::SendMessage(h_edit, EM_SETSEL, (WPARAM)len, (LPARAM)len);
 
 		//SetRedraw(FALSE) 동안 쌓인 무효화는 버려지므로, 되켠 뒤 직접 무효화하고 그 자리에서 그린다.
+		//bErase=FALSE — TRUE 로 주면 배경 지우기가 한 프레임 먼저 나가 글자가 사라졌다 나타난다.
+		//Edit 은 자기 WM_PAINT 안에서 배경까지 칠하므로 별도 erase 가 필요 없다.
 		::SendMessage(h_edit, WM_SETREDRAW, TRUE, 0);
-		::InvalidateRect(h_edit, NULL, TRUE);
+		::InvalidateRect(h_edit, NULL, FALSE);
 		::UpdateWindow(h_edit);
 	}
 

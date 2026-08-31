@@ -6,7 +6,6 @@
 #include "../../../Common/Functions.h"
 #include "../../MemoryDC.h"
 #include "../../CEdit/SCEdit/SCEdit.h"
-#include "../../log/SCLog/SCLog.h"		//20260831 by claude. [진단] 선택영역 높이/텍스트 위치 추적. 원인 확정 후 제거 예정.
 #include <imm.h>	// ImmGetCompositionString — IME 조합 중 문자열 취득 (필터링용)
 #include <commctrl.h>	// SetWindowSubclass / RemoveWindowSubclass
 #pragma comment(lib, "comctl32.lib")
@@ -30,76 +29,6 @@ static LRESULT CALLBACK sccombo_edit_subclass(
 		//combo != hwnd 확인 — GetComboBoxInfo 가 edit 대신 콤보 자신을 돌려주는 경우 무한 재귀가 된다.
 		if (combo && combo != hwnd && !self->GetDroppedState())
 			return ::SendMessage(combo, msg, wp, lp);
-	}
-
-	//20260831 by claude. 한 줄 Edit 은 글자를 자기 클라이언트 *위쪽* 에 붙여 그리고, EM_SETRECT 는
-	//multiline 전용이라 세로 정렬을 지정할 방법이 없다. 그래서 클라이언트 자체를 글자 높이로 줄인다.
-	//창은 선택영역을 그대로 채우므로 배경·클릭 영역·캐럿 높이가 어긋나지 않는다.
-	//얼마나 줄일지는 콤보가 계산해 둔다(CSCComboBox::apply_edit_text_padding).
-	if (msg == WM_NCCALCSIZE)
-	{
-		LRESULT r = ::DefSubclassProc(hwnd, msg, wp, lp);
-
-		CSCComboBox* self = reinterpret_cast<CSCComboBox*>(ref_data);
-		if (self)
-		{
-			int pad_top = self->get_edit_pad_top();
-			int pad_bottom = self->get_edit_pad_bottom();
-
-			if (pad_top > 0 || pad_bottom > 0)
-			{
-				//wp=TRUE 면 rgrc[0], FALSE 면 lp 자체가 "창 rect → 클라이언트 rect" 자리다.
-				RECT* prc = wp ? &reinterpret_cast<NCCALCSIZE_PARAMS*>(lp)->rgrc[0] : reinterpret_cast<RECT*>(lp);
-
-				//클라이언트가 없어질 만큼 줄이지는 않는다 — 캐럿·선택이 동작하지 않는다.
-				if (prc->bottom - prc->top > pad_top + pad_bottom)
-				{
-					prc->top += pad_top;
-					prc->bottom -= pad_bottom;
-				}
-			}
-		}
-		return r;
-	}
-
-	//NCCALCSIZE 로 떼어낸 위아래 띠는 Edit 도 콤보도 칠하지 않아 이전 픽셀이 남는다. 필드와 같은 색으로 채운다.
-	if (msg == WM_NCPAINT)
-	{
-		LRESULT r = ::DefSubclassProc(hwnd, msg, wp, lp);
-
-		CSCComboBox* self = reinterpret_cast<CSCComboBox*>(ref_data);
-		if (self && (self->get_edit_pad_top() > 0 || self->get_edit_pad_bottom() > 0))
-		{
-			RECT rw;
-			::GetWindowRect(hwnd, &rw);
-
-			RECT rc;
-			::GetClientRect(hwnd, &rc);
-
-			POINT origin = { 0, 0 };
-			::ClientToScreen(hwnd, &origin);
-
-			int off_y = origin.y - rw.top;
-			int w = rw.right - rw.left;
-			int h = rw.bottom - rw.top;
-
-			HDC hdc = ::GetWindowDC(hwnd);
-			if (hdc)
-			{
-				HBRUSH br = ::CreateSolidBrush(self->get_field_back_color());
-
-				RECT band = { 0, 0, w, off_y };
-				::FillRect(hdc, &band, br);
-
-				band.top = off_y + (rc.bottom - rc.top);
-				band.bottom = h;
-				::FillRect(hdc, &band, br);
-
-				::DeleteObject(br);
-				::ReleaseDC(hwnd, hdc);
-			}
-		}
-		return r;
 	}
 
 	LRESULT r = ::DefSubclassProc(hwnd, msg, wp, lp);
@@ -151,7 +80,6 @@ BEGIN_MESSAGE_MAP(CSCComboBox, CComboBox)
 	ON_WM_DRAWITEM()
 	ON_WM_TIMER()
 	ON_WM_CTLCOLOR_REFLECT()
-	ON_WM_SIZE()		//20260831 by claude. 콤보 높이가 바뀌면 선택영역도 따라 채운다(sync_edit_height).
 END_MESSAGE_MAP()
 
 
@@ -228,25 +156,6 @@ void CSCComboBox::DrawItem(LPDRAWITEMSTRUCT lpDrawItemStruct)
 
 		CRect rtext = rItem;
 		rtext.DeflateRect(4, 0);
-
-		//20260831 by claude. [진단] 닫힌 콤보(선택영역)만. 텍스트가 세로 중앙에 안 오는 원인 확정용.
-		//OS 가 준 rcItem 이 컨트롤을 채우는지, 폰트 line box(tmHeight)가 그 안에서 어디에 놓이는지를 본다.
-		if (lpDrawItemStruct->itemState & ODS_COMBOBOXEDIT)
-		{
-			CRect rc_client;
-			GetClientRect(rc_client);
-
-			TEXTMETRIC tm = {};
-			dc.GetTextMetrics(&tm);
-
-			logWrite(_T("[SCComboBox] field id=%d client=(%d,%d,%d,%d) h=%d | rcItem=(%d,%d,%d,%d) h=%d | itemH(-1)=%d itemH(0)=%d | tmHeight=%d asc=%d desc=%d intLead=%d extLead=%d | text=%s"),
-				lpDrawItemStruct->itemID,
-				rc_client.left, rc_client.top, rc_client.right, rc_client.bottom, rc_client.Height(),
-				rItem.left, rItem.top, rItem.right, rItem.bottom, rItem.Height(),
-				GetItemHeight(-1), GetItemHeight(0),
-				tm.tmHeight, tm.tmAscent, tm.tmDescent, tm.tmInternalLeading, tm.tmExternalLeading,
-				(LPCTSTR)strData);
-		}
 
 		if (m_is_font_combo)
 		{
@@ -574,119 +483,10 @@ void CSCComboBox::reconstruct_font()
 	}
 
 	//-1 = 선택영역(닫힌 콤보) 높이, 0 = listbox 항목 높이.
-	//20260831 by claude. 선택영역은 폰트 기준값을 '최소' 로만 쓰고, 컨트롤이 그보다 높으면 채운다(sync_edit_height).
-	m_edit_height_min = edit_height;
+	SetItemHeight(-1, edit_height);
 	SetItemHeight(0, list_height);
-	sync_edit_height();
 
 	ASSERT(bCreated);
-}
-
-//20260831 by claude. 선택영역(닫힌 콤보의 텍스트 칸) 높이를 컨트롤 높이에 맞춘다.
-//
-//예전에는 이 높이를 폰트 메트릭만으로 정했다. 그러면 리소스에서 콤보를 폰트가 필요로 하는 것보다
-//높게 잡았을 때 텍스트 칸이 위쪽에 붙은 채로 남아 글자가 위로 치우쳐 보인다(아래는 빈 공간).
-//DrawItem 은 이미 DT_VCENTER 로 그리므로, 칸이 컨트롤을 채우기만 하면 세로 중앙에 온다.
-//
-//상하 여백은 상수로 박지 않고 실측한다 — GetComboBoxInfo 의 rcItem.top 이 곧 위쪽 테두리 두께이고,
-//아래도 같다고 보면 채울 높이 = client 높이 - top*2 다. 이 값은 항목 높이와 무관하므로 순환하지 않는다.
-//폰트 기준값보다 작아지지는 않게 한다 — 콤보가 폰트보다 낮으면 글자가 잘리는 쪽이 더 나쁘다.
-void CSCComboBox::sync_edit_height()
-{
-	if (!::IsWindow(m_hWnd) || m_edit_height_min <= 0)
-		return;
-
-	int edit_height = m_edit_height_min;
-
-	CRect rc;
-	GetClientRect(rc);
-
-	COMBOBOXINFO info = { 0 };
-	info.cbSize = sizeof(info);
-
-	BOOL got = GetComboBoxInfo(&info);
-
-	if (got)
-	{
-		int fill = rc.Height() - info.rcItem.top * 2;
-		if (fill > edit_height)
-			edit_height = fill;
-	}
-
-	//20260831 by claude. [진단] 이 함수가 언제 어떤 값으로 도는지. client 높이가 이미 field 높이와 같다면
-	//"컨트롤이 field 보다 크다" 는 전제 자체가 틀린 것이므로 여기서 바로 드러난다.
-	logWrite(_T("[SCComboBox] sync_edit_height client_h=%d min=%d -> %d | cbi=%d rcItem=(%d,%d,%d,%d) h=%d | cur itemH(-1)=%d"),
-		rc.Height(), m_edit_height_min, edit_height,
-		(int)got,
-		info.rcItem.left, info.rcItem.top, info.rcItem.right, info.rcItem.bottom,
-		info.rcItem.bottom - info.rcItem.top,
-		GetItemHeight(-1));
-
-	if (GetItemHeight(-1) != edit_height)
-		SetItemHeight(-1, edit_height);
-
-	apply_edit_text_padding();
-}
-
-//20260831 by claude. CBS_DROPDOWN 콤보의 글자를 선택영역 세로 중앙에 보이게 한다.
-//
-//측정 (Test_SCColorTheme, 2026-08-31):
-//  폰트 콤보  CBS_DROPDOWN     client=27  field=(3,3,..,24) h=21  tmHeight=16  → 아래 5px 가 남았다
-//  테마 콤보  CBS_DROPDOWNLIST client=23  field=(3,3,..,20) h=17  tmHeight=16  → 차이가 없어 멀쩡했다
-//두 콤보의 차이는 폰트가 아니라 스타일이었다. DROPDOWNLIST 는 닫힌 칸까지 owner-draw 라 DrawItem 이
-//DT_VCENTER 로 그린다. DROPDOWN 은 닫힌 칸이 진짜 자식 Edit 이라 WM_DRAWITEM 이 아예 오지 않고,
-//한 줄 Edit 은 글자를 자기 클라이언트 위쪽에 붙여 그린다(EM_SETRECT 는 multiline 전용이라 지정 불가).
-//
-//Edit 창 자체를 줄여 옮기는 방법은 쓰지 않는다 — 창이 선택영역보다 작아지면 그 바깥 띠의 배경,
-//클릭으로 캐럿이 잡히는 범위, 포커스 표시가 전부 어긋난다.
-//창은 선택영역을 그대로 채우게 두고 *클라이언트* 만 글자 높이로 줄인다(subclass 의 WM_NCCALCSIZE).
-//줄어든 위아래는 NC 영역이 되므로 같은 배경색으로 칠한다(WM_NCPAINT). 글자만 내려오고 나머지는 그대로다.
-//
-//창 높이는 우리가 바꾸지 않으므로 이 계산은 몇 번을 불러도 같은 값에 머문다(누적 드리프트 없음).
-void CSCComboBox::apply_edit_text_padding()
-{
-	COMBOBOXINFO info = { 0 };
-	info.cbSize = sizeof(info);
-
-	if (!GetComboBoxInfo(&info))
-		return;
-
-	//DROPDOWNLIST 는 hwndItem 이 콤보 자신이다 — 자식 Edit 이 없어 할 일이 없다.
-	if (info.hwndItem == NULL || info.hwndItem == m_hWnd)
-		return;
-
-	CRect rc_edit;
-	::GetWindowRect(info.hwndItem, &rc_edit);
-
-	CClientDC dc(this);
-	CFont* old_font = dc.SelectObject(&m_font);
-	TEXTMETRIC tm = {};
-	dc.GetTextMetrics(&tm);
-	dc.SelectObject(old_font);
-
-	int pad_top = 0;
-	int pad_bottom = 0;
-
-	if (tm.tmHeight > 0 && rc_edit.Height() > tm.tmHeight)
-	{
-		int extra = rc_edit.Height() - tm.tmHeight;
-		pad_top = extra / 2;
-		pad_bottom = extra - pad_top;
-	}
-
-	if (pad_top == m_edit_pad_top && pad_bottom == m_edit_pad_bottom)
-		return;
-
-	m_edit_pad_top = pad_top;
-	m_edit_pad_bottom = pad_bottom;
-
-	//20260831 by claude. [진단] Edit 클라이언트를 얼마나 줄이는지.
-	logWrite(_T("[SCComboBox] edit_pad edit_win_h=%d tmHeight=%d -> top=%d bottom=%d"),
-		rc_edit.Height(), tm.tmHeight, pad_top, pad_bottom);
-
-	//WM_NCCALCSIZE 를 다시 태워야 새 padding 이 반영된다.
-	::SetWindowPos(info.hwndItem, NULL, 0, 0, 0, 0,
-		SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
 }
 
 
@@ -739,11 +539,6 @@ void CSCComboBox::PreSubclassWindow()
 	COMBOBOXINFO cbi = { sizeof(COMBOBOXINFO) };
 	if (::GetComboBoxInfo(m_hWnd, &cbi) && cbi.hwndItem)
 		::SetWindowSubclass(cbi.hwndItem, sccombo_edit_subclass, 1, (DWORD_PTR)this);
-
-	//20260831 by claude. 위 subclass 가 붙은 뒤에 다시 계산한다 — reconstruct_font 에서 이미 한 번 돌았지만
-	//그때는 WM_NCCALCSIZE 를 받아줄 subclass 가 없어 padding 이 반영되지 않는다.
-	m_edit_pad_top = m_edit_pad_bottom = 0;		//값이 같으면 early return 하므로 강제로 다시 적용되게 한다.
-	apply_edit_text_padding();
 }
 
 // 필터링 결과 항목 수에 맞춰 dropdown listbox 영역 높이를 조정.
@@ -858,43 +653,8 @@ void CSCComboBox::OnPaint()
 	CRect rc;
 	GetClientRect(rc);
 
-	//20260831 by claude. Default() 에서 comctl32 가 그린 테마 프레임을 지우고 우리 테두리로 바꾼다.
-	//
-	//comctl32 는 같은 콤보라도 스타일에 따라 다른 테마 파트로 프레임을 그린다 —
-	//CBS_DROPDOWN 은 편집 컨트롤 테두리, CBS_DROPDOWNLIST 는 목록/버튼 테두리다.
-	//그래서 같은 CSCComboBox 인데 리소스 스타일만 다르면 테두리 모양·두께가 달라 보였다.
-	//(CSCEdit 은 같은 문제를 PreSubclassWindow 에서 WS_BORDER/WS_EX_CLIENTEDGE 를 떼어 푼다.
-	// 콤보의 프레임은 스타일 비트가 아니라 comctl32 의 그리기라 그 방법을 쓸 수 없어 덮어 지운다.)
-	//
-	//선택영역(자식 Edit 또는 DrawItem 이 칠하는 칸)은 client 안쪽으로 inset 만큼 들어가 있으므로,
-	//그 바깥 링만 배경색으로 덮으면 내용은 건드리지 않고 프레임만 사라진다.
-	//inset 은 상수로 박지 않고 GetComboBoxInfo 로 실측한다(측정값 3px, 테마·DPI 에 따라 달라진다).
-	int inset = 3;
-	{
-		COMBOBOXINFO info = { 0 };
-		info.cbSize = sizeof(info);
-		if (GetComboBoxInfo(&info) && info.rcItem.top > 0)
-			inset = info.rcItem.top;
-		if (inset < 1)
-			inset = 1;
-		if (inset > 4)
-			inset = 4;
-	}
-
-	CRgn rgn_outer;
-	CRgn rgn_inner;
-	rgn_outer.CreateRectRgn(rc.left, rc.top, rc.right, rc.bottom);
-	rgn_inner.CreateRectRgn(rc.left + inset, rc.top + inset, rc.right - inset, rc.bottom - inset);
-	rgn_outer.CombineRgn(&rgn_outer, &rgn_inner, RGN_DIFF);
-
-	CBrush br_back(m_theme.cr_back.ToCOLORREF());
-	dc.FillRgn(&rgn_outer, &br_back);
-
-	//지운 자리에 우리 테두리를 그린다. 색 선택 기준은 OnNcPaint 와 동일하게 맞춘다
-	//(자식 Edit 이 포커스를 가진 경우도 콤보가 포커스인 것으로 본다 — CBS_DROPDOWN).
-	bool focused = (GetFocus() == this) || (GetFocus() != nullptr && IsChild(GetFocus()));
-	CBrush br_border(focused ? m_theme.cr_border_active.ToCOLORREF() : m_theme.cr_border_inactive.ToCOLORREF());
-	dc.FrameRect(rc, &br_border);
+	//dc.FillSolidRect(rc, RGB(255, 0, 0));
+	//draw_rectangle(&dc, rc, gGRAY(192), m_crBack);
 
 	//owner draw fixed, has string 때문인지 dropdown 버튼이 표시되지 않는다.
 	//우선 수동으로 그려준다.
@@ -915,14 +675,6 @@ BOOL CSCComboBox::OnEraseBkgnd(CDC* pDC)
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
 	return FALSE;
 	return CComboBox::OnEraseBkgnd(pDC);
-}
-
-//20260831 by claude. 리소스 편집기에서 잡은 높이든 런타임 MoveWindow 든, 컨트롤 높이가 정해지는 시점은 여기다.
-//reconstruct_font 한 번만으로는 그 이후의 높이 변경을 못 따라가므로 여기서도 맞춘다.
-void CSCComboBox::OnSize(UINT nType, int cx, int cy)
-{
-	CComboBox::OnSize(nType, cx, cy);
-	sync_edit_height();
 }
 
 

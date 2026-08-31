@@ -44,7 +44,77 @@ END_MESSAGE_MAP()
 /////////////////////////////////////////////////////////////////////////////
 // CControlSplitter 긽긞긜?긙 긪깛긤깋
 
-void CControlSplitter::OnLButtonDown(UINT nFlags, CPoint point) 
+//20260831 by claude. splitter 와 링크된 컨트롤을 "한 번에" 옮기고 그 자리에서 동기 갱신한다.
+//
+//예전에는 컨트롤마다 MoveWindow 를 따로 부르고 Invalidate() 만 했다. 그러면 조금만 빨리 드래그해도
+//세로 줄무늬 잔상이 남았는데, 원인이 셋이었고 셋 다 막아야 없어진다.
+//
+// (1) WM_PAINT 는 메시지 큐에서 최저 우선순위다. 큐에 다른 메시지가 하나라도 있으면 생성되지 않는다.
+//     드래그 중에는 WM_MOUSEMOVE 가 끊이지 않으므로 무효 영역이 쌓이기만 하고 화면에 반영되지 않는다.
+//     → RDW_UPDATENOW 로 큐를 거치지 않고 그 자리에서 그린다.
+// (2) SetWindowPos 는 기본적으로 기존 픽셀을 새 위치로 BitBlt 하고 *새로 노출된 부분만* 무효화한다.
+//     리스트/트리는 내용이 위치 의존적(컬럼이 왼쪽 기준, 커스텀 페인트)이라 그 복사본은 틀린 그림인데,
+//     무효화 대상이 아니라 그대로 남는다. 이것이 줄무늬의 정체다. → SWP_NOCOPYBITS 로 복사를 끈다.
+// (3) 컨트롤을 하나씩 옮기면 "A 는 옮겨졌고 B 는 아직" 인 중간 상태가 화면에 노출된다.
+//     → DeferWindowPos 로 전부 묶어 한 번에 반영한다(클리핑 계산도 1회).
+void CControlSplitter::apply_moves(std::vector<split_move>& moves)
+{
+	CWnd* pParent = GetParent();
+	if (pParent == NULL || moves.empty())
+		return;
+
+	CRgn rgn_old;
+	CRgn rgn_new;
+	CRgn rgn_one;
+	rgn_old.CreateRectRgn(0, 0, 0, 0);
+	rgn_new.CreateRectRgn(0, 0, 0, 0);
+	rgn_one.CreateRectRgn(0, 0, 0, 0);
+
+	for (auto& m : moves)
+	{
+		CRect rect_old;
+		m.pWnd->GetWindowRect(&rect_old);
+		pParent->ScreenToClient(&rect_old);
+
+		rgn_one.SetRectRgn(rect_old);
+		rgn_old.CombineRgn(&rgn_old, &rgn_one, RGN_OR);
+
+		rgn_one.SetRectRgn(m.rect);
+		rgn_new.CombineRgn(&rgn_new, &rgn_one, RGN_OR);
+	}
+
+	const UINT swp_flags = SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOCOPYBITS;
+
+	HDWP hdwp = ::BeginDeferWindowPos((int)moves.size());
+	for (auto& m : moves)
+	{
+		if (hdwp == NULL)
+		{
+			//리소스 부족으로 defer 를 못 열었으면 개별 이동으로 폴백한다. 원자성은 잃지만
+			//(2)(1) 은 아래 플래그·동기 갱신이 그대로 막아주므로 잔상은 나지 않는다.
+			m.pWnd->SetWindowPos(NULL, m.rect.left, m.rect.top, m.rect.Width(), m.rect.Height(), swp_flags);
+			continue;
+		}
+
+		hdwp = ::DeferWindowPos(hdwp, m.pWnd->GetSafeHwnd(), NULL,
+			m.rect.left, m.rect.top, m.rect.Width(), m.rect.Height(), swp_flags);
+	}
+	if (hdwp)
+		::EndDeferWindowPos(hdwp);
+
+	//비워진 자리(옛 위치 - 새 위치)에만 RDW_ERASE 를 준다. 새 위치까지 지우게 하면 부모가 자식 밑을
+	//칠한 직후 자식이 덮어 그려 깜빡인다 — 다이얼로그는 WS_CLIPCHILDREN 이 기본이 아니다.
+	CRgn rgn_vacated;
+	rgn_vacated.CreateRectRgn(0, 0, 0, 0);
+	rgn_vacated.CombineRgn(&rgn_old, &rgn_new, RGN_DIFF);
+	pParent->RedrawWindow(NULL, &rgn_vacated, RDW_INVALIDATE | RDW_ERASE);
+
+	//옛 위치 ∪ 새 위치 전체를 지금 그린다.
+	rgn_old.CombineRgn(&rgn_old, &rgn_new, RGN_OR);
+	pParent->RedrawWindow(NULL, &rgn_old, RDW_INVALIDATE | RDW_ALLCHILDREN | RDW_UPDATENOW);
+}
+
+void CControlSplitter::OnLButtonDown(UINT nFlags, CPoint point)
 {
 	// TODO: 궞궻댧뭫궸긽긞긜?긙 긪깛긤깋뾭궻긓?긤귩믁돿궥귡궔귏궫궼긢긲긅깑긣궻룉뿚귩뚁귂뢯궢궲궘궬궠궋
 	
@@ -66,6 +136,11 @@ void CControlSplitter::OnLButtonDown(UINT nFlags, CPoint point)
 		//parent가 resize된 경우는 이 값을 다시 갱신시켜줘야 한다.
 		GetParent()->GetWindowRect(m_rectMax);
 		GetParent()->ScreenToClient(m_rectMax);
+
+		//20260831 by claude. 드래그 동안은 창 리사이즈와 같은 상태다. 리스트/트리의 스크롤바 재계산
+		//(SWP_FRAMECHANGED 유발)을 재워 마우스 이동당 비용을 줄인다. 연결은 app 몫 — 헤더 주석 참조.
+		if (m_live_resize_hook)
+			m_live_resize_hook(true);
 
 		//parent가 resize된 경우 m_move_limit이 그 범위를 넘을 경우도 존재한다. 보정해줘야 한다.
 		//if (m_move_limit.left > m_rectMax.left)
@@ -91,10 +166,20 @@ void CControlSplitter::OnLButtonUp(UINT nFlags, CPoint point)
 		ReleaseCapture();
         m_pOldDragCapture = NULL;
     }
+	bool was_dragging = m_bDragging;
 	m_bDragging = false;
 	//GetParent()->Invalidate(false);
 	//GetParent()->SendMessage(MSG_CONTROL_SPLITTER_MOVED,(WPARAM)m_hWnd,(LPARAM)MAKELONG(point.x,point.y));
 	CButton::OnLButtonUp(nFlags, point);
+
+	//20260831 by claude. 재워뒀던 컨트롤을 깨우고 최종 상태로 한 번 다시 그린다.
+	//hook 해제만 하면 스크롤바가 드래그 시작 시점의 상태로 남으므로 갱신까지 해야 한다.
+	if (was_dragging && m_live_resize_hook)
+	{
+		m_live_resize_hook(false);
+		if (CWnd* pParent = GetParent())
+			pParent->RedrawWindow(NULL, NULL, RDW_INVALIDATE | RDW_ALLCHILDREN | RDW_UPDATENOW);
+	}
 
 	Invalidate(false);
 }
@@ -259,6 +344,11 @@ void CControlSplitter::OnMouseMove(UINT nFlags, CPoint point)
 		if (!succeed)
 			return;
 
+		//20260831 by claude. 예전엔 여기서 컨트롤마다 MoveWindow 를 따로 불렀다. 이제는 새 위치만 모아서
+		//apply_moves 에 한 번에 넘긴다 — 개별 이동이 드래그 잔상의 원인이었다(apply_moves 주석 참조).
+		std::vector<split_move> moves;
+		moves.reserve(m_vtTopLeftControls.size() + m_vtBottomRightControls.size() + 1);
+
 		for (it = m_vtTopLeftControls.begin(); it < m_vtTopLeftControls.end(); it++)
 		{
 			CWnd* pCtrl = it->pWnd;
@@ -272,10 +362,6 @@ void CControlSplitter::OnMouseMove(UINT nFlags, CPoint point)
 
 			if(m_type == CS_HORZ)
 			{
-				//TRACE(_T("before rectCtrl %d, %d, w = %d, h = %d\n"), rectCtrl.left, rectCtrl.top, rectCtrl.Width(), rectCtrl.Height());
-
-				//if (rectCtrl.Height() < 50)
-				//	return;
 				if (nFlag & SPF_BOTTOM)
 				{
 					rectCtrl.bottom +=  sizeMove.cy;
@@ -286,14 +372,9 @@ void CControlSplitter::OnMouseMove(UINT nFlags, CPoint point)
 					rectCtrl.top +=  sizeMove.cy;
 					rectCtrl.top += sizeDiff.cy;
 				}
-
-				//TRACE(_T("after  rectCtrl %d, %d, w = %d, h = %d\n"), rectCtrl.left, rectCtrl.top, rectCtrl.Width(), rectCtrl.Height());
 			}
 			else
 			{
-				//TRACE(_T("before rectCtrl %d, %d, w = %d, h = %d\n"), rectCtrl.left, rectCtrl.top, rectCtrl.Width(), rectCtrl.Height());
-				//if (rectCtrl.Width() < 50)
-				//	return;
 				if ((nFlag & SPF_RIGHT))
 				{
 					rectCtrl.right +=  sizeMove.cx;
@@ -304,11 +385,10 @@ void CControlSplitter::OnMouseMove(UINT nFlags, CPoint point)
 					rectCtrl.left +=  sizeMove.cx;
 					rectCtrl.left += sizeDiff.cx;
 				}
-				//TRACE(_T("after  rectCtrl %d, %d, w = %d, h = %d\n"), rectCtrl.left, rectCtrl.top, rectCtrl.Width(), rectCtrl.Height());
 			}
 
-			GetParent()->ScreenToClient(&rectCtrl);		
-			pCtrl->MoveWindow(rectCtrl);
+			GetParent()->ScreenToClient(&rectCtrl);
+			moves.push_back({ pCtrl, rectCtrl });
 		}
 
 		for (it = m_vtBottomRightControls.begin(); it < m_vtBottomRightControls.end(); it++)
@@ -324,9 +404,6 @@ void CControlSplitter::OnMouseMove(UINT nFlags, CPoint point)
 
 			if (m_type == CS_HORZ)
 			{
-				//TRACE(_T("before rectCtrl %d, %d, w = %d, h = %d\n"), rectCtrl.left, rectCtrl.top, rectCtrl.Width(), rectCtrl.Height());
-				//if (rectCtrl.Height() < 50)
-				//	return;
 				if (nFlag & SPF_TOP)
 				{
 					rectCtrl.top +=  sizeMove.cy;
@@ -338,13 +415,9 @@ void CControlSplitter::OnMouseMove(UINT nFlags, CPoint point)
 					rectCtrl.bottom +=  sizeMove.cy;
 					rectCtrl.bottom += sizeDiff.cy;
 				}
-				//TRACE(_T("after  rectCtrl %d, %d, w = %d, h = %d\n"), rectCtrl.left, rectCtrl.top, rectCtrl.Width(), rectCtrl.Height());
 			}
 			else
 			{
-				//TRACE(_T("before rectCtrl %d, %d, w = %d, h = %d\n"), rectCtrl.left, rectCtrl.top, rectCtrl.Width(), rectCtrl.Height());
-				//if (rectCtrl.Width() < 50)
-				//	return;
 				if (nFlag & SPF_LEFT)
 				{
 					rectCtrl.left +=  sizeMove.cx;
@@ -356,16 +429,17 @@ void CControlSplitter::OnMouseMove(UINT nFlags, CPoint point)
 					rectCtrl.right +=  sizeMove.cx;
 					rectCtrl.right += sizeDiff.cx;
 				}
-				//TRACE(_T("after  rectCtrl %d, %d, w = %d, h = %d\n"), rectCtrl.left, rectCtrl.top, rectCtrl.Width(), rectCtrl.Height());
 			}
 
-			GetParent()->ScreenToClient(&rectCtrl);		
-			pCtrl->MoveWindow(rectCtrl);
+			GetParent()->ScreenToClient(&rectCtrl);
+			moves.push_back({ pCtrl, rectCtrl });
 		}
-		
-		MoveWindow(rect);
+
+		//splitter 자신도 같은 배치에 넣어야 컨트롤과 한 프레임에 움직인다. rect 는 이미 parent client 좌표.
+		moves.push_back({ this, rect });
+
+		apply_moves(moves);
 		GetParent()->SendMessage(Message_CControlSplitter,(WPARAM)m_hWnd,(LPARAM)MAKELONG(point.x,point.y));
-		Invalidate();
 	}
 	
 	CButton::OnMouseMove(nFlags, point);
@@ -689,14 +763,20 @@ bool CControlSplitter::apply_split_delta(int dcx, int dcy)
 			return false;
 	}
 
+	//20260831 by claude. 드래그 경로(OnMouseMove)와 같은 배치 이동을 쓴다. 개별 MoveWindow 는
+	//SetWindowPos 의 비트 복사 때문에 위치 의존 콘텐츠에 잘못된 픽셀을 남긴다(apply_moves 주석 참조).
+	std::vector<split_move> moves;
+	moves.reserve(pending.size() + 1);
+
 	for (auto& m : pending)
 	{
 		CRect rc = m.rect;
 		GetParent()->ScreenToClient(&rc);
-		m.pCtrl->MoveWindow(rc);
+		moves.push_back({ m.pCtrl, rc });
 	}
-	MoveWindow(rectSplitClient);
+	moves.push_back({ this, rectSplitClient });
+
+	apply_moves(moves);
 	GetParent()->SendMessage(Message_CControlSplitter, (WPARAM)m_hWnd, 0);
-	Invalidate();
 	return true;
 }

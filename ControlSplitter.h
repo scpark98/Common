@@ -13,6 +13,7 @@
 //
 #include <afxwin.h>
 #include <vector>
+#include <functional>
 #include <GdiPlus.h>
 /////////////////////////////////////////////////////////////////////////////
 // CControlSplitter 긂귻깛긤긂
@@ -98,9 +99,37 @@ public:
 	//splitter 와 linked ctrls 를 new_offset 위치로 일괄 이동. min size / parent 경계 체크 후 모두 통과해야 적용.
 	bool set_split_offset(int new_offset);
 
+	//20260831 by claude. 드래그 시작 시 true, 끝날 때 false 로 호출된다(선택 사항 — 안 걸면 아무 일도 없다).
+	//리스트/트리처럼 리사이즈 중 스크롤바 재계산(SWP_FRAMECHANGED 유발)이 비싼 컨트롤을 잠시 재우는 용도다.
+	//이 모듈이 CSCListCtrl/CSCTreeCtrl 을 직접 참조하면 그 컨트롤을 쓰지 않는 프로젝트까지 링크 의존이
+	//생기므로 연결은 app 이 한다. 끝날 때 sync_scrollbar 로 복원하는 것도 app 몫이다 — 어느 인스턴스를
+	//되살려야 하는지는 app 만 안다.
+	//
+	//	m_splitter.set_live_resize_hook([this](bool on) {
+	//		CSCListCtrl::set_live_resize(on);
+	//		CSCTreeCtrl::set_live_resize(on);
+	//		if (!on) {
+	//			m_list.sync_scrollbar();
+	//			m_tree.sync_scrollbar();
+	//		}
+	//	});
+	//
+	//주의 : 바를 숨기는 최적화까지 받으려면 각 컨트롤에 set_hide_scroll_when_resize(true) 도 필요하다(기본 false).
+	void set_live_resize_hook(std::function<void(bool)> fn) { m_live_resize_hook = fn; }
+
 protected:
 	//splitter + linked ctrls 의 새 위치 산출 후 한꺼번에 적용. drag (OnMouseMove) 와 programmatic set_split_offset 공용.
 	bool apply_split_delta(int dcx, int dcy);
+
+	//20260831 by claude. apply_moves 에 넘기는 이동 지시 한 건. rect 는 parent client 좌표의 *최종* 위치다.
+	struct split_move
+	{
+		CWnd*	pWnd;
+		CRect	rect;
+	};
+
+	//splitter 와 링크된 컨트롤을 한 번에 옮기고 그 자리에서 동기 갱신한다. 상세 근거는 .cpp 참조.
+	void apply_moves(std::vector<split_move>& moves);
 public:
 
 	// 맯맟궠귢궫긽긞긜?긙 ?긞긵듫릶
@@ -132,6 +161,9 @@ private:
 	bool			m_draw_dots = false;
 	Gdiplus::Color	m_cr_dots = Gdiplus::Color::DimGray;
 	void			draw_dots(CDC* pDC, CRect const* rect, bool horz, int number, int size, Gdiplus::Color cr);
+
+	//20260831 by claude. set_live_resize_hook 으로 받은 콜백. 비어 있으면 아무 일도 하지 않는다.
+	std::function<void(bool)>	m_live_resize_hook;
 
 public:
 	afx_msg void OnPaint();

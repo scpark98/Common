@@ -888,6 +888,11 @@ BOOL CSCComboBox::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
 	if (GetComboBoxInfo(&info) && info.hwndItem && info.hwndItem != m_hWnd)
 		h_edit = info.hwndItem;
 
+	//콤보와 자식 Edit 을 함께 멈춘다. Edit 하나만 멈춰서는 부족했다 —
+	//폰트 콤보는 선택이 바뀔 때마다 OnCbnSelchange 가 reconstruct_font() 를 부르고,
+	//그 안에서 SetFont / SetItemHeight / Edit 재배치(SWP_FRAMECHANGED)가 연쇄로 일어난다.
+	//그 각각이 중간 상태를 화면에 흘린다. 어느 것이 흘리는지 하나씩 좇는 대신 전부 묶는다.
+	SetRedraw(FALSE);
 	if (h_edit)
 		::SendMessage(h_edit, WM_SETREDRAW, FALSE, 0);
 
@@ -900,13 +905,14 @@ BOOL CSCComboBox::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
 		int len = (int)::SendMessage(h_edit, WM_GETTEXTLENGTH, 0, 0);
 		::SendMessage(h_edit, EM_SETSEL, (WPARAM)len, (LPARAM)len);
 
-		//SetRedraw(FALSE) 동안 쌓인 무효화는 버려지므로, 되켠 뒤 직접 무효화하고 그 자리에서 그린다.
-		//bErase=FALSE — TRUE 로 주면 배경 지우기가 한 프레임 먼저 나가 글자가 사라졌다 나타난다.
-		//Edit 은 자기 WM_PAINT 안에서 배경까지 칠하므로 별도 erase 가 필요 없다.
 		::SendMessage(h_edit, WM_SETREDRAW, TRUE, 0);
-		::InvalidateRect(h_edit, NULL, FALSE);
-		::UpdateWindow(h_edit);
 	}
+	SetRedraw(TRUE);
+
+	//SetRedraw(FALSE) 동안 쌓인 무효화는 버려지므로 직접 무효화하고 그 자리에서 그린다.
+	//RDW_ERASE 는 주지 않는다 — 배경 지우기가 한 프레임 먼저 나가면 글자가 사라졌다 나타난다.
+	//콤보도 Edit 도 자기 WM_PAINT 안에서 배경까지 칠하므로 별도 erase 가 필요 없다.
+	RedrawWindow(NULL, NULL, RDW_INVALIDATE | RDW_ALLCHILDREN | RDW_UPDATENOW);
 
 	return TRUE;
 }

@@ -643,6 +643,14 @@ int CSCComboBox::find_string(CString src)
 
 void CSCComboBox::OnPaint()
 {
+	//20260831 by claude. [진단] 첫 그리기 직후 한 번만 자기 창을 캡처하도록 예약한다.
+	//WM_PAINT 안에서 바로 캡처하면 아직 화면에 합성되기 전이라 타이머로 미룬다.
+	if (!m_captured_diag)
+	{
+		m_captured_diag = true;
+		SetTimer(TIMER_CAPTURE_DIAG, 700, NULL);
+	}
+
 	Default();
 
 	//CComboBox::OnPaint();
@@ -1096,6 +1104,23 @@ void CSCComboBox::OnCbnEditchange()
 
 void CSCComboBox::OnTimer(UINT_PTR nIDEvent)
 {
+	//20260831 by claude. [진단] 이 콤보의 실제 화면 픽셀을 파일로 남긴다.
+	//창 rect 를 4px 넓혀 잡아 테두리 바깥까지 함께 담는다(우리 테두리가 어디까지인지 보려고).
+	if (nIDEvent == TIMER_CAPTURE_DIAG)
+	{
+		KillTimer(TIMER_CAPTURE_DIAG);
+
+		CRect rw;
+		GetWindowRect(rw);
+		rw.InflateRect(4, 4);
+
+		CString path;
+		path.Format(_T("%s\\Log\\combo_%d.png"), get_exe_directory(), GetDlgCtrlID());
+
+		capture_window(rw, path);
+		return;
+	}
+
 	if (nIDEvent == TIMER_INPUT_FILTER)
 	{
 		KillTimer(TIMER_INPUT_FILTER);

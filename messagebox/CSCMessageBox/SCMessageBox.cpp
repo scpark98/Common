@@ -396,7 +396,16 @@ void CSCMessageBox::set_message(CString msg, int type, int timeout_sec, int alig
 		rc.bottom = MAX(rc.top + gap + rect_text.Height() + gap + m_sz_button.cy + bottom_gap, MIN_SIZE_CY);
 
 		rc.top -= m_title_height;
-		MoveWindow(rc);
+
+		//20260831 by claude. rc 는 GetClientRect 로 만든 것이라 left/top 이 항상 0 이다. 그대로 MoveWindow 에
+		//넘기면 이 창은 WS_POPUP(=최상위)이라 좌표가 화면 기준으로 해석돼 메시지박스가 화면 좌상단(0,0)으로
+		//튄다. 그 뒤 CenterWindow 가 제자리로 되돌리기 때문에 "0,0 을 갔다가 돌아오는" 것처럼 보였다.
+		//set_font 처럼 이미 떠 있는 상태에서 레이아웃을 다시 도는 경로에서 특히 눈에 띈다.
+		//크기만 바꾸고 위치는 지금 자리를 유지한다. rc 는 아래에서 클라이언트 좌표로 계속 쓰이므로
+		//건드리지 않고 별도 rect 로 옮긴다.
+		CRect rect_window;
+		GetWindowRect(rect_window);
+		MoveWindow(rect_window.left, rect_window.top, rc.Width(), rc.Height());
 
 		m_button_quit.MoveWindow(CRect(rc.right - 2 - m_title_height, rc.top + 2, rc.right - 2, m_title_height - 1));
 

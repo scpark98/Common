@@ -2501,6 +2501,11 @@ void CSCListCtrl::set_color_theme(int theme, bool invalidate)
 	m_theme.set_color_theme(theme);
 	m_HeaderCtrlEx.set_color(m_theme.cr_header_text, m_theme.cr_header_back);
 
+	//20260831 by claude. 잘린 셀 툴팁은 처음 필요할 때 생성되므로 아직 없을 수 있다. 있으면 같이 갈아준다.
+	//const CSCColorTheme& 오버로드에도 같은 줄이 있다 — 자식 전파를 추가할 땐 두 곳 모두에 넣어야 한다.
+	if (::IsWindow(m_tooltip.GetSafeHwnd()))
+		m_tooltip.set_color_theme(m_theme);
+
 	//invalidate 를 그대로 전파 — 호출자가 true 로 호출하면 scrollbar 도 즉시 redraw 되어야 한다.
 	//(이전엔 false 하드코딩이라 색만 바뀌고 화면 갱신은 안 됐다.)
 	if (::IsWindow(m_scrollbar.m_hWnd))

@@ -5986,6 +5986,11 @@ void CSCTreeCtrl::set_color_theme(int theme, bool invalidate)
 {
 	m_theme.set_color_theme(theme);
 
+	//20260831 by claude. 잘린 라벨 툴팁은 처음 필요할 때 생성되므로 아직 없을 수 있다. 있으면 같이 갈아준다.
+	//const CSCColorTheme& 오버로드에도 같은 줄이 있다 — 자식 전파를 추가할 땐 두 곳 모두에 넣어야 한다.
+	if (::IsWindow(m_tooltip.GetSafeHwnd()))
+		m_tooltip.set_color_theme(m_theme);
+
 	if (::IsWindow(m_scrollbar.m_hWnd))
 		m_scrollbar.set_color_theme(m_theme, invalidate);
 	if (::IsWindow(m_scrollbar_h.m_hWnd))

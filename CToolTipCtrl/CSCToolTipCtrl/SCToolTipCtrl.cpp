@@ -36,7 +36,15 @@ BOOL CSCToolTipCtrl::Create(CWnd* pParentWnd, DWORD dwStyle)
 
 void CSCToolTipCtrl::set_color_theme(const CSCColorTheme& theme)
 {
-	m_theme = theme;
+	//20260831 by claude. operator= 가 아니라 copy_colors_from 을 쓴다. 다른 SC 컨트롤과 같은 규칙이다.
+	//operator= 는 src 의 m_parent / m_cur_theme 까지 덮어써서, 이후 default 테마를 다시 적용할 때
+	//툴팁이 자기 부모가 아니라 색을 준 컨트롤 기준으로 배경을 고르게 된다(colors.h 의 copy_colors_from 주석 참조).
+	m_theme.copy_colors_from(theme);
+
+	//이미 떠 있는 툴팁은 다음에 뜰 때 새 색으로 그려진다 — 크기·배경 계산이 TTN_SHOW / CDDS_PREPAINT 에서
+	//일어나기 때문이다. 테마를 바꾼 그 순간 화면에 떠 있던 것은 내려서 다음 표시부터 확실히 새 색이 되게 한다.
+	if (::IsWindow(m_hWnd))
+		Pop();
 }
 
 CString CSCToolTipCtrl::escape_tags(const CString& text)

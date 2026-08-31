@@ -641,20 +641,65 @@ int CSCComboBox::find_string(CString src)
 }
 
 
+//20260831 by claude. Default() 를 부르지 않는다. 콤보의 겉모습은 전부 여기서 그린다.
+//
+//예전에는 Default() 를 먼저 불러 comctl32 가 visual styles 로 그리게 하고 그 위에 덧그렸다.
+//그 결과가 화면 픽셀로 확인된 것(dark_gray 테마, 2026-08-31 스크린샷 실측):
+//  - 프레임 안쪽에 흰색(255,255,255) 띠 — CBS_DROPDOWN 은 2px, CBS_DROPDOWNLIST 는 1px.
+//    같은 CSCComboBox 인데 리소스 스타일만 다르면 테두리 두께가 달라 보이던 원인이다.
+//  - 드롭다운 버튼 영역(우측 약 19px)이 통째로 흰색. 어두운 테마인데 그 부분만 밝게 남던 원인이다.
+//  - 게다가 Default() 가 BeginPaint/EndPaint 로 무효 영역을 이미 검증해버려, 그 뒤에 CPaintDC 를
+//    새로 열어 덧그리는 것은 클립이 비어 버려질 수 있다. 앞선 시도들이 화면에 반영되지 않은 이유다.
+//
+//같은 저장소의 CBitComboBox 도 Default() 없이 CPaintDC 로 전부 자기가 그린다. 그 방식에 맞춘다.
+//CBS_DROPDOWN 의 자식 Edit 은 별도 창이라 자기 WM_PAINT 로 계속 그려지므로 글자는 그대로 나온다.
+//CBS_DROPDOWNLIST 는 자식이 없어 comctl32 가 WM_DRAWITEM 으로 보내주던 닫힌 칸 글자를 여기서 직접 그린다.
 void CSCComboBox::OnPaint()
 {
-	Default();
+	CPaintDC dc(this);
 
-	//CComboBox::OnPaint();
-	//return;
-	CPaintDC dc(this); // device context for painting
-					   // TODO: 여기에 메시지 처리기 코드를 추가합니다.
-					   // 그리기 메시지에 대해서는 CComboBox::OnPaint()을(를) 호출하지 마십시오.
 	CRect rc;
 	GetClientRect(rc);
 
-	//dc.FillSolidRect(rc, RGB(255, 0, 0));
-	//draw_rectangle(&dc, rc, gGRAY(192), m_crBack);
+	dc.FillSolidRect(rc, m_theme.cr_back.ToCOLORREF());
+
+	//선택영역 위치는 상수로 박지 않고 OS 가 잡아준 값을 쓴다(테마·DPI 에 따라 달라진다).
+	COMBOBOXINFO info = { 0 };
+	info.cbSize = sizeof(info);
+	bool has_info = (GetComboBoxInfo(&info) != FALSE);
+
+	//닫힌 칸 글자 — 자식 Edit 이 없는 CBS_DROPDOWNLIST 만 해당.
+	//(hwndItem 이 콤보 자신이면 자식 Edit 이 없다는 뜻이다.)
+	if (has_info && (info.hwndItem == NULL || info.hwndItem == m_hWnd))
+	{
+		int sel = GetCurSel();
+		if (sel >= 0)
+		{
+			CString text;
+			GetLBText(sel, text);
+
+			COLORREF cr_text = m_theme.cr_text.ToCOLORREF();
+
+			//항목별 지정색 — DrawItem 의 판단 기준과 동일하게 맞춘다.
+			CSCComboBoxColor* cr = (CSCComboBoxColor*)GetItemData(sel);
+			if (!m_is_font_combo && cr &&
+				(cr->cr_text.GetValue() != m_theme.cr_text.GetValue()) &&
+				(cr->cr_text.GetValue() != Gdiplus::Color::Transparent))
+				cr_text = cr->cr_text.ToCOLORREF();
+
+			if (!IsWindowEnabled())
+				cr_text = m_theme.cr_text_disabled.ToCOLORREF();
+
+			CRect r_text = info.rcItem;
+			r_text.DeflateRect(4, 0);		//DrawItem 의 여백과 동일.
+
+			CFont* old_font = dc.SelectObject(&m_font);
+			dc.SetBkMode(TRANSPARENT);
+			dc.SetTextColor(cr_text);
+			dc.DrawText(text, &r_text, DT_LEFT | DT_SINGLELINE | DT_VCENTER | DT_WORD_ELLIPSIS | DT_NOPREFIX);
+			dc.SelectObject(old_font);
+		}
+	}
 
 	//owner draw fixed, has string 때문인지 dropdown 버튼이 표시되지 않는다.
 	//우선 수동으로 그려준다.
@@ -667,6 +712,12 @@ void CSCComboBox::OnPaint()
 	int sz = 4;
 	draw_line(&dc, cp.x - sz, cp.y - sz, cp.x, cp.y, GRAY(128), 2);
 	draw_line(&dc, cp.x + sz, cp.y - sz, cp.x, cp.y, GRAY(128), 2);
+
+	//테두리는 맨 마지막에 — 위의 배경 채우기가 덮지 않도록.
+	//색 기준은 OnNcPaint 와 동일(자식 Edit 이 포커스면 콤보 포커스로 본다 — CBS_DROPDOWN).
+	bool focused = (GetFocus() == this) || (GetFocus() != nullptr && IsChild(GetFocus()));
+	CBrush br_border(focused ? m_theme.cr_border_active.ToCOLORREF() : m_theme.cr_border_inactive.ToCOLORREF());
+	dc.FrameRect(rc, &br_border);
 }
 
 

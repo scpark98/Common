@@ -15875,6 +15875,82 @@ CRect get_window_real_rect(CWnd* pWnd)
 	return rw;
 }
 
+//20260831 by claude. 계약·근거는 Functions.h 의 선언부 주석 참조.
+void move_windows_together(HWND parent, const std::vector<sc_window_move>& moves)
+{
+	if (parent == NULL || !::IsWindow(parent))
+		return;
+
+	if (moves.empty())
+	{
+		//옮길 것이 없어도 부모가 이미 무효화해 둔 영역(창이 커져 새로 드러난 띠 등)은 밀어내 준다.
+		//모든 컨트롤이 고정 앵커라 한 개도 안 움직이는 리사이즈에서 배경만 검게 남던 경우 대비.
+		::UpdateWindow(parent);
+		return;
+	}
+
+	CRgn rgn_old;
+	CRgn rgn_new;
+	CRgn rgn_one;
+	rgn_old.CreateRectRgn(0, 0, 0, 0);
+	rgn_new.CreateRectRgn(0, 0, 0, 0);
+	rgn_one.CreateRectRgn(0, 0, 0, 0);
+
+	for (const auto& m : moves)
+	{
+		if (!::IsWindow(m.hwnd))
+			continue;
+
+		CRect rect_old;
+		::GetWindowRect(m.hwnd, &rect_old);
+		::MapWindowPoints(HWND_DESKTOP, parent, (LPPOINT)(LPRECT)&rect_old, 2);
+
+		rgn_one.SetRectRgn(rect_old);
+		rgn_old.CombineRgn(&rgn_old, &rgn_one, RGN_OR);
+
+		rgn_one.SetRectRgn(m.rect);
+		rgn_new.CombineRgn(&rgn_new, &rgn_one, RGN_OR);
+	}
+
+	const UINT swp_flags = SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOCOPYBITS;
+
+	HDWP hdwp = ::BeginDeferWindowPos((int)moves.size());
+	for (const auto& m : moves)
+	{
+		if (!::IsWindow(m.hwnd))
+			continue;
+
+		if (hdwp == NULL)
+		{
+			//리소스 부족으로 defer 를 못 열었으면 개별 이동으로 폴백한다. 원자성만 잃고,
+			//복사 금지와 동기 갱신은 그대로 적용되므로 잔상은 나지 않는다.
+			::SetWindowPos(m.hwnd, NULL, m.rect.left, m.rect.top, m.rect.Width(), m.rect.Height(), swp_flags);
+			continue;
+		}
+
+		hdwp = ::DeferWindowPos(hdwp, m.hwnd, NULL,
+			m.rect.left, m.rect.top, m.rect.Width(), m.rect.Height(), swp_flags);
+	}
+	if (hdwp)
+		::EndDeferWindowPos(hdwp);
+
+	//비워진 자리(옛 위치 - 새 위치)에만 배경을 지우게 한다.
+	//CWnd::RedrawWindow 대신 Win32 를 직접 부른다 — 드래그 중 매 이동마다 도는 경로라
+	//FromHandle 이 임시 CWnd 를 만드는 비용을 둘 이유가 없다.
+	CRgn rgn_vacated;
+	rgn_vacated.CreateRectRgn(0, 0, 0, 0);
+	rgn_vacated.CombineRgn(&rgn_old, &rgn_new, RGN_DIFF);
+	::RedrawWindow(parent, NULL, (HRGN)rgn_vacated.GetSafeHandle(), RDW_INVALIDATE | RDW_ERASE);
+
+	//옛 위치 ∪ 새 위치 전체를 지금 그린다.
+	rgn_old.CombineRgn(&rgn_old, &rgn_new, RGN_OR);
+	::RedrawWindow(parent, NULL, (HRGN)rgn_old.GetSafeHandle(), RDW_INVALIDATE | RDW_ALLCHILDREN | RDW_UPDATENOW);
+
+	//위 두 줄은 우리가 지정한 영역만 그린다. 창이 커져 새로 드러난 띠처럼 *OS 가 이미 무효화해 둔* 영역은
+	//그대로 남아 드래그가 끝날 때까지 검게 보인다. 여기서 함께 밀어낸다(무효 영역이 없으면 아무 일도 안 한다).
+	::UpdateWindow(parent);
+}
+
 //주어진 점들을 포함하는 최대 사각형을 구한다.
 CRect get_max_rect(CPoint *pt, int nPoints)
 {

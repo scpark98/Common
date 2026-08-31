@@ -2511,6 +2511,35 @@ h		: 복사할 height 크기(pixel)
 	//특히 전체화면일 경우 lt는 0,0이 아닌 -8,-8로 리턴된다. 실제 보여지는 영역을 구하기 위한 함수
 	CRect		get_window_real_rect(CWnd* pWnd);
 
+	//20260831 by claude. move_windows_together 의 이동 지시 한 건. rect 는 parent client 좌표의 *최종* 위치.
+	struct sc_window_move
+	{
+		HWND	hwnd;
+		CRect	rect;
+	};
+
+	//여러 자식 창을 한 번에 옮기고 그 자리에서 동기 갱신한다.
+	//스플리터 드래그·창 리사이즈처럼 "마우스를 움직이는 동안 계속 재배치" 하는 모든 경우에 쓴다.
+	//
+	//창을 하나씩 MoveWindow 하고 Invalidate 만 하면 조금만 빨리 드래그해도 잔상·줄무늬·검은 영역이 남는다.
+	//원인이 셋이고 셋 다 막아야 사라지므로 한 함수로 묶었다.
+	//
+	// (1) WM_PAINT 는 메시지 큐 최저 우선순위다. 큐에 다른 메시지가 하나라도 있으면 생성되지 않는다.
+	//     드래그 중에는 WM_MOUSEMOVE / WM_SIZE 가 끊이지 않으므로 무효 영역이 쌓이기만 하고 그려지지 않는다.
+	//     아직 한 번도 안 그려진 영역은 검게 보인다. → RDW_UPDATENOW 로 큐를 거치지 않고 그 자리에서 그린다.
+	// (2) SetWindowPos 는 기본적으로 기존 픽셀을 새 위치로 BitBlt 하고 *새로 노출된 부분만* 무효화한다.
+	//     리스트/트리처럼 내용이 위치 의존적인 창은 그 복사본이 틀린 그림인데도 무효화 대상이 아니라 그대로 남는다.
+	//     → SWP_NOCOPYBITS 로 복사를 끈다.
+	// (3) 창을 하나씩 옮기면 "A 는 옮겨졌고 B 는 아직" 인 중간 상태가 화면에 노출된다.
+	//     → DeferWindowPos 로 전부 묶어 한 번에 반영한다(클리핑 계산도 1회).
+	//
+	//RDW_ERASE 는 비워진 자리(옛 위치 - 새 위치)에만 준다 — 새 위치까지 지우게 하면 부모가 자식 밑을 칠한
+	//직후 자식이 덮어 그려 깜빡인다(다이얼로그는 WS_CLIPCHILDREN 이 기본이 아니다).
+	//
+	//마지막의 UpdateWindow 는 *컨트롤이 없는 부모 배경* 을 위한 것이다. 창이 커지면 새로 드러난 띠를 OS 가
+	//무효화해 두는데, 그것 역시 위 (1) 때문에 드래그가 끝날 때까지 안 그려져 검게 남는다. 여기서 함께 밀어낸다.
+	void		move_windows_together(HWND parent, const std::vector<sc_window_move>& moves);
+
 	bool		pt_in_rect(CRect r, CPoint pt);
 	bool		pt_in_rect(Gdiplus::RectF r, CPoint pt);
 	bool		pt_in_rect_border(CRect r, CPoint pt, int sz = 0);

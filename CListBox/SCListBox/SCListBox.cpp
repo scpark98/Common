@@ -1677,7 +1677,7 @@ void CSCListBox::edit(int index)
 }
 
 //modify가 true이면 편집된 텍스트로 변경, 그렇지 않으면 기존 텍스트 유지.
-void CSCListBox::edit_end(bool modify)
+void CSCListBox::edit_end(bool modify, bool restore_selection)
 {
 	remove_edit_mouse_hook();
 
@@ -1732,7 +1732,11 @@ void CSCListBox::edit_end(bool modify)
 	//multi-select(LBS_MULTIPLESEL/EXTENDEDSEL) listbox 는 SetCurSel 이 no-op(LB_ERR) 이라 SetSel 로 재선택해야
 	//한다 — 이게 누락돼 변경 시(Enter / 수정 후 외부 클릭)에만 선택이 풀려 보였다. 타 항목 선택은 보존.
 	//(포커스 복귀는 Enter/Esc 등 *명시적* 종료에서만 — on_message_CSCStaticEdit 에서 SetFocus. 외부 클릭은 그쪽으로 포커스 양보.)
-	if (keep_index >= 0 && keep_index < GetCount())
+	//20260901 by claude. 단, *이 리스트박스의 다른 항목을 클릭해서* 끝난 경우는 되살리지 않는다.
+	//그 클릭이 이미 새 선택을 만든 뒤에 여기서 옛 항목을 더하면 둘 다 선택된 것처럼 보인다
+	//(LBS_EXTENDEDSEL 의 평범한 클릭은 다른 선택을 지우는데, SetSel(idx,TRUE) 는 지우지 않고 더한다).
+	//순서: 훅이 클릭을 통과시키고 종료를 post → 클릭으로 새 항목 선택 → 그 다음 이 함수가 돈다.
+	if (restore_selection && keep_index >= 0 && keep_index < GetCount())
 	{
 		if (GetStyle() & (LBS_MULTIPLESEL | LBS_EXTENDEDSEL))
 			SetSel(keep_index, TRUE);
@@ -2433,7 +2437,16 @@ LRESULT CALLBACK CSCListBox::edit_mouse_hook_proc(int code, WPARAM wParam, LPARA
 
 			//edit 내부 클릭은 캐럿 이동이므로 종료 금지. 바깥이면 종료를 post (클릭 자체는 그대로 통과시킴).
 			if (!rc_edit.PtInRect(mh->pt))
-				s_editing_listbox->PostMessage(WM_LISTBOX_END_EDIT, 0, 0);
+			{
+				//20260901 by claude. 그 클릭이 이 리스트박스 안이었는지 함께 넘긴다.
+				//안이면 곧 새 항목이 선택되므로 편집하던 항목을 되살리면 안 된다(edit_end 의 restore_selection).
+				//밖(다른 컨트롤·다이얼로그)이면 선택은 그대로 남아야 하므로 되살린다.
+				CRect rc_list;
+				s_editing_listbox->GetWindowRect(&rc_list);
+
+				s_editing_listbox->PostMessage(WM_LISTBOX_END_EDIT,
+					rc_list.PtInRect(mh->pt) ? 1 : 0, 0);
+			}
 		}
 	}
 
@@ -2442,6 +2455,8 @@ LRESULT CALLBACK CSCListBox::edit_mouse_hook_proc(int code, WPARAM wParam, LPARA
 
 LRESULT CSCListBox::on_end_edit_posted(WPARAM wParam, LPARAM lParam)
 {
-	edit_end(true);
+	//20260901 by claude. wParam=1 이면 이 리스트박스 안을 클릭해 끝난 것 — 그 클릭이 이미 새 선택을
+	//만들었으므로 편집하던 항목을 되살리지 않는다. 밖을 클릭한 경우(0)는 예전처럼 되살린다.
+	edit_end(true, wParam == 0);
 	return 0;
 }

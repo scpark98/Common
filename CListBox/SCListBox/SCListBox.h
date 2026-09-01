@@ -248,7 +248,13 @@ public:
 	//index == -1이면 선택된 첫번째 항목 편집
 	void		edit(int index = -1);
 	//modify가 true이면 편집된 텍스트로 변경, 그렇지 않으면 기존 텍스트 유지.
-	void		edit_end(bool modify = true);
+	//20260901 by claude. restore_selection — 편집하던 항목을 다시 선택 상태로 되돌릴지.
+	//기본 true(Enter/Esc 처럼 제자리에서 끝나는 경우). 특히 텍스트가 바뀌면 DeleteString+insert 로
+	//선택이 사라지므로 반드시 되살려야 한다.
+	//false 를 줘야 하는 경우는 하나 — *이 리스트박스의 다른 항목을 클릭해서* 편집이 끝난 때다.
+	//그 클릭이 이미 새 선택을 만들었는데 옛 항목을 되살리면 둘 다 선택된 것처럼 보인다
+	//(LBS_EXTENDEDSEL 에서 SetSel(idx, TRUE) 는 기존 선택을 지우지 않고 더하기 때문).
+	void		edit_end(bool modify = true, bool restore_selection = true);
 	//편집된 데이터가 empty이어도 정상 데이터로 처리할 지...
 	//false일 경우는 해당 라인을 제거한다.
 	void		set_accept_empty_edit_str(bool accept = true) { m_accept_empty_edit_str = accept; }

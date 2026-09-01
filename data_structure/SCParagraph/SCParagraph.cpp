@@ -517,16 +517,20 @@ void CSCParagraph::build_paragraph_str(CString& text, std::deque<std::deque<CSCP
 			push_attr(_T("box"));
 			para_temp.text_prop.cr_box = get_color(arg(value, 0));
 			CString radius = arg(value, 1);
-			CString pad = arg(value, 2);
+			CString pad_x = arg(value, 2);
+			//20260901 by claude. 4번째 인자(세로여백)는 선택. 생략하면 가로여백과 같은 값이라 기존 표기가 그대로 동작한다.
+			CString pad_y = arg(value, 3);
 			para_temp.text_prop.box_round = radius.IsEmpty() ? 8.0f : (float)_tstof(radius);
-			para_temp.text_prop.box_pad = pad.IsEmpty() ? 4 : _ttoi(pad);
+			para_temp.text_prop.box_pad_x = pad_x.IsEmpty() ? 4 : _ttoi(pad_x);
+			para_temp.text_prop.box_pad_y = pad_y.IsEmpty() ? para_temp.text_prop.box_pad_x : _ttoi(pad_y);
 		}
 		else if (name == _T("/box"))
 		{
 			CSCTextProperty prev = pop_attr(_T("box"));
 			para_temp.text_prop.cr_box = prev.cr_box;
 			para_temp.text_prop.box_round = prev.box_round;
-			para_temp.text_prop.box_pad = prev.box_pad;
+			para_temp.text_prop.box_pad_x = prev.box_pad_x;
+			para_temp.text_prop.box_pad_y = prev.box_pad_y;
 		}
 
 		//---- 자간 ----
@@ -1207,15 +1211,17 @@ CRect CSCParagraph::calc_text_rect(CRect rc, CDC* pDC, std::deque<std::deque<CSC
 			//set_line_spacing 이 <ls> 배율로 늘였다 줄였다 하면 안 된다.
 			if (para[i][j].text_prop.cr_box.GetA() > 0)
 			{
-				int box_pad = para[i][j].text_prop.box_pad;
+				//20260901 by claude. 여백이 가로/세로로 나뉘었다. 가로는 advance 에, 세로는 라인 높이에 반영한다.
+				int pad_x = para[i][j].text_prop.box_pad_x;
+				int pad_y = para[i][j].text_prop.box_pad_y;
 
-				para[i][j].r.OffsetRect(box_pad, 0);
-				para[i][j].ink_height += box_pad * 2;
+				para[i][j].r.OffsetRect(pad_x, 0);
+				para[i][j].ink_height += pad_y * 2;
 
-				sz.cx += box_pad * 2;
-				sz.cy += box_pad;
+				sz.cx += pad_x * 2;
+				sz.cy += pad_y;
 
-				line_rise = MAX(line_rise, box_pad);
+				line_rise = MAX(line_rise, pad_y);
 			}
 
 			//TRACE(_T("[%d][%d] text = %s, sz = %dx%d, r = %s\n"), i, j, para[i][j].text, sz.cx, sz.cy, get_rect_info_string(para[i][j].r));
@@ -1497,11 +1503,13 @@ CRect CSCParagraph::get_bounding_rect(std::deque<std::deque<CSCParagraph>>& para
 	{
 		for (int j = 0; j < (int)para[i].size(); j++)
 		{
-			//<box> 의 배경은 그리기가 r 을 box_pad 만큼 사방으로 부풀리므로 그만큼 포함시킨다.
-			int box_pad = (para[i][j].text_prop.cr_box.GetA() > 0) ? para[i][j].text_prop.box_pad : 0;
+			//<box> 의 배경은 그리기가 r 을 여백만큼 사방으로 부풀리므로 그만큼 포함시킨다(가로/세로 각각).
+			bool has_box = (para[i][j].text_prop.cr_box.GetA() > 0);
+			int box_pad_x = has_box ? para[i][j].text_prop.box_pad_x : 0;
+			int box_pad_y = has_box ? para[i][j].text_prop.box_pad_y : 0;
 
 			CRect r = para[i][j].r;
-			r.InflateRect(box_pad, box_pad);
+			r.InflateRect(box_pad_x, box_pad_y);
 
 			if (first_run)
 			{
@@ -2063,12 +2071,20 @@ CRect CSCParagraph::draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCPar
 			//text 배경색을 칠하고
 			draw_rect(g, para[i][j].r, Gdiplus::Color::Transparent, para[i][j].text_prop.cr_back);
 
-			//<box=색,radius,pad> — run 단위 라운드 배경. 위 cr_back 이 run 박스 그대로의 사각형인 것과 달리
-			//pad 만큼 부풀린 라운드 사각형이라, 둘 다 지정하면 cr_back 위에 이것이 덮인다.
+			//<box=색,반지름,가로여백[,세로여백]> — run 단위 라운드 배경. 위 cr_back 이 run 박스 그대로의
+			//사각형인 것과 달리 여백만큼 부풀린 라운드 사각형이라, 둘 다 지정하면 cr_back 위에 이것이 덮인다.
 			if (para[i][j].text_prop.cr_box.GetA() > 0)
 			{
 				CRect rb = para[i][j].r;
-				rb.InflateRect(para[i][j].text_prop.box_pad, para[i][j].text_prop.box_pad);
+				rb.InflateRect(para[i][j].text_prop.box_pad_x, para[i][j].text_prop.box_pad_y);
+
+				//20260901 by claude. 반지름을 높이의 절반으로 제한한다.
+				//높이 절반이 완전한 알약(양 끝이 반원)이고 그 이상은 의미가 없다. 제한이 없으면 큰 값을 줬을 때
+				//알약도 사각도 아닌 어중간한 모양이 나온다 — 반지름 10, 높이 25 같은 조합이 그랬다.
+				//이제 큰 값을 주면 항상 깔끔한 알약이 되므로 "알약을 원하면 큰 수" 로 쓸 수 있다.
+				int round = (int)para[i][j].text_prop.box_round;
+				if (round > rb.Height() / 2)
+					round = rb.Height() / 2;
 
 				//20260828 by claude. 작은 라운드 사각형은 SmoothingMode 만으로는 곡선 경계에 계단이 보인다.
 				//PixelOffsetMode 기본값은 픽셀 중심을 정수 좌표로 보므로 AA 커버리지가 반 픽셀 어긋난 채 계산되는데,
@@ -2082,7 +2098,7 @@ CRect CSCParagraph::draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCPar
 
 				draw_round_rect(&g, Gdiplus::Rect(rb.left, rb.top, rb.Width(), rb.Height()),
 					Gdiplus::Color::Transparent, para[i][j].text_prop.cr_box,
-					(int)para[i][j].text_prop.box_round, 0);
+					round, 0);
 
 				g.SetPixelOffsetMode(old_pixel_offset);
 				g.SetSmoothingMode(old_smoothing);

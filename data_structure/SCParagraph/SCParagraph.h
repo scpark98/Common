@@ -36,12 +36,20 @@
 	<grad=orangered>		//글자를 cr_text → 지정색 그라디언트로 채운다. 인자는 도착색 하나다(출발색은 그 구간의 cr_text).
 							//20260828 by claude. 두 번째 인자에 h 를 주면 가로 방향 — <grad=orangered,h>.
 							//(예전 예시가 <grad=gold,orangered> 였는데 파서는 두 번째를 방향으로 읽으므로 gold 세로 그라디언트가 된다.)
-	<box=royalblue,12,7>	//run 단위 라운드 배경(색, 반지름, 여백). CSS 의 background + padding + border-radius 에 해당한다.
+	<box=royalblue,99,8,2>	//run 단위 라운드 배경(색, 반지름, 가로여백[, 세로여백]).
+							//CSS 의 background + padding + border-radius 에 해당한다.
 							//위 <crb>/<cb> 와 같은 "글자 뒤 배경" 이지만 그쪽은 run 박스 그대로의 사각형(여백 0, 라운드 0)이다.
 							//둘을 같이 주면 cr_back 을 칠한 뒤 그 위에 이 라운드 사각형을 덮는다.
 							//20260828 by claude. 여백은 글리프가 아니라 글자 박스(폰트 line box) 기준으로 붙는다.
 							//그래서 한 글자짜리 run 을 감싸면 폭보다 높이가 훨씬 커져 세로로 긴 알약이 된다 —
 							//단어 단위로 감싸는 것이 자연스럽다. (HTML 의 inline span padding 과 같은 동작.)
+							//20260901 by claude. 여백을 가로/세로로 나눴다. 네 번째 인자는 생략 가능하고,
+							//생략하면 가로여백과 같은 값이라 <box=색,반지름,여백> 표기가 그대로 동작한다.
+							//세로 여백은 위 line box(ascent+descent 포함)에 더해지므로 조금만 줘도 금방 두꺼워진다.
+							//칩처럼 보이려면 가로는 넉넉히, 세로는 1~3 정도가 적당하다.
+							//반지름은 높이의 절반으로 제한된다 — 절반이 완전한 알약이고 그 이상은 의미가 없다.
+							//그래서 알약을 원하면 99 처럼 큰 값을 주면 되고, 어중간한 값(예: 높이 25 에 반지름 10)은
+							//알약도 사각도 아닌 모양이 되므로 피한다. 모서리만 살짝 둥글리려면 3~5.
 
 	[외곽선 / 그림자 / 발광]
 	<st=4> = <stroke=4>		//외곽선 두께. 펜이 path 중앙 정렬이라 눈에 보이는 두께는 이 값의 절반이다.
@@ -174,10 +182,14 @@ public:
 	Gdiplus::Color cr_glow = Gdiplus::Color::Transparent;
 	float		glow_sigma = 0.0f;
 
-	//<box=색,radius,pad> — run 단위 라운드 배경. 사각형인 cr_back 과 별개.
+	//<box=색,반지름,가로여백[,세로여백]> — run 단위 라운드 배경. 사각형인 cr_back 과 별개.
+	//20260901 by claude. 여백을 가로/세로로 나눴다. 하나로 묶여 있을 때는 칩 모양이 안 나왔다 —
+	//세로 여백은 라인박스(ascent+descent 를 포함해 이미 글자 잉크보다 크다)에 더해져 조금만 줘도 금방
+	//두꺼워지는 반면, 가로는 넉넉해야 보기 좋다. 세로여백을 생략하면 가로여백과 같은 값이라 기존 동작 그대로다.
 	Gdiplus::Color cr_box = Gdiplus::Color::Transparent;
 	float		box_round = 0.0f;
-	int			box_pad = 0;
+	int			box_pad_x = 0;
+	int			box_pad_y = 0;
 
 	//<sp=값> — 이 run 안의 글자 사이 간격(픽셀). calc_text_rect 가 run 폭에 반영한다.
 	float		char_spacing = 0.0f;

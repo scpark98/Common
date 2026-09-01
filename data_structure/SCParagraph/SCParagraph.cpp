@@ -1166,14 +1166,31 @@ CRect CSCParagraph::calc_text_rect(CRect rc, CDC* pDC, std::deque<std::deque<CSC
 
 				Gdiplus::RectF ink_bounds;
 				if (ink_path.GetBounds(&ink_bounds) == Gdiplus::Ok && ink_bounds.Height > 0)
-				{
 					para[i][j].ink_height = ink_bounds.Height + para[i][j].text_prop.thickness;
 
-					//20260901 by claude. 위치까지 보관한다. AddString 의 원점이 PointF(0,0) 이고 그리기도
-					//같은 GenericTypographic 으로 get_text_origin() 에 그리므로, 이 값은 그 원점 기준 offset 이다.
-					//<box> 가 라인박스가 아니라 글자를 감싸는 데 쓴다.
-					para[i][j].glyph_ink_top = ink_bounds.Y;
-					para[i][j].glyph_ink_bottom = ink_bounds.Y + ink_bounds.Height;
+				//20260901 by claude. <box> 가 감쌀 글리프 범위는 *픽셀 단위* 로 다시 잰다.
+				//위 AddString 은 font->GetSize() 를 그대로 emSize 로 넘기는데, 폰트는 UnitPoint 로 만들어져
+				//그 값이 포인트다. 반면 Graphics 없이 만든 path 의 world 단위는 픽셀이라, 96dpi 에서 0.75 배로
+				//작게 잡힌다. 그 값으로 박스를 그렸더니 글자보다 작아 위아래가 잘려 보였다.
+				//ink_height 는 <ls> 줄간격이 그 값을 기준으로 맞춰져 있으므로 건드리지 않고,
+				//박스용 값만 올바른 크기로 따로 구한다(박스가 있는 run 에서만 도므로 비용도 그때뿐이다).
+				if (para[i][j].text_prop.cr_box.GetA() > 0)
+				{
+					float em_px = font->GetSize();
+					if (font->GetUnit() == Gdiplus::UnitPoint)
+						em_px = em_px * g.GetDpiY() / 72.0f;
+
+					Gdiplus::GraphicsPath box_path;
+					box_path.AddString(CStringW(para[i][j].text), -1, &ff, para[i][j].text_prop.style,
+						em_px, Gdiplus::PointF(0, 0), sf.GenericTypographic());
+
+					Gdiplus::RectF box_ink;
+					if (box_path.GetBounds(&box_ink) == Gdiplus::Ok && box_ink.Height > 0)
+					{
+						//원점은 그리기와 같다 — DrawString 도 get_text_origin() 에 GenericTypographic 으로 그린다.
+						para[i][j].glyph_ink_top = box_ink.Y;
+						para[i][j].glyph_ink_bottom = box_ink.Y + box_ink.Height;
+					}
 				}
 			}
 #endif

@@ -1637,9 +1637,12 @@ void CSCListBox::edit(int index)
 	if (::IsWindow(m_scrollbar.m_hWnd) && m_scrollbar.IsWindowVisible())
 		rItem.right -= m_scrollbar.get_width();
 
-	//ES_MULTILINE EDIT 의 caret 높이는 폰트 line height 와 거의 동일하다. client area 가 caret 보다 작거나
-	//거의 같으면 Windows 가 caret 표시를 suppress 한다. 위/아래로 여유를 확보해 caret 이 항상 보이게 함.
-	rItem.InflateRect(0, 4);
+	//20260901 by claude. [삭제] 여기 있던 rItem.InflateRect(0, 4) 를 제거했다.
+	//원래 이유(ebdfd4f, 2026-05-28) — "ES_MULTILINE EDIT 의 caret 높이가 폰트 line height 와 거의 같아
+	//client area 가 caret 보다 작으면 Windows 가 caret 표시를 suppress 한다" 였다.
+	//그때 m_pEdit 는 native CEdit 파생(CSCEdit)이라 caret 을 Windows 가 관리했다.
+	//지금은 CSCStaticEdit(CStatic 파생)이라 caret 도 자기가 그린다 — 그 규칙이 적용되지 않는다.
+	//클래스를 교체할 때 함께 지웠어야 할 잔재였고, 이것 때문에 편집 박스만 항목보다 8px 두꺼웠다.
 
 	CString text;
 	GetText(index, text);
@@ -1655,12 +1658,18 @@ void CSCListBox::edit(int index)
 	{
 		m_pEdit = new CSCStaticEdit();
 		m_pEdit->Create(WS_BORDER, rItem, this, IDC_EDIT_CELL);
-		m_pEdit->SetFont(&m_font);
-		m_pEdit->set_line_align(DT_VCENTER);
-		//셀 편집기 — 항목 높이 = edit 높이 이므로 자체 padding 을 2px 로 줄여 텍스트가 위/아래로 자연스럽게 채워지게.
-		//0 으로 두면 선택 하이라이트가 보더에 붙어 일반 edit 컨트롤 외관과 어긋남.
-		m_pEdit->set_padding(2);
 	}
+
+	//20260901 by claude. 폰트는 *매번* 다시 준다. 예전에는 위 생성 블록 안에 있어서, 리스트박스의 폰트를
+	//나중에 바꿔도(set_font_name / set_font_size → reconstruct_font) 편집 박스는 처음 만들어질 때의
+	//폰트로 계속 표시됐다. CSCTreeCtrl 은 이미 생성 블록 밖에서 매번 주고 있었고, CSCListCtrl 은 편집기를
+	//매번 새로 만들어 같은 문제가 없다 — 리스트박스만 어긋나 있었다.
+	m_pEdit->SetFont(&m_font, true);
+	m_pEdit->set_line_align(DT_VCENTER);
+	//셀 편집기 — 항목 높이 = edit 높이 이므로 자체 padding 을 2px 로 줄여 텍스트가 위/아래로 자연스럽게 채워지게.
+	//0 으로 두면 선택 하이라이트가 보더에 붙어 일반 edit 컨트롤 외관과 어긋남.
+	m_pEdit->set_padding(2);
+
 	m_pEdit->set_readonly(m_edit_readonly);
 
 	m_pEdit->SetWindowText(text);

@@ -185,16 +185,22 @@ void CSCEdit::reconstruct_font()
 	//각각의 지우기+그리기가 그대로 화면에 나가 두 번 번쩍인다.
 	//(CSCStaticEdit 은 CStatic 파생이라 OnPaint 를 직접 그려 이 경로가 없다 — 그래서 깜빡임이 없었다.)
 	//둘을 묶어 멈춘 뒤 최종 상태로 한 번만 그린다.
-	bool alive = (::IsWindow(m_hWnd) != FALSE);
+	//20260901 by claude. 숨겨진 창에는 SetRedraw 를 쓰면 안 된다.
+	//WM_SETREDRAW(TRUE) 는 WS_VISIBLE 을 세우므로, 숨겨져 있던 창이 그대로 화면에 나타난다.
+	//CPathCtrl 의 편집용 CSCEdit 이 프로그램 시작과 동시에 보이던 원인이 이것이었다
+	//(그 edit 은 WS_VISIBLE 없이 만들어져 클릭할 때만 SW_SHOW 되는 창이다).
+	//안 보이는 창은 깜빡일 것도 없으므로 묶기 자체가 불필요하다.
+	bool batch = (::IsWindow(m_hWnd) != FALSE) && (IsWindowVisible() != FALSE);
 
-	if (alive)
+	if (batch)
 		SetRedraw(FALSE);
 
-	CEdit::SetFont(&m_font, FALSE);		//어차피 아래에서 한 번에 그린다.
+	//묶지 않을 때는 예전처럼 TRUE — 그래야 폰트 변경이 바로 반영된다.
+	CEdit::SetFont(&m_font, batch ? FALSE : TRUE);
 
 	set_line_align(m_valign);
 
-	if (alive)
+	if (batch)
 	{
 		//SetRedraw(FALSE) 동안 쌓인 무효화는 버려지므로 직접 무효화하고 그 자리에서 그린다.
 		//native EDIT 은 배경을 WM_ERASEBKGND 로 칠하므로 RDW_ERASE 가 필요하다.

@@ -1116,31 +1116,46 @@ BOOL CSCComboBox::PreTranslateMessage(MSG* pMsg)
 		m_tooltip->SendMessage(TTM_RELAYEVENT, 0, (LPARAM)&msg);
 	}
 
-	if (pMsg->message == WM_KEYDOWN)
+	//20260901 by claude. 편집 콤보(CBS_DROPDOWN)에서 항목 이름을 직접 타이핑하고 Enter 를 쳐도
+	//아무 일도 일어나지 않았다 — CBN_SELCHANGE 는 *목록에서 고를 때만* 오므로 타이핑 경로엔 알림이 없다.
+	//여기서 목록과 대조해 일치하는 항목이 있으면 선택으로 확정하고 부모에게 CBN_SELCHANGE 를 보낸다.
+	//목록에서 고른 것과 결과가 같아진다. 대소문자는 FindStringExact 가 무시한다.
+	//PreTranslateMessage 에서 잡는 이유: 다이얼로그의 IsDialogMessage 가 Enter 를 기본 버튼으로 가로채
+	//편집칸의 WM_KEYDOWN 까지 오지 않는다. 처리한 경우엔 소비해서 기본 버튼이 눌리지 않게 한다.
+	//IME 조합 중의 Enter 는 조합을 확정하는 키다. 가로채면 한글 입력 자체가 되지 않으므로 그대로 넘긴다.
+	if (pMsg->message == WM_KEYDOWN && pMsg->wParam == VK_RETURN && !is_ime_composing(m_hWnd))
 	{
-		bool	is_exist = false;
-		CString text;
+		COMBOBOXINFO info = { sizeof(COMBOBOXINFO) };
 
-		/*
-		switch (pMsg->wParam)
+		//hwndItem 이 콤보 자신이면 DROPDOWNLIST — 편집칸이 없어 타이핑 경로 자체가 없다.
+		if (GetComboBoxInfo(&info) && info.hwndItem && info.hwndItem != m_hWnd)
 		{
-			case VK_RETURN:
-				if (m_use_edit)
-				{
-					edit_end(true);
-					return true;
-				}
-				break;
-			case VK_ESCAPE:
-				if (!m_pEdit || !m_pEdit->IsWindowVisible() || (GetFocus() != m_pEdit))
-					break;
+			CString text;
+			GetWindowText(text);
 
-				TRACE(_T("escape\n"));
-				m_pEdit->ShowWindow(SW_HIDE);
-				SetWindowText(m_old_text);
-				return true;
+			//입력 필터(apply_filter_now)가 목록을 다시 만든 뒤 드롭다운을 *열어 둔다*. 그래서 열린 상태에서도
+			//처리해야 한다 — 안 그러면 첫 Enter 는 목록을 닫는 데만 쓰이고 두 번째라야 적용된다(사용자 보고).
+			//현재 선택과 같은 인덱스여도 알린다. 필터가 목록을 재구성해 인덱스가 이미 맞아 있을 수 있는데,
+			//사용자는 적용하려고 Enter 를 누른 것이므로 "이미 같다"는 이유로 무시하면 안 된다.
+			int index = FindStringExact(-1, text);
+			if (index != CB_ERR)
+			{
+				//대기 중인 필터 타이머 제거 — 확정한 뒤에 목록이 다시 열리면 안 된다.
+				KillTimer(TIMER_INPUT_FILTER);
+
+				if (GetDroppedState())
+					ShowDropDown(FALSE);
+
+				SetCurSel(index);
+
+				CWnd* parent = GetParent();
+				if (parent)
+					parent->SendMessage(WM_COMMAND,
+						MAKEWPARAM(GetDlgCtrlID(), CBN_SELCHANGE), (LPARAM)m_hWnd);
+
+				return TRUE;
+			}
 		}
-		*/
 	}
 
 	return CComboBox::PreTranslateMessage(pMsg);
@@ -1223,28 +1238,38 @@ int CSCComboBox::add(CString text, Gdiplus::Color cr_text)
 	return index;
 }
 
+//20260901 by claude. 이유는 헤더 선언부 참조.
+void CSCComboBox::redraw_after_color_change()
+{
+	if (!m_hWnd)
+		return;
+
+	RedrawWindow(NULL, NULL, RDW_INVALIDATE | RDW_ERASE | RDW_FRAME | RDW_ALLCHILDREN);
+}
+
 void CSCComboBox::set_color_theme(int theme)
 {
 	m_theme.set_color_theme(theme);
+	redraw_after_color_change();
 }
 
 void CSCComboBox::set_color_theme(const CSCColorTheme& theme, bool invalidate)
 {
 	m_theme.copy_colors_from(theme);
-	if (invalidate && m_hWnd)
-		Invalidate();
+	if (invalidate)
+		redraw_after_color_change();
 }
 
 void CSCComboBox::set_text_color(Gdiplus::Color cr_text)
 {
 	m_theme.cr_text = cr_text;
-	Invalidate();
+	redraw_after_color_change();
 }
 
 void CSCComboBox::set_back_color(Gdiplus::Color cr_back)
 {
 	m_theme.cr_back = cr_back;
-	Invalidate();
+	redraw_after_color_change();
 }
 
 void CSCComboBox::OnNcPaint()

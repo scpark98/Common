@@ -101,6 +101,11 @@ public:
 	//그리기를 묶는 중인지. subclass 의 WM_NCPAINT 가 이때는 직접 그리지 않는다(설명은 m_suspend_paint).
 	bool			is_paint_suspended() const { return m_suspend_paint; }
 protected:
+	//색이 바뀐 뒤의 갱신. Invalidate() 만으로는 부족하다 — CBS_DROPDOWN 의 닫힌 칸은 *자식 Edit 창* 이라
+	//부모 무효화가 닿지 않고(RDW_ALLCHILDREN 필요), 세로중앙 정렬로 줄인 위아래 밴드는 NC 영역이라
+	//WM_NCPAINT 를 다시 받아야 한다(RDW_FRAME). DROPDOWNLIST 는 자식 Edit 이 없어 Invalidate() 로도 멀쩡했다.
+	void			redraw_after_color_change();
+
 //design
 	//-1이면 폰트크기에 따라 자동 조정
 	int				m_line_height = -1;

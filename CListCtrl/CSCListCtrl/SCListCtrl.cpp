@@ -704,9 +704,21 @@ void CSCListCtrl::draw_row(CDC* pDC, int iItem, const CRect& row_bounds)
 			}
 			//20260831 by claude. [잘린 셀 툴팁] 판정을 그리기 직전 이 자리에서 한다 — DC 에 이 셀의 실제 폰트가
 			//선택돼 있고 textRect 도 확정된 상태라, 레이아웃·폰트 산식을 따로 복제하지 않아도 그리기와 항상 일치한다.
-			//DT_WORD_ELLIPSIS 가 "..." 로 줄이는 조건과 같은 비교다.
-			if (m_use_ellipsis_tooltip && !text.IsEmpty() && pDC->GetTextExtent(text).cx > textRect.Width())
-				m_clipped_cells.insert(std::make_pair(iItem, iSubItem));
+			//
+			//20260901 by claude. 기준은 "화면에서 온전히 읽을 수 있는가" 다(탐색기와 동일).
+			//컬럼이 좁아 "..." 로 줄어든 경우뿐 아니라, 컬럼은 넓은데 컨트롤이 좁아 셀 일부가 화면 밖으로
+			//나간 경우도 못 읽는 것은 마찬가지이므로 함께 잡는다. CSCTreeCtrl 도 같은 기준이다.
+			//그래서 textRect 를 그대로 쓰지 않고 보이는 영역(row_bounds)으로 잘라서 비교한다.
+			//그리기는 textRect 원본 그대로 둔다 — "..." 는 컬럼 끝에 나와야지 화면 끝에 나오면 안 된다.
+			if (m_use_ellipsis_tooltip && !text.IsEmpty())
+			{
+				CRect r_visible = textRect;
+				if (r_visible.left  < row_bounds.left)	r_visible.left  = row_bounds.left;
+				if (r_visible.right > row_bounds.right)	r_visible.right = row_bounds.right;
+
+				if (pDC->GetTextExtent(text).cx > r_visible.Width())
+					m_clipped_cells.insert(std::make_pair(iItem, iSubItem));
+			}
 
 			pDC->DrawText(text, textRect, format);
 			if (pOldFont)

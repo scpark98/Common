@@ -1468,6 +1468,14 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		//(예전엔 4px 고정 — 표준 하단이라 좁아 보였고, 고DPI 에서 박스는 커지는데 간격은 그대로라 상대적으로 더 좁아졌다.)
 		int box_text_gap = MulDiv(6, dc.GetDeviceCaps(LOGPIXELSX), 96);
 
+		//20260901 by claude. indicator(체크박스 사각형 / 라디오 원) 테두리 농도 — 체크박스와 라디오가 같아야 한다.
+		//cr_text 를 그대로 쓰면 배경 240 에 검정이 얹혀 대비 240 으로 너무 진하다. 알파로 낮춘다.
+		//눈으로 맞춘 값 — 0.28(대비 67)은 disabled 와 구분이 안 됐고, 0.45(108)·0.55(132)는 아직 연했다.
+		//참고로 Windows 11 기본 라디오는 대략 #868686 on #F3F3F3 로 대비 ~110 이다.
+		const double indicator_opacity = 0.68;
+		const Gdiplus::Color cr_ind_border(
+			(BYTE)(cr_text.GetA() * indicator_opacity), cr_text.GetR(), cr_text.GetG(), cr_text.GetB());
+
 		//사각형 안에 v자 체크를 직접 그려준다.
 		if (is_button_style(BS_CHECKBOX, BS_AUTOCHECKBOX) && !is_button_style(BS_PUSHLIKE))
 		{
@@ -1477,7 +1485,7 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 			r.bottom = r.top + m_check_size;
 
 			//테두리: round_fill 은 채움만(테두리 없음), 그 외는 cr_text. radius: default=직각, round/round_fill=둥근 모서리.
-			Gdiplus::Color cr_border = (m_check_style == check_style_round_fill) ? Gdiplus::Color::Transparent : cr_text;
+			Gdiplus::Color cr_border = (m_check_style == check_style_round_fill) ? Gdiplus::Color::Transparent : cr_ind_border;
 			int radius = (m_check_style == check_style_default) ? 0 : 2;
 
 			//채움 = cr_ind_fill(미지정 시 Transparent → 미채움/배경 비침), 체크 = cr_ind_mark(채움 대비색/미채움 시 cr_text).
@@ -1517,21 +1525,113 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 					g.FillEllipse(&br_fill, r.left, r.top, r.Width(), r.Height());
 				}
 
-				Gdiplus::Pen pen(cr_text, 1.0);		//원 외곽선 = cr_text
-				Gdiplus::SolidBrush br(cr_ind_mark);	//가운데 점(mark) = 채움 대비색(미채움 시 cr_text)
-				g.DrawEllipse(&pen, r.left, r.top, r.Width(), r.Height());
-
-				if (GetCheck())
+				//20260901 by claude. 원 외곽선은 GDI+ 에 맡기지 않고 커버리지를 직접 계산해 그린다.
+				//DrawEllipse 의 AA 는 13px 원에서 *정확한* 커버리지와 오차합 37.77(고리 전체 잉크 37.7 과
+				//맞먹는다), 최대 오차 1.00 으로 어긋난다. 상하좌우 대칭도 깨져 테두리가 번져 보였다.
+				//완전히 칠해지는 픽셀이 71개 중 5개뿐인데, 정확히 계산하면 20개다.
+				//다른 경로는 전부 확인해 봤고 답이 아니었다 —
+				//  펜 폭 1.0~1.5 는 GDI+ 가 전부 1px 헤어라인으로 스냅해 결과가 한 픽셀도 다르지 않다
+				//  (Pen 생성자든 SetWidth() 든 동일, 정렬 Inset/Center 도 무영향). 1.6 부터 잉크가
+				//  36.6 -> 66.4 로 뛰어 확연히 굵어진다.
+				//  고리 채움(FillPath)은 17%, PixelOffsetModeHalf 를 얹어도 19% 로 번짐이 남는다.
+				//  AA 를 끄면 100% 또렷하지만 13px 에서는 원이 아니라 팔각형이 된다.
+				//  SS 배로 그린 뒤 DrawImage 로 축소하면 GDI+ 축소 필터가 언더샘플링해 잉크가
+				//  37.7 -> 20.1(Bilinear) / 25.3(Bicubic) 로 날아가 더 흐려진다.
+				//픽셀당 SS x SS 서브샘플로 고리 면적 비율을 구해 알파로 칠한다. 구성상 대칭이고,
+				//13px 기준 169픽셀 x 64샘플이라 비용도 무시할 수준이다.
 				{
-					//점(dot)은 r 의 "복사본"에서 그린다. r 을 직접 Deflate/Inflate(예전 Deflate3/Inflate2 = net -1px)하면
-					//아래 rText 위치가 checked/unchecked 에 따라 달라져, 선택 상태별로 정렬이 다르게 보였다(사용자 지적).
-					CRect r_dot = r;
-					r_dot.DeflateRect(3, 3);
-					g.FillEllipse(&br,
-						(Gdiplus::REAL)(r_dot.left) + 0.2f,
-						(Gdiplus::REAL)(r_dot.top) + 0.2f,
-						(Gdiplus::REAL)(r_dot.Width()) - 0.4f,
-						(Gdiplus::REAL)(r_dot.Height()) - 0.4f);
+					const int d = r.Width();
+					const int SS = 8;
+					const double cx = d / 2.0;
+					const double cy = d / 2.0;
+					const double ro = d / 2.0;			//바깥 반지름
+					const double ri = ro - 1.0;			//1px 두께 고리
+					const double ro2 = ro * ro;			//거리 비교는 제곱으로 — sqrt 를 돌 이유가 없다
+					const double ri2 = ri * ri;
+
+					//20260901 by claude. 가운데 점도 같은 비트맵에 같은 중심(cx, cy)으로 그린다.
+					//따로 FillEllipse 로 그리면 (a) 같은 GDI+ 타원 AA 를 타 테두리처럼 번지고
+					//(b) 중심을 맞추려 +0.2/-0.4 같은 보정값이 붙는다. 한 패스로 계산하면 정렬이 구성상 보장된다.
+					//반지름은 기존 DeflateRect(3, 3) 과 같은 크기.
+					const bool   draw_dot = (GetCheck() != 0);
+					const double rd  = ro - 3.0;
+					const double rd2 = rd * rd;
+
+					//테두리 농도는 체크박스와 같은 값을 쓴다(위 indicator_opacity). 배경색을 알아내 섞는 대신
+					//*알파* 로 낮추므로, 실제로 뒤에 있는 픽셀과 합성되어 부모 배경이 무엇이든(그림·그라데이션 포함)
+					//올바르게 연해지고 m_cr_parent_back 이 안 잡힌 경우에도 동작한다.
+					const double ring_opacity = indicator_opacity;
+
+					//선택 표시(점)는 테두리보다 조금 진하게 — 선택 상태가 한눈에 들어와야 한다.
+					const double dot_opacity = 0.85;
+
+					Gdiplus::Color cr_ring = cr_text;
+
+					Gdiplus::Bitmap ring(d, d, PixelFormat32bppARGB);
+					Gdiplus::Rect lock_rect(0, 0, d, d);
+					Gdiplus::BitmapData bd;
+
+					if (ring.LockBits(&lock_rect, Gdiplus::ImageLockModeWrite, PixelFormat32bppARGB, &bd) == Gdiplus::Ok)
+					{
+						const BYTE ring_r = cr_ring.GetR();
+						const BYTE ring_g = cr_ring.GetG();
+						const BYTE ring_b = cr_ring.GetB();
+						const int  ring_a = cr_ring.GetA();
+
+						const BYTE dot_r = cr_ind_mark.GetR();
+						const BYTE dot_g = cr_ind_mark.GetG();
+						const BYTE dot_b = cr_ind_mark.GetB();
+						const int  dot_a = cr_ind_mark.GetA();
+
+						for (int y = 0; y < d; y++)
+						{
+							BYTE* row = (BYTE*)bd.Scan0 + y * bd.Stride;
+
+							for (int x = 0; x < d; x++)
+							{
+								int hit_ring = 0;
+								int hit_dot = 0;
+
+								for (int sy = 0; sy < SS; sy++)
+								{
+									for (int sx = 0; sx < SS; sx++)
+									{
+										double px = x + (sx + 0.5) / SS - cx;
+										double py = y + (sy + 0.5) / SS - cy;
+										double dist2 = px * px + py * py;
+
+										if (dist2 <= ro2 && dist2 >= ri2)
+											hit_ring++;
+										else if (draw_dot && dist2 <= rd2)
+											hit_dot++;
+									}
+								}
+
+								//고리(ri~ro)와 점(0~rd)은 rd < ri 라 겹치지 않는다. 둘 중 잉크가 있는 쪽으로 칠한다.
+								if (hit_ring > 0)
+								{
+									row[x * 4 + 0] = ring_b;
+									row[x * 4 + 1] = ring_g;
+									row[x * 4 + 2] = ring_r;
+									row[x * 4 + 3] = (BYTE)(hit_ring * ring_a * ring_opacity / (SS * SS));
+								}
+								else
+								{
+									row[x * 4 + 0] = dot_b;
+									row[x * 4 + 1] = dot_g;
+									row[x * 4 + 2] = dot_r;
+									row[x * 4 + 3] = (BYTE)(hit_dot * dot_a * dot_opacity / (SS * SS));
+								}
+							}
+						}
+						ring.UnlockBits(&bd);
+
+						//1:1 로 얹는다. 확대·축소가 없어야 위에서 계산한 커버리지가 그대로 남는다.
+						Gdiplus::InterpolationMode old_interpolation = g.GetInterpolationMode();
+						g.SetInterpolationMode(Gdiplus::InterpolationModeNearestNeighbor);
+						g.DrawImage(&ring, r.left, r.top, d, d);
+						g.SetInterpolationMode(old_interpolation);
+					}
 				}
 
 				//텍스트는 버튼 전체 높이(rc)에서 DT_VCENTER 로 수직 중앙정렬 — 원(circle)도 버튼 중앙이라 서로 정렬되고,

@@ -275,6 +275,14 @@ public:
 	//set_line_spacing 이 <ls> 줄간격을 "보이는 여백 = pitch - ink_height" 로 계산할 때 사용.
 	float			ink_height = 0.0f;
 
+	//20260901 by claude. 실제 글리프 윤곽의 위/아래 위치. 기준점은 글자 출력 원점(get_text_origin())이다.
+	//ink_height 와 달리 이후 단계(<box> 여백, ruby, <sup>)에서 변형되지 않는 원본 값이다.
+	//<box> 가 이것을 써서 라인박스가 아니라 글자를 감싼다 — 라인박스에는 ascent/descent 의 빈 공간이
+	//포함돼 있어 그대로 감싸면 박스만 두꺼워지고 글자가 가운데에 있지 않은 것처럼 보인다.
+	//둘이 같으면(이미지 run 등 못 잰 경우) 예전처럼 라인박스 기준으로 감싼다.
+	float			glyph_ink_top = 0.0f;
+	float			glyph_ink_bottom = 0.0f;
+
 	//이 paragraph의 CSCTextProperty 설정에 맞는 Gdiplus::Font를 구한다.
 	void			get_paragraph_font(Gdiplus::Graphics& g, Gdiplus::Font** font);
 

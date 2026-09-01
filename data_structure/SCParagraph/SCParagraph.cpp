@@ -1166,7 +1166,15 @@ CRect CSCParagraph::calc_text_rect(CRect rc, CDC* pDC, std::deque<std::deque<CSC
 
 				Gdiplus::RectF ink_bounds;
 				if (ink_path.GetBounds(&ink_bounds) == Gdiplus::Ok && ink_bounds.Height > 0)
+				{
 					para[i][j].ink_height = ink_bounds.Height + para[i][j].text_prop.thickness;
+
+					//20260901 by claude. 위치까지 보관한다. AddString 의 원점이 PointF(0,0) 이고 그리기도
+					//같은 GenericTypographic 으로 get_text_origin() 에 그리므로, 이 값은 그 원점 기준 offset 이다.
+					//<box> 가 라인박스가 아니라 글자를 감싸는 데 쓴다.
+					para[i][j].glyph_ink_top = ink_bounds.Y;
+					para[i][j].glyph_ink_bottom = ink_bounds.Y + ink_bounds.Height;
+				}
 			}
 #endif
 			//<ruby=주석> — 본문 위에 ruby_scale 배 크기의 주석을 얹는다.
@@ -2077,6 +2085,20 @@ CRect CSCParagraph::draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCPar
 			{
 				CRect rb = para[i][j].r;
 				rb.InflateRect(para[i][j].text_prop.box_pad_x, para[i][j].text_prop.box_pad_y);
+
+				//20260901 by claude. 세로는 라인박스가 아니라 *실제 글리프* 를 감싼다.
+				//라인박스는 폰트의 ascent/descent 를 포함해 글자 위아래로 빈 공간을 갖는다. 그것을 그대로
+				//감싸면 (1) 박스가 글자보다 훨씬 두꺼워지고 (2) 그 빈 공간이 위아래로 같지 않아 글자가
+				//박스 가운데에 있지 않은 것처럼 보인다. 실측(<box=…,8,2>, "편집") : 박스 19px 에 글자 잉크 11px,
+				//위 5 / 아래 3 으로 어긋나 있었다.
+				//글리프 윤곽을 감싸면 박스 높이 = 잉크 + 여백×2 가 되고 글자는 항상 정확히 가운데에 온다.
+				//잉크를 못 잰 run(<img> 등)은 glyph_ink_* 가 0 이라 위의 라인박스 기준이 그대로 유지된다.
+				if (para[i][j].glyph_ink_bottom > para[i][j].glyph_ink_top)
+				{
+					CPoint origin = para[i][j].get_text_origin();
+					rb.top    = origin.y + (int)floor(para[i][j].glyph_ink_top)    - para[i][j].text_prop.box_pad_y;
+					rb.bottom = origin.y + (int)ceil (para[i][j].glyph_ink_bottom) + para[i][j].text_prop.box_pad_y;
+				}
 
 				//20260901 by claude. 반지름을 높이의 절반으로 제한한다.
 				//높이 절반이 완전한 알약(양 끝이 반원)이고 그 이상은 의미가 없다. 제한이 없으면 큰 값을 줬을 때

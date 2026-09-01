@@ -705,18 +705,31 @@ void CSCListCtrl::draw_row(CDC* pDC, int iItem, const CRect& row_bounds)
 			//20260831 by claude. [잘린 셀 툴팁] 판정을 그리기 직전 이 자리에서 한다 — DC 에 이 셀의 실제 폰트가
 			//선택돼 있고 textRect 도 확정된 상태라, 레이아웃·폰트 산식을 따로 복제하지 않아도 그리기와 항상 일치한다.
 			//
-			//20260901 by claude. 기준은 "화면에서 온전히 읽을 수 있는가" 다(탐색기와 동일).
-			//컬럼이 좁아 "..." 로 줄어든 경우뿐 아니라, 컬럼은 넓은데 컨트롤이 좁아 셀 일부가 화면 밖으로
-			//나간 경우도 못 읽는 것은 마찬가지이므로 함께 잡는다. CSCTreeCtrl 도 같은 기준이다.
-			//그래서 textRect 를 그대로 쓰지 않고 보이는 영역(row_bounds)으로 잘라서 비교한다.
+			//20260901 by claude. 기준은 "화면에서 온전히 읽을 수 있는가" 다(탐색기와 동일). 두 가지를 함께 본다.
+			//  (1) 컬럼이 좁아 DT_WORD_ELLIPSIS 로 "..." 가 붙는 경우
+			//  (2) 컬럼은 넓은데 글자가 그려지는 자리가 화면 밖으로 나가는 경우
+			//
+			//(2) 를 "글자폭 > 보이는폭" 으로 판정하면 안 된다 — 그 식은 왼쪽 정렬에서만 맞다.
+			//DT_RIGHT/DT_CENTER 컬럼은 글자가 컬럼 안에서 오른쪽/가운데로 밀려 그려지므로,
+			//컬럼의 오른쪽 끝이 화면 밖이면 짧은 글자도 화면 밖으로 나간다. 그때 폭 비교는 통과해버린다.
+			//(실제 사례 — Slogan 컬럼이 HDF_RIGHT 이고 컬럼 우단이 화면 밖: 글자가 반쯤 잘려 보이는데도 안 떴다.)
+			//그래서 정렬을 반영해 *실제로 그려질 가로 구간*을 구한 뒤 보이는 영역 안에 온전히 들어오는지 본다.
 			//그리기는 textRect 원본 그대로 둔다 — "..." 는 컬럼 끝에 나와야지 화면 끝에 나오면 안 된다.
 			if (m_use_ellipsis_tooltip && !text.IsEmpty())
 			{
-				CRect r_visible = textRect;
-				if (r_visible.left  < row_bounds.left)	r_visible.left  = row_bounds.left;
-				if (r_visible.right > row_bounds.right)	r_visible.right = row_bounds.right;
+				int text_w = pDC->GetTextExtent(text).cx;
 
-				if (pDC->GetTextExtent(text).cx > r_visible.Width())
+				int draw_left = textRect.left;
+				if (format & DT_RIGHT)
+					draw_left = textRect.right - text_w;
+				else if (format & DT_CENTER)
+					draw_left = textRect.left + (textRect.Width() - text_w) / 2;
+
+				int draw_right = draw_left + text_w;
+
+				if (text_w > textRect.Width() ||					//(1) 컬럼 안에서 잘림
+					draw_left  < row_bounds.left ||					//(2) 왼쪽이 화면 밖
+					draw_right > row_bounds.right)					//(2) 오른쪽이 화면 밖
 					m_clipped_cells.insert(std::make_pair(iItem, iSubItem));
 			}
 

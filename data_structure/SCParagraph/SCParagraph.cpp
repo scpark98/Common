@@ -1168,28 +1168,71 @@ CRect CSCParagraph::calc_text_rect(CRect rc, CDC* pDC, std::deque<std::deque<CSC
 				if (ink_path.GetBounds(&ink_bounds) == Gdiplus::Ok && ink_bounds.Height > 0)
 					para[i][j].ink_height = ink_bounds.Height + para[i][j].text_prop.thickness;
 
-				//20260901 by claude. <box> 가 감쌀 글리프 범위는 *픽셀 단위* 로 다시 잰다.
-				//위 AddString 은 font->GetSize() 를 그대로 emSize 로 넘기는데, 폰트는 UnitPoint 로 만들어져
-				//그 값이 포인트다. 반면 Graphics 없이 만든 path 의 world 단위는 픽셀이라, 96dpi 에서 0.75 배로
-				//작게 잡힌다. 그 값으로 박스를 그렸더니 글자보다 작아 위아래가 잘려 보였다.
-				//ink_height 는 <ls> 줄간격이 그 값을 기준으로 맞춰져 있으므로 건드리지 않고,
-				//박스용 값만 올바른 크기로 따로 구한다(박스가 있는 run 에서만 도므로 비용도 그때뿐이다).
+				//20260901 by claude. <box> 가 감쌀 글리프 범위는 *실제로 그려질 픽셀* 을 재야 한다.
+				//GraphicsPath::AddString 의 외곽선 bounds 로는 맞출 수 없다 — DrawString 은 그리드 피팅으로
+				//글리프를 픽셀 격자에 스냅시키는데 외곽선은 스냅 전 기하 위치라 최대 1px 어긋난다.
+				//실측 9개 표본 중 7개가 틀렸다(맑은 고딕 8pt "편집" 경로 2.50 vs 렌더 3, 굴림 "편집" 0.98 vs 0,
+				//Segoe UI "label" 3.61 vs 3). 오차가 폰트·글자마다 방향까지 달라 반올림으로는 보정되지 않는다.
+				//그래서 그릴 때와 같은 DrawString 으로 작은 비트맵에 한 번 그린 뒤 잉크 행을 직접 스캔한다.
+				//그리드 피팅 힌트 3종(ClearType/AntiAlias/SingleBit)은 세로 잉크 행이 모두 같으므로(실측)
+				//어느 것으로 재도 결과가 같다. 원점의 소수부가 스냅에 영향을 주는데 실제 출력 원점
+				//get_text_origin() 도 정수라 정수 위치에 그려 맞춘다. 박스가 있는 run 에서만 도는 비용이다.
 				if (para[i][j].text_prop.cr_box.GetA() > 0)
 				{
-					float em_px = font->GetSize();
-					if (font->GetUnit() == Gdiplus::UnitPoint)
-						em_px = em_px * g.GetDpiY() / 72.0f;
+					Gdiplus::RectF box_measure;
+					g.MeasureString(CStringW(para[i][j].text), -1, font,
+						Gdiplus::PointF(0, 0), sf.GenericTypographic(), &box_measure);
 
-					Gdiplus::GraphicsPath box_path;
-					box_path.AddString(CStringW(para[i][j].text), -1, &ff, para[i][j].text_prop.style,
-						em_px, Gdiplus::PointF(0, 0), sf.GenericTypographic());
+					const int probe_pad = 4;
+					int pw = (int)ceil(box_measure.Width) + probe_pad * 2;
+					int ph = (int)ceil(box_measure.Height) + probe_pad * 2;
 
-					Gdiplus::RectF box_ink;
-					if (box_path.GetBounds(&box_ink) == Gdiplus::Ok && box_ink.Height > 0)
+					if (pw > 0 && ph > 0)
 					{
-						//원점은 그리기와 같다 — DrawString 도 get_text_origin() 에 GenericTypographic 으로 그린다.
-						para[i][j].glyph_ink_top = box_ink.Y;
-						para[i][j].glyph_ink_bottom = box_ink.Y + box_ink.Height;
+						Gdiplus::Bitmap probe(pw, ph, PixelFormat32bppARGB);
+						Gdiplus::Graphics gp(&probe);
+
+						gp.Clear(Gdiplus::Color::Black);
+						gp.SetTextRenderingHint(Gdiplus::TextRenderingHintAntiAliasGridFit);
+
+						Gdiplus::SolidBrush br_probe(Gdiplus::Color::White);
+						gp.DrawString(CStringW(para[i][j].text), -1, font,
+							Gdiplus::PointF((Gdiplus::REAL)probe_pad, (Gdiplus::REAL)probe_pad),
+							sf.GenericTypographic(), &br_probe);
+
+						Gdiplus::Rect lock_rect(0, 0, pw, ph);
+						Gdiplus::BitmapData bd;
+						if (probe.LockBits(&lock_rect, Gdiplus::ImageLockModeRead, PixelFormat32bppARGB, &bd) == Gdiplus::Ok)
+						{
+							int ink_top = -1;
+							int ink_bottom = -1;
+
+							for (int y = 0; y < ph; y++)
+							{
+								BYTE* row = (BYTE*)bd.Scan0 + y * bd.Stride;
+
+								for (int x = 0; x < pw; x++)
+								{
+									//검정 배경에 흰 글자라 채널 하나만 봐도 된다. AA 꼬리를 잉크로 세지 않도록 문턱을 둔다.
+									if (row[x * 4] > 24)
+									{
+										if (ink_top < 0)
+											ink_top = y;
+										ink_bottom = y;
+										break;
+									}
+								}
+							}
+							probe.UnlockBits(&bd);
+
+							//잉크 행 [ink_top, ink_bottom] 의 각 행은 [y, y+1) 을 덮으므로 아래 끝은 +1 해야
+							//박스 계산(center/half)이 정수로 떨어져 여백이 위아래 똑같이 나온다.
+							if (ink_top >= 0)
+							{
+								para[i][j].glyph_ink_top = (float)(ink_top - probe_pad);
+								para[i][j].glyph_ink_bottom = (float)(ink_bottom + 1 - probe_pad);
+							}
+						}
 					}
 				}
 			}
@@ -2113,8 +2156,17 @@ CRect CSCParagraph::draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCPar
 				if (para[i][j].glyph_ink_bottom > para[i][j].glyph_ink_top)
 				{
 					CPoint origin = para[i][j].get_text_origin();
-					rb.top    = origin.y + (int)floor(para[i][j].glyph_ink_top)    - para[i][j].text_prop.box_pad_y;
-					rb.bottom = origin.y + (int)ceil (para[i][j].glyph_ink_bottom) + para[i][j].text_prop.box_pad_y;
+
+					//20260901 by claude. 위/아래를 각각 floor·ceil 로 따로 반올림하면 남는 여유가 한쪽으로 몰린다.
+					//잉크 범위는 calc_text_rect 에서 실제 렌더 픽셀 행으로 재므로 정수이고, 아래 식은 그 잉크의
+					//*중심* 에서 위아래로 같은 길이를 잡는다. 따라서 여백이 위아래 정확히 box_pad_y 로 떨어진다.
+					//+0.5 반올림은 잉크가 정수로 안 떨어지는 경우에도 한쪽으로 치우치지 않게 하는 안전장치다.
+					float center = (para[i][j].glyph_ink_top + para[i][j].glyph_ink_bottom) * 0.5f;
+					float half   = (para[i][j].glyph_ink_bottom - para[i][j].glyph_ink_top) * 0.5f
+								 + (float)para[i][j].text_prop.box_pad_y;
+
+					rb.top    = origin.y + (int)floor(center - half + 0.5f);
+					rb.bottom = origin.y + (int)floor(center + half + 0.5f);
 				}
 
 				//20260901 by claude. 반지름을 높이의 절반으로 제한한다.
@@ -2135,10 +2187,25 @@ CRect CSCParagraph::draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCPar
 				g.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
 				g.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHalf);
 
+				//20260901 by claude. GDI+ AA 는 *곡선* 가장자리를 오른쪽·아래로 치우쳐 샘플링한다.
+				//위 PixelOffsetModeHalf 조건에서 FillRectangle 은 완전 대칭인데 FillEllipse(16x16) 는
+				//맨 윗행 3.53 / 맨 아랫행 5.37 로 아래가 굵다. 알약 아래 곡선이 덜 좁아져 "맨 밑 1픽셀이
+				//잘려나간" 것처럼 보이던 원인 — 경로 계산 자체는 원래 상하 대칭이라 계산으로는 안 잡힌다.
+				//그만큼 되밀어 상쇄한다. 11가지 크기·반지름 실측에서 상하 1.10~3.34 → 0.00~0.19,
+				//좌우 0.46~1.88 → 0.00~0.19. 직선 변은 AA 양자화가 흡수해 그대로 또렷하다.
+				//보정값은 PixelOffsetModeHalf 를 전제로 구한 것이라 여기서만 적용한다 — 기본 모드로
+				//그리는 곳(CGdiButton 등)에 걸면 오히려 번진다. 그래서 get_round_rect_path 가 아니라
+				//이 호출 지점에서 변환으로 준다. 기존 변환을 지우지 않도록 되돌릴 때도 이동만 한다.
+				const float aa_bias_x = -0.10f;
+				const float aa_bias_y = -0.15f;
+
+				g.TranslateTransform(aa_bias_x, aa_bias_y);
+
 				draw_round_rect(&g, Gdiplus::Rect(rb.left, rb.top, rb.Width(), rb.Height()),
 					Gdiplus::Color::Transparent, para[i][j].text_prop.cr_box,
 					round, 0);
 
+				g.TranslateTransform(-aa_bias_x, -aa_bias_y);
 				g.SetPixelOffsetMode(old_pixel_offset);
 				g.SetSmoothingMode(old_smoothing);
 			}

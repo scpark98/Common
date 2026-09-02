@@ -95,6 +95,15 @@ public:
         action_folder,
     };
 
+    //20260902 by claude. 패스워드 마스크 모양. 폰트 글리프가 아니라 직접 그리므로 문자가 아닌 도형으로 지정한다.
+    //웹 입력폼 관례대로 원이 기본이다.
+    enum password_mask_shape
+    {
+        mask_shape_circle = 0,
+        mask_shape_square,
+        mask_shape_diamond,
+    };
+
     CSCColorTheme	m_theme = CSCColorTheme(this);
     void			set_color_theme(int color_theme, bool invalidate = true); //apply current m_theme colors to the control.
     //호출자가 이미 cr_back 등을 수정해 둔 CSCColorTheme 객체를 그대로 적용.
@@ -171,10 +180,12 @@ public:
     void			set_back_color_disabled(Gdiplus::Color cr = Gdiplus::Color::Transparent);
 
 
-    //mask_char 기본 = U+25CF BLACK CIRCLE (●). '*' 는 typography 관례상 superscript 위치(x-height 위)에
-    //그려져 세로 가운데로 보이지 않는다 (Windows OS 도 동일 이유로 XP 부터 패스워드 기본을 ● 로 변경).
-    //소스 인코딩(CP949/UTF-8) 영향을 피하려고 정수 리터럴로 표기.
-    void		    set_password_mode(bool password = true, TCHAR mask_char = (TCHAR)0x25CF);
+    //20260902 by claude. 마스크는 폰트 글리프가 아니라 원을 직접 그린다. 글리프(U+25CF ● 등) 방식은
+    //(1) 점 지름이 폰트 크기에 묶이고 (2) 자간을 줄 수 없어 촘촘하며 (3) baseline 기준이라 셀 중앙보다
+    //아래에 놓인다. 셋 다 직접 그리기로 해소되므로 mask_char 인자를 없앴다.
+    void		    set_password_mode(bool password = true, password_mask_shape shape = mask_shape_circle);
+    //마스크 점 지름과 셀 폭(자간을 포함한 1문자 전진폭), px. 0 = 폰트 높이에서 자동 산출.
+    void		    set_password_mask_metric(int dot_size = 0, int cell_width = 0);
     //입력 가능한 최대 문자 수. 0 = 제한 없음. insert_text 에서 enforce.
     //CEdit::LimitText() 네이밍을 따름.
     void		    set_limit_text(int max)              { m_limit_text = max; }
@@ -293,6 +304,10 @@ private:
     LOGFONT		m_lf = {};
     CFont		m_font;
     int			m_font_height = 0; // tm.tmHeight 캐시. action 버튼 정사각 사이즈와 동일.
+    //20260902 by claude. tm.tmInternalLeading 캐시 — tmHeight 위쪽의 악센트용 여백.
+    //셀을 기하학적 중앙에 두면 글자는 이 값의 절반만큼 아래로 내려가 보인다(get_text_top 보정에 사용).
+    //폰트·크기마다 값이 달라 상수로는 맞출 수 없고 metric 에서 받아야 한다.
+    int			m_font_internal_leading = 0;
     void		rebuild_font();
 
     // ── 옵션 ──
@@ -307,7 +322,9 @@ private:
     Gdiplus::Color	get_text_color_disabled() const { return m_text_color_disabled_user_set ? m_cr_text_disabled_override : get_sys_color(COLOR_GRAYTEXT); }
     Gdiplus::Color	get_back_color_disabled() const { return (m_theme.cr_back_disabled.GetA() != 0) ? m_theme.cr_back_disabled : Gdiplus::Color::LightGray; }
     bool		m_password   = false;
-    TCHAR		m_mask_char  = (TCHAR)0x25CF;	//U+25CF BLACK CIRCLE (●) — set_password_mode 주석 참조
+    password_mask_shape	m_mask_shape = mask_shape_circle;
+    int			m_mask_dot_size   = 0;	//0 = 자동(폰트 높이 기준)
+    int			m_mask_cell_width = 0;	//0 = 자동(점 지름 기준)
     int			m_limit_text = 0;      // 0 = 제한 없음
     int			m_padding    = 4;      // 텍스트 여백
     CRect		m_margin     = CRect(0, 0, 0, 0); // 사용자 정의 4면 추가 inset
@@ -368,6 +385,11 @@ private:
 
     // ── 내부 헬퍼 ──
     CString		get_display_text() const;      // 패스워드 마스킹 적용된 표시용 텍스트
+    int			get_mask_dot_size() const;     // 패스워드 마스크 점 지름(px)
+    int			get_mask_cell_width() const;   // 패스워드 마스크 1문자 전진폭(px)
+    // 표시 문자열의 픽셀 폭. 패스워드 모드면 글자 수 × 셀 폭이라 폰트 측정을 타지 않는다.
+    // 그리기·캐럿·선택·히트테스트가 모두 이 함수를 거쳐야 서로 픽셀이 어긋나지 않는다.
+    int			measure_display_width(CDC& dc, const CString& display) const;
     CRect		get_text_area() const;         // 텍스트가 그려질 수 있는 영역 (패딩/보더/round/카피버튼 제외)
     // 테두리 안쪽 입력영역 (= native EDIT 의 editable client). border 만 제외하고 세로 padding 은 안 뺀다.
     // 캐럿·선택 블록의 세로 clamp 기준 — rc_text(get_text_area) 로 clamp 하면 세로 padding 탓에 tmHeight
@@ -401,6 +423,7 @@ private:
     void		draw_border(Gdiplus::Graphics& g, const CRect& rc);
     void		draw_selection(Gdiplus::Graphics& g, const CRect& rc_text);
     void		draw_text(Gdiplus::Graphics& g, const CRect& rc_text);
+    void		draw_password_mask(Gdiplus::Graphics& g, const CRect& rc_text, int count, Gdiplus::Color cr_text);
     void		draw_dim_text(Gdiplus::Graphics& g, const CRect& rc_text);
 
 

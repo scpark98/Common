@@ -222,6 +222,9 @@ void CSCStaticEdit::rebuild_font()
 		TEXTMETRIC tm = {};
 		tmp.GetTextMetrics(&tm);
 		m_font_height = tm.tmHeight;
+		//20260902 by claude. tmHeight 위쪽의 악센트용 여백. 셀을 기하학적 중앙에 두면 글자는 이 값의
+		//절반만큼 아래로 내려가 보인다 — get_text_top 의 세로 중앙 보정에 쓴다.
+		m_font_internal_leading = tm.tmInternalLeading;
 		tmp.SelectObject(p_old);
 		tmp.Detach();
 	}
@@ -368,12 +371,19 @@ void CSCStaticEdit::set_back_color_disabled(Gdiplus::Color cr)
 	Invalidate();
 }
 
-void CSCStaticEdit::set_password_mode(bool password, TCHAR mask_char)
+void CSCStaticEdit::set_password_mode(bool password, password_mask_shape shape)
 {
 	m_password = password;
-	m_mask_char = mask_char;
+	m_mask_shape = shape;
 	//rebuild_font 가 m_password 보고 lfQuality 를 결정 — 패스워드 모드 진입/이탈 시 폰트 재생성 필수.
 	rebuild_font();
+	Invalidate(FALSE);
+}
+
+void CSCStaticEdit::set_password_mask_metric(int dot_size, int cell_width)
+{
+	m_mask_dot_size   = dot_size;
+	m_mask_cell_width = cell_width;
 	Invalidate(FALSE);
 }
 
@@ -1294,8 +1304,14 @@ void CSCStaticEdit::draw_border(Gdiplus::Graphics& g, const CRect& rc)
 
 int CSCStaticEdit::get_text_top(const CRect& rc_text, int text_h) const
 {
+	//20260902 by claude. 셀(text_h = tmHeight)을 기하학적 정중앙에 두면 글자가 아래로 내려가 보인다.
+	//tmHeight 의 위쪽 tmInternalLeading 은 악센트용 빈 공간이라 실제 잉크는 그만큼 아래에서 시작하기
+	//때문이고, 잉크 기준 중앙은 셀 중앙보다 tmInternalLeading/2 만큼 위다. 그만큼 올려 보정한다.
+	//이 값은 폰트·크기마다 달라(Segoe UI 8 vs 맑은 고딕 9) 상수로는 맞출 수 없다.
+	//셀 top 을 쓰는 draw_text / draw_selection / get_compose_draw_box 가 모두 여기를 거치므로
+	//글자·선택블록·IME 박스가 함께 이동해 정합이 유지된다.
 	if (m_valign & DT_VCENTER)
-		return rc_text.top + (rc_text.Height() - text_h) / 2;
+		return rc_text.top + (rc_text.Height() - text_h) / 2 - m_font_internal_leading / 2;
 	else if (m_valign & DT_BOTTOM)
 		return rc_text.bottom - text_h;
 	return rc_text.top;
@@ -1349,6 +1365,13 @@ void CSCStaticEdit::draw_text(Gdiplus::Graphics& g, const CRect& rc_text)
 	//네이티브 disabled edit 은 WM_CTLCOLOR 텍스트색을 무시하고 항상 GRAYTEXT 로 그림, 빨강 테스트로 확인). set_text_color_disabled 로
 	//명시 지정한 경우에만 그 색. (사용자 지시 2026-07-28 — 기본은 CSCEdit 과 동일, 명시 지정 시 그 색 존중)
 	Gdiplus::Color cr_text = IsWindowEnabled() ? m_theme.cr_text : get_text_color_disabled();
+
+	//20260902 by claude. 패스워드 마스크는 폰트 글리프가 아니라 도형으로 직접 그린다(사유는 헤더 set_password_mode 주석).
+	if (m_password)
+	{
+		draw_password_mask(g, rc_text, display.GetLength(), cr_text);
+		return;
+	}
 
 	// 텍스트는 GDI(TextOut)로 렌더링 ? 측정(GetTextExtent)과 픽셀 단위로 완벽 일치.
 	// (GDI+ MeasureString/DrawString 조합은 측정-렌더링 간 서브픽셀 오차가 있어
@@ -1411,6 +1434,76 @@ void CSCStaticEdit::draw_text(Gdiplus::Graphics& g, const CRect& rc_text)
 		dc.Detach();
 	}
 	g.ReleaseHDC(hdc);
+}
+
+//셀 폭이 모두 같아 measure_display_width() 의 산술과 픽셀이 정확히 일치한다.
+//세로 기준은 글자 셀이 아니라 rc_text 를 직접 쓴다 — 도형에는 baseline 이 없으므로 get_text_top 의
+//폰트 metric 보정을 태우면 오히려 중앙에서 벗어난다.
+void CSCStaticEdit::draw_password_mask(Gdiplus::Graphics& g, const CRect& rc_text, int count, Gdiplus::Color cr_text)
+{
+	if (count <= 0)
+		return;
+
+	int cell = get_mask_cell_width();
+	int dot  = get_mask_dot_size();
+	int x0   = get_text_start_x(count * cell);
+
+	int cy;
+	if (m_valign & DT_VCENTER)
+		cy = rc_text.top + rc_text.Height() / 2;
+	else if (m_valign & DT_BOTTOM)
+		cy = rc_text.bottom - m_font_height / 2;
+	else
+		cy = rc_text.top + m_font_height / 2;
+
+	int sel_s = 0;
+	int sel_e = 0;
+	bool draw_sel = has_selection() && GetFocus() == this;
+	if (draw_sel)
+	{
+		sel_s = min(m_sel_start, m_sel_end);
+		sel_e = max(m_sel_start, m_sel_end);
+	}
+
+	//prefix 이미지·액션 버튼 영역을 침범하지 않도록 clip. 평문 경로의 IntersectClipRect 와 같은 목적.
+	Gdiplus::GraphicsState state = g.Save();
+	g.SetClip(Gdiplus::Rect(rc_text.left, rc_text.top, rc_text.Width(), rc_text.Height()), Gdiplus::CombineModeIntersect);
+	g.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
+
+	Gdiplus::SolidBrush br(cr_text);
+	Gdiplus::SolidBrush br_selected(m_theme.cr_text_selected);
+
+	for (int i = 0; i < count; i++)
+	{
+		Gdiplus::SolidBrush* p_br = (draw_sel && i >= sel_s && i < sel_e) ? &br_selected : &br;
+
+		float left = (float)(x0 + i * cell) + (cell - dot) / 2.0f;
+		float top  = (float)cy - dot / 2.0f;
+
+		switch (m_mask_shape)
+		{
+			case mask_shape_square:
+				g.FillRectangle(p_br, left, top, (float)dot, (float)dot);
+				break;
+			case mask_shape_diamond:
+			{
+				float r = dot / 2.0f;
+				Gdiplus::PointF pts[4];
+				pts[0] = Gdiplus::PointF(left + r, top);
+				pts[1] = Gdiplus::PointF(left + dot, top + r);
+				pts[2] = Gdiplus::PointF(left + r, top + dot);
+				pts[3] = Gdiplus::PointF(left, top + r);
+				g.FillPolygon(p_br, pts, 4);
+				break;
+			}
+			case mask_shape_circle:
+			default:
+				g.FillEllipse(p_br, left, top, (float)dot, (float)dot);
+				break;
+		}
+	}
+
+	g.Restore(state);
 }
 
 void CSCStaticEdit::draw_dim_text(Gdiplus::Graphics& g, const CRect& rc_text)
@@ -1530,22 +1623,17 @@ CRect CSCStaticEdit::get_text_rect() const
 	if (m_composing)
 		display.Insert(m_caret_pos, m_compose);
 
-	CSize      sz = dc.GetTextExtent(display);
+	int        text_w = measure_display_width(dc, display);
 	TEXTMETRIC tm = {};
 	dc.GetTextMetrics(&tm);
 
 	dc.SelectObject(p_old);
 
-	int text_w = sz.cx;
 	int text_h = tm.tmHeight;
 
-	int text_y;
-	if (m_valign & DT_VCENTER)
-		text_y = rc_area.top + (rc_area.Height() - text_h) / 2;
-	else if (m_valign & DT_BOTTOM)
-		text_y = rc_area.bottom - text_h;
-	else
-		text_y = rc_area.top;
+	//20260902 by claude. valign 을 여기서 다시 계산하지 않고 get_text_top 을 쓴다. 세로 중앙 보정이
+	//한 곳에만 있어야 draw_text 가 실제로 그린 위치와 이 bounding box 가 어긋나지 않는다.
+	int text_y = get_text_top(rc_area, text_h);
 
 	int text_x = get_text_start_x(text_w);
 
@@ -1581,13 +1669,12 @@ CPoint CSCStaticEdit::calc_caret_pixel_pos(int char_pos) const
 	if (m_composing)
 		display.Insert(m_caret_pos, m_compose);
 
-	CSize sz_total = dc.GetTextExtent(display);
-	CString left = display.Left(char_pos);
-	CSize sz = dc.GetTextExtent(left);
+	int w_total = measure_display_width(dc, display);
+	int w_left  = measure_display_width(dc, display.Left(char_pos));
 	dc.SelectObject(p_old);
 
 	// 가로 정렬 + 스크롤을 반영한 텍스트 시작 x 에 문자까지의 폭을 더한다.
-	int x = get_text_start_x(sz_total.cx) + sz.cx;
+	int x = get_text_start_x(w_total) + w_left;
 	int y = get_text_area().top;
 	return CPoint(x, y);
 }
@@ -1602,14 +1689,20 @@ int CSCStaticEdit::hit_test_char(CPoint pt) const
 
 	CString display = get_display_text();
 	// 텍스트 실제 시작 x (정렬 + 스크롤 반영). rel_x 는 "텍스트 시작점으로부터의 오프셋".
-	CSize sz_total = dc.GetTextExtent(display);
-	int text_start_x = get_text_start_x(sz_total.cx);
+	int text_start_x = get_text_start_x(measure_display_width(dc, display));
 	int rel_x = pt.x - text_start_x;
 
 	int len  = display.GetLength();
 	int best = 0;
 
-	if (len > 0)
+	//20260902 by claude. 패스워드 모드는 셀 폭이 모두 같으므로 누적 폭 배열 없이 나눗셈 한 번이면 된다.
+	if (m_password && len > 0)
+	{
+		int cell = get_mask_cell_width();
+		best = (rel_x + cell / 2) / cell;
+		best = max(0, min(best, len));
+	}
+	else if (len > 0)
 	{
 		// GetTextExtentExPoint 한 번의 호출로 각 문자까지의 누적 폭을 얻음(O(n)).
 		// 기존 display.Left(i) 루프는 문자열 복사 + 측정을 매 반복 수행 → O(n²).
@@ -1656,9 +1749,9 @@ CRect CSCStaticEdit::get_compose_draw_box() const
 	CString display = get_display_text();
 	display.Insert(m_caret_pos, m_compose);
 
-	CSize sz_total = dc.GetTextExtent(display);
-	CSize sz_before = dc.GetTextExtent(display.Left(m_caret_pos));
-	CSize sz_compose = dc.GetTextExtent(m_compose);
+	int w_total   = measure_display_width(dc, display);
+	int w_before  = measure_display_width(dc, display.Left(m_caret_pos));
+	int w_compose = measure_display_width(dc, m_compose);
 
 	TEXTMETRIC tm = {};
 	dc.GetTextMetrics(&tm);
@@ -1670,10 +1763,10 @@ CRect CSCStaticEdit::get_compose_draw_box() const
 
 	// IME 블록도 빔 커서/선택 블록과 동일하게 rc_text 안으로 clamp.
 	// 가로 정렬 + 스크롤 반영한 텍스트 시작 x 에서 조합 이전 부분의 폭만큼 오른쪽으로.
-	int x = get_text_start_x(sz_total.cx) + sz_before.cx;
+	int x = get_text_start_x(w_total) + w_before;
 	int h = min(text_h, rc_text.Height());
 	int y = text_y + (text_h - h) / 2;   // clamp 시 중앙 정렬 유지
-	int w = sz_compose.cx;
+	int w = w_compose;
 	if (w < 2) w = 2;
 	return CRect(x, y, x + w, y + h);
 }
@@ -1754,9 +1847,44 @@ CString CSCStaticEdit::get_display_text() const
 {
 	if (!m_password) return m_text;
 	CString str;
+	//20260902 by claude. 이 문자는 화면에 그려지지 않는다. 패스워드 모드의 그리기는 draw_password_mask 가
+	//도형으로 직접 하고, 이 문자열은 길이·인덱스 계산에만 쓰인다. 그래도 만약 어딘가에서 그려지더라도
+	//평문이 새지 않도록 마스크 문자로 채운다.
 	for (int i = 0; i < m_text.GetLength(); i++)
-		str += m_mask_char;
+		str += (TCHAR)0x25CF;
 	return str;
+}
+
+// ──────────────────────────────────────────────────────────
+// 헬퍼: 패스워드 마스크 기하 — 폰트가 아니라 px 로 결정된다
+// ──────────────────────────────────────────────────────────
+int CSCStaticEdit::get_mask_dot_size() const
+{
+	if (m_mask_dot_size > 0)
+		return m_mask_dot_size;
+
+	//폰트 높이의 1/4 정도가 웹 입력폼의 점 크기와 비슷하다. 아주 작은 폰트에서도 3px 는 보장.
+	return max(3, (m_font_height + 2) / 4);
+}
+
+int CSCStaticEdit::get_mask_cell_width() const
+{
+	if (m_mask_cell_width > 0)
+		return m_mask_cell_width;
+
+	//점 지름의 2배 = 점 사이 여백이 점 지름과 같아진다. 웹 입력폼의 마스크 간격이 대략 이 비율이다.
+	return get_mask_dot_size() * 2;
+}
+
+// ──────────────────────────────────────────────────────────
+// 헬퍼: 표시 문자열의 픽셀 폭
+// ──────────────────────────────────────────────────────────
+int CSCStaticEdit::measure_display_width(CDC& dc, const CString& display) const
+{
+	if (m_password)
+		return display.GetLength() * get_mask_cell_width();
+
+	return dc.GetTextExtent(display).cx;
 }
 
 // ──────────────────────────────────────────────────────────
@@ -2088,9 +2216,10 @@ void CSCStaticEdit::draw_action_icon_password_toggle(Gdiplus::Graphics& g)
 		Gdiplus::Pen pen_slash(cr_stroke, 1.8f);
 		pen_slash.SetStartCap(Gdiplus::LineCapRound);
 		pen_slash.SetEndCap  (Gdiplus::LineCapRound);
+		//20260902 by claude. 눈 모양 대비 사선이 1px 오른쪽으로 치우쳐 보여 양 끝 x 를 1px 왼쪽으로 옮김.
 		g.DrawLine(&pen_slash,
-			m_r_action_button.right - 2, m_r_action_button.top    + 2,
-			m_r_action_button.left  + 2, m_r_action_button.bottom - 2);
+			m_r_action_button.right - 3, m_r_action_button.top    + 2,
+			m_r_action_button.left  + 1, m_r_action_button.bottom - 2);
 	}
 }
 

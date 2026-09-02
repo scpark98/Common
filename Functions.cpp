@@ -196,19 +196,23 @@ CString get_time_str(COleDateTime t, CString sep, bool h24, bool sec)
 	}
 	else
 	{
+		//20260902 by claude. %2d 는 한 자리 시각에 앞 공백을 넣어 "오후  6:01" 처럼 두 칸이 됐다 — 탐색기·시계 모두 "오후 6:01" 이다.
+		//12시간제 변환도 h>=13 이면 h-12 라서 0시가 "오전 0시" 로 나왔다. 0시·12시는 12 로 표기한다.
+		int h12 = (h % 12 == 0 ? 12 : h % 12);
+
 		if (GetUserDefaultUILanguage() == 1042)
 		{
-			str.Format(_T("%s %2d%s%02d%s%02d"), (am ? _T("오전") : _T("오후")), (h >= 13 ? h - 12 : h), sep, m, sep, s);
+			str.Format(_T("%s %d%s%02d%s%02d"), (am ? _T("오전") : _T("오후")), h12, sep, m, sep, s);
 		}
 		else
 		{
 			if (sec)
 			{
-				str.Format(_T("%2d%s%02d%s%02d %s"), (h >= 13 ? h - 12 : h), sep, m, sep, s, (am ? _T("AM") : _T("PM")));
+				str.Format(_T("%d%s%02d%s%02d %s"), h12, sep, m, sep, s, (am ? _T("AM") : _T("PM")));
 			}
 			else
 			{
-				str.Format(_T("%2d%s%02d %s"), (h >= 13 ? h - 12 : h), sep, m, (am ? _T("AM") : _T("PM")));
+				str.Format(_T("%d%s%02d %s"), h12, sep, m, (am ? _T("AM") : _T("PM")));
 				return str;
 			}
 		}
@@ -8752,27 +8756,32 @@ CString get_file_property(CString fullpath, CString strFlag)
 	if (dwSize <= 0)
 		return _T("");
 
-	TCHAR * buffer = new TCHAR[dwSize];
+	//20260902 by claude. dwSize 는 바이트 수다. TCHAR 개수로 쓰면 유니코드 빌드에서 2배로 할당되고
+	//memset 은 그 절반만 지우게 된다.
+	BYTE* buffer = new BYTE[dwSize];
 	memset(buffer, 0, dwSize);
 
-	GetFileVersionInfo(fullpath, 0, dwSize, buffer);
+	CString strReturn;
 
-	UINT cbTranslate;
-	UINT dwBytes;
-
+	//20260902 by claude. VerQueryValue 는 실패하면 출력 인자를 건드리지 않는다.
+	//cbTranslate 를 초기화하지 않고 반환값도 보지 않으면, Translation 블록이 없는 파일에서
+	//스택 쓰레기 값이 0 이 아니라는 이유로 lpTranslate 를 그대로 역참조하게 된다.
+	UINT cbTranslate = 0;
+	UINT dwBytes = 0;
 	LPBYTE lpBuffer = NULL;
 
-	VerQueryValue(buffer, _T("\\VarFileInfo\\Translation"), (LPVOID*)&lpTranslate, &cbTranslate);
-
-	if(cbTranslate != 0) // 버전 정보가 없을 경우 "
+	if (GetFileVersionInfo(fullpath, 0, dwSize, buffer)
+		&& VerQueryValue(buffer, _T("\\VarFileInfo\\Translation"), (LPVOID*)&lpTranslate, &cbTranslate)
+		&& cbTranslate >= sizeof(LANGANDCODEPAGE))
 	{
 		CString strSub;
 		strSub.Format(_T("\\StringFileInfo\\%04x%04x\\%s"), lpTranslate[0].wLanguage, lpTranslate[0].wCodePage, strFlag);
-		VerQueryValue(buffer, (LPTSTR)(LPCTSTR)strSub, (LPVOID*)&lpBuffer, &dwBytes); 
-	}
 
-	CString strReturn;
-	strReturn.Format(_T("%s"), lpBuffer);
+		//20260902 by claude. 요청한 항목이 없으면 lpBuffer 가 NULL 로 남는데,
+		//NULL 을 %s 로 Format 하면 MSVC 는 빈 문자열이 아니라 "(null)" 을 찍는다.
+		if (VerQueryValue(buffer, (LPTSTR)(LPCTSTR)strSub, (LPVOID*)&lpBuffer, &dwBytes) && lpBuffer)
+			strReturn = (LPCTSTR)lpBuffer;
+	}
 
 	delete [] buffer;
 
@@ -8990,8 +8999,8 @@ CString get_file_time_str(FILETIME filetime)
 	FileTimeToLocalFileTime(&(filetime), &ftLocal);
 	FileTimeToSystemTime(&ftLocal, &st);
 
-	//20260709 by claude. h24=false(언어별 오전/오후·AM/PM), sec=true(초 표시 — 파일목록 원래 표기 "2023-07-03 오후 6:01:47"). msec=false.
-	return get_datetime_str(st, 2, true, _T(" "), false, true, false);
+	//20260902 by claude. h24=false(언어별 오전/오후·AM/PM), sec=false. 탐색기의 "수정한 날짜" 는 초를 표시하지 않는다("2023-07-03 오후 6:01").
+	return get_datetime_str(st, 2, true, _T(" "), false, false, false);
 }
 
 size_t read_raw(CString sfile, uint8_t *dst, size_t size)

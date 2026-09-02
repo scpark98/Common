@@ -12,6 +12,7 @@ extern "C" {
 #include <libavutil/pixdesc.h>
 }
 
+#include <algorithm>
 #include <vector>
 
 namespace
@@ -100,29 +101,73 @@ namespace ffi
 		//video_has_pts()==false 를 보고 LAV 로 라우팅한다. probe 는 read-only — 몇 개 packet 만 demux 후 처음으로
 		//seek-back 하므로 재생에 영향 없음. (valid-PTS 영상은 첫 video packet 에 timestamp 가 있어 영향 없음.)
 		{
+			//20260902 by claude. 컨테이너가 avg_frame_rate 를 갖고 있지 않으면(DefaultDuration 없는 VFR webm/mkv —
+			//find_stream_info 도 못 채운다) 이 probe 에서 video packet PTS 를 모아 fps 를 함께 측정한다. 어차피 읽는
+			//packet 이라 추가 I/O 가 없다. fps=0 이면 프레임 이동의 간격(1000/fps)이 inf → 위치가 NaN 이 되어
+			//1프레임 이동이 통째로 죽는다.
+			AVRational avg = m_fmt->streams[m_video_stream_idx]->avg_frame_rate;
+			bool need_fps_probe = (avg.den == 0 || avg.num <= 0);
+			m_is_vfr = need_fps_probe;
+			std::vector<int64_t> vpts;
+
 			AVPacket* probe = av_packet_alloc();
 			if (probe)
 			{
 				int scanned = 0;
+				int video_seen = 0;
 				while (scanned < 100 && av_read_frame(m_fmt, probe) >= 0)
 				{
 					if (probe->stream_index == m_video_stream_idx)
 					{
-						//frame->pts 는 packet 의 pts 에서 옴 (이 디코더는 best_effort_timestamp 미사용 — 971/1032행).
-						//그래서 dts 는 보지 않고 pts 만 본다. AVI 처럼 packet 에 dts 만 있고 pts 가 없으면 frame->pts 가
-						//NOPTS 가 되어 internal path 의 PTS 기반 동기가 깨지므로 LAV 로 보내야 함.
-						m_video_has_pts = (probe->pts != AV_NOPTS_VALUE);
-						av_packet_unref(probe);
-						break;
+						if (video_seen == 0)
+						{
+							//frame->pts 는 packet 의 pts 에서 옴 (이 디코더는 best_effort_timestamp 미사용 — 971/1032행).
+							//그래서 dts 는 보지 않고 pts 만 본다. AVI 처럼 packet 에 dts 만 있고 pts 가 없으면 frame->pts 가
+							//NOPTS 가 되어 internal path 의 PTS 기반 동기가 깨지므로 LAV 로 보내야 함.
+							m_video_has_pts = (probe->pts != AV_NOPTS_VALUE);
+						}
+						++video_seen;
+
+						if (probe->pts != AV_NOPTS_VALUE)
+							vpts.push_back(probe->pts);
+
+						//fps 측정이 필요 없거나 PTS 가 아예 없으면 기존대로 첫 video packet 에서 멈춘다.
+						if (!need_fps_probe || !m_video_has_pts)
+						{
+							av_packet_unref(probe);
+							break;
+						}
 					}
 					av_packet_unref(probe);
 					++scanned;
 				}
 				av_packet_free(&probe);
 			}
+
+			if (need_fps_probe && vpts.size() >= 3)
+			{
+				//packet 은 decode order 라 PTS 가 뒤섞일 수 있다(B-frame) → 정렬 후 인접 간격의 중앙값.
+				std::sort(vpts.begin(), vpts.end());
+				std::vector<int64_t> gaps;
+				for (size_t i = 1; i < vpts.size(); ++i)
+				{
+					if (vpts[i] > vpts[i - 1])
+						gaps.push_back(vpts[i] - vpts[i - 1]);
+				}
+				if (!gaps.empty())
+				{
+					std::sort(gaps.begin(), gaps.end());
+					double gap_ms = (double)gaps[gaps.size() / 2]
+						* av_q2d(m_fmt->streams[m_video_stream_idx]->time_base) * 1000.0;
+					if (gap_ms > 0.0)
+						m_fps_probed = 1000.0 / gap_ms;
+				}
+			}
 			//probe 로 소비한 packet 위치를 처음으로 되돌림 (재생은 이후 on_change_start/seek 가 위치 설정).
 			av_seek_frame(m_fmt, -1, 0, AVSEEK_FLAG_BACKWARD);
-			//logWrite(_T("[ffi/dec] video_has_pts=%d"), (int)m_video_has_pts);
+			//20260902 by claude. [진단] fps 출처 확인 — avg 가 0 인데 probed 도 0 이면 프레임 이동이 동작하지 않는다.
+			logWrite(_T("[ffi/dec] video_has_pts=%d | fps: avg=%d/%d probed=%.6f (video packets=%d)"),
+				(int)m_video_has_pts, avg.num, avg.den, m_fps_probed, (int)vpts.size());
 		}
 
 		//decoder 준비
@@ -505,6 +550,14 @@ namespace ffi
 				//wa, ha, ca, wb, hb, cb, video_width(), video_height(), frames, GetTickCount64() - t0);
 		}
 
+		//20260902 by claude. VFR 이면 전체 frame PTS 인덱스를 백그라운드로 만든다. 이 인덱스가 프레임 번호 표기와
+		//프레임 이동의 공통 기준이 된다 — 둘이 서로 다른 근거(실제 PTS vs 시각×fps)를 쓰면 화면과 숫자가 어긋난다.
+		if (m_is_vfr)
+		{
+			m_frame_index_quit.store(false);
+			m_frame_index_thread = std::thread(&CDecoder::frame_index_worker, this);
+		}
+
 		return true;
 	}
 
@@ -699,6 +752,16 @@ namespace ffi
 		m_scan_quit.store(true);
 		if (m_scan_thread.joinable())
 			m_scan_thread.join();
+
+		//20260902 by claude. m_path 를 쓰는 스레드라 아래 m_path.clear() 보다 먼저 회수해야 한다.
+		m_frame_index_quit.store(true);
+		if (m_frame_index_thread.joinable())
+			m_frame_index_thread.join();
+		m_frame_index_ready.store(false);
+		{
+			std::lock_guard<std::mutex> lk(m_frame_index_mtx);
+			m_frame_index_ms.clear();
+		}
 		m_buffered_frontier_ms.store(-1.0);
 		m_scanned_duration_ms.store(-1.0);
 		m_unreliable_video_pts = false;
@@ -722,6 +785,14 @@ namespace ffi
 		//20260705 by claude. custom pb buffer + AVIOContext + Win32 handle 까지 한 번에 정리.
 		if (m_fmt)
 			close_share_delete(&m_fmt);
+
+		{
+			std::lock_guard<std::mutex> lk(m_probe_mtx);
+			if (m_probe_fmt)
+				close_share_delete(&m_probe_fmt);
+		}
+		m_is_vfr = false;
+		m_fps_probed = 0.0;
 
 		m_video_stream_idx = -1;
 		m_probe_w = 0;
@@ -902,9 +973,160 @@ namespace ffi
 		if (!m_fmt || m_video_stream_idx < 0)
 			return 0.0;
 		AVRational r = m_fmt->streams[m_video_stream_idx]->avg_frame_rate;
-		if (r.den == 0)
-			return 0.0;
-		return (double)r.num / (double)r.den;
+		if (r.den != 0 && r.num > 0)
+			return (double)r.num / (double)r.den;
+		//20260902 by claude. 컨테이너에 평균 fps 가 없는 경우(VFR webm 등) open() 의 PTS 간격 측정값. 그것도 0 이면 unknown.
+		return m_fps_probed;
+	}
+
+	//VFR 미디어의 전체 frame PTS 를 모은다. 재생 context 와 분리된 2nd context 에서 packet 만 읽으므로(디코드 없음)
+	//파일 크기에 비례한 순차 I/O 한 번이 전부다. 화면 녹화 webm 은 프레임 자체가 적어 거의 즉시 끝난다.
+	void CDecoder::frame_index_worker()
+	{
+		AVFormatContext* fmt = open_share_delete(m_path.c_str());
+		if (!fmt)
+			return;
+		if (avformat_find_stream_info(fmt, NULL) < 0 ||
+			m_video_stream_idx < 0 || m_video_stream_idx >= (int)fmt->nb_streams)
+		{
+			close_share_delete(&fmt);
+			return;
+		}
+
+		const AVRational tb = fmt->streams[m_video_stream_idx]->time_base;
+		const AVRational ms = { 1, 1000 };
+
+		std::vector<int64_t> index;
+		AVPacket* pkt = av_packet_alloc();
+		if (pkt)
+		{
+			while (!m_frame_index_quit.load() && av_read_frame(fmt, pkt) >= 0)
+			{
+				if (pkt->stream_index == m_video_stream_idx)
+				{
+					int64_t pts = (pkt->pts != AV_NOPTS_VALUE) ? pkt->pts : pkt->dts;
+					if (pts != AV_NOPTS_VALUE)
+						index.push_back(av_rescale_q(pts, tb, ms));
+				}
+				av_packet_unref(pkt);
+			}
+			av_packet_free(&pkt);
+		}
+		close_share_delete(&fmt);
+
+		if (m_frame_index_quit.load() || index.empty())
+			return;
+
+		//packet 은 decode order 라 PTS 가 뒤섞일 수 있다(B-frame). 표시 순서로 정렬한다.
+		std::sort(index.begin(), index.end());
+		index.erase(std::unique(index.begin(), index.end()), index.end());
+		{
+			std::lock_guard<std::mutex> lk(m_frame_index_mtx);
+			m_frame_index_ms.swap(index);
+		}
+		m_frame_index_ready.store(true);
+		logWrite(_T("[ffi/dec] VFR frame index 완성 — %d frames"), (int)m_frame_index_ms.size());
+	}
+
+	int CDecoder::frame_count() const
+	{
+		if (!m_frame_index_ready.load())
+			return 0;
+		std::lock_guard<std::mutex> lk(m_frame_index_mtx);
+		return (int)m_frame_index_ms.size();
+	}
+
+	double CDecoder::frame_pts_at(int index) const
+	{
+		if (!m_frame_index_ready.load())
+			return -1.0;
+		std::lock_guard<std::mutex> lk(m_frame_index_mtx);
+		if (index < 0 || index >= (int)m_frame_index_ms.size())
+			return -1.0;
+		return (double)m_frame_index_ms[index];
+	}
+
+	int CDecoder::frame_index_for_ms(double t_ms) const
+	{
+		if (!m_frame_index_ready.load())
+			return -1;
+		std::lock_guard<std::mutex> lk(m_frame_index_mtx);
+		if (m_frame_index_ms.empty())
+			return -1;
+		//pts <= t 인 마지막 frame = t 시각에 화면에 떠 있는 frame.
+		auto it = std::upper_bound(m_frame_index_ms.begin(), m_frame_index_ms.end(), (int64_t)(t_ms + 0.5));
+		if (it == m_frame_index_ms.begin())
+			return -1;
+		return (int)(it - m_frame_index_ms.begin()) - 1;
+	}
+
+	double CDecoder::neighbor_frame_pts_ms(double t_ms, bool forward)
+	{
+		std::lock_guard<std::mutex> lk(m_probe_mtx);
+
+		if (m_video_stream_idx < 0 || m_path.empty())
+			return -1.0;
+
+		if (!m_probe_fmt)
+		{
+			m_probe_fmt = open_share_delete(m_path.c_str());
+			if (!m_probe_fmt)
+				return -1.0;
+			if (avformat_find_stream_info(m_probe_fmt, NULL) < 0)
+			{
+				close_share_delete(&m_probe_fmt);
+				return -1.0;
+			}
+		}
+		if (m_video_stream_idx >= (int)m_probe_fmt->nb_streams)
+			return -1.0;
+
+		const AVRational tb = m_probe_fmt->streams[m_video_stream_idx]->time_base;
+		const AVRational ms = { 1, 1000 };
+		const int64_t target = av_rescale_q((int64_t)(t_ms + 0.5), ms, tb);
+
+		//target 이하의 keyframe 으로 이동한 뒤 packet 을 순서대로 읽는다. 디코드를 안 하므로 GOP 가 길어도 싸다.
+		if (av_seek_frame(m_probe_fmt, m_video_stream_idx, target, AVSEEK_FLAG_BACKWARD) < 0)
+			return -1.0;
+
+		int64_t best = AV_NOPTS_VALUE;
+		int	    past = 0;	//target 을 지난 packet 수. PTS 재배열(B-frame) 폭만큼 더 보고 끊는다.
+
+		AVPacket* pkt = av_packet_alloc();
+		if (!pkt)
+			return -1.0;
+
+		for (int i = 0; i < 5000 && av_read_frame(m_probe_fmt, pkt) >= 0; ++i)
+		{
+			if (pkt->stream_index == m_video_stream_idx)
+			{
+				int64_t pts = (pkt->pts != AV_NOPTS_VALUE) ? pkt->pts : pkt->dts;
+				if (pts != AV_NOPTS_VALUE)
+				{
+					if (forward)
+					{
+						if (pts > target && (best == AV_NOPTS_VALUE || pts < best))
+							best = pts;
+					}
+					else
+					{
+						if (pts < target && (best == AV_NOPTS_VALUE || pts > best))
+							best = pts;
+					}
+					if (pts >= target && ++past >= 16)
+					{
+						av_packet_unref(pkt);
+						break;
+					}
+				}
+			}
+			av_packet_unref(pkt);
+		}
+		av_packet_free(&pkt);
+
+		if (best == AV_NOPTS_VALUE)
+			return -1.0;
+		return (double)av_rescale_q(best, tb, ms);
 	}
 
 	AVRational CDecoder::video_time_base() const

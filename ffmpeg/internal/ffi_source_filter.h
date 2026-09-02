@@ -84,6 +84,10 @@ namespace ffi
 		void				on_change_start(REFERENCE_TIME rtStart);
 
 		REFERENCE_TIME		last_rtStart() const { return m_last_rtStart; }
+		//그래프 스트림 시각 = 현재 segment 가 시작된 뒤 흐른 시간(100ns). Running 이 아니거나 기준 클럭이 없으면 -1.
+		//프레임이 드문드문 있는 미디어의 재생 위치는 마지막 emit frame 의 PTS 가 아니라 이 값으로 읽어야 한다 —
+		//한 프레임이 수십 초를 덮으면 그동안 PTS 는 멈춰 있지만 재생 시각은 계속 흐른다.
+		REFERENCE_TIME		stream_time_or_neg() const;
 		int64_t				last_emitted_pts_ms() const { return m_last_emitted_pts_ms.load(); }
 		//frame step settle 신호 — *실제* frame emit 마다 ++. seek 의 pre-set(on_change_start)은 미증가.
 		//CDShow::step_frame 의 closed-loop backward 가 seek 후 이 값 변화로 새 표시 frame 착지를 확인.

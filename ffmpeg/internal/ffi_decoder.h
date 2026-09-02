@@ -61,7 +61,27 @@ namespace ffi
 		int		video_width()  const;
 		int		video_height() const;
 		double	duration_ms()  const;
-		double	frame_rate()   const;		 //avg_frame_rate (fps). 0 이면 unknown.
+		//영상 fps. 컨테이너의 avg_frame_rate 를 우선 쓰고, 그 값이 없으면(VFR webm/mkv 처럼 DefaultDuration 이 없어
+		//find_stream_info 도 평균을 못 채우는 경우) open() 이 packet PTS 간격으로 측정한 값을 반환한다. 0 이면 unknown.
+		double	frame_rate()   const;
+		//컨테이너가 avg_frame_rate 를 갖지 않는 미디어 = 진짜 VFR. 화면이 바뀔 때만 프레임을 넣는 화면 녹화 webm 이
+		//대표적이며, 프레임 간격이 10ms 부터 수십 초까지 벌어진다. 이런 미디어에서는 "1프레임 = 1000/fps" 산술이
+		//성립하지 않으므로 프레임 단위 조작은 neighbor_frame_pts_ms 로 실제 PTS 를 물어야 한다.
+		bool	is_vfr() const { return m_is_vfr; }
+
+		//t_ms 를 기준으로 한 *실제* 이웃 frame 의 PTS(ms). forward 면 t 보다 큰 첫 frame, 아니면 t 보다 작은 마지막
+		//frame. 그런 frame 이 없으면(파일 처음/끝) -1. 재생 컨텍스트를 건드리지 않으려고 전용 context 에서 packet 만
+		//읽는다(디코드 없음). 호출자 스레드에서 동기 수행 — 키프레임 한 구간의 packet 읽기라 수 ms 수준.
+		double	neighbor_frame_pts_ms(double t_ms, bool forward);
+
+		//VFR 미디어의 전체 frame PTS 인덱스. open() 이 백그라운드로 파일 전체를 demux 해(디코드 없음) 만든다.
+		//프레임 번호 표기와 프레임 이동이 같은 값을 보게 하는 단일 진실 — "시각×fps" 환산은 VFR 에서 실재하지
+		//않는 프레임을 세므로 쓰지 않는다. 준비 전에는 frame_index_ready()==false 이고 나머지는 0/-1 을 준다.
+		bool	frame_index_ready() const	{ return m_frame_index_ready.load(); }
+		int		frame_count() const;					//총 frame 수. 준비 전 0.
+		double	frame_pts_at(int index) const;			//index 번째 frame 의 PTS(ms). 범위 밖이면 -1.
+		int		frame_index_for_ms(double t_ms) const;	//t 시각에 화면에 있는 frame = pts <= t 인 마지막 frame. 없으면 -1.
+
 		AVRational video_time_base() const;	 //stream 의 time_base. pts→ms 변환에 사용.
 		int		video_pixel_format() const;	 //AVPixelFormat. AVFrame 의 format 과 동일 또는 codec 의 hw_pix_fmt.
 
@@ -186,6 +206,26 @@ namespace ffi
 		AVPixelFormat		m_hw_pix_fmt = AV_PIX_FMT_NONE;	  //HW frame format (codec 의 get_format 반환).
 
 		bool				m_video_has_pts = true;	  //open() 의 첫 video packet probe 결과. false 면 호출측이 LAV 로 라우팅.
+
+		//20260902 by claude. avg_frame_rate 가 없는 컨테이너에서 쓸 fps. open() 의 packet probe 가 video packet PTS
+		//간격의 *중앙값* 으로 산출한다. 평균이 아니라 중앙값인 이유는 VFR 에서 드물게 섞이는 긴 간격(정지 구간)이
+		//평균을 끌어내려 프레임 간격이 실제보다 넓게 잡히는 것을 막기 위해서다.
+		double				m_fps_probed = 0.0;
+
+		//20260902 by claude. VFR 프레임 이동용. m_probe_fmt 은 neighbor_frame_pts_ms 전용 2nd context 로, 첫 호출 때
+		//열어 close() 까지 유지한다(호출마다 열면 probe 비용이 keypress 마다 붙는다). 재생 context(m_fmt)를 공유하면
+		//worker 의 demux 위치가 흐트러지므로 반드시 분리.
+		bool				m_is_vfr = false;
+		AVFormatContext*	m_probe_fmt = nullptr;
+		std::mutex			m_probe_mtx;
+
+		//VFR frame PTS 인덱스 (ms, 오름차순). 파일 전체를 packet 만 읽어 만들므로 디코드 비용은 없다.
+		std::vector<int64_t>	m_frame_index_ms;
+		mutable std::mutex		m_frame_index_mtx;
+		std::atomic<bool>		m_frame_index_ready{ false };
+		std::atomic<bool>		m_frame_index_quit{ false };
+		std::thread				m_frame_index_thread;
+		void					frame_index_worker();
 
 		//audio decode
 		AVCodecContext*		m_audio_ctx = nullptr;

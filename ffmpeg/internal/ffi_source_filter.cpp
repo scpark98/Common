@@ -115,6 +115,24 @@ namespace ffi
 		return CSourceStream::NonDelegatingQueryInterface(riid, ppv);
 	}
 
+	REFERENCE_TIME CFFiVideoStream::stream_time_or_neg() const
+	{
+		if (!m_pFilter)
+			return -1;
+
+		//Paused 에서도 기준 클럭 자체는 흐르므로 StreamTime 이 화면과 무관하게 증가한다 — Running 일 때만 쓴다.
+		FILTER_STATE fs = State_Stopped;
+		if (FAILED(m_pFilter->GetState(0, &fs)) || fs != State_Running)
+			return -1;
+
+		CRefTime rt;
+		if (FAILED(m_pFilter->StreamTime(rt)))
+			return -1;
+
+		REFERENCE_TIME t = (REFERENCE_TIME)rt;
+		return (t < 0) ? 0 : t;
+	}
+
 	void CFFiVideoStream::on_change_start(REFERENCE_TIME rtStart)
 	{
 		if (!m_pSource)
@@ -684,6 +702,18 @@ namespace ffi
 				seek_target_pts = (video_tb.num > 0 && video_tb.den > 0) ?
 					av_rescale_q(seg_rt, AVRational{1, 10000000}, video_tb) : 0;
 
+				//20260902 by claude. VFR 은 skip 기준을 "target 이상의 첫 frame" 이 아니라 *target 시각에 화면에
+				//있어야 할 frame* = pts <= target 인 마지막 frame 으로 내린다. 한 프레임이 30초를 덮는 미디어에서
+				//기존 규칙은 목표 시각을 지나쳐 그 다음 프레임(수십 초 뒤 내용)을 보여준다 — 30초로 이동했는데
+				//37초의 화면이 뜬다. 인덱스가 아직 없으면 기존 규칙 그대로.
+				if (dec.is_vfr() && video_tb.num > 0 && video_tb.den > 0)
+				{
+					int cover = dec.frame_index_for_ms((double)seg_rt / 10000.0);
+					double cover_ms = (cover >= 0) ? dec.frame_pts_at(cover) : -1.0;
+					if (cover_ms >= 0.0)
+						seek_target_pts = av_rescale_q((int64_t)cover_ms, AVRational{1, 1000}, video_tb);
+				}
+
 				//pre-target skip 분기 — 옵션 환경설정→재생→"키 프레임 단위로 이동(정확하지 않음)".
 				//[옵션 ON]: decoder 가 이미 forward keyframe(pts>=target) 부터 전달 → 여기선 skip 없이 첫 frame emit.
 				//[옵션 OFF]: pre-target skip 으로 정확 target 위치 + budget exceeded fallback.
@@ -836,10 +866,17 @@ namespace ffi
 			if (video_first == LLONG_MIN)
 			{
 				//이 emit 가 *FillBuffer 의 첫 emit* — pre-target skip 통과한 frame. audio 가 reference 로 사용할 anchor.
-				video_first = frame_pts_rt;
+				//20260902 by claude. VFR 은 첫 frame 의 PTS 가 아니라 *seek 목표* 를 기준점으로 삼는다. 목표 시각을
+				//덮는 frame 은 목표보다 앞서 있을 수 있는데(한 프레임이 30초를 덮으면 25.9초 frame 이 30초 화면이다)
+				//그 PTS 를 0 으로 잡으면 다음 frame 까지의 대기가 실제보다 그만큼 길어져 재생이 늘어진다.
+				//목표 기준이면 대기 = (다음 frame − 목표) 로 정확하고, 재생 위치(목표+스트림 시각)와도 일치한다.
+				video_first = dec.is_vfr() ? (int64_t)m_segment_start : frame_pts_rt;
 				dec.set_video_first_emit_pts_rt(video_first);
 			}
 			rtStart = frame_pts_rt - video_first;
+			//목표를 덮는 frame 은 목표보다 앞서므로 음수가 된다 — 즉시 표시가 맞다.
+			if (rtStart < 0)
+				rtStart = 0;
 
 			//20260823 by claude. 세그먼트 기준점 오염 자기교정.
 			//seek 직후 첫 emit 가 *이전 위치* 의 frame 이면(디코더 내부/전달 경로 어딘가의 경합으로 실측 발생)
@@ -849,7 +886,15 @@ namespace ffi
 			//이 frame 으로 다시 anchor 를 잡는다. audio 도 같은 값을 reference 로 쓰므로 A/V 정렬은 함께 복구된다.
 			//정상 재생은 프레임 간격(수십 ms)이라 이 분기에 걸리지 않는다.
 			static const REFERENCE_TIME anchor_sanity_rt = 5000000;	//500ms
-			if (m_sample_count <= 2 && rtStart > anchor_sanity_rt)
+			//20260902 by claude. VFR 은 "rtStart 가 크다" 로 판별하면 안 된다 — 프레임 간격이 정상적으로 수십 초까지
+			//벌어져서 *멀쩡한* 간격을 오염으로 오판하고 anchor 를 당겨버린다. 실측(2026-09-02): 0초부터 재생 시
+			//pts 0·11ms 두 프레임을 내보낸 뒤 다음 프레임(7428ms)에서 이 분기가 걸려 타임라인이 7.4초 앞당겨졌고,
+			//그 뒤로 재생 위치와 화면이 계속 어긋났다. VFR 은 대신 오염의 진짜 징표 — anchor 가 seek 목표보다
+			//*앞선* frame 인지 — 를 직접 본다. pre-target skip 을 통과한 정상 emit 는 목표 이상이다.
+			const bool anchor_suspect = dec.is_vfr()
+				? (video_first < m_segment_start - anchor_sanity_rt)
+				: (rtStart > anchor_sanity_rt);
+			if (m_sample_count <= 2 && anchor_suspect)
 			{
 				logWrite(_T("[ffi/src/video/seekgap] anchor 재설정 — sample #%lld 의 rtStart=%lldms 는 비정상(이전 위치 frame 이 anchor 가 됨)"),
 					(long long)m_sample_count, (long long)(rtStart / 10000));
@@ -2093,6 +2138,22 @@ namespace ffi
 			if (m_pVideoStream)
 				return (m_pVideoStream->m_segment_start + m_pVideoStream->last_rtStart()) / 10000;
 			return -1;
+		}
+
+		//20260902 by claude. 프레임이 드문드문 있는 VFR(화면 녹화 webm 등): "마지막 emit frame 의 PTS" 는 재생 시각이
+		//아니다. 한 프레임이 30초를 덮으면 그 30초 동안 값이 그대로라 트랙 시계가 멎어 있다가 다음 프레임에서 한 번에
+		//튄다(사용자 실측 2026-09-02). 재생 중에는 그래프 스트림 클럭으로 읽어 시간이 연속으로 흐르게 한다.
+		//sample.rtStart 를 rate 로 나눠 찍으므로(FillBuffer) 되돌릴 때 rate 를 곱한다.
+		if (m_decoder.is_vfr() && m_pVideoStream)
+		{
+			REFERENCE_TIME st = m_pVideoStream->stream_time_or_neg();
+			if (st < 0)
+				return (m_pVideoStream->m_segment_start + m_pVideoStream->last_rtStart()) / 10000;
+
+			double rate = playback_rate();
+			if (rate <= 0.0)
+				rate = 1.0;
+			return (int64_t)((double)m_pVideoStream->m_segment_start + (double)st * rate) / 10000;
 		}
 
 		//정상 파일: 기존대로 video frame pts 우선 (자막 timing reference), 없으면 audio.

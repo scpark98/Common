@@ -1328,7 +1328,11 @@ Confluence(`koinodoc.atlassian.net`)에 문서를 만들 때는 **무조건 라�
 
 - **Confluence 문서 갱신은 항상 `html` 왕복으로 한다.** `markdown` 으로 받아 되쓰면 목차뿐 아니라 패널(`data-type="panel-*"`)·상태 배지(`data-type="status"`)·작업 목록이 전부 평문으로 뭉개진다. 기존 노드의 `data-local-id` 는 그대로 보존하고, 새로 만드는 노드에는 붙이지 않는다.
 - **내용이 같아도 다시 올릴 때는 이 규칙이 그대로 적용된다.** 캐시를 밀려고 재발행하는 경우, 되돌리려고 옛 판을 다시 올리는 경우 모두 `html` 로 보내야 한다. `markdown` 으로 보내면 "내용은 그대로인데 매크로만 사라진" 판이 새로 만들어진다. 2026-09-01 45645826 문서에서 실제로 그렇게 목차를 날렸다.
-- 문서 최상단에 **`문서 버전: N · 최종 갱신: yyyy-mm-dd hh:mm:ss`** 를 표시한다. 번호는 **Confluence 자체의 버전 번호**를 쓰고 별도 번호 체계를 만들지 않는다. 모든 문서에 같은 형식으로 통일한다(사용자 지시, 2026-09-01).
+- **모든 프로젝트·모든 문서 공통 (강제)** — 문서 최상단에는 **Change History 매크로**를 둔다. 편집 중 `/버전` 으로 삽입하며, 새로 만드는 문서든 기존 문서를 갱신하든 맨 앞에 이 매크로가 있는지 먼저 확인하고 없으면 넣는다. 문서 버전과 최종 갱신 시각이 **자동으로** 표시되므로 손으로 적지 않는다(사용자 지시, 2026-09-02 — *"이 규칙은 다른 모든 프로젝트, 모든 문서 공통이다"*). HTML+ 형식은 다음과 같다(`macroId` 는 넣지 않는다).
+
+```html
+<div data-type="extension" data-extension-key="change-history" data-extension-type="com.atlassian.confluence.macro.core" data-layout="default" data-parameters="{&quot;macroParams&quot;:{},&quot;macroMetadata&quot;:{&quot;schemaVersion&quot;:{&quot;value&quot;:&quot;1&quot;},&quot;title&quot;:&quot;Change History&quot;}}"></div>
+```
 - 절 번호를 바꾸는 편집을 했으면 본문의 상호 참조(`N절`, `N.M 절`)도 함께 고친다. 목차는 제목에서 자동 생성되므로 별도 갱신이 필요 없지만, 본문 참조는 자동으로 따라오지 않는다.
 
 ## 방식이 다른 알고리즘 개선 — 기존 것 유지 + 선택 가능하게 (강제, 모든 프로젝트)

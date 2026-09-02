@@ -277,6 +277,12 @@ public:
 
 	void			set_zigzag_color(Gdiplus::Color cr_back, Gdiplus::Color cr_fore);
 
+	//이미지 바깥 여백과 투명 픽셀 뒤에 깔리는 배경색.
+	//Transparent(default) = 기존 동작. 짙은 회색 바탕 + 투명 픽셀 구간엔 지그재그 격자.
+	//불투명 색을 주면 격자 없이 그 색 단색으로 대체된다 (알파 채널은 무시, RGB 만 사용).
+	void			set_back_color(Gdiplus::Color cr_back);
+	Gdiplus::Color	get_back_color() const { return m_cr_back; }
+
 //animated gif 관련 public member
 	void			play();
 	//재생중이든 아니든 무조건 일시정지로 동작시킨다.
@@ -417,6 +423,8 @@ protected:
 	ID2D1SolidColorBrush* m_brush_pixel_guide = nullptr;
 
 	bool			m_show_cursor_guide_line = false;
+
+	Gdiplus::Color	m_cr_back = Gdiplus::Color::Transparent;	//set_back_color 참조
 
 	//CRect			m_r_pixel;
 	Gdiplus::Color	m_cr_pixel = Gdiplus::Color::Black;

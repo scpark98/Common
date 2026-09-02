@@ -167,7 +167,10 @@ void CSCD2ImageDlg::OnPaint()
 	d2dc->SetTransform(D2D1::Matrix3x2F::Identity());
 
 	//black으로 칠한 후
-	d2dc->Clear(D2D1::ColorF(0.125f, 0.125f, 0.125f));
+	if (m_cr_back.GetA() == 0)
+		d2dc->Clear(D2D1::ColorF(0.125f, 0.125f, 0.125f));
+	else
+		d2dc->Clear(D2D1::ColorF(m_cr_back.GetR() / 255.0f, m_cr_back.GetG() / 255.0f, m_cr_back.GetB() / 255.0f));
 
 
 	if (m_images.size() == 0 || m_images[0].is_empty())
@@ -261,7 +264,8 @@ void CSCD2ImageDlg::OnPaint()
 	//실제 이미지를 그려준다. 투명 이미지인 경우는 배경에 지그재그 패턴을 그려준 후에 실제 이미지를 그려준다.
 	//또한 격자 패턴이 모든 경우에 동일한 격자부터 시작되도록 하기 위해 그 시작 위치를 m_r_display의 left, top 위치로 이동시켜 그려줘야 한다.
 	//브러시 타일링은 기본적으로 0, 0에서 시작되므로 이를 해주지 않으면 그려지는 모양이 창의 위치에 따라 달라진다.
-	if (m_images[0].get_alpha_pixel_count() > 0)
+	//20260902 by claude. 배경색을 지정한 경우엔 격자를 깔지 않는다 — 투명 픽셀 뒤로 그 색이 그대로 보여야 한다.
+	if (m_images[0].get_alpha_pixel_count() > 0 && m_cr_back.GetA() == 0)
 	{
 		auto zigzag = m_d2dc.get_zigzag_brush();
 		float zigzag_size = m_d2dc.get_zigzag_size();
@@ -1389,6 +1393,17 @@ void CSCD2ImageDlg::set_zigzag_color(Gdiplus::Color cr_back, Gdiplus::Color cr_f
 {
 	m_d2dc.set_zigzag_color(cr_back, cr_fore);
 	Invalidate();
+}
+
+void CSCD2ImageDlg::set_back_color(Gdiplus::Color cr_back)
+{
+	if (m_cr_back.GetValue() == cr_back.GetValue())
+		return;
+
+	m_cr_back = cr_back;
+
+	if (GetSafeHwnd())
+		Invalidate();
 }
 
 LRESULT CSCD2ImageDlg::on_message_CSCThumbCtrl(WPARAM wParam, LPARAM lParam)

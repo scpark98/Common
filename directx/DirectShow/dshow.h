@@ -114,6 +114,12 @@ public:
 	//m_frame_rate 에서 가져온다. 호출측은 경로를 신경 쓸 필요가 없다.
 	double			get_video_fps();
 
+	//pos_ms 시각의 프레임 번호(0-base)와 총 프레임 수. 표기·이동이 같은 근거를 쓰게 하는 단일 접근자다.
+	//진짜 VFR 미디어(화면 녹화 webm 등)는 파일에서 만든 실제 frame 인덱스를 쓰고, 그 밖에는 시각×fps 로 환산한다.
+	//VFR 인덱스가 아직 준비되지 않았거나 fps 를 모르면 false — 그때는 프레임 번호를 표시하지 않는다
+	//(시각×fps 는 VFR 에서 실재하지 않는 프레임을 세므로 대체값으로 쓰지 않는다).
+	bool			get_frame_number(double pos_ms, int& frame_index, int& frame_total);
+
 	CString			get_audio_codec_name();
 	int				get_audio_sample_rate();    //Hz
 	int				get_audio_channels();

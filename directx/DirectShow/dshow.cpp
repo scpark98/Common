@@ -2362,6 +2362,27 @@ double CDShow::get_video_fps()
 	return m_frame_rate;
 }
 
+bool CDShow::get_frame_number(double pos_ms, int& frame_index, int& frame_total)
+{
+	ffi::CDecoder* dec = ffi_decoder_or_null(m_pFFiSource);
+	if (dec && dec->is_vfr())
+	{
+		if (!dec->frame_index_ready())
+			return false;
+		frame_index = dec->frame_index_for_ms(pos_ms);
+		frame_total = dec->frame_count();
+		return (frame_index >= 0 && frame_total > 0);
+	}
+
+	double fps = get_video_fps();
+	double dur = get_media_duration();
+	if (fps <= 0.0 || dur <= 0.0)
+		return false;
+	frame_index = (int)(pos_ms * fps / 1000.0 + 0.5);
+	frame_total = (int)(dur * fps / 1000.0 + 0.5);
+	return true;
+}
+
 CString CDShow::get_audio_codec_name()
 {
 	if (m_use_internal_ffmpeg)
@@ -3338,6 +3359,14 @@ int CDShow::load_media_internal_ffmpeg(CString sfile, CWnd* pParent)
 	m_duration   = pFFi->decoder().duration_ms();
 	m_video_size = CSize(pFFi->decoder().video_width(), pFFi->decoder().video_height());
 	m_frame_rate = pFFi->decoder().frame_rate();
+	//20260902 by claude. fps 를 끝내 못 구하면 LAV 경로(1706행)와 같은 값으로 맞춘다. m_frame_rate 가 0 이면
+	//step_frame 의 간격 1000/fps 가 inf 가 되어 anchor·표시 위치가 NaN 으로 오염되고(put_CurrentPosition 이
+	//E_INVALIDARG, 이후 위치가 0 으로 튄다) 1프레임 이동이 통째로 죽는다.
+	if (m_frame_rate <= 1.0)
+	{
+		logWrite(_T("[internal] fps 산출 실패 — %.2f 로 대체 (1프레임 이동 간격이 부정확할 수 있음)"), 29.97);
+		m_frame_rate = 29.97;
+	}
 	//logWrite(_T("[internal] open OK %dx%d fps=%.2f duration=%.0fms"),
 		//m_video_size.cx, m_video_size.cy, m_frame_rate, m_duration);
 
@@ -3936,7 +3965,13 @@ double CDShow::get_track_pos()
 			//pts 라 화면 표시 video frame 보다 A/V offset(수 프레임)만큼 뒤처진다(로그 확정 — 일시정지↔첫 frame-step
 			//시각이 증가처럼 튐). 내장 경로의 실제 표시 frame = last_emitted - interval(렌더러 큐 1)로 보정해 반환.
 			//frame-step 시작 후(m_step_anchor_ms>=0)는 step 이 m_last_track_pos_ms 를 landed(실제 frame)로 갱신하므로 그대로.
-			if (m_pFFiSource && m_step_anchor_ms < 0 && m_frame_rate > 0.0)
+			//20260902 by claude. VFR 은 제외 — 이 보정은 "표시 frame = last_emitted − 1프레임" 을 전제하는데,
+			//프레임 간격이 일정하지 않으면 그 1프레임을 계산할 수 없다. 게다가 화면 녹화 webm 처럼 한 프레임이
+			//수십 초 지속되는 미디어에서는 표시 frame PTS 자체가 재생 시각이 아니다 — 30초 지점에서 25초짜리
+			//프레임을 보고 있으면 위치가 25초로 읽혀, 방향키 상대 이동이 제자리이거나 뒤로 갔다(실측 2026-09-02).
+			//이 경우 seek 목표(m_last_track_pos_ms)가 곧 재생 시각이므로 그것을 그대로 쓴다.
+			ffi::CDecoder* dec_pos = ffi_decoder_or_null(m_pFFiSource);
+			if (m_pFFiSource && m_step_anchor_ms < 0 && m_frame_rate > 0.0 && !(dec_pos && dec_pos->is_vfr()))
 			{
 				ffi::CFFiVideoStream* vs = ((ffi::CFFiSource*)m_pFFiSource)->video_stream();
 				int64_t v = vs ? vs->last_emitted_pts_ms() : -1;
@@ -4234,6 +4269,14 @@ void CDShow::step_frame(bool forward)
 
 	double interval_ms = 1000.0 / m_frame_rate;
 
+	//20260902 by claude. 진짜 VFR 미디어(컨테이너에 avg_frame_rate 가 없는 것 — 화면이 바뀔 때만 프레임을 넣는
+	//화면 녹화 webm 등)는 프레임 간격이 10ms~30s 로 들쭉날쭉해 "1프레임 = interval_ms" 라는 전제 자체가 깨진다.
+	//실측(46프레임/107초 webm): anchor 를 +interval 로 누적하니 실제 표시 프레임과 8초까지 벌어졌고, 그 가짜
+	//위치로 backward seek 해 엉뚱한 지점으로 점프했다. 이 경우에만 디코더에 *실제* 이웃 frame PTS 를 물어
+	//목표를 정한다. CFR 미디어는 이 분기를 타지 않으므로 기존 동작 그대로.
+	ffi::CDecoder* dec = ffi_decoder_or_null(m_pFFiSource);
+	const bool vfr = (dec && dec->is_vfr());
+
 	//fresh = 외부 seek/재생 후 첫 step. backward closed-loop 가 "재생→일시정지 직후(렌더러 큐 1프레임)" 와
 	//"이전 step 으로 큐가 비워진 상태(큐 0)" 를 구분하는 데 사용.
 	bool fresh = (m_step_anchor_ms < 0.0);
@@ -4254,8 +4297,10 @@ void CDShow::step_frame(bool forward)
 			ffi::CFFiSource* src = (ffi::CFFiSource*)m_pFFiSource;
 			int64_t v = src->video_stream() ? src->video_stream()->last_emitted_pts_ms() : -1;
 			v_seed = v;
+			//VFR 은 "표시 frame = last_emitted − 1프레임" 을 계산할 interval 이 없다(프레임 간격이 일정하지 않다).
+			//마지막으로 렌더러에 넘어간 frame 을 그대로 seed 로 쓰고, 첫 step 의 settle 이 실제 착지 PTS 로 재앵커한다.
 			if (v >= 0)
-				m_step_anchor_ms = (double)v - interval_ms;
+				m_step_anchor_ms = vfr ? (double)v : (double)v - interval_ms;
 		}
 		//20260823 by claude. [진단] fresh seed 의 출처와 결과. 여기서 어긋나면 첫 스텝부터 밀린다.
 		logWrite(_T("[step] fresh seed: track_pos=%.1f last_emit=%lld interval=%.3f → anchor=%.1f"),
@@ -4264,7 +4309,9 @@ void CDShow::step_frame(bool forward)
 
 	//forward step: IVideoFrameStep (MPC-VR / EVR 지원) — graph clock 진행 없이 *다음 sample 1 개* 표시.
 	//seek-based step 의 부작용 (sparse keyframe 미디어에서 av_seek_frame BACKWARD 가 forward fallback → 수초 jump) 회피.
-	if (forward)
+	//VFR 은 제외 — 화면은 1프레임 전진하지만 anchor 를 +interval 로 가정할 수 없어 위치가 실제와 벌어진다.
+	//아래 seek 경로에서 앞/뒤 모두 실제 frame PTS 로 이동해 anchor 와 화면이 항상 일치하게 한다.
+	if (forward && !vfr)
 	{
 		CComQIPtr<IVideoFrameStep> pFrameStep(m_pGB);
 		HRESULT hr_can = pFrameStep ? pFrameStep->CanStep(0, NULL) : E_NOINTERFACE;
@@ -4314,7 +4361,35 @@ void CDShow::step_frame(bool forward)
 	//그 중앙인 displayed - 1.5·interval 로 둬 no-move(>prev) / skip(≤prev2) 양쪽에 0.5·interval 여유 확보.
 	bool closed_loop = (vstream && !forward);
 
-	if (closed_loop)
+	//20260902 by claude. VFR 은 앞/뒤 모두 실제 이웃 frame PTS 로 이동한다. seek 은 "첫 pts ≥ target frame" 을
+	//표시하므로 target 을 그 frame 의 PTS 로 정확히 주면 그 frame 에 결정적으로 착지한다(여유 구간 계산 불필요).
+	if (vfr)
+	{
+		double displayed = m_step_anchor_ms;
+
+		//인덱스가 있으면 조회 한 번. 아직 만들어지는 중이면 packet 을 직접 읽어 이웃을 찾는다(느리지만 정확).
+		double neighbor = -1.0;
+		int	   idx_here = dec->frame_index_for_ms(displayed);
+		if (idx_here >= 0)
+			neighbor = dec->frame_pts_at(idx_here + (forward ? 1 : -1));
+		else
+			neighbor = dec->neighbor_frame_pts_ms(displayed, forward);
+
+		logWrite(_T("[step] %s VFR | displayed=%.1f (last_emit=%lld) frame#=%d/%d → 이웃 frame=%.1f"),
+			forward ? _T("FORWARD") : _T("BACKWARD"), displayed,
+			(long long)(vstream ? vstream->last_emitted_pts_ms() : -1),
+			idx_here, dec->frame_count(), neighbor);
+		if (neighbor < 0.0)
+		{
+			//그 방향에 frame 이 없다 = 파일 처음/끝. 화면·anchor 모두 그대로 둔다.
+			logWrite(_T("[step] ==== 종료 | %s 방향에 frame 없음 — 이동 안 함 (anchor=%.1f)"),
+				forward ? _T("앞") : _T("뒤"), m_step_anchor_ms);
+			return;
+		}
+		m_step_anchor_ms = neighbor;
+		closed_loop = (vstream != nullptr);	//forward 도 settle 로 실제 착지 PTS 를 확인해 재앵커.
+	}
+	else if (closed_loop)
 	{
 		//20260823 by claude. 표시 frame PTS = m_step_anchor_ms. 이전엔 last_emitted_pts_ms() 를 썼는데,
 		//그건 *렌더러에 deliver 된* 프레임이라 MPC-VR 의 lookahead 1프레임만큼 표시보다 앞선다. 직전 동작이
@@ -4378,7 +4453,12 @@ void CDShow::step_frame(bool forward)
 		for (; waited < 250 && vstream->emit_seq() == seq0; waited++)
 			::Sleep(1);
 		double target_before_settle = m_step_anchor_ms;
-		m_step_anchor_ms = (double)vstream->last_emitted_pts_ms();	//실제 착지 frame → 다음 step 의 표시 PTS source.
+		//20260902 by claude. VFR 은 target 자체가 *실재하는 frame 의 PTS* 라 착지 지점이 이미 확정이다. 여기서
+		//last_emitted 로 덮으면 settle 이 timeout 났을 때(2560x1600 VP9 는 keyframe 이 멀어 한 프레임 디코드가
+		//250ms 를 넘을 수 있다) 이전 frame 값이 들어와 anchor 가 뒤로 밀리고, 다음 step 이 거기서 출발해 튄다.
+		//emit 대기는 그대로 하되(화면·OSD 가 갱신된 뒤 반환) anchor 는 target 을 유지한다.
+		if (!vfr)
+			m_step_anchor_ms = (double)vstream->last_emitted_pts_ms();	//실제 착지 frame → 다음 step 의 표시 PTS source.
 		m_last_track_pos_ms = m_step_anchor_ms;
 		//20260823 by claude. [진단] settle 이 timeout(250ms) 이면 emit 을 못 기다린 것 — 그 경우 last_emitted 는
 		//*이전* frame 이라 anchor 가 뒤로 안 가고 제자리(또는 역행)가 된다. "값이 변하지 않는" 증상의 유력 후보.
@@ -4388,11 +4468,15 @@ void CDShow::step_frame(bool forward)
 			target_before_settle, m_step_anchor_ms, m_step_anchor_ms - target_before_settle);
 	}
 
-	if (anchor_enter >= 0.0)
+	if (anchor_enter < 0.0)
+		logWrite(_T("[step] ==== 종료 | anchor=%.1f (fresh 진입 — 이동량 기준 없음)"), m_step_anchor_ms);
+	else if (vfr)
+		//VFR 은 프레임 간격이 일정하지 않아 "몇 프레임" 이라는 환산이 성립하지 않는다 — ms 로만 남긴다.
+		logWrite(_T("[step] ==== 종료 | anchor=%.1f 이동=%.1fms (VFR)"),
+			m_step_anchor_ms, m_step_anchor_ms - anchor_enter);
+	else
 		logWrite(_T("[step] ==== 종료 | anchor=%.1f 이동=%.2f프레임"),
 			m_step_anchor_ms, (m_step_anchor_ms - anchor_enter) / interval_ms);
-	else
-		logWrite(_T("[step] ==== 종료 | anchor=%.1f (fresh 진입 — 이동량 기준 없음)"), m_step_anchor_ms);
 }
 
 void CDShow::select_stream(bool video, int index)

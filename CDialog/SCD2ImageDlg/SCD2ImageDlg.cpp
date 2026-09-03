@@ -208,6 +208,18 @@ void CSCD2ImageDlg::OnPaint()
 	else
 		d2dc->Clear(D2D1::ColorF(m_cr_back.GetR() / 255.0f, m_cr_back.GetG() / 255.0f, m_cr_back.GetB() / 255.0f));
 
+	//20260903 by claude. 배경 전체를 투명 격자로. 아래 이미지용 격자와 달리 클라이언트 원점 기준이라
+	//창을 리사이즈해도 격자 위상이 고정된다.
+	if (m_back_zigzag)
+	{
+		auto zigzag = m_d2dc.get_zigzag_brush();
+		if (zigzag)
+		{
+			zigzag->SetTransform(D2D1::Matrix3x2F::Scale(m_d2dc.get_zigzag_size(), m_d2dc.get_zigzag_size()));
+			d2dc->FillRectangle(CRect_to_d2Rect(rc), zigzag.Get());
+		}
+	}
+
 
 	if (m_images.size() == 0 || m_images[0].is_empty())
 	{
@@ -301,7 +313,8 @@ void CSCD2ImageDlg::OnPaint()
 	//또한 격자 패턴이 모든 경우에 동일한 격자부터 시작되도록 하기 위해 그 시작 위치를 m_r_display의 left, top 위치로 이동시켜 그려줘야 한다.
 	//브러시 타일링은 기본적으로 0, 0에서 시작되므로 이를 해주지 않으면 그려지는 모양이 창의 위치에 따라 달라진다.
 	//20260902 by claude. 배경색을 지정한 경우엔 격자를 깔지 않는다 — 투명 픽셀 뒤로 그 색이 그대로 보여야 한다.
-	if (m_images[0].get_alpha_pixel_count() > 0 && m_cr_back.GetA() == 0)
+	//배경 전체가 이미 격자면(m_back_zigzag) 위상이 다른 격자를 겹쳐 그려 이음매가 보이므로 역시 건너뛴다.
+	if (m_images[0].get_alpha_pixel_count() > 0 && m_cr_back.GetA() == 0 && !m_back_zigzag)
 	{
 		auto zigzag = m_d2dc.get_zigzag_brush();
 		float zigzag_size = m_d2dc.get_zigzag_size();
@@ -1437,6 +1450,17 @@ void CSCD2ImageDlg::set_back_color(Gdiplus::Color cr_back)
 		return;
 
 	m_cr_back = cr_back;
+
+	if (GetSafeHwnd())
+		Invalidate();
+}
+
+void CSCD2ImageDlg::set_back_zigzag(bool use)
+{
+	if (m_back_zigzag == use)
+		return;
+
+	m_back_zigzag = use;
 
 	if (GetSafeHwnd())
 		Invalidate();

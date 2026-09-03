@@ -285,6 +285,12 @@ public:
 	void			set_back_color(Gdiplus::Color cr_back);
 	Gdiplus::Color	get_back_color() const { return m_cr_back; }
 
+	//배경 전체를 투명 격자(지그재그)로 채운다 — 이미지 편집기의 투명 표시와 같은 방식.
+	//켜면 set_back_color 지정색보다 우선한다. default = false (기존 동작 유지).
+	//격자 색은 set_zigzag_color 로 바꾼다.
+	void			set_back_zigzag(bool use);
+	bool			get_back_zigzag() const { return m_back_zigzag; }
+
 //animated gif 관련 public member
 	void			play();
 	//재생중이든 아니든 무조건 일시정지로 동작시킨다.
@@ -431,6 +437,7 @@ protected:
 	bool			m_show_cursor_guide_line = false;
 
 	Gdiplus::Color	m_cr_back = Gdiplus::Color::Transparent;	//set_back_color 참조
+	bool			m_back_zigzag = false;					//set_back_zigzag 참조
 
 	//CRect			m_r_pixel;
 	Gdiplus::Color	m_cr_pixel = Gdiplus::Color::Black;

@@ -51,6 +51,19 @@ CSCStatic::CSCStatic()
 
 CSCStatic::~CSCStatic()
 {
+	//20260903 by claude. 둘 다 이 클래스가 소유한다 (set_header_images / set_use_tooltip 이
+	//교체할 때 직접 delete 한다). 소멸자에서만 빠져 있어 인스턴스마다 그대로 샜다.
+	//deep_copy 의 "양쪽 소멸자에서 두 번 delete" 주석도 여기서 해제되는 것을 전제로 쓰여 있다.
+	for (auto* img : m_header_images)
+		delete img;
+	m_header_images.clear();
+
+	if (m_tooltip)
+	{
+		m_tooltip->DestroyWindow();
+		delete m_tooltip;
+		m_tooltip = nullptr;
+	}
 }
 
 BEGIN_MESSAGE_MAP(CSCStatic, CStatic)

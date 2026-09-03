@@ -320,7 +320,10 @@ private:
     Gdiplus::Color	m_cr_text_disabled_override = Gdiplus::Color::Transparent;
     //disabled 색 헬퍼. text: 세터 호출됐으면 override 색, 아니면 시스템 GRAYTEXT. back: m_theme.cr_back_disabled(Transparent 면 LightGray).
     Gdiplus::Color	get_text_color_disabled() const { return m_text_color_disabled_user_set ? m_cr_text_disabled_override : get_sys_color(COLOR_GRAYTEXT); }
-    Gdiplus::Color	get_back_color_disabled() const { return (m_theme.cr_back_disabled.GetA() != 0) ? m_theme.cr_back_disabled : Gdiplus::Color::LightGray; }
+    //20260903 by claude. auto(Transparent) 일 때 LightGray 고정은 밝은 테마에서만 맞고, dark 테마에서는
+    //밝은 회색 판이 배경 위로 튄다. 컨트롤 배경색에서 파생하면 모든 테마가 자기 팔레트 안에서 해결된다.
+    //get_weak_color 는 어두운 색은 밝게, 밝은 색은 어둡게 민다 (CGdiButton 이 normal 에서 파생하는 방식과 동일).
+    Gdiplus::Color	get_back_color_disabled() const { return (m_theme.cr_back_disabled.GetA() != 0) ? m_theme.cr_back_disabled : get_weak_color(m_theme.cr_back, 16); }
     bool		m_password   = false;
     password_mask_shape	m_mask_shape = mask_shape_circle;
     int			m_mask_dot_size   = 0;	//0 = 자동(폰트 높이 기준)

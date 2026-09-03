@@ -262,7 +262,8 @@ protected:
 	//Gdiplus::Color	m_cr_back;
 	//disabled 색은 m_theme.cr_text_disabled / cr_back_disabled 에 저장(Common 공통). 아래 헬퍼로 sentinel(Transparent) 해석.
 	Gdiplus::Color		get_text_color_disabled() const { return (m_theme.cr_text_disabled.GetA() != 0) ? m_theme.cr_text_disabled : get_sys_color(COLOR_GRAYTEXT); }
-	Gdiplus::Color		get_back_color_disabled() const { return (m_theme.cr_back_disabled.GetA() != 0) ? m_theme.cr_back_disabled : Gdiplus::Color::LightGray; }
+	//20260903 by claude. LightGray 고정 -> 배경색 파생. 사유는 CSCStaticEdit::get_back_color_disabled 주석 참조.
+	Gdiplus::Color		get_back_color_disabled() const { return (m_theme.cr_back_disabled.GetA() != 0) ? m_theme.cr_back_disabled : get_weak_color(m_theme.cr_back, 16); }
 
 	//readonly일 때 m_cr_back_readonly를 사용할 지 지정된 배경인 m_cr_back을 사용할 지.
 	//때로는 readonly일 때도 m_cr_back으로 표현해야 하는 경우도 있다.

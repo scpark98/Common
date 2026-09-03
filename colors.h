@@ -625,7 +625,7 @@ public:
 
 	Gdiplus::Color	cr_back;						//BTNFACE	: for CDialog, CButton, CStatic...
 	//disabled 컨트롤의 배경색 (cr_text_disabled 와 한 쌍). 기본 Transparent = "auto":
-	//각 컨트롤이 자기 기존 기본으로 파생(CGdiButton=normal 에서 get_weak_color, CSCEdit/CSCStaticEdit=LightGray).
+	//각 컨트롤이 자기 배경색에서 get_weak_color 로 파생한다(CGdiButton=normal, CSCEdit/CSCStaticEdit=cr_back).
 	//불투명색을 지정하면 그 색을 disabled 배경으로 사용 → 테마가 무채색 gray 대신 팔레트에 맞는 색을 강제할 수 있다.
 	Gdiplus::Color	cr_back_disabled = Gdiplus::Color::Transparent;
 	Gdiplus::Color	cr_back_hover;					//= hover = over = track_select... 다양한 같은 의미가 있으나 hover로 통일하자.

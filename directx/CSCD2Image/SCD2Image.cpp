@@ -258,7 +258,10 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 		return hr;
 	}
 
-	return load(pWICFactory, d2context, pDecoder, auto_play);
+	//20260903 by claude. load() 는 pDecoder 를 보관하지 않으므로 여기서 해제해야 한다.
+	hr = load(pWICFactory, d2context, pDecoder, auto_play);
+	pDecoder->Release();
+	return hr;
 }
 
 HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d2context, CString path, bool auto_play, bool first_frame_only)
@@ -443,6 +446,14 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 			_M(hr, d2context->CreateBitmapFromWicBitmap(pFormatConverter, 0, &img));
 		}
 	}
+
+	//20260903 by claude. CreateBitmapFromMemory 는 픽셀 버퍼를 IWICBitmap 안으로 복사한다.
+	//여기서 Release 하지 않으면 호출 1회당 width*height*4 바이트가 그대로 샌다
+	//(바로 아래 add_frame_from_raw 는 같은 자리에서 Release 하고 있다).
+	if (pFormatConverter)
+		pFormatConverter->Release();
+	if (pWicBitmap)
+		pWicBitmap->Release();
 
 	if (img)
 	{

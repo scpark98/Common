@@ -123,6 +123,8 @@ public:
 	// create() 호출 전에 설정하면 이 D2D 컨텍스트의 Factory/Device를 공유한다.
 	void			set_shared_d2dc(CSCD2Context* pShared) { m_pSharedD2DC = pShared; }
 
+	//인스턴스당 1회만 유효하다. 이미 창이 있으면 아무것도 하지 않고 false 를 반환한다
+	//(크기/부모 변경은 SetWindowPos / SetParent, 재생성은 DestroyWindow() 후 다시 호출).
 	bool			create(CWnd* parent, int x = 0, int y = 0, int cx = 100, int cy = 100);
 
 	enum ENUM_VIEW_MODE
@@ -339,9 +341,13 @@ protected:
 
 	CSCD2Context*			m_pSharedD2DC = nullptr;
 	CSCD2Context			m_d2dc;
-	ID2D1SolidColorBrush*	m_brush;
-	IDWriteFactory*			m_WriteFactory;
-	IDWriteTextFormat*		m_WriteFormat;
+	ID2D1SolidColorBrush*	m_brush = nullptr;
+	IDWriteFactory*			m_WriteFactory = nullptr;
+	IDWriteTextFormat*		m_WriteFormat = nullptr;
+
+	//create() 가 만든 raw COM 포인터 (위 3개 + m_brush_pixel_guide) 를 해제한다.
+	//소멸자와, DestroyWindow() 후 재생성하는 create() 진입부에서 호출.
+	void			release_com_resources();
 
 	//n개의 이미지를 버퍼링하기 위해 deque로 생성(-2, -1, 0, 1, 2)
 	//0이 cur? n개 미만인 경우는 어떻게 저장할 지, 어떤 index가 현재 표시중인 이미지인지 정하기 애매해진다.

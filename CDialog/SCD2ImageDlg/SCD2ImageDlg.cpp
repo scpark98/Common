@@ -21,6 +21,33 @@ CSCD2ImageDlg::CSCD2ImageDlg(CWnd* parent)
 CSCD2ImageDlg::~CSCD2ImageDlg()
 {
 	stop();
+	release_com_resources();
+}
+
+//20260903 by claude. create() 가 만든 raw COM 포인터들. 놓지 않으면 브러시가 ID2D1Device 를,
+//그 디바이스가 D3D11 디바이스와 스왑체인을 계속 붙들어 인스턴스 하나당 수십 MB 가 영구히 남는다.
+void CSCD2ImageDlg::release_com_resources()
+{
+	if (m_brush_pixel_guide)
+	{
+		m_brush_pixel_guide->Release();
+		m_brush_pixel_guide = nullptr;
+	}
+	if (m_brush)
+	{
+		m_brush->Release();
+		m_brush = nullptr;
+	}
+	if (m_WriteFormat)
+	{
+		m_WriteFormat->Release();
+		m_WriteFormat = nullptr;
+	}
+	if (m_WriteFactory)
+	{
+		m_WriteFactory->Release();
+		m_WriteFactory = nullptr;
+	}
 }
 
 void CSCD2ImageDlg::set_simple_mode(bool simple)
@@ -42,6 +69,15 @@ void CSCD2ImageDlg::set_simple_mode(bool simple)
 
 bool CSCD2ImageDlg::create(CWnd* parent, int x, int y, int cx, int cy)
 {
+	//20260903 by claude. 이미 창이 있는 인스턴스에 다시 create() 하면 MFC 가 이전 HWND 를 놓친 채
+	//새 창을 붙이고, 아래에서 만드는 COM 객체 4개도 이전 것을 덮어써 그대로 샌다.
+	//크기/부모를 바꾸려면 SetWindowPos / SetParent 를, 진짜 다시 만들려면 DestroyWindow() 후 호출한다.
+	if (GetSafeHwnd())
+		return false;
+
+	//DestroyWindow() 후의 재생성 경로 — 이전 COM 객체가 남아 있으면 여기서 놓고 새로 만든다.
+	release_com_resources();
+
 	m_parent = parent;
 
 	LONG_PTR dwStyle = WS_CHILD | WS_VISIBLE | WS_CLIPCHILDREN;

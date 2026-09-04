@@ -82,6 +82,15 @@ private:
 	HBITMAP         m_hOldScreenBmp = nullptr;
 	CPoint          m_screen_origin;
 
+	//20260904 by claude. 커서가 속한 모니터 영역. 정보 문자열을 화면 안으로 밀어 넣는 데 쓴다.
+	//16ms 타이머마다 EnumDisplayMonitors 를 돌리지 않도록 커서가 이 사각형을 벗어날 때만 갱신한다.
+	CRect           m_monitor_rect = CRect(0, 0, 0, 0);
+
+	//20260904 by claude. 조합키 안내 띠. 내용이 바뀌지 않으므로 태그 파싱 / 레이아웃을 매 프레임 돌리지 않고
+	//비트맵으로 한 번 구워두고 그리기만 한다.
+	Gdiplus::Bitmap* m_hint_bitmap = nullptr;
+	void            build_hint_bitmap();
+
 	void            capture_screen();
 	void            release_screen();
 	void            update_display();

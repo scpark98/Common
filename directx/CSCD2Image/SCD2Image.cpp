@@ -252,11 +252,11 @@ HRESULT CSCD2Image::load(IWICImagingFactory2* pWICFactory, ID2D1DeviceContext* d
 		&pDecoder);                   // Pointer to the decoder
 
 	// Retrieve the first bitmap frame.
+	//20260904 by claude. 여기 pStream->Release() 가 있었다. pStream 은 ComPtr 이라 소멸자가 이미 놓으므로
+	//이 실패 경로를 타면 참조 카운트가 한 번 더 줄어 이미 해제된 객체를 다시 놓게 된다.
+	//(바로 아래 pDecoder 는 raw 포인터라 명시적 Release 가 맞다.)
 	if (FAILED(hr) || !pDecoder)
-	{
-		pStream->Release();
 		return hr;
-	}
 
 	//20260903 by claude. load() 는 pDecoder 를 보관하지 않으므로 여기서 해제해야 한다.
 	hr = load(pWICFactory, d2context, pDecoder, auto_play);

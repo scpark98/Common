@@ -3,6 +3,7 @@
 #include "../../Functions.h"
 #include "../../cursor_helpers.h"
 #include "../../data_structure/SCParagraph/SCParagraph.h"
+#include "../../win_compat/dpi.h"
 
 IMPLEMENT_DYNAMIC(CSCDropperDlg, CDialog)
 
@@ -20,7 +21,7 @@ END_MESSAGE_MAP()
 static LPCTSTR kRegSection = _T("setting\\color picker\\dropper");
 
 //커서 좌표 / 색상 정보 문자열
-static const float	kInfoFontSize = 14.0f;
+static const float	kInfoFontSize = 12.0f;	//20260904 by claude. 100% 기준으로 정하고 175% 는 scaled 로 1.75배가 된다 (100%=16px).
 static const int	kInfoOffsetY = 32;	//커서 중심에서 아래로 이만큼 떨어진 자리가 기본 위치
 
 //조합키 안내 — 돋보기 원 바깥(위/아래 띠)에 그린다.
@@ -55,13 +56,24 @@ static CRect measure_label(Gdiplus::Graphics& g, CString text, float font_size)
 	return CRect(0, 0, (int)rt.Width + 5, (int)rt.Height + 3);
 }
 
-//draw_text 의 그림자는 rTarget 을 (0,0) 기준 비트맵에 0.4 배로 그린 뒤 되늘리는 방식이라
-//rTarget.left/top 이 0 이 아니면 그림자가 엉뚱한 곳에 놓이거나 아예 잘려나간다.
-//원점에서 시작하는 rect + 우하단 정렬로 넘겨야 문자열도 그림자도 r 자리에 그려진다.
+//rTarget 을 원점에서 시작하는 rect + 우하단 정렬로 넘긴다 — draw_text 는 rTarget.left/top 을
+//기준으로 몇 가지 내부 계산을 하므로 임의 위치 rect 를 주면 결과가 어긋난다.
+//
+//20260904 by claude. shadow_depth 는 0 이어야 한다. draw_text 의 그림자는 글자를 0.4 배로
+//별도 비트맵에 그린 뒤 2.5 배로 되늘리는 방식인데, 그 비트맵은 96 DPI 로 만들어지는 반면
+//본문은 대상 Graphics 의 DPI 로 그려져 배율이 어긋난다. 그 결과 같은 문자열이 크기·위치가 다른
+//두 벌로 겹쳐 보인다 (175% 에서 특히 심함 — 실제 화면에서 확인).
+//thickness 1.0 의 외곽선이 이미 가독성을 담당하므로 그림자는 없어도 된다.
 static void draw_label(Gdiplus::Graphics& g, CRect r, CString text, float font_size,
 	Gdiplus::Color cr_text, Gdiplus::Color cr_shadow)
 {
-	draw_text(g, CRect(0, 0, r.right, r.bottom), text, font_size, Gdiplus::FontStyleBold, 2, 1.0f,
+	//20260904 by claude. 외곽선 두께는 글자 크기에 비례해야 한다. 상수 1.0f 이면
+	//(펜이 path 중앙 정렬이라 눈에 보이는 두께는 그 절반인 0.5px) 175% 의 큰 글자에서 선이 끊겨 보인다.
+	//실제 픽셀 글자 높이의 1/10 정도가 적당하다 — 100% 에서 약 1.9, 175% 에서 약 3.3.
+	const float px = g.GetDpiY() * font_size / 72.0f;
+	const float thickness = max(1.5f, px / 10.0f);
+
+	draw_text(g, CRect(0, 0, r.right, r.bottom), text, font_size, Gdiplus::FontStyleBold, 0, thickness,
 		_T("Arial"), cr_text, cr_shadow, cr_shadow, Gdiplus::Color::Transparent, DT_RIGHT | DT_BOTTOM);
 }
 
@@ -153,7 +165,22 @@ void CSCDropperDlg::build_hint_bitmap()
 
 	CSCTextProperty prop;
 	set_hint_font(prop);
-	prop.size = 9.0f;
+	//20260904 by claude. CSCParagraph::get_paragraph_font 은 emSize = DPI * size / 96 으로 폰트를 만드는데
+	//그 Gdiplus::Font 의 기본 단위가 UnitPoint 라, 포인트→픽셀 변환에서 DPI 가 **한 번 더** 곱해진다.
+	//즉 실제 픽셀 크기가 DPI 의 제곱에 비례한다 — 175% 에서 1.75 배가 아니라 3.06 배가 된다.
+	//(96 DPI 에서는 두 계수가 상쇄돼 드러나지 않는다. 여기서만 Graphics 해상도를 m_dpi 로 올려 쓰기 때문에 보인다.)
+	//같은 비율로 미리 나눠 두면 최종 픽셀 크기가 DPI 에 선형이 된다 — 100% 에서 10px, 175% 에서 17.5px.
+	const float kHintFontPt = 11.0f;	//100% 에서 14.7px.
+
+	//GDI DC 는 per-monitor DPI 를 따라가지 않고 항상 시스템 DPI 를 준다. CSCParagraph 의 측정이 그 DC 를
+	//쓰므로 렌더도 같은 값으로 해야 어긋나지 않는다. 화면에 그릴 때 m_dpi / m_hint_dpi 로 조정한다.
+	{
+		CClientDC probe_dc(this);
+		const int dc_dpi = ::GetDeviceCaps(probe_dc.m_hDC, LOGPIXELSY);
+		m_hint_dpi = (dc_dpi > 0) ? (UINT)dc_dpi : 96;
+	}
+
+	prop.size = kHintFontPt * 96.0f / (float)m_hint_dpi;
 	prop.cr_text = Gdiplus::Color(235, 235, 235);
 
 	std::deque<std::deque<CSCParagraph>> para;
@@ -172,18 +199,22 @@ void CSCDropperDlg::build_hint_bitmap()
 	for (auto& line : para)
 	{
 		for (auto& run : line)
-			run.r.OffsetRect(-bounds.left + kHintPadX, -bounds.top + kHintPadY);
+			run.r.OffsetRect(-bounds.left + ::MulDiv(kHintPadX, m_hint_dpi, 96), -bounds.top + ::MulDiv(kHintPadY, m_hint_dpi, 96));
 	}
 
-	const int bw = bounds.Width() + kHintPadX * 2;
-	const int bh = bounds.Height() + kHintPadY * 2;
+	const int bw = bounds.Width() + ::MulDiv(kHintPadX, m_hint_dpi, 96) * 2;
+	const int bh = bounds.Height() + ::MulDiv(kHintPadY, m_hint_dpi, 96) * 2;
 
 	//ClearType(서브픽셀 AA)은 작은 글씨를 또렷하게 만드는 유일한 수단인데, GDI+ 는 알파 채널이 있는
 	//대상에는 걸어주지 않는다 (레이어드 윈도우에 합성하려면 최종 비트맵은 알파가 있어야 한다).
 	//그래서 글자는 불투명 비트맵에 ClearType 으로 그리고, 라운드 모서리 알파만 따로 만들어 합성한다.
 	//이 때문에 띠 자체는 완전 불투명이 된다 — 반투명으로 두면 ClearType 이 계산해 둔 색 프린지가
 	//바탕과 어긋나 오히려 지저분해진다.
+	//20260904 by claude. 비트맵 해상도를 m_dpi 로 맞춘다. GDI+ 는 Graphics 의 DPI 로 pt→px 를 환산하므로
+	//(기본 96) 이걸 안 맞추면 측정은 창 DC(=m_dpi) 로, 렌더는 비트맵(=96) 으로 하게 되어 글자만 작게 그려진다.
+	//좌표 단위는 그대로 픽셀이다 — 해상도는 폰트 크기와 DrawImage 의 "원본 크기" 해석에만 영향을 준다.
 	Gdiplus::Bitmap text_bmp(bw, bh, PixelFormat32bppRGB);
+	text_bmp.SetResolution((Gdiplus::REAL)m_hint_dpi, (Gdiplus::REAL)m_hint_dpi);
 	{
 		Gdiplus::Graphics gt(&text_bmp);
 		gt.Clear(kHintPlateColor);
@@ -194,13 +225,15 @@ void CSCDropperDlg::build_hint_bitmap()
 	}
 
 	m_hint_bitmap = new Gdiplus::Bitmap(bw, bh, PixelFormat32bppPARGB);
+	//canvas 와 해상도가 다르면 DrawImage(x, y) 가 해상도 비율만큼 확대/축소해 그린다. 같게 맞춰 1:1 로 둔다.
+	m_hint_bitmap->SetResolution((Gdiplus::REAL)m_hint_dpi, (Gdiplus::REAL)m_hint_dpi);
 	{
 		//흰색으로 채운 라운드 사각형 = 알파 마스크. 모서리는 AA 로 부드럽게 떨어진다.
 		Gdiplus::Graphics gm(m_hint_bitmap);
 		gm.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
 
 		draw_round_rect(&gm, Gdiplus::Rect(0, 0, bw, bh),
-			Gdiplus::Color::Transparent, Gdiplus::Color::White, 6);
+			Gdiplus::Color::Transparent, Gdiplus::Color::White, ::MulDiv(6, m_hint_dpi, 96));
 	}
 
 	//마스크의 알파를 그대로 두고, 색만 ClearType 렌더 결과로 갈아끼운다 (PARGB 라 알파를 곱해 넣는다).
@@ -262,6 +295,16 @@ void CSCDropperDlg::release_screen()
 	}
 }
 
+int CSCDropperDlg::scaled(int px_at_96dpi) const
+{
+	return win_compat::dpi::scale(px_at_96dpi, m_dpi);
+}
+
+float CSCDropperDlg::scaled_f(float px_at_96dpi) const
+{
+	return win_compat::dpi::scale_f(px_at_96dpi, m_dpi);
+}
+
 // --- 생성 ---
 bool CSCDropperDlg::create(CWnd* parent)
 {
@@ -281,6 +324,21 @@ bool CSCDropperDlg::create(CWnd* parent)
 		release_screen();
 		return false;
 	}
+
+	//20260904 by claude. DPI 를 읽기 전에 창을 커서 위치로 옮긴다.
+	//CreateEx 는 창을 (0,0) 에 만드는데 그 자리는 항상 주 모니터다. 그 상태로 DC 를 읽으면
+	//커서가 어느 모니터에 있든 주 모니터의 DPI 가 나와, 100% 모니터에서 띄워도 175% 크기로 떴다.
+	{
+		POINT pt = {};
+		::GetCursorPos(&pt);
+		::SetWindowPos(m_hWnd, NULL, pt.x, pt.y, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+	}
+
+	//UI 크기 기준 DPI. **GDI DC 로 읽으면 안 된다** — GetDeviceCaps(LOGPIXELSY) 는 창이 어느 모니터에
+	//있든 항상 *시스템* DPI(주 모니터 배율)를 돌려준다. 실측으로 확인했다:
+	//100% 모니터의 창에서 GetDpiForWindow=96 인데 창 DC 의 LOGPIXELSY 는 168 이었다.
+	//그래서 100% 모니터에서도 돋보기가 175% 크기로 떴다.
+	m_dpi = win_compat::dpi::for_window(m_hWnd);
 
 	//20260904 by claude. 전역 단축키로 띄우면 이 프로세스가 포그라운드가 아니라 창을 만들어도 키 입력이
 	//직전 앱으로 간다 — ESC 취소 / 방향키 이동 / 휠 조작이 모두 먹지 않는다.
@@ -309,7 +367,15 @@ void CSCDropperDlg::update_display()
 	//20260904 by claude. 모니터가 바뀔 때만 다시 찾는다 — get_monitor_index / get_monitor_rect 는
 	//호출할 때마다 EnumDisplayMonitors 를 돌리므로 16ms 타이머에서 매번 부르면 낭비다.
 	if (!m_monitor_rect.PtInRect(cursor))
+	{
 		m_monitor_rect = get_monitor_rect(get_monitor_index(cursor.x, cursor.y));
+
+		//20260904 by claude. 돋보기는 커서를 따라 모니터를 넘나든다. 배율이 다른 모니터로 넘어가면
+		//원 크기 / 문자열 / 안내 띠가 이전 배율 그대로 남으므로 여기서 같이 갱신한다.
+		//DPI 를 창 DC 에서 읽는 이유는 create() 주석 참조 (문자열 측정과 같은 값이어야 한다).
+		//커서가 있는 모니터의 DPI 를 쓴다. 창 DC 는 항상 시스템 DPI 라 쓸 수 없다 (create() 주석 참조).
+		m_dpi = win_compat::dpi::for_point(cursor);
+	}
 
 	const int half = m_sample / 2;
 	const int srcX = cursor.x - m_screen_origin.x - half;
@@ -331,7 +397,8 @@ void CSCDropperDlg::update_display()
 	for (int i = 0, n = m_sample * m_sample; i < n; ++i)
 		pCapBits[i * 4 + 3] = 0xFF;
 
-	const int ws = m_wnd_size;
+	//m_wnd_size 는 96 DPI 기준 값(레지스트리에 그대로 저장). 그릴 때만 물리 픽셀로 환산한다.
+	const int ws = scaled(m_wnd_size);
 
 	Gdiplus::Bitmap content(ws, ws, PixelFormat32bppPARGB);
 	{
@@ -363,7 +430,7 @@ void CSCDropperDlg::update_display()
 
 		const float cx = half * cs;
 		const float cy = half * cs;
-		Gdiplus::Pen centerPen(Gdiplus::Color(220, 255, 255, 255), 1.5f);
+		Gdiplus::Pen centerPen(Gdiplus::Color(220, 255, 255, 255), scaled_f(1.5f));
 		cg.DrawRectangle(&centerPen, cx, cy, cs, cs);
 	}
 
@@ -380,9 +447,12 @@ void CSCDropperDlg::update_display()
 		rgb.Format(_T("%dx%d (%s)"), cursor.x - m_screen_origin.x, cursor.y - m_screen_origin.y, get_color_str(m_center_color));
 
 		build_hint_bitmap();
-		rhint.SetRect(0, 0, (int)m_hint_bitmap->GetWidth(), (int)m_hint_bitmap->GetHeight());
+		//비트맵은 m_hint_dpi(=시스템 DPI) 로 구워져 있다. 화면 표시 크기는 m_dpi 기준이어야 하므로 비율로 환산한다.
+		rhint.SetRect(0, 0,
+			::MulDiv((int)m_hint_bitmap->GetWidth(),  m_dpi, m_hint_dpi),
+			::MulDiv((int)m_hint_bitmap->GetHeight(), m_dpi, m_hint_dpi));
 
-		band = max(kHintBandHeight, rhint.Height() + 4);
+		band = max(scaled(kHintBandHeight), rhint.Height() + scaled(4));
 		if (cw < rhint.Width())
 			cw = rhint.Width();
 	}
@@ -391,7 +461,9 @@ void CSCDropperDlg::update_display()
 	const int ox = (cw - ws) / 2;	//캔버스 안에서 돋보기 원의 좌상단
 	const int oy = band;
 
+	//좌표 폰트(kInfoFontSize)의 pt→px 환산과 안내 띠 DrawImage 가 1:1 이 되도록 해상도를 맞춘다 (위 build_hint_bitmap 참조).
 	Gdiplus::Bitmap canvas(cw, ch, PixelFormat32bppPARGB);
+	canvas.SetResolution((Gdiplus::REAL)m_dpi, (Gdiplus::REAL)m_dpi);
 	{
 		Gdiplus::Graphics g(&canvas);
 		g.SetSmoothingMode(Gdiplus::SmoothingMode::SmoothingModeAntiAlias);
@@ -404,10 +476,10 @@ void CSCDropperDlg::update_display()
 		g.FillEllipse(&tb,
 			Gdiplus::RectF((float)ox, (float)oy, (float)ws, (float)ws));
 
-		Gdiplus::Pen borderPen(Gdiplus::Color(200, 60, 60, 60), 2.5f);
+		Gdiplus::Pen borderPen(Gdiplus::Color(200, 60, 60, 60), scaled_f(2.5f));
 		g.DrawEllipse(&borderPen,
-			ox + 1.5f, oy + 1.5f,
-			(float)(ws - 3), (float)(ws - 3));
+			ox + scaled_f(1.5f), oy + scaled_f(1.5f),
+			(float)(ws - scaled(3)), (float)(ws - scaled(3)));
 
 		if (m_show_info)
 		{
@@ -419,11 +491,11 @@ void CSCDropperDlg::update_display()
 			rc_visible.OffsetRect(-org.x, -org.y);
 
 			CRect rinfo = measure_label(g, rgb, kInfoFontSize);
-			rinfo.OffsetRect(ox + (ws - rinfo.Width()) / 2, oy + ws / 2 + kInfoOffsetY - rinfo.Height() / 2);
+			rinfo.OffsetRect(ox + (ws - rinfo.Width()) / 2, oy + ws / 2 + scaled(kInfoOffsetY) - rinfo.Height() / 2);
 
 			//커서 아래가 잘리면 위로 뒤집는다. 남는 어긋남과 좌우는 밀어서 맞춘다.
 			if (rinfo.bottom > rc_visible.bottom)
-				rinfo.OffsetRect(0, -2 * kInfoOffsetY);
+				rinfo.OffsetRect(0, -2 * scaled(kInfoOffsetY));
 			clamp_into(rinfo, rc_visible);
 
 			Gdiplus::Color cr_text;
@@ -436,7 +508,8 @@ void CSCDropperDlg::update_display()
 				rhint.OffsetRect(0, -(ws + band));
 			clamp_into(rhint, rc_visible);
 
-			g.DrawImage(m_hint_bitmap, rhint.left, rhint.top);
+			g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
+			g.DrawImage(m_hint_bitmap, Gdiplus::Rect(rhint.left, rhint.top, rhint.Width(), rhint.Height()));
 		}
 	}
 

@@ -86,6 +86,21 @@ private:
 	//16ms 타이머마다 EnumDisplayMonitors 를 돌리지 않도록 커서가 이 사각형을 벗어날 때만 갱신한다.
 	CRect           m_monitor_rect = CRect(0, 0, 0, 0);
 
+	//20260904 by claude. UI 크기 기준 DPI. 호출 앱이 Per-Monitor DPI 인식이면 물리 픽셀을 직접
+	//다루므로, 코드/레지스트리에 있는 96 DPI 기준 크기를 그대로 쓰면 175% 모니터에서 57% 로 보인다.
+	//m_wnd_size 는 96 DPI 기준 값으로 보관하고(레지스트리 값이 배율마다 달라지지 않도록)
+	//그릴 때만 scaled() 로 환산한다.
+	//주의: m_sample(확대해서 보여줄 화면 픽셀 수)은 물리 픽셀이 곧 의미이므로 스케일하지 않는다.
+	//DPI-unaware 앱에서는 96 이 돌아와 기존 동작 그대로다.
+	UINT            m_dpi = 96;
+
+	//20260904 by claude. 안내 띠 비트맵을 구울 때 쓴 DPI. GDI DC 는 per-monitor DPI 를 따라가지 않고
+	//항상 시스템 DPI 를 돌려주는데, CSCParagraph 의 문자열 측정이 그 DC 를 쓰므로 렌더도 같은 값으로 해야
+	//측정과 어긋나지 않는다. 화면에 그릴 때 m_dpi / m_hint_dpi 비율로 확대·축소한다.
+	UINT            m_hint_dpi = 96;
+	int             scaled(int px_at_96dpi) const;
+	float           scaled_f(float px_at_96dpi) const;
+
 	//20260904 by claude. 조합키 안내 띠. 내용이 바뀌지 않으므로 태그 파싱 / 레이아웃을 매 프레임 돌리지 않고
 	//비트맵으로 한 번 구워두고 그리기만 한다.
 	Gdiplus::Bitmap* m_hint_bitmap = nullptr;

@@ -202,15 +202,21 @@ void CSCD2ImageDlg::OnPaint()
 	d2dc->BeginDraw();
 	d2dc->SetTransform(D2D1::Matrix3x2F::Identity());
 
+	//20260904 by claude. 알파 0 = 배경색 미지정. 알파 255 미만이면 반투명이라 격자 위에 덮어 그린다.
+	const int back_alpha = m_cr_back.GetA();
+	const bool back_translucent = (back_alpha > 0 && back_alpha < 255);
+
 	//black으로 칠한 후
-	if (m_cr_back.GetA() == 0)
-		d2dc->Clear(D2D1::ColorF(0.125f, 0.125f, 0.125f));
-	else
+	if (back_alpha == 255)
 		d2dc->Clear(D2D1::ColorF(m_cr_back.GetR() / 255.0f, m_cr_back.GetG() / 255.0f, m_cr_back.GetB() / 255.0f));
+	else
+		d2dc->Clear(D2D1::ColorF(0.125f, 0.125f, 0.125f));
 
 	//20260903 by claude. 배경 전체를 투명 격자로. 아래 이미지용 격자와 달리 클라이언트 원점 기준이라
 	//창을 리사이즈해도 격자 위상이 고정된다.
-	if (m_back_zigzag)
+	//20260904 by claude. 반투명 배경색도 격자를 먼저 깐다 — 격자 없이 알파만 낮추면 어두운 단색과 구분되지 않아
+	//배경이 반투명이라는 사실이 화면에 드러나지 않는다 (이미지 편집기가 투명도를 보여주는 방식과 같다).
+	if (m_back_zigzag || back_translucent)
 	{
 		auto zigzag = m_d2dc.get_zigzag_brush();
 		if (zigzag)
@@ -218,6 +224,16 @@ void CSCD2ImageDlg::OnPaint()
 			zigzag->SetTransform(D2D1::Matrix3x2F::Scale(m_d2dc.get_zigzag_size(), m_d2dc.get_zigzag_size()));
 			d2dc->FillRectangle(CRect_to_d2Rect(rc), zigzag.Get());
 		}
+	}
+
+	if (back_translucent)
+	{
+		ComPtr<ID2D1SolidColorBrush> br_back;
+		d2dc->CreateSolidColorBrush(
+			D2D1::ColorF(m_cr_back.GetR() / 255.0f, m_cr_back.GetG() / 255.0f, m_cr_back.GetB() / 255.0f, back_alpha / 255.0f),
+			br_back.GetAddressOf());
+		if (br_back)
+			d2dc->FillRectangle(CRect_to_d2Rect(rc), br_back.Get());
 	}
 
 

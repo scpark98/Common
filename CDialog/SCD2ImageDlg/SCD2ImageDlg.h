@@ -279,9 +279,10 @@ public:
 
 	void			set_zigzag_color(Gdiplus::Color cr_back, Gdiplus::Color cr_fore);
 
-	//이미지 바깥 여백과 투명 픽셀 뒤에 깔리는 배경색.
-	//Transparent(default) = 기존 동작. 짙은 회색 바탕 + 투명 픽셀 구간엔 지그재그 격자.
-	//불투명 색을 주면 격자 없이 그 색 단색으로 대체된다 (알파 채널은 무시, RGB 만 사용).
+	//이미지 바깥 여백과 투명 픽셀 뒤에 깔리는 배경색. 알파에 따라 세 가지로 동작한다.
+	//  알파 0   (default) = 미지정. 짙은 회색 바탕 + 투명 픽셀 구간엔 지그재그 격자 (기존 동작).
+	//  알파 255           = 격자 없이 그 색 단색.
+	//  알파 1~254         = 투명 격자를 깐 뒤 그 위에 알파를 살려 덮는다. 배경이 반투명임이 눈에 보인다.
 	void			set_back_color(Gdiplus::Color cr_back);
 	Gdiplus::Color	get_back_color() const { return m_cr_back; }
 

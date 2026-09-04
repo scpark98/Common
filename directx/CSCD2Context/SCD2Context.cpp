@@ -3,6 +3,18 @@
 #pragma comment(lib, "d2d1.lib")
 #pragma comment(lib, "d3d11.lib")
 
+//20260904 by claude. D2D 렌더 타겟의 DPI. 96 = DIP 가 곧 물리 픽셀.
+//이 컨텍스트를 쓰는 코드는 전부 좌표·크기를 *픽셀* 로 넘긴다 — 스왑체인 버퍼도 클라이언트 rect 픽셀
+//크기로 만들고, 이미지도 픽셀 단위로 그린다. 여기에 96 이외의 값을 주면 D2D 가 DIP→픽셀 변환에서
+//그 비율만큼 확대해 그려, 화면 캡처·이미지 뷰어의 1:1 표시가 통째로 깨진다.
+//
+//원래는 GetDpiForWindow(::GetDesktopWindow()) 였다. 이름만 보면 배율을 따라갈 것 같지만
+//GetDpiForWindow 는 desktop(루트) 윈도우에 대해 배율과 무관하게 항상 96 을 돌려준다 —
+//2026-09-04 에 175%/100% 혼합 환경에서 직접 측정해 확인했다(모니터 effective=168,
+//GetDpiForSystem()=168 인데도 그 호출만 96). 즉 값은 늘 96 이었고 동작은 이 상수와 동일하다.
+//다만 표현이 "DPI 를 따라간다" 로 오독되어 다음 사람이 또 의심하게 되므로 상수로 고정한다.
+static const FLOAT kTargetDpi = 96.0f;
+
 CSCD2Context::CSCD2Context()
 {
 }
@@ -120,7 +132,7 @@ HRESULT CSCD2Context::init(HWND hWnd, CSCD2Context* pShared, int cx, int cy)
 		if (FAILED(hr)) return hr;
 
 		ComPtr<ID2D1Bitmap1> bitmap;
-		FLOAT dpi = (FLOAT)GetDpiForWindow(::GetDesktopWindow());
+		FLOAT dpi = kTargetDpi;
 		D2D1_BITMAP_PROPERTIES1 props = D2D1::BitmapProperties1(
 			D2D1_BITMAP_OPTIONS_TARGET | D2D1_BITMAP_OPTIONS_CANNOT_DRAW,
 			D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED),
@@ -185,7 +197,7 @@ HRESULT CSCD2Context::create_device_resources()
 		if (SUCCEEDED(hr))
 		{
 			FLOAT dpiX, dpiY;
-			dpiX = (FLOAT)GetDpiForWindow(::GetDesktopWindow());
+			dpiX = kTargetDpi;
 			dpiY = dpiX;
 
 			D2D1_BITMAP_PROPERTIES1 properties = D2D1::BitmapProperties1(
@@ -373,7 +385,7 @@ HRESULT CSCD2Context::on_size_changed(int cx, int cy)
 	if (SUCCEEDED(hr))
 	{
 		FLOAT dpiX, dpiY;
-		dpiX = (FLOAT)GetDpiForWindow(::GetDesktopWindow());
+		dpiX = kTargetDpi;
 		dpiY = dpiX;
 		D2D1_BITMAP_PROPERTIES1 properties = D2D1::BitmapProperties1(
 			D2D1_BITMAP_OPTIONS_TARGET | D2D1_BITMAP_OPTIONS_CANNOT_DRAW,

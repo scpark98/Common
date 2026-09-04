@@ -148,10 +148,19 @@ bool CSCD2ImageDlg::create(CWnd* parent, int x, int y, int cx, int cy)
 		set_interpolation_mode((D2D1_BITMAP_INTERPOLATION_MODE)AfxGetApp()->GetProfileInt(_T("setting\\CSCD2ImageDlg"), _T("interpolation mode"), D2D1_BITMAP_INTERPOLATION_MODE_LINEAR));
 	}
 
-	fit2ctrl(AfxGetApp()->GetProfileInt(_T("setting\\CSCD2ImageDlg"), _T("fit to ctrl"), true));
+	//20260904 by claude. 이 두 줄이 !m_simple_mode 블록 밖에 있어서, 뷰어가 아닌 simple_mode 인스턴스도
+	//앱 전역 뷰어 배율을 물려받았다 (SCDeskTools 캡처 노트가 직전 노트의 배율로 뜨던 원인).
+	//simple_mode 는 "뷰어가 아니라 이미지 한 장을 보여주는 자식 컨트롤" 이므로 전역 설정과 무관해야 한다.
+	//쓰는 쪽 차단은 fit2ctrl() / zoom() 안에 있다.
+	if (m_simple_mode)
+		fit2ctrl(true);
+	else
+	{
+		fit2ctrl(AfxGetApp()->GetProfileInt(_T("setting\\CSCD2ImageDlg"), _T("fit to ctrl"), true));
 
-	if (!m_fit2ctrl)
-		zoom(get_profile_value(_T("setting\\CSCD2ImageDlg"), _T("zoom ratio"), 1.0));
+		if (!m_fit2ctrl)
+			zoom(get_profile_value(_T("setting\\CSCD2ImageDlg"), _T("zoom ratio"), 1.0));
+	}
 
 	return true;
 }
@@ -842,7 +851,10 @@ void CSCD2ImageDlg::set_render_angle(double deg)
 void CSCD2ImageDlg::fit2ctrl(bool fit, bool invalidate)
 {
 	m_fit2ctrl = fit;
-	AfxGetApp()->WriteProfileInt(_T("setting\\CSCD2ImageDlg"), _T("fit to ctrl"), m_fit2ctrl);
+
+	//20260904 by claude. simple_mode 는 앱 전역 뷰어 설정을 읽지도 쓰지도 않는다 (create() 주석 참조).
+	if (!m_simple_mode)
+		AfxGetApp()->WriteProfileInt(_T("setting\\CSCD2ImageDlg"), _T("fit to ctrl"), m_fit2ctrl);
 
 	if (invalidate)
 		rerender();
@@ -859,7 +871,10 @@ void CSCD2ImageDlg::zoom(int mode)
 		m_zoom = 1.0;
 
 	Clamp(m_zoom, 0.2, 40.0);
-	write_profile_value(_T("setting\\CSCD2ImageDlg"), _T("zoom ratio"), m_zoom);
+
+	//20260904 by claude. simple_mode 는 앱 전역 뷰어 설정을 읽지도 쓰지도 않는다 (create() 주석 참조).
+	if (!m_simple_mode)
+		write_profile_value(_T("setting\\CSCD2ImageDlg"), _T("zoom ratio"), m_zoom);
 
 	//m_fit2ctrl의 값을 직접 변경하지 말고 fit2ctrl() 함수를 호출해야만
 	//registry에 설정이 저장된다.
@@ -873,7 +888,10 @@ void CSCD2ImageDlg::zoom(double ratio)
 {
 	m_zoom = ratio;
 	Clamp(m_zoom, 0.2, 40.0);
-	write_profile_value(_T("setting\\CSCD2ImageDlg"), _T("zoom ratio"), m_zoom);
+
+	//20260904 by claude. simple_mode 는 앱 전역 뷰어 설정을 읽지도 쓰지도 않는다 (create() 주석 참조).
+	if (!m_simple_mode)
+		write_profile_value(_T("setting\\CSCD2ImageDlg"), _T("zoom ratio"), m_zoom);
 
 	fit2ctrl(false, false);
 	rerender();

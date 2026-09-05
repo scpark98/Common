@@ -579,7 +579,13 @@ void CSCMenu::PreSubclassWindow()
 
 BOOL CSCMenu::PreTranslateMessage(MSG* pMsg)
 {
-	if (pMsg->message == WM_KEYDOWN)
+	//20260905 by claude. 표시 중일 때만 키를 처리한다.
+	//MFC 의 WalkPreTranslateTree 는 *포커스 창부터* 부모 방향으로 올라가며 PreTranslateMessage 를 부른다.
+	//숨겨진 메뉴 창이 포커스를 쥐고 있으면 아래 분기가 먼저 돌아 VK_SPACE / 방향키 / ESC / access key 를
+	//return TRUE 로 삼켜, 정작 그 키를 처리해야 할 부모 창까지 메시지가 가지 못한다.
+	//(실측: 앱 시작 직후 포커스가 숨은 CSCMenu 에 있어 스페이스바 재생·방향키가 통째로 죽었다.)
+	//숨겨진 메뉴에는 over item 도 없어 activate_over_item / navigate_over 가 의미 없으므로 손해도 없다.
+	if (pMsg->message == WM_KEYDOWN && IsWindowVisible())
 	{
 		UINT key = (UINT)pMsg->wParam;
 		switch (key)
@@ -1946,7 +1952,13 @@ void CSCMenu::recalc_items_rect()
 
 	rw.bottom = rw.top + total_height + 4 + border.cy * 2;	//2=margin(equal to top margin), 8 = border height? * 2
 
-	SetWindowPos(&wndTopMost, 0, 0, rw.Width(), rw.Height(), SWP_NOMOVE);
+	//20260905 by claude. SWP_NOACTIVATE 필수 — 이 플래그가 없으면 SetWindowPos 가 창을 활성화하고,
+	//WS_POPUP 최상위 창이 활성화되면 키보드 포커스가 그리로 넘어온다. 이 함수는 set_color_theme /
+	//set_line_height / set_thumbnail_size / 모든 add_* 에서 불리므로, 화면에 뜨지도 않은 메뉴가
+	//사용자의 포커스를 조용히 뺏어갔다. (Endorphin2: 시작 직후 스페이스바·방향키가 통째로 죽었다 —
+	//포커스를 쥔 숨은 메뉴의 PreTranslateMessage 가 그 키들을 먼저 삼켰다.)
+	//메뉴가 포커스를 가져야 하는 시점은 popup_menu 가 표시할 때뿐이다.
+	SetWindowPos(&wndTopMost, 0, 0, rw.Width(), rw.Height(), SWP_NOMOVE | SWP_NOACTIVATE);
 }
 
 void CSCMenu::OnPaint()

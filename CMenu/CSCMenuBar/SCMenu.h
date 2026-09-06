@@ -146,6 +146,13 @@ public:
 
 	bool			create(CWnd* parent, int width = 220);
 
+	//20260905 by claude. 창 생성을 첫 popup_menu() 까지 미룬다. 인자만 보관하고 아무것도 만들지 않는다.
+	//서브메뉴를 여러 개 붙일 때, 사용자가 실제로 펼치지 않는 것까지 창을 만드는 비용을 없앤다.
+	//windowless 동안 add_* / set_* 는 recalc_items_rect() 가 조기 반환하므로 사실상 공짜다.
+	//(Endorphin2 실측: 북마크 서브메뉴 38개 = 창 생성 65ms + setter 36ms 가 첫 우클릭마다 들었다.)
+	//생성 시점이 늦어질 뿐 create() 와 결과는 같다. 즉시 창이 필요하면 기존 create() 를 쓴다.
+	bool			create_deferred(CWnd* parent, int width = 220);
+
 	//resource 의 sub-popup 을 직접 load. idx0 = LoadMenu 직후 첫 번째 GetSubMenu, idx1 = 그 안의 nested sub-popup (생략 시 1 단계만).
 	//IDR 의 nested 구조: load(IDR, 0, 4) = LoadMenu().GetSubMenu(0).GetSubMenu(4).
 	//include_popup_placeholder=true 시 POPUP (sub menu) 항목 + VS 가 빈 POPUP 을 down-grade 한 MENUITEM id=0xFFFF 도
@@ -363,6 +370,11 @@ protected:
 	int				m_line_height;
 	int				m_thumb_w = 80;
 	int				m_thumb_h = 45;
+	//create_deferred() 로 보관해 둔 인자. m_deferred_parent 가 비어 있지 않고 창이 없으면
+	//popup_menu() 가 이 값으로 create() 를 부른다.
+	CWnd*			m_deferred_parent = nullptr;
+	int				m_deferred_width = 0;
+
 	int				m_min_width = 220;		//create() 시 전달된 너비 — 항목 측정값이 이보다 크면 그만큼 확장.
 	int				m_update_depth = 0;		//>0 이면 recalc_items_rect() 보류 (begin_update/end_update bulk add 최적화).
 	//항목이 추가/삭제되거나 m_line_height가 변경되면 반드시 rect정보를 갱신해줘야 한다.

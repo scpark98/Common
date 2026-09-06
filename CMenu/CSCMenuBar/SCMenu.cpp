@@ -802,7 +802,8 @@ void CSCMenu::popup_submenu_for(int over_index)
 		return;	//disabled 항목은 hover/click/keyboard 모든 경로에서 sub popup 차단.
 	if (item->m_type != CSCMenuItem::item_submenu || !item->m_sub_menu)
 		return;
-	if (item->m_sub_menu->IsWindowVisible())
+	//20260905 by claude. create_deferred() 로 아직 창이 없을 수 있다 — CWnd::IsWindowVisible 은 그때 ASSERT.
+	if (::IsWindow(item->m_sub_menu->m_hWnd) && item->m_sub_menu->IsWindowVisible())
 		return;
 
 	CRect rItem = item->m_r;
@@ -1274,6 +1275,17 @@ void CSCMenu::OnSize(UINT nType, int cx, int cy)
 	// TODO: Add your message handler code here
 }
 
+//20260905 by claude. 창 생성을 첫 popup_menu() 까지 미룬다 — 선언부 주석 참조.
+//부모·너비는 create() 와 같은 시점에 반영해, 생성 전에도 이 두 값을 읽는 코드가 정상 동작하게 한다.
+bool CSCMenu::create_deferred(CWnd* parent, int width)
+{
+	m_deferred_parent = parent;
+	m_deferred_width = width;
+	m_parent = parent;
+	m_min_width = width;
+	return true;
+}
+
 bool CSCMenu::create(CWnd* parent, int width)
 {
 	m_parent = parent;
@@ -1559,9 +1571,12 @@ void CSCMenu::popup_menu(int x, int y)
 	if (GetTickCount() - m_dismiss_tick < 80)
 		return;
 
+	//20260905 by claude. create_deferred() 로 미뤄둔 창을 여기서 만든다 — 실제로 펼칠 때가 처음이다.
+	if (!::IsWindow(m_hWnd) && m_deferred_parent != nullptr)
+		create(m_deferred_parent, m_deferred_width);
+
 	m_over_item = -1;
-	m_scroll_offset = 0;
-	m_scrollable = false;
+	m_scroll_offset = 0;	m_scrollable = false;
 	m_max_scroll = 0;
 	m_auto_scroll_dir = 0;
 	m_submenu_ever_opened = false;	//새 popup session — 첫 hover 는 delay, 이후엔 즉시 전환.
@@ -1703,7 +1718,8 @@ void CSCMenu::set_line_height(int _line_height)
 
 	m_line_height = _line_height;
 	recalc_items_rect();
-	Invalidate();
+	if (m_hWnd)
+		Invalidate();
 }
 
 CSCMenu& CSCMenu::set_font(LOGFONT& lf)
@@ -1784,7 +1800,8 @@ void CSCMenu::set_color_theme(int theme, bool apply_now)
 	}
 
 	if (apply_now)
-		Invalidate();
+		if (m_hWnd)
+			Invalidate();
 }
 */
 //선택된 메뉴ID를 전달한다.
@@ -2252,7 +2269,8 @@ void CSCMenu::set_back_image(CSCGdiplusBitmap* img)
 		return;
 
 	img->deep_copy(&m_img_back);
-	Invalidate();
+	if (m_hWnd)
+		Invalidate();
 }
 
 void CSCMenu::OnNcCalcSize(BOOL bCalcValidRects, NCCALCSIZE_PARAMS* lpncsp)

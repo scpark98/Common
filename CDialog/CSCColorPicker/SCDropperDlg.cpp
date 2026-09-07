@@ -36,15 +36,15 @@ static const int	kHintPadY = 5;
 static const Gdiplus::Color kHintPlateColor = Gdiplus::Color(20, 20, 20);
 
 static LPCTSTR		kHintText =
-	_T("<cr=#FFD54F>휠</cr> : 배율 조정      ")
-	_T("<cr=#FFD54F>Shift+휠</cr> : 배율 크게 조정      ")
-	_T("<cr=#FFD54F>Ctrl+휠</cr> : 창 크기 조정")
+	_T("<cr=#FFD54F>휠</cr> : 배율 조정   <t>")
+	_T("<cr=#FFD54F>Shift+휠</cr> : 배율 크게 조정   <t>")
+	_T("<cr=#FFD54F>Ctrl+휠</cr> : 창 크기 조정   <t>")
+	_T("<cr=#FFD54F>ESC</cr> : 취소")
 	_T("<br>")
-	_T("<cr=#FFD54F>방향키</cr> : 1픽셀 이동      ")
-	_T("<cr=#FFD54F>Shift+방향키</cr> : 8픽셀 이동      ")
-	_T("<cr=#FFD54F>좌클릭</cr> : 색 선택      ")
-	_T("<cr=#FFD54F>휠클릭</cr> : 좌표·안내 On/Off      ")
-	_T("<cr=#FFD54F>ESC</cr> : 취소");
+	_T("<cr=#FFD54F>방향키</cr> : 1픽셀 이동   <t>")
+	_T("<cr=#FFD54F>Shift+방향키</cr> : 8픽셀 이동   <t>")
+	_T("<cr=#FFD54F>좌클릭</cr> : 색 선택   <t>")
+	_T("<cr=#FFD54F>휠클릭</cr> : 좌표·안내 On/Off");
 
 //문자열을 실제로 그려질 크기로 잰다. draw_text 는 thickness > 0 이면 emSize = dpi * font_size / 72 로
 //글자 path 를 만들므로 (thickness == 0 인 DrawString 경로의 /96 과 다르다) 여기서도 /72 + UnitPixel 로 맞춘다.

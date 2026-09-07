@@ -230,8 +230,12 @@ void CSCParagraph::build_paragraph_str(CString& text, std::deque<std::deque<CSCP
 
 	//바로 다음 run 하나에만 적용되는 값.
 	int     pending_tab_x = -1;
+	int     pending_tab_col = -1;
 	CString pending_id;
 	CString pending_ruby;
+
+	//20260907 by claude. <t> 로 열린 열의 번호. 라인이 바뀌면 0 으로 돌아간다.
+	int     tab_col_counter = 0;
 
 	//태그별 속성 스택. 닫는 태그가 "자기 그룹의 필드만" 되돌리므로
 	//<b><cr=red>This</b></cr> 처럼 교차 중첩된 기존 문서도 그대로 동작하면서
@@ -311,6 +315,7 @@ void CSCParagraph::build_paragraph_str(CString& text, std::deque<std::deque<CSCP
 		pending_v_align = DT_TOP;
 		pending_indent = 0.0f;
 		pending_hang = 0.0f;
+		tab_col_counter = 0;
 	};
 
 	//시작 태그를 만나면 속성을 세팅하고
@@ -633,8 +638,10 @@ void CSCParagraph::build_paragraph_str(CString& text, std::deque<std::deque<CSCP
 			}
 
 			run.tab_x = pending_tab_x;
+			run.tab_col = pending_tab_col;
 			run.id = pending_id;
 			pending_tab_x = -1;
+			pending_tab_col = -1;
 			pending_id.Empty();
 
 			para_line.push_back(run);
@@ -648,6 +655,10 @@ void CSCParagraph::build_paragraph_str(CString& text, std::deque<std::deque<CSCP
 		else if (name == _T("tab"))
 		{
 			pending_tab_x = _ttoi(value);
+		}
+		else if (name == _T("t"))
+		{
+			pending_tab_col = ++tab_col_counter;
 		}
 
 		//---- 라인 단위 ----
@@ -698,6 +709,7 @@ void CSCParagraph::build_paragraph_str(CString& text, std::deque<std::deque<CSCP
 			CSCParagraph run = para_temp;
 			run.text = tag;
 			run.tab_x = pending_tab_x;
+			run.tab_col = pending_tab_col;
 			run.id = pending_id;
 			run.ruby = pending_ruby;
 
@@ -713,6 +725,7 @@ void CSCParagraph::build_paragraph_str(CString& text, std::deque<std::deque<CSCP
 					if (k > 0)
 					{
 						one.tab_x = -1;
+						one.tab_col = -1;
 						one.id.Empty();
 						one.ruby.Empty();
 					}
@@ -725,6 +738,7 @@ void CSCParagraph::build_paragraph_str(CString& text, std::deque<std::deque<CSCP
 			}
 
 			pending_tab_x = -1;
+			pending_tab_col = -1;
 			pending_id.Empty();
 			pending_ruby.Empty();
 		}
@@ -750,10 +764,92 @@ void CSCParagraph::split_runs_per_char(std::deque<std::deque<CSCParagraph>>& par
 			{
 				CSCParagraph one = run;
 				one.text = run.text.Mid(k, 1);
+
+				//20260907 by claude. 열을 여는 것은 첫 글자 하나다. 복사본마다 남겨두면
+				//apply_auto_tab_columns 가 같은 열이 여러 번 시작한 것으로 읽는다.
+				if (k > 0)
+					one.tab_col = -1;
+
 				split_line.push_back(one);
 			}
 		}
 		line.swap(split_line);
+	}
+}
+
+//20260907 by claude. <t> 자동 열 맞춤.
+//열 폭을 태그에 픽셀로 적는 대신(<tab=170>) 이미 계산된 run 의 r 로부터 재어 정한다 —
+//폰트 크기나 문구가 바뀌어도 다시 계산되므로 마법의 숫자가 남지 않는다.
+void CSCParagraph::apply_auto_tab_columns(std::deque<std::deque<CSCParagraph>>& para)
+{
+	int max_col = 0;
+
+	for (auto& line : para)
+		for (auto& run : line)
+			max_col = MAX(max_col, run.tab_col);
+
+	if (max_col <= 0)
+		return;
+
+	//한 열이 차지하는 run 범위 [begin, end). 열 0 은 <t> 없이 라인의 첫 run 에서 암묵적으로 열린다.
+	struct column_span
+	{
+		int col;
+		int begin;
+		int end;
+	};
+
+	std::vector<std::vector<column_span>> spans(para.size());
+	std::vector<int> col_width(max_col + 1, 0);
+
+	for (size_t i = 0; i < para.size(); i++)
+	{
+		for (size_t j = 0; j < para[i].size(); j++)
+		{
+			int col = para[i][j].tab_col;
+			if (j == 0 && col < 0)
+				col = 0;
+			if (col < 0)
+				continue;
+
+			if (!spans[i].empty())
+				spans[i].back().end = (int)j;
+
+			column_span span = { col, (int)j, (int)para[i].size() };
+			spans[i].push_back(span);
+		}
+
+		for (auto& span : spans[i])
+			col_width[span.col] = MAX(col_width[span.col], para[i][span.end - 1].r.right - para[i][span.begin].r.left);
+	}
+
+	for (size_t i = 0; i < para.size(); i++)
+	{
+		if (spans[i].empty())
+			continue;
+
+		int target = para[i][0].r.left;
+		size_t si = 0;
+
+		for (int c = 0; c <= max_col; c++)
+		{
+			//spans 는 열 번호 오름차순이라 앞에서부터 하나씩 맞춰 보면 된다.
+			if (si < spans[i].size() && spans[i][si].col == c)
+			{
+				const int dx = target - para[i][spans[i][si].begin].r.left;
+
+				if (dx != 0)
+				{
+					for (int j = spans[i][si].begin; j < spans[i][si].end; j++)
+						para[i][j].r.OffsetRect(dx, 0);
+				}
+
+				si++;
+			}
+
+			//그 라인에 없는 열도 폭만큼 자리를 비운다 — 뒤 열의 x 가 라인마다 어긋나지 않는다.
+			target += col_width[c];
+		}
 	}
 }
 
@@ -1359,6 +1455,10 @@ CRect CSCParagraph::calc_text_rect(CRect rc, CDC* pDC, std::deque<std::deque<CSC
 	}
 
 	total_text_height = sy;
+
+	//20260907 by claude. <t> 로 나뉜 열을 문단 전체에서 맞춘다. 정렬(align) 보정은 이 결과를 그대로 밀기만 하면 되므로
+	//그 앞에서 한다. <t> 가 없는 문단에서는 즉시 반환하므로 기존 동작에 영향이 없다.
+	apply_auto_tab_columns(para);
 
 	font.DeleteObject();
 

@@ -78,6 +78,13 @@
 	<indent=30>				//이 라인 전체를 오른쪽으로 미는 픽셀(들여쓰기)
 	<hang=20>				//word-wrap 으로 이어진 라인만 추가로 미는 픽셀(내어쓰기)
 	<tab=170>				//다음 run 의 라인 내 시작 x 를 강제. 열 맞추기용. 이미 지난 위치면 무시.
+	<t>						//20260907 by claude. 자동 열 맞춤 — Tab 키와 같은 의미로 다음 열로 넘어간다.
+							//<tab> 과 달리 픽셀을 주지 않는다. 열 번호(= 라인 시작 이후 <t> 개수)가 같은 run 끼리
+							//문단 전체에서 폭을 재어 가장 넓은 것에 맞추므로 문구·폰트가 바뀌어도 자동으로 정렬된다.
+							//열 사이 간격은 따로 주지 않는다 — 앞 열 텍스트 뒤의 공백이 그 열의 폭에 포함되므로
+							//"항목A   <t>항목B" 처럼 공백으로 조절한다.
+							//ex. "휠 : 배율<t>Ctrl+휠 : 창 크기<br>방향키 : 이동<t>좌클릭 : 색 선택"
+							//    → 두 줄의 두 번째 항목이 같은 x 에서 시작한다.
 	<nowrap> </nowrap>		//word-wrap 이 이 구간을 쪼개지 않는다. "홍길동 님", "12.5 GB" 처럼 붙어야 하는 덩어리용.
 
 	[루비 / 이미지]
@@ -251,6 +258,11 @@ public:
 	//<tab=x> 이 run 의 라인 내 시작 x 를 강제(현재 누적 폭이 이미 x 를 넘었으면 무시). < 0 = 미지정.
 	int				tab_x = -1;
 
+	//20260907 by claude. <t> 로 이 run 이 여는 자동 열의 번호(1부터). < 0 = 열의 시작이 아닌 run.
+	//열 0 은 라인의 첫 run 이라 태그 없이 암묵적으로 존재한다.
+	//폭은 apply_auto_tab_columns() 가 문단 전체를 재어 정하므로 파서는 번호만 매긴다.
+	int				tab_col = -1;
+
 	//<id=이름> run 식별자. 렌더에는 영향 없고 호출자가 특정 run 을 찾아 부분 갱신/hit-test 하는 용도.
 	CString			id;
 
@@ -329,6 +341,11 @@ public:
 	//calc_text_rect 가 run 사이에 spacing 을 넣는 것이 곧 글자 사이에 spacing 이 되도록 한다.
 	//이미 1 글자 이하인 run 은 그대로 두고, 다중 글자 run 만 분해.
 	static void		split_runs_per_char(std::deque<std::deque<CSCParagraph>>& para);
+
+	//20260907 by claude. <t> 로 나뉜 열들이 문단 전체에서 같은 x 에서 시작하도록 run 들을 옮긴다.
+	//각 열의 폭 = 모든 라인에서 그 열이 실제로 차지한 폭의 최대값. <t> 가 없으면 아무것도 하지 않는다.
+	//calc_text_rect 가 run 의 r 을 모두 채운 뒤, 정렬(align) 보정 전에 호출한다.
+	static void		apply_auto_tab_columns(std::deque<std::deque<CSCParagraph>>& para);
 	static int		get_max_width_line(std::deque<std::deque<CSCParagraph>>& para);
 
 	//20260828 by claude. 모든 run 의 union 으로 문단이 실제로 그려지는 영역을 구한다.

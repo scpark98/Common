@@ -37,12 +37,13 @@ static const Gdiplus::Color kHintPlateColor = Gdiplus::Color(20, 20, 20);
 
 static LPCTSTR		kHintText =
 	_T("<cr=#FFD54F>휠</cr> : 배율 조정      ")
-	_T("<cr=#FFD54F>Ctrl+휠</cr> : 창 크기 조정      ")
-	_T("<cr=#FFD54F>Shift</cr> : 큰 폭으로 조정")
+	_T("<cr=#FFD54F>Shift+휠</cr> : 배율 크게 조정      ")
+	_T("<cr=#FFD54F>Ctrl+휠</cr> : 창 크기 조정")
 	_T("<br>")
 	_T("<cr=#FFD54F>방향키</cr> : 1픽셀 이동      ")
+	_T("<cr=#FFD54F>Shift+방향키</cr> : 8픽셀 이동      ")
 	_T("<cr=#FFD54F>좌클릭</cr> : 색 선택      ")
-	_T("<cr=#FFD54F>휠클릭</cr> : 정보 표시      ")
+	_T("<cr=#FFD54F>휠클릭</cr> : 좌표·안내 On/Off      ")
 	_T("<cr=#FFD54F>ESC</cr> : 취소");
 
 //문자열을 실제로 그려질 크기로 잰다. draw_text 는 thickness > 0 이면 emSize = dpi * font_size / 72 로
@@ -170,7 +171,7 @@ void CSCDropperDlg::build_hint_bitmap()
 	//즉 실제 픽셀 크기가 DPI 의 제곱에 비례한다 — 175% 에서 1.75 배가 아니라 3.06 배가 된다.
 	//(96 DPI 에서는 두 계수가 상쇄돼 드러나지 않는다. 여기서만 Graphics 해상도를 m_dpi 로 올려 쓰기 때문에 보인다.)
 	//같은 비율로 미리 나눠 두면 최종 픽셀 크기가 DPI 에 선형이 된다 — 100% 에서 10px, 175% 에서 17.5px.
-	const float kHintFontPt = 11.0f;	//100% 에서 14.7px.
+	const float kHintFontPt = 9.0f;	//100% 에서 12px.
 
 	//GDI DC 는 per-monitor DPI 를 따라가지 않고 항상 시스템 DPI 를 준다. CSCParagraph 의 측정이 그 DC 를
 	//쓰므로 렌더도 같은 값으로 해야 어긋나지 않는다. 화면에 그릴 때 m_dpi / m_hint_dpi 로 조정한다.

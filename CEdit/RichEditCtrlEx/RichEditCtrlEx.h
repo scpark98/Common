@@ -113,9 +113,16 @@ public:
 
 	void				use_popup_menu(bool use) { m_use_popup_menu = use; }
 
-	UINT				get_line_spacing();
-	//줄간격. 0=1줄, 1=1.5줄, 2=2.0줄
-	void				set_line_spacing(UINT nLineSpace);
+	//20260908 by claude. 줄간격 *배수*. 1.0 = 한 줄, 1.5 = 한 줄 반, 2.0 = 두 줄.
+	//Common 의 다른 컨트롤(CSCStatic / CSCToolTipCtrl / CSCParagraph)과 같은 규약이다.
+	//예전에는 0=1.0, 1=1.5, 2=2.0 인 정수 규약이라 set_line_spacing(1) 이 1.5줄이 되어 혼동이 컸다.
+	void				set_line_spacing(float spacing = 1.0f);
+	//rule 3/4(twips 절대값)로 설정된 문단은 배수로 환산할 수 없어 1.0 을 돌려준다.
+	float				get_line_spacing();
+
+	//예전 정수 규약으로 넘기던 호출을 컴파일 단계에서 잡는다.
+	//두지 않으면 set_line_spacing(0) 이 배수 0.0 으로 읽혀 줄이 겹치고, (1) 은 1.5줄이 1.0줄로 조용히 바뀐다.
+	void				set_line_spacing(int) = delete;
 
 	//20231004. Append~로 시작되는 4개의 함수를 1개로 간소화한다.
 	//맨 끝에 "\n"을 자동으로 붙여주지 않으므로 필요하다면 addl()함수를 사용한다.

@@ -954,34 +954,58 @@ void CRichEditCtrlEx::OnPopupMenu(UINT menuID)
 			toggle_show_time();
 			break;
 		case id_menu_richedit_line_space10 :
+			set_line_spacing(1.0f);
+			break;
 		case id_menu_richedit_line_space15 :
+			set_line_spacing(1.5f);
+			break;
 		case id_menu_richedit_line_space20 :
-			set_line_spacing(menuID - id_menu_richedit_line_space10);
+			set_line_spacing(2.0f);
 			break;
 	}
 }
 
-//줄간격. 0=1줄, 1=1.5줄, 2=2.0줄
-void CRichEditCtrlEx::set_line_spacing(UINT nLineSpace)
+void CRichEditCtrlEx::set_line_spacing(float spacing)
 {
+	if (spacing <= 0.0f)
+		spacing = 1.0f;
+
 	PARAFORMAT2	paraFormat;
 
 	GetParaFormat(paraFormat);
 	paraFormat.dwMask = PFM_LINESPACING;
-	paraFormat.bLineSpacingRule = (BYTE)nLineSpace;		//줄간격. 0=1.0, 1=1.5, 2=2.0
-	
+
+	//20260908 by claude. bLineSpacingRule 5 = "dyLineSpacing / 20 이 줄 수". 20=1.0줄, 30=1.5줄, 40=2.0줄.
+	//예전에 쓰던 rule 0/1/2 는 1.0/1.5/2.0 세 가지뿐인데다 인자 값과 의미가 달라(1 을 주면 1.5줄) 혼동이 컸다.
+	paraFormat.bLineSpacingRule = 5;
+	paraFormat.dyLineSpacing = (LONG)(spacing * 20.0f + 0.5f);
+
 	SetSel(0, -1);
 	SetParaFormat(paraFormat);
 	SetSel(-1, -1);
 }
 
-UINT CRichEditCtrlEx::get_line_spacing()
+float CRichEditCtrlEx::get_line_spacing()
 {
 	PARAFORMAT2	paraFormat;
 
 	GetParaFormat(paraFormat);
 
-	return paraFormat.bLineSpacingRule;
+	//예전 규약(rule 0/1/2)으로 설정된 문단도 읽을 수 있어야 한다.
+	//rule 3/4 는 twips 절대값이라 배수로 환산할 수 없다 — 그때는 1.0 으로 답한다.
+	switch (paraFormat.bLineSpacingRule)
+	{
+		case 0:
+			return 1.0f;
+		case 1:
+			return 1.5f;
+		case 2:
+			return 2.0f;
+		case 5:
+			return paraFormat.dyLineSpacing / 20.0f;
+	}
+
+	return 1.0f;
 }
 
 void CRichEditCtrlEx::set_back_color(Gdiplus::Color cr_back)

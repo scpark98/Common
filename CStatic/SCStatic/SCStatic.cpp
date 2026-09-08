@@ -2138,10 +2138,16 @@ void CSCStatic::OnDestroy()
 	CStatic::OnDestroy();
 
 	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
+	//20260907 by claude. 지운 뒤 반드시 비워 둔다. WM_DESTROY 는 소멸자보다 먼저 오고 소멸자도 같은 것을 해제하므로,
+	//여기서 흔적을 남기면 소멸자가 죽은 포인터를 다시 만져 이중 해제로 죽는다.
+	//(실제 사고: KoinoTools 종료 시 ~CSCStatic 의 m_tooltip->DestroyWindow() 에서 액세스 위반 0xC0000005.
+	// InitInstance 안의 dlg 가 소멸하는 중에 터져 ExitInstance 도, 정적 소멸자(gLog)도 실행되지 못했다 —
+	// "종료 로그가 안 찍힌다" 는 증상의 원인이 이것이었다.)
 	if (m_tooltip)
 	{
 		m_tooltip->DestroyWindow();
 		delete m_tooltip;
+		m_tooltip = nullptr;
 	}
 
 	if (m_hIcon)
@@ -2152,6 +2158,7 @@ void CSCStatic::OnDestroy()
 		CSCGdiplusBitmap* img = m_header_images[i];
 		delete img;
 	}
+	m_header_images.clear();
 
 	//functions.h에 gradient_fill을 위해서 선언된 이 핸들을 사용하는 프로그램이라면
 	//종료될 때 해제시켜주자.

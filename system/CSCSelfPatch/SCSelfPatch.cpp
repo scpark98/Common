@@ -292,13 +292,82 @@ void CSCSelfPatch::self_update(bool rerun)
 //
 //시작프로그램 폴더의 바로가기는 건드리지 않는다 — 사용자가 직접 만들어 둔 것일 수 있고,
 //인자나 시작 폴더가 들어 있을 수도 있다. Run 등록과 겹쳐 두 번 뜨더라도 중복 실행 검사가 걸러낸다.
+//20260908 by claude. 등록값에서 실행파일 경로만 떼어낸다.
+//따옴표로 감싸여 있으면 그 안쪽이 경로다. 아니면 인자가 없다고 보고 전체를 경로로 본다 —
+//따옴표 없이 공백이 든 경로는 어디까지가 경로인지 원리적으로 알 수 없어 추측하지 않는다.
+static CString get_exe_path_from_command(CString command)
+{
+	command.Trim();
+
+	if (command.GetLength() >= 2 && command[0] == _T('\"'))
+	{
+		const int close = command.Find(_T('\"'), 1);
+
+		if (close > 1)
+			return command.Mid(1, close - 1);
+	}
+
+	return command;
+}
+
+//20260908 by claude. Run 키에서 *같은 이름의 exe* 를 가리키되 경로가 다른 등록을 지운다.
+//값 이름이 우리 것과 달라도 지운다 — 사용자가 손으로 넣었거나 옛 버전이 다른 이름으로 넣었을 수 있다.
+//남겨 두면 부팅 때 옛 위치의 사본이 함께 떠서 두 벌이 돌고, 그 사본을 지우고 나면 죽은 경로가 된다.
+//경로가 *같은* 등록은 이름이 달라도 건드리지 않는다 — 사용자가 인자를 붙여 둔 것일 수 있다.
+static void remove_startup_entries_of_other_paths(const CString& exe_path)
+{
+	HKEY hkey = nullptr;
+
+	if (RegOpenKeyEx(HKEY_CURRENT_USER, kStartupRunKey, 0, KEY_READ | KEY_SET_VALUE, &hkey) != ERROR_SUCCESS)
+		return;
+
+	const CString exe_name = get_part(exe_path, fn_name);
+
+	//열거 도중에 지우면 인덱스가 밀려 남은 항목을 건너뛴다. 이름만 모아 두고 열거가 끝난 뒤 지운다.
+	std::deque<CString> targets;
+
+	for (DWORD i = 0; ; i++)
+	{
+		TCHAR	name[256] = { 0, };
+		DWORD	name_length = _countof(name);
+		DWORD	type = 0;
+		TCHAR	data[MAX_PATH * 2] = { 0, };
+		DWORD	data_size = sizeof(data);
+
+		if (RegEnumValue(hkey, i, name, &name_length, nullptr, &type, (LPBYTE)data, &data_size) != ERROR_SUCCESS)
+			break;
+
+		if (type != REG_SZ && type != REG_EXPAND_SZ)
+			continue;
+
+		const CString registered_path = get_exe_path_from_command(data);
+
+		if (get_part(registered_path, fn_name).CompareNoCase(exe_name) != 0)
+			continue;
+
+		if (registered_path.CompareNoCase(exe_path) == 0)
+			continue;
+
+		targets.push_back(name);
+	}
+
+	for (size_t i = 0; i < targets.size(); i++)
+		RegDeleteValue(hkey, targets[i]);
+
+	RegCloseKey(hkey);
+}
+
 void CSCSelfPatch::update_startup_registration()
 {
-	const CString exe_title = get_part(get_exe_filename(true), fn_title);
+	const CString exe_path = get_exe_filename(true);
+	const CString exe_title = get_part(exe_path, fn_title);
+
+	//다른 폴더의 같은 exe 등록을 먼저 걷어낸다. 우리 값 이름으로 된 것은 아래에서 덮어쓴다.
+	remove_startup_entries_of_other_paths(exe_path);
 
 	//경로에 공백이 들어갈 수 있으므로 따옴표로 감싼다. 사용자명이 두 단어인 계정에서 실제로 문제가 된다.
 	CString command;
-	command.Format(_T("\"%s\""), get_exe_filename(true));
+	command.Format(_T("\"%s\""), exe_path);
 
 	CString registered;
 	get_registry_str(HKEY_CURRENT_USER, kStartupRunKey, exe_title, &registered);

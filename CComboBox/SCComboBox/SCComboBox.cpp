@@ -256,6 +256,11 @@ void CSCComboBox::DrawItem(LPDRAWITEMSTRUCT lpDrawItemStruct)
 			dc.DrawText(strData, &rtext, DT_LEFT | DT_SINGLELINE | DT_VCENTER | DT_NOCLIP);
 			dc.SelectObject(pOldFont);
 		}
+
+		//20260908 by claude. 최근 항목 블록의 마지막 줄 아래 테두리에 구분선을 긋는다.
+		//전용 항목을 두지 않는 이유는 m_recent_block_size 선언부 참조.
+		if (m_use_recent_selected && (int)lpDrawItemStruct->itemID == m_recent_block_size - 1)
+			dc.FillSolidRect(rItem.left + 4, rItem.bottom - 1, rItem.Width() - 8, 1, m_theme.cr_separator.ToCOLORREF());
 	}
 
 	screen_dc.Detach();
@@ -1007,6 +1012,33 @@ void CSCComboBox::OnCbnKillfocus()
 //(ON_CONTROL_REFLECT_EX: FALSE 반환 시 parent 에게도 CBN_SELCHANGE 가 전달됨)
 BOOL CSCComboBox::OnCbnSelchange()
 {
+	//20260908 by claude. 최근 항목 갱신.
+	if (m_use_recent_selected)
+	{
+		const CString text = get_cur_sel_text();
+
+		if (!text.IsEmpty())
+		{
+			//이미 있는 항목이면 맨 앞으로 올린다.
+			for (std::deque<CString>::iterator it = m_recent.begin(); it != m_recent.end(); ++it)
+			{
+				if (*it == text)
+				{
+					m_recent.erase(it);
+					break;
+				}
+			}
+
+			m_recent.push_front(text);
+
+			while ((int)m_recent.size() > m_recent_count)
+				m_recent.pop_back();
+
+			save_recent();
+			rebuild_recent_block();
+		}
+	}
+
 	//font combo라면 현재 선택된 폰트로 m_lf가 자동 변경되어야 한다.
 	//set_font_name()은 m_is_font_combo==true 인 경우 early return 이므로
 	//여기서는 m_lf를 직접 갱신하고 reconstruct_font() 를 호출.
@@ -1200,6 +1232,123 @@ bool CSCComboBox::set_cur_sel(int index)
 }
 
 //현재 입력된 텍스트를 읽어오고 항목에 존재하지 않으면 추가시킨다. 레지스트리에도 저장한다.
+void CSCComboBox::use_recent_selected(bool use, int count, LPCTSTR reg_section)
+{
+	m_use_recent_selected = use;
+	m_recent_count = max(1, count);
+	m_recent_section = (reg_section != nullptr) ? reg_section : _T("");
+
+	if (!use)
+		m_recent.clear();
+	else
+		load_recent();
+
+	rebuild_recent_block();
+}
+
+//레지스트리에서 최근 목록을 읽는다. 그 사이에 콤보에서 사라진 항목은 rebuild_recent_block 이 걸러낸다.
+void CSCComboBox::load_recent()
+{
+	CWinApp* app = AfxGetApp();
+
+	if (app == nullptr || m_recent_section.IsEmpty())
+		return;
+
+	m_recent.clear();
+
+	const int count = app->GetProfileInt(m_recent_section, _T("recent count"), 0);
+
+	for (int i = 0; i < count && (int)m_recent.size() < m_recent_count; i++)
+	{
+		CString key;
+		key.Format(_T("recent %03d"), i);
+
+		const CString text = app->GetProfileString(m_recent_section, key, _T(""));
+
+		if (!text.IsEmpty())
+			m_recent.push_back(text);
+	}
+}
+
+void CSCComboBox::save_recent()
+{
+	CWinApp* app = AfxGetApp();
+
+	if (app == nullptr || m_recent_section.IsEmpty())
+		return;
+
+	app->WriteProfileInt(m_recent_section, _T("recent count"), (int)m_recent.size());
+
+	for (int i = 0; i < (int)m_recent.size(); i++)
+	{
+		CString key;
+		key.Format(_T("recent %03d"), i);
+
+		app->WriteProfileString(m_recent_section, key, m_recent[i]);
+	}
+}
+
+void CSCComboBox::rebuild_recent_block()
+{
+	if (m_hWnd == nullptr)
+		return;
+
+	const CString sel_text = get_cur_sel_text();
+
+	SetRedraw(FALSE);
+
+	//기존 블록 제거. 복제본에 붙인 색 객체는 원본 것과 별개라 여기서 해제한다.
+	for (int i = 0; i < m_recent_block_size; i++)
+	{
+		CSCComboBoxColor* cr = (CSCComboBoxColor*)GetItemData(0);
+
+		if (cr != nullptr && cr != (CSCComboBoxColor*)CB_ERR)
+			delete cr;
+
+		CComboBox::DeleteString(0);
+	}
+
+	m_recent_block_size = 0;
+
+	if (m_use_recent_selected && !m_recent.empty())
+	{
+		//블록이 없는 지금 원본의 색을 먼저 찾아 둔다. 끼워 넣은 뒤에 찾으면 복제본이 먼저 잡힌다.
+		std::deque<CString>			items;
+		std::deque<CSCComboBoxColor>	colors;
+
+		for (size_t i = 0; i < m_recent.size() && (int)items.size() < m_recent_count; i++)
+		{
+			//목록에서 사라진 항목은 건너뛴다.
+			const int index = FindStringExact(-1, m_recent[i]);
+
+			if (index < 0)
+				continue;
+
+			CSCComboBoxColor* cr = (CSCComboBoxColor*)GetItemData(index);
+
+			items.push_back(m_recent[i]);
+			colors.push_back((cr != nullptr && cr != (CSCComboBoxColor*)CB_ERR) ? *cr : CSCComboBoxColor());
+		}
+
+		for (size_t i = 0; i < items.size(); i++)
+		{
+			const int index = CComboBox::InsertString((int)i, items[i]);
+
+			if (colors[i].cr_text.GetValue() != Gdiplus::Color::Transparent)
+				SetItemData(index, (DWORD_PTR)new CSCComboBoxColor(colors[i]));
+		}
+
+		m_recent_block_size = (int)items.size();
+	}
+
+	//인덱스가 밀렸으므로 선택은 글자로 되찾는다.
+	if (!sel_text.IsEmpty())
+		CComboBox::SetCurSel(FindStringExact(-1, sel_text));
+
+	SetRedraw(TRUE);
+	Invalidate();
+}
+
 int CSCComboBox::add(CString text, Gdiplus::Color cr_text)
 {
 	if (m_is_font_combo)

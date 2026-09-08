@@ -5,6 +5,7 @@
 */
 
 #include <afxwin.h>
+#include <deque>
 #include <vector>
 #include "../../colors.h"
 
@@ -81,6 +82,13 @@ public:
 	//src내에 존재하는 콤보박스 아이템의 인덱스를 리턴.
 	int				find_string(CString src);
 
+	//20260908 by claude. 최근에 고른 항목 count 개를 목록 맨 위에 모아 보여주고 그 아래에 구분선을 그린다.
+	//원본 항목은 제자리에 그대로 남으므로 같은 항목이 위아래로 두 번 보인다(파워포인트 글꼴 콤보와 같다).
+	//기본은 꺼짐.
+	//reg_section 을 주면 최근 목록이 그 섹션에 저장되어 다음 실행에서도 유지된다. 선택할 때마다 자동 저장한다.
+	//주지 않으면 창이 살아 있는 동안만 유지된다.
+	void			use_recent_selected(bool use = true, int count = 5, LPCTSTR reg_section = nullptr);
+
 //편집 관련
 	//void			edit_end(bool valid);
 	//LRESULT			on_message_CSCEdit(WPARAM wParam, LPARAM lParam);
@@ -136,6 +144,22 @@ protected:
 	//CString			m_old_text;				//편집되기 전의 원본 텍스트
 	//CRect			m_edit_margin;			//edit box 내부 여백(세로로 가운데 정렬되게 표시하기 위해)
 	//void			repos_edit();			//resize를 하면 여백이 리셋되므로 위치와 여백을 다시 계산
+
+//최근 선택 항목 (use_recent_selected)
+	bool			m_use_recent_selected = false;
+	int				m_recent_count = 5;
+	std::deque<CString>	m_recent;			//앞쪽이 최신.
+	//목록 맨 위에 끼워 넣은 항목 수. 0 이면 블록 없음. 구분선은 이 블록의 *마지막 항목 아래 테두리* 에 긋는다 —
+	//구분선 전용 항목을 두면 한 줄을 통째로 차지해 여백이 크고, 그 줄이 선택 대상이 되어 따로 막아야 한다.
+	int				m_recent_block_size = 0;
+	CString			m_recent_section;		//비어 있지 않으면 최근 목록을 이 레지스트리 섹션에 저장·복원한다.
+
+	//맨 위 블록을 지우고 다시 만든다. 원본 항목은 건드리지 않는다 — 복제본을 끼워 넣을 뿐이다.
+	//목록을 통째로 다시 만들지 않는 이유는 항목별 색(ItemData)과 추가 순서를 그대로 두기 위해서다.
+	void			rebuild_recent_block();
+
+	void			load_recent();
+	void			save_recent();
 
 //즐겨찾기 관련
 	CString			m_reg_section;		//load or save할 때 넘어온 section값을 기억해놓는다.

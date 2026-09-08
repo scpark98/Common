@@ -1575,6 +1575,21 @@ Confluence(`koinodoc.atlassian.net`)에 문서를 만들 때는 **일반 페이�
 
 ---
 
+## 자체 패치(Self Patch) — 새 프로젝트에 붙일 때는 CSCSelfPatch 를 쓴다
+
+앱이 스스로 최신 버전으로 갈아끼우는 기능은 `Common/system/CSCSelfPatch/SCSelfPatch.{h,cpp}` 하나에 있다.
+각 프로젝트는 서버 경로만 지정하고 `startup()` / `shutdown()` 두 줄을 호출한다. **새로 만들지 말 것.**
+
+- 원리·서버 구성·적용 절차 문서: <https://koinodoc.atlassian.net/wiki/spaces/2HfRugOJ0HVK/pages/48562184>
+- 서버: `ss.linkmemine.com:443` 의 `/download/tools/KoinoTools/<앱>/` 에 `filelist.lst` + `<파일명>.zip`
+- **실행한 그 자리에서 패치한다** — 정해진 설치 폴더가 없다. 쓰기 권한이 없는 폴더(Program Files 등)면 패치 없이 그냥 실행된다.
+- zip 이름은 **확장자를 포함한 원본 파일명**에 `.zip` (`SCDeskTools.exe.zip`) — 이름이 같고 확장자만 다른 파일들을 한 폴더에 둘 수 있어야 하므로
+
+`Functions.cpp` 에 `run_self_update_batch()` 라는 비슷한 함수가 따로 있으나 호출처가 없다(정리 대상).
+새 코드는 `CSCSelfPatch` 를 쓴다.
+
+---
+
 ## Claude Code 프롬프트 제안 기능 — 끈다 (양쪽 머신 공통, 강제)
 
 Claude Code 는 응답이 끝나면 입력창에 다음 프롬프트를 회색으로 미리 채워 제안한다. **이 기능은 집·회사 두 머신 모두에서 끈다.**

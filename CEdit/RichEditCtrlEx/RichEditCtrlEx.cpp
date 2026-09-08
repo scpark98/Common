@@ -8,6 +8,11 @@
 //#include <stdarg.h>
 #include <strsafe.h>	//for StringCchCopyN
 
+//20260908 by claude. TOM(Text Object Model). 선택을 건드리지 않고 문서를 다루는 인터페이스다.
+//AfxInitRichEdit2() 로 올라오는 RichEdit 2.0 이상이면 쓸 수 있다.
+#include <richole.h>
+#include <tom.h>
+
 #define TIMER_CLEAR_LOG					0
 
 // CRichEditCtrlEx
@@ -27,6 +32,175 @@ CRichEditCtrlEx::CRichEditCtrlEx()
 
 CRichEditCtrlEx::~CRichEditCtrlEx()
 {
+	if (m_text_doc != nullptr)
+	{
+		m_text_doc->Release();
+		m_text_doc = nullptr;
+	}
+}
+
+//20260908 by claude. TOM 문서 객체. 한 번 얻어 두고 계속 쓴다.
+//EM_GETOLEINTERFACE 는 참조 수를 올려 주므로 QueryInterface 후 그쪽은 놓아 준다.
+ITextDocument* CRichEditCtrlEx::get_text_document()
+{
+	if (m_hWnd == nullptr)
+		return nullptr;
+
+	//20260908 by claude. TOM 은 이 창을 만든 스레드에서만 쓴다.
+	//SetSel / ReplaceSel 은 윈도우 메시지라 다른 스레드에서 불러도 SendMessage 로 UI 스레드에 넘어가
+	//WM_PAINT 와 직렬화되지만, ITextRange::SetText 은 *직접 함수 호출* 이라 그리기와 동시에 돌아
+	//riched20 내부 구조를 깨뜨린다(2026-09-08 filelist_maker 실측 — WM_PAINT 처리 중 액세스 위반).
+	//워커 스레드에서 부르면 nullptr 을 돌려주고, append_tom() 이 메시지 기반 대체 경로로 넘어간다.
+	if (::GetWindowThreadProcessId(m_hWnd, nullptr) != ::GetCurrentThreadId())
+		return nullptr;
+
+	if (m_text_doc != nullptr)
+		return m_text_doc;
+
+	IRichEditOle* ole = GetIRichEditOle();
+
+	if (ole == nullptr)
+		return nullptr;
+
+	if (FAILED(ole->QueryInterface(__uuidof(ITextDocument), (void**)&m_text_doc)))
+		m_text_doc = nullptr;
+
+	ole->Release();
+
+	return m_text_doc;
+}
+
+//20260908 by claude. 선택·캐럿·화면을 건드리지 않고 문서 끝에 글자를 넣는다.
+//SetSel + ReplaceSel 은 캐럿을 옮기고 그 캐럿을 화면 안으로 끌어온다. 그것을 감추려고 SetRedraw 로 묶고
+//스크롤과 선택을 되돌리는 우회가 필요했고, 그 여파로 캐럿이 깜빡이지 못했다. 이 경로는 그 전부가 필요 없다.
+//appended 를 주면 방금 넣은 구간의 범위를 돌려준다(키워드 강조용). 받은 쪽이 Release 한다.
+bool CRichEditCtrlEx::append_tom(const CString& text, Gdiplus::Color cr, ITextRange** appended)
+{
+	if (appended != nullptr)
+		*appended = nullptr;
+
+	if (text.IsEmpty())
+		return false;
+
+	ITextDocument*	doc = get_text_document();
+	ITextRange*		range = nullptr;
+
+	if (doc != nullptr && SUCCEEDED(doc->Range(0, 0, &range)) && range != nullptr)
+	{
+		//문서 끝으로 접는다. 그 자리에 SetText 하면 삽입이 되고, 범위는 넣은 글자를 덮게 된다.
+		range->MoveEnd(tomStory, 1, nullptr);
+		range->Collapse(tomEnd);
+
+		BSTR bstr = text.AllocSysString();
+		const HRESULT hr = range->SetText(bstr);
+		::SysFreeString(bstr);
+
+		if (FAILED(hr))
+		{
+			range->Release();
+			range = nullptr;
+		}
+	}
+
+	if (range == nullptr)
+	{
+		//TOM 이 거부한 경우의 대체 경로. 선택을 옮기므로 호출측이 그리기를 묶어 준다.
+		//ES_READONLY 인 컨트롤이 실제 사례다 — ITextRange::SetText 은 사용자 편집과 같은 경로로 보고 막지만,
+		//EM_REPLACESEL 은 프로그램 삽입으로 허용한다. 여기서 되돌리지 않으면 글자가 조용히 사라진다.
+		const long end = GetWindowTextLength();
+
+		CHARFORMAT cf;
+		ZeroMemory(&cf, sizeof(cf));
+		cf.cbSize = sizeof(cf);
+		cf.dwMask = CFM_COLOR;
+		cf.crTextColor = cr.ToCOLORREF();
+
+		SetSel(end, end);
+		SetSelectionCharFormat(cf);
+		ReplaceSel(text);
+
+		return false;
+	}
+
+	ITextFont* font = nullptr;
+
+	if (SUCCEEDED(range->GetFont(&font)) && font != nullptr)
+	{
+		font->SetForeColor((long)cr.ToCOLORREF());
+		font->Release();
+	}
+
+	//문단 정렬. 예전에는 GetParaFormat / SetParaFormat 으로 했는데 그 둘은 *선택* 에 적용되므로
+	//먼저 SetSel 을 해야 했다. 범위 객체는 선택과 무관하게 그 구간에만 적용한다.
+	ITextPara* para = nullptr;
+
+	if (SUCCEEDED(range->GetPara(&para)) && para != nullptr)
+	{
+		long alignment = tomAlignLeft;
+
+		if (m_align == PFA_CENTER)
+			alignment = tomAlignCenter;
+		else if (m_align == PFA_RIGHT)
+			alignment = tomAlignRight;
+
+		para->SetAlignment(alignment);
+		para->Release();
+	}
+
+	if (appended != nullptr)
+		*appended = range;
+	else
+		range->Release();
+
+	return true;
+}
+
+//20260908 by claude. 방금 넣은 구간(body) 안에서 등록된 키워드를 찾아 서식을 입힌다.
+//범위 객체로 잡으므로 선택도 캐럿도 움직이지 않는다.
+void CRichEditCtrlEx::apply_keyword_formats(ITextRange* body, const CString& text)
+{
+	ITextDocument* doc = get_text_document();
+
+	if (doc == nullptr || body == nullptr || m_keyword_formats.empty())
+		return;
+
+	long body_start = 0;
+
+	if (FAILED(body->GetStart(&body_start)))
+		return;
+
+	for (int k = 0; k < (int)m_keyword_formats.size(); k++)
+	{
+		std::deque<int> results;
+		find_all(results, text, m_keyword_formats[k].keyword, false, true);
+
+		for (int j = 0; j < (int)results.size(); j++)
+		{
+			const int pos = results[j];
+
+			if (pos < 0)
+				continue;
+
+			ITextRange* word = nullptr;
+
+			if (FAILED(doc->Range(body_start + pos, body_start + pos + m_keyword_formats[k].keyword.GetLength(), &word)) || word == nullptr)
+				continue;
+
+			ITextFont* font = nullptr;
+
+			if (SUCCEEDED(word->GetFont(&font)) && font != nullptr)
+			{
+				font->SetForeColor((long)m_keyword_formats[k].cr.ToCOLORREF());
+				font->SetBold(m_keyword_formats[k].bold ? tomTrue : tomFalse);
+				font->SetItalic(m_keyword_formats[k].italic ? tomTrue : tomFalse);
+				font->SetUnderline(m_keyword_formats[k].underline ? tomSingle : tomNone);
+				font->SetStrikeThrough(m_keyword_formats[k].strikeout ? tomTrue : tomFalse);
+				font->Release();
+			}
+
+			word->Release();
+		}
+	}
 }
 
 
@@ -88,17 +262,13 @@ CString CRichEditCtrlEx::add(Gdiplus::Color cr, LPCTSTR lpszFormat, ...)
 	//따라갈지는 이미 정해져 있다(선언부 참조). 여기서 스크롤 위치를 다시 재서 판단하지 않는다.
 	const bool	follow = is_auto_scrolling();
 
-	//따라가지 않는 중이면 아래에서 사용자가 찍어 둔 캐럿·선택을 그대로 되돌린다.
-	//이 함수는 글자를 넣으려고 SetSel 로 캐럿을 끝으로 옮기므로, 되돌리지 않으면 클릭한 자리가 매번 사라진다.
-	//Ctrl+End 는 이 복원에 걸리지 않는다 — PreTranslateMessage 가 키를 받는 즉시 따라가기를 켜기 때문이다.
+	//20260908 by claude. TOM 으로 넣으면 선택도 캐럿도 화면도 움직이지 않는다 — 감출 것이 없다.
+	//아래 억제·복원은 TOM 을 못 얻은 대체 경로(SetSel + ReplaceSel)에서만 필요하다.
+	//그 경로는 캐럿을 끝으로 옮기고 화면을 그리로 끌어오므로, 따라가지 않는 중이면 되돌려야 하고
+	//되돌리는 동안의 왕복을 감추려면 그리기를 묶어야 한다(그 여파로 캐럿이 깜빡이지 못한다).
+	const bool	suppress_redraw = (!follow && get_text_document() == nullptr);
 
-	//글자를 넣는 동안 SetSel 이 화면을 캐럿(맨 끝) 쪽으로 끌어온다. 따라가지 않는 중이면 그 뒤에 원래 자리로
-	//되돌리므로 화면이 오가며 심하게 깜빡인다. 그래서 그때만 그리기를 묶는다.
-	//
-	//따라가는 중에는 묶지 않는다. 중간 이동의 목적지가 어차피 최종 목적지(맨 끝)와 같아 왕복이 없고,
-	//무엇보다 SetRedraw 를 끄면 컨트롤이 캐럿을 감추는데 다시 켠다고 저절로 보여주지 않는다.
-	//로그가 계속 들어오면 캐럿이 매번 지워져 깜빡이지 않는 것처럼 보인다(2026-09-08 실측).
-	if (!follow)
+	if (suppress_redraw)
 		SetRedraw(FALSE);
 
 	//CString으로 변환
@@ -127,27 +297,17 @@ CString CRichEditCtrlEx::add(Gdiplus::Color cr, LPCTSTR lpszFormat, ...)
 	new_text = new_text.Mid(linefeed_count);
 
 
-	// Set insertion point to end of text
-	long		nInsertionPoint = 0;
-
-	nInsertionPoint = GetWindowTextLength();
-
+	//20260908 by claude. 삽입은 append_tom() 이 담당한다. TOM 을 얻으면 선택을 건드리지 않고 끝에 넣고,
+	//못 얻으면 그 안에서 예전 SetSel + ReplaceSel 로 대체한다.
 	if (linefeed_count == 0 && new_text.IsEmpty())
 	{
-		SetSel(nInsertionPoint, -1);
-		ReplaceSel(_T("\n"));
+		append_tom(_T("\n"), cr);
 	}
 	else
 	{
 		for (i = 0; i < linefeed_count; i++)
-		{
-			SetSel(nInsertionPoint, -1);
-			ReplaceSel(_T("\n"));
-			nInsertionPoint = GetWindowTextLength();
-		}
+			append_tom(_T("\n"), cr);
 	}
-
-	nInsertionPoint = GetWindowTextLength();
 
 	if (m_show_time)
 	{
@@ -165,147 +325,65 @@ CString CRichEditCtrlEx::add(Gdiplus::Color cr, LPCTSTR lpszFormat, ...)
 		}
 	}
 
-	CHARFORMAT	cf;
-	ZeroMemory(&cf, sizeof(cf));
-
-	nInsertionPoint = GetWindowTextLength();
-
-	SetSel(nInsertionPoint, nInsertionPoint);
-
-	PARAFORMAT2 pf;
-	GetParaFormat(pf);
-	pf.dwMask = PFM_ALIGNMENT;
-	pf.wAlignment = m_align;
-	SetParaFormat(pf);
-	SendMessage(EM_SETMODIFY, (WPARAM)TRUE, 0L);
-
+	//시간값은 그 줄의 첫 컬럼일 때만 붙인다(위에서 판정).
 	if (m_show_time && !skip_time_info)
 	{
 		SYSTEMTIME	t;
-		CString sTime;
+		CString		sTime;
 
 		::GetLocalTime(&t);
 		sTime.Format(_T("%d-%02d-%02d %02d:%02d:%02d(%03d) "), t.wYear, t.wMonth, t.wDay, t.wHour, t.wMinute, t.wSecond, t.wMilliseconds);
 
-		cf.cbSize = sizeof(CHARFORMAT);
-		cf.dwMask = CFM_COLOR;
-		//cf.dwEffects = 0;	// To disable CFE_AUTOCOLOR
-		cf.crTextColor = RGB(128, 128, 128);
-		SetSelectionCharFormat(cf);
-
-		ReplaceSel(sTime);
+		append_tom(sTime, gGRAY(128));
 	}
-
-	// Initialize character format structure
-	cf.cbSize = sizeof(CHARFORMAT);
-	cf.dwMask = CFM_COLOR | CFM_BOLD | CFM_ITALIC | CFM_UNDERLINE | CFM_STRIKEOUT;
-
-	//cr 은 함수 앞부분에서 Transparent 면 m_theme.cr_text 로 이미 치환되므로 여기선 그대로 변환한다.
-	cf.crTextColor = cr.ToCOLORREF();
 
 	//텍스트 전체 크기가 특정 크기를 넘어가면 클리어
-	if (m_max_length > 0 && nInsertionPoint >= m_max_length)
+	if (m_max_length > 0 && GetWindowTextLength() >= m_max_length)
+		clear_all();
+
+	//본문. 넣은 구간의 범위를 받아 키워드 강조에 쓴다.
+	//예전에는 삽입 위치를 문자 인덱스로 계산하면서 "라인이 추가되면 위치가 밀린다" 는 보정(- total_lines)을
+	//두고 있었다. 그 어긋남은 GetWindowTextLength 가 줄바꿈을 CRLF 두 글자로 세기 때문인데,
+	//범위 객체는 그 차이를 타지 않으므로 보정이 필요 없다.
+	ITextRange* body = nullptr;
+
+	if (append_tom(new_text, cr, &body) && body != nullptr)
 	{
-		//clear
-		SetSel(0, -1);
-		ReplaceSel(_T(""));
+		apply_keyword_formats(body, new_text);
+		body->Release();
 	}
-
-	//텍스트를 추가하고
-	nInsertionPoint = GetWindowTextLength();
-	SetSel(nInsertionPoint, nInsertionPoint);
-	SetSelectionCharFormat(cf);
-	ReplaceSel(new_text);
-
-	//조건에 따라 텍스트 일부 색상을 변경한다.
-	//라인이 추가되면서 pos의 위치가 하나씩 밀리는 현상이 왜 발생하는지 모르겠으나
-	//total_lines 변수를 이용해서 보정한다.
-
-	int total_lines = GetLineCount() - 2;
-
-	//우선 add()함수에서 이를 for루프로 처리하고 있으나 속도를 개선하기 위해 thread로 분리시켜야 한다.
-	for (int i = 0; i < m_keyword_formats.size(); i++)
-	{
-		std::deque<int> results;
-		find_all(results, new_text, m_keyword_formats[i].keyword, false, true);
-
-		for (int j = 0; j < results.size(); j++)
-		{
-			int pos = results[j];
-			if (pos >= 0)
-			{
-				cf.crTextColor = m_keyword_formats[i].cr.ToCOLORREF();
-				cf.dwEffects = 0;
-				if (m_keyword_formats[i].bold)
-					cf.dwEffects |= CFE_BOLD;
-				if (m_keyword_formats[i].italic)
-					cf.dwEffects |= CFE_ITALIC;
-				if (m_keyword_formats[i].underline)
-					cf.dwEffects |= CFE_UNDERLINE;
-				if (m_keyword_formats[i].strikeout)
-					cf.dwEffects |= CFE_STRIKEOUT;
-				SetSel(nInsertionPoint + pos - total_lines, nInsertionPoint + pos - total_lines + m_keyword_formats[i].keyword.GetLength());
-				SetSelectionCharFormat(cf);
-			}
-		}
-	}
-
-	/*
-	CString find_str = _T("][");
-	int pos = new_text.Find(find_str);
-	if (pos >= 0)
-	{
-		cf.crTextColor = RGB(255, 0, 0);
-		SetSel(nInsertionPoint + pos - total_lines, nInsertionPoint + pos - total_lines + find_str.GetLength());
-		SetSelectionCharFormat(cf);
-	}
-
-	cf.crTextColor = m_theme.cr_text;
-	if (pos >= 0)
-		SetSel(nInsertionPoint + pos - total_lines + find_str.GetLength(), GetWindowTextLength());
-	else
-		SetSel(nInsertionPoint, GetWindowTextLength());
-	SetSelectionCharFormat(cf);
-	*/
-
-	// Replace selection. Because we have nothing selected, this will simply insert
-	// the string at the current caret position.
-	//SetRedraw(FALSE);
-	//SetRedraw(TRUE);
-
-#ifdef _DEBUG
-	//TRACE(new_text);
-#endif
-
-	//스크롤은 반드시 그리기를 다시 켠 뒤에 한다. SetRedraw(FALSE) 동안에는 컨트롤이 스크롤 위치를
-	//갱신하지 않아 여기서 보낸 스크롤 명령이 통째로 무시된다(2026-09-08 실측).
-	if (!follow)
-		SetRedraw(TRUE);
 
 	//아래 스크롤은 우리가 하는 것이므로 OnVScroll 이 m_at_bottom 을 다시 정하지 않게 막는다.
 	m_in_programmatic_scroll = true;
 
 	if (follow)
 	{
+		//20260908 by claude. 따라가는 중에는 캐럿도 끝으로 데려간다.
+		//TOM 삽입은 선택을 건드리지 않으므로, 두지 않으면 캐럿이 예전 자리에 남아 내용과 함께 위로 밀려 올라간다.
+		//마지막 줄(addl 이 붙인 "\n" 뒤의 빈 줄)의 0번 컬럼에 둔다.
+		const int caret_pos = LineIndex(GetLineCount() - 1);
+
+		SetSel(caret_pos, caret_pos);
+
 		scroll_to_bottom();
 	}
-	else
+	else if (suppress_redraw)
 	{
+		//대체 경로로 넣은 경우에만 되돌릴 것이 있다. TOM 으로 넣었으면 화면도 선택도 그대로다.
+		//스크롤은 반드시 그리기를 켠 뒤에 한다 — 꺼져 있는 동안에는 스크롤 위치가 갱신되지 않아
+		//여기서 보낸 스크롤 명령이 통째로 무시된다(2026-09-08 실측).
+		SetRedraw(TRUE);
+
 		const int new_first_line = GetFirstVisibleLine();
 
 		if (old_first_line != new_first_line)
 			LineScroll(old_first_line - new_first_line);
 
-		//20260908 by claude. 이 Invalidate() 는 반드시 있어야 한다.
-		//위 LineScroll 은 화면 픽셀을 비트블릿으로 옮기는데, SetRedraw(FALSE) 동안 갱신되지 않은
-		//낡은 픽셀이 그대로 옮겨져 같은 줄이 여러 번 찍힌다(2026-09-08 실측 — 500ms 로 늦추니 드러났다).
-		//대신 이 때문에 50ms 처럼 잦은 삽입에서는 캐럿이 매번 지워져 깜빡이지 못한다. 둘은 이 구조에서
-		//동시에 만족시킬 수 없다 — 선택을 건드리지 않고 삽입하는 방식(TOM)으로 가야 풀린다.
+		//위 LineScroll 은 화면 픽셀을 비트블릿으로 옮기는데, 그리기를 꺼 둔 동안 갱신되지 않은
+		//낡은 픽셀이 그대로 옮겨져 같은 줄이 여러 번 찍힌다(2026-09-08 실측). 그래서 다시 그려야 한다.
 		Invalidate();
 
-		//사용자가 찍어 둔 캐럿·선택을 되돌린다(복사하려던 것이 매번 풀리면 안 된다).
-		//그리기를 켠 *뒤* 에 해야 감춰졌던 캐럿이 함께 살아난다.
-		//캐럿은 방금 되돌린 화면 안에 있으므로 이 SetSel 이 화면을 다시 움직이지는 않는다.
+		//사용자가 찍어 둔 캐럿·선택을 되돌린다. 그리기를 켠 뒤에 해야 감춰졌던 캐럿이 함께 살아난다.
 		SetSel(old_sel_min, old_sel_max);
 	}
 
@@ -344,19 +422,15 @@ int CRichEditCtrlEx::get_bottom_first_line()
 	if (line_count <= 1 || line_height <= 0)
 		return 0;
 
-	//addl() 은 텍스트 뒤에 "\n" 을 붙이므로 마지막 줄은 항상 빈 줄이다.
-	//그 빈 줄을 화면 아래에 맞추면 한 줄이 통째로 비어 보인다. 글자가 있는 마지막 줄을 기준으로 삼는다.
-	int last_line = line_count - 1;
-
-	if (last_line > 0 && LineLength(LineIndex(last_line)) == 0)
-		last_line--;
-
 	CRect rc;
 	GetClientRect(rc);
 
 	const int visible_lines = rc.Height() / line_height;
 
-	return max(0, last_line + 1 - visible_lines);
+	//20260908 by claude. 끝의 빈 줄(addl 의 "\n")까지 화면에 넣는다. 따라가는 중에는 캐럿이 그 줄의
+	//0번 컬럼에서 깜빡이므로 그 줄이 보여야 한다. 그만큼 마지막 글자 아래에 한 줄이 남지만,
+	//다른 편집기들도 캐럿 아래 다음 줄이 살짝 보인다.
+	return max(0, line_count - visible_lines);
 }
 
 void CRichEditCtrlEx::scroll_to_bottom()
@@ -679,8 +753,40 @@ void CRichEditCtrlEx::OnTimer(UINT_PTR nIDEvent)
 	}
 }
 
+//20260908 by claude. 글자를 바꾸는 입력인지. 읽기 전용 흉내에서 이것만 삼킨다.
+//이동·복사(Ctrl+C)·전체선택(Ctrl+A)은 읽기 전용에서도 되어야 하므로 통과시킨다.
+static bool is_text_changing_input(MSG* pMsg)
+{
+	//IME 조합 포함. WM_CHAR 는 글자 입력 그 자체다.
+	if (pMsg->message == WM_CHAR || pMsg->message == WM_IME_CHAR || pMsg->message == WM_IME_COMPOSITION)
+		return true;
+
+	if (pMsg->message != WM_KEYDOWN)
+		return false;
+
+	if (pMsg->wParam == VK_BACK || pMsg->wParam == VK_DELETE)
+		return true;
+
+	const bool ctrl = ((::GetKeyState(VK_CONTROL) & 0x8000) != 0);
+	const bool shift = ((::GetKeyState(VK_SHIFT) & 0x8000) != 0);
+
+	//붙여넣기 · 잘라내기 · 되돌리기
+	if (ctrl && (pMsg->wParam == 'V' || pMsg->wParam == 'X' || pMsg->wParam == 'Z' || pMsg->wParam == 'Y'))
+		return true;
+
+	if (shift && (pMsg->wParam == VK_INSERT || pMsg->wParam == VK_DELETE))
+		return true;
+
+	return false;
+}
+
 BOOL CRichEditCtrlEx::PreTranslateMessage(MSG* pMsg)
 {
+	//20260908 by claude. 읽기 전용 흉내. PreSubclassWindow 에서 ES_READONLY 를 벗겼으므로
+	//(그 주석 참조) 글자를 바꾸는 입력을 여기서 삼킨다.
+	if (m_readonly && is_text_changing_input(pMsg))
+		return TRUE;
+
 	// TODO: 여기에 특수화된 코드를 추가 및/또는 기본 클래스를 호출합니다.
 	if (pMsg->message == WM_MOUSEWHEEL)
 	{
@@ -746,7 +852,7 @@ BOOL CRichEditCtrlEx::PreTranslateMessage(MSG* pMsg)
 LRESULT CRichEditCtrlEx::on_paste(WPARAM wParam, LPARAM lParam)
 {
 	//PasteSpecial / ReplaceSel 은 readonly 를 검사하지 않는다. 기본 처리와 같아지도록 여기서 막는다.
-	if (GetStyle() & ES_READONLY)
+	if (m_readonly)
 		return 0;
 
 	//"Rich Text Format" 은 RTF 의 표준 클립보드 형식 이름이다. XP 의 RichEdit 2.0 에도 있다.
@@ -803,6 +909,18 @@ void CRichEditCtrlEx::PreSubclassWindow()
 {
 	//세로 스크롤바·자동 스크롤은 리소스에서 빠뜨려도 런타임에 보강한다.
 	ModifyStyle(0, ES_AUTOVSCROLL | WS_VSCROLL, SWP_FRAMECHANGED);
+
+	//20260908 by claude. 읽기 전용은 스타일이 아니라 이 클래스가 입력을 막는 방식으로 구현한다.
+	//ITextRange::SetText 이 ES_READONLY 를 사용자 편집으로 보고 거부하기 때문이다 — 그 스타일이 붙어 있으면
+	//TOM 삽입이 통째로 실패해 로그가 한 줄도 남지 않는다(2026-09-08 filelist_maker 실측).
+	//넣을 때만 잠깐 스타일을 푸는 방법도 있으나, 워커 스레드에서 add() 를 부르면 두 번의 EM_SETREADONLY
+	//사이에 UI 스레드가 사용자 키를 처리할 수 있어 글자가 끼어든다.
+	//그래서 스타일은 벗겨 두고, 글자를 바꾸는 입력만 PreTranslateMessage 에서 삼킨다.
+	if (GetStyle() & ES_READONLY)
+	{
+		m_readonly = true;
+		SetReadOnly(FALSE);
+	}
 
 	//ES_MULTILINE 은 richedit 가 생성 시점(WM_NCCREATE)에만 읽으므로 ModifyStyle 로 런타임 전환이 안 된다.
 	//(서브클래싱 도중 DestroyWindow→재생성하는 우회는 MFC SubclassWindow 의 공유 super-wndproc 를 깨뜨려 불가.)

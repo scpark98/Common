@@ -4,6 +4,10 @@
 #include <afxcmn.h>
 #include <deque>
 
+//20260908 by claude. TOM 인터페이스 전방 선언. 구현부에서 <tom.h> 를 include 한다.
+struct ITextDocument;
+struct ITextRange;
+
 #include "../../colors.h"
 
 /*
@@ -170,6 +174,10 @@ protected:
 	bool		m_show_time;
 	bool		m_use_popup_menu = true;
 
+	//20260908 by claude. 리소스에 ES_READONLY 가 있었는지. 그 스타일은 PreSubclassWindow 에서 벗기고
+	//대신 PreTranslateMessage 가 글자를 바꾸는 입력을 삼킨다 — 이유는 그 두 곳 주석 참조.
+	bool		m_readonly = false;
+
 	int			m_clear_log_interval;	//KIOSK에서 메모리 증가를 막기 위해 주기적으로 로그 내용을 지워주는 타이머 세팅(단위.초, 0이면 동작 안함)
 	int			m_max_length;		//정해진 문자수 이상이면 모두 지우고 새로 쓴다.
 	int			m_scroll_size;
@@ -187,6 +195,17 @@ protected:
 
 	//메뉴에 보여줄 값이자 add() 가 보는 값. 둘 중 하나라도 꺼져 있으면 따라가지 않는다.
 	bool		is_auto_scrolling() { return (m_use_auto_scroll && m_at_bottom); }
+
+	//20260908 by claude. TOM 문서 객체. 없으면(구형 richedit) nullptr — 그때는 예전 SetSel 경로로 넣는다.
+	ITextDocument*	m_text_doc = nullptr;
+	ITextDocument*	get_text_document();
+
+	//선택·캐럿·화면을 건드리지 않고 문서 끝에 글자를 넣는다. 구현부 주석 참조.
+	//TOM 으로 넣었으면 true. false 면 대체 경로(SetSel + ReplaceSel)로 넣은 것이라 선택이 끝으로 옮겨졌다.
+	bool		append_tom(const CString& text, Gdiplus::Color cr, ITextRange** appended = nullptr);
+
+	//방금 넣은 구간 안에서 등록된 키워드를 찾아 서식을 입힌다.
+	void		apply_keyword_formats(ITextRange* body, const CString& text);
 
 	//한 줄 높이(px). 줄이 둘 미만이면 0.
 	int			get_line_height();

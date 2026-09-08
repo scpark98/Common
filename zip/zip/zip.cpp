@@ -1,6 +1,8 @@
 ﻿//#include <windows.h>
 #include <afxwin.h>
 #include <stdio.h>
+#include <stdlib.h>	//20260907 by claude. _countof
+#include <string.h>	//20260907 by claude. _TRUNCATE, strncpy_s/strncat_s
 #include <tchar.h>
 #include "zip.h"
 
@@ -2626,7 +2628,8 @@ ZRESULT TZip::Add(const TCHAR* odstzn, void* src, unsigned int len, DWORD flags)
 	int passex = 0; if (password != 0 && flags != ZIP_FOLDER) passex = 12;
 
 	// zip has its own notion of what its names should look like: i.e. dir/file.stuff
-	TCHAR dstzn[MAX_PATH]; _tcscpy(dstzn, odstzn);
+	//20260907 by claude. 잘라내기(_TRUNCATE)로 받는다. _tcscpy_s 는 넘치면 잘못된 매개변수 처리기로 프로세스를 죽인다.
+	TCHAR dstzn[MAX_PATH]; _tcsncpy_s(dstzn, _countof(dstzn), odstzn, _TRUNCATE);
 	if (*dstzn == 0) return ZR_ARGS;
 	TCHAR* d = dstzn; while (*d != 0) { if (*d == '\\') *d = '/'; d++; }
 	bool isdir = (flags == ZIP_FOLDER);
@@ -2647,24 +2650,27 @@ ZRESULT TZip::Add(const TCHAR* odstzn, void* src, unsigned int len, DWORD flags)
 
 	// Initialize the local header
 	TZipFileInfo zfi; zfi.nxt = NULL;
-	strcpy(zfi.name, "");
+	zfi.name[0] = 0;
 #ifdef UNICODE
 	// 한글 깨지는 문제가 있어서 수정
 	char* sTime;
 	int nLen = WideCharToMultiByte(CP_ACP, 0, dstzn, -1, NULL, 0, NULL, NULL);
 	sTime = new char[nLen + 1];
-	WideCharToMultiByte(CP_ACP, 0, dstzn, -1, sTime, 128, NULL, NULL);
-	strcpy(zfi.iname, sTime);
+	//20260907 by claude. 버퍼 크기로 128 을 넘기고 있었다. nLen 이 128 을 넘으면 변환이 실패해(0 반환)
+	//sTime 이 초기화되지 않은 채 아래에서 복사된다. 실제로 할당한 크기를 넘긴다.
+	WideCharToMultiByte(CP_ACP, 0, dstzn, -1, sTime, nLen + 1, NULL, NULL);
+	strncpy_s(zfi.iname, _countof(zfi.iname), sTime, _TRUNCATE);
 	// 필요없으면 메모리를 제거한다.
-	free(sTime);
+	//20260907 by claude. new[] 로 잡은 것을 free() 로 풀고 있었다(정의되지 않은 동작).
+	delete[] sTime;
 
 	//WideCharToMultiByte(CP_UTF8,0,dstzn,-1,zfi.iname,MAX_PATH,0,0);
 #else
-	strcpy(zfi.iname, dstzn);
+	strncpy_s(zfi.iname, _countof(zfi.iname), dstzn, _TRUNCATE);
 #endif
 	zfi.nam = strlen(zfi.iname);
-	if (needs_trailing_slash) { strcat(zfi.iname, "/"); zfi.nam++; }
-	strcpy(zfi.zname, "");
+	if (needs_trailing_slash) { strncat_s(zfi.iname, _countof(zfi.iname), "/", _TRUNCATE); zfi.nam++; }
+	zfi.zname[0] = 0;
 	zfi.extra = NULL; zfi.ext = 0;   // extra header to go after this compressed data, and its length
 	zfi.cextra = NULL; zfi.cext = 0; // extra header to go in the central end-of-zip directory, and its length
 	zfi.comment = NULL; zfi.com = 0; // comment, and its length
@@ -2845,7 +2851,7 @@ unsigned int FormatZipMessageZ(ZRESULT code, char* buf, unsigned int len)
 	unsigned int mlen = (unsigned int)strlen(msg);
 	if (buf == 0 || len == 0) return mlen;
 	unsigned int n = mlen; if (n + 1 > len) n = len - 1;
-	strncpy(buf, msg, n); buf[n] = 0;
+	strncpy_s(buf, len, msg, n);	//n <= len-1 이므로 여기서 잘릴 일은 없고, 널 종료도 함께 해 준다.
 	return mlen;
 }
 

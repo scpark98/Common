@@ -3751,7 +3751,7 @@ FILETIME dosdatetime2filetime(WORD dosdate,WORD dostime)
 
 class TUnzip
 { public:
-  TUnzip(const char *pwd) : uf(0), unzbuf(0), currentfile(-1), czei(-1), password(0) {if (pwd!=0) {password=new char[strlen(pwd)+1]; strcpy(password,pwd);}}
+  TUnzip(const char *pwd) : uf(0), unzbuf(0), currentfile(-1), czei(-1), password(0) {if (pwd!=0) {size_t pwd_len=strlen(pwd)+1; password=new char[pwd_len]; strcpy_s(password,pwd_len,pwd);}}
   ~TUnzip() {if (password!=0) delete[] password; password=0; if (unzbuf!=0) delete[] unzbuf; unzbuf=0;}
 
   unzFile uf; int currentfile; ZIPENTRY cze; int czei;
@@ -3774,10 +3774,10 @@ ZRESULT TUnzip::Open(void *z,unsigned int len,DWORD flags)
 #ifdef GetCurrentDirectory
   GetCurrentDirectory(MAX_PATH,rootdir);
 #else
-  _tcscpy(rootdir,_T("\\"));
+  _tcscpy_s(rootdir,_countof(rootdir),_T("\\"));
 #endif
   TCHAR lastchar = rootdir[_tcslen(rootdir)-1];
-  if (lastchar!='\\' && lastchar!='/') _tcscat(rootdir,_T("\\"));
+  if (lastchar!='\\' && lastchar!='/') _tcscat_s(rootdir,_countof(rootdir),_T("\\"));
   //
   if (flags==ZIP_HANDLE)
   { // test if we can seek on it. We can't use GetFileType(h)==FILE_TYPE_DISK since it's not on CE.
@@ -3793,9 +3793,11 @@ ZRESULT TUnzip::Open(void *z,unsigned int len,DWORD flags)
 }
 
 ZRESULT TUnzip::SetUnzipBaseDir(const TCHAR *dir)
-{ _tcscpy(rootdir,dir);
+{ //20260907 by claude. 잘라내기(_TRUNCATE)로 받는다. _tcscpy_s 는 넘치면 잘못된 매개변수 처리기로 프로세스를 죽이는데,
+  //zip 안의 경로는 외부에서 들어오는 값이라 길다는 이유로 앱이 죽어서는 안 된다.
+  _tcsncpy_s(rootdir,_countof(rootdir),dir,_TRUNCATE);
   TCHAR lastchar = rootdir[_tcslen(rootdir)-1];
-  if (lastchar!='\\' && lastchar!='/') _tcscat(rootdir,_T("\\"));
+  if (lastchar!='\\' && lastchar!='/') _tcscat_s(rootdir,_countof(rootdir),_T("\\"));
   return ZR_OK;
 }
 
@@ -3839,13 +3841,13 @@ ZRESULT TUnzip::Get(int index,ZIPENTRY *ze)
   // 이제 변환을 수행한다.
   MultiByteToWideChar(CP_ACP, 0, fn, -1, bstr, nLen);
 
-  _tcscpy(tfn, bstr);
+  _tcsncpy_s(tfn, _countof(tfn), bstr, _TRUNCATE);
   // 필요없어지면 제거한다.
   SysFreeString(bstr);
 
   //MultiByteToWideChar(CP_UTF8,0,fn,-1,tfn,MAX_PATH);
 #else
-  strcpy(tfn,fn);
+  strncpy_s(tfn,_countof(tfn),fn,_TRUNCATE);
 #endif
   // As a safety feature: if the zip filename had sneaky stuff
   // like "c:\windows\file.txt" or "\windows\file.txt" or "fred\..\..\..\windows\file.txt"
@@ -3865,7 +3867,7 @@ ZRESULT TUnzip::Get(int index,ZIPENTRY *ze)
     c=_tcsstr(sfn,_T("/..\\")); if (c!=0) {sfn=c+4; continue;}
     break;
   }
-  _tcscpy(ze->name, sfn);
+  _tcsncpy_s(ze->name, _countof(ze->name), sfn, _TRUNCATE);
 
 
   // zip has an 'attribute' 32bit value. Its lower half is windows stuff
@@ -3940,7 +3942,7 @@ ZRESULT TUnzip::Find(const TCHAR *tname,bool ic,int *index,ZIPENTRY *ze)
 #ifdef UNICODE
   WideCharToMultiByte(CP_UTF8,0,tname,-1,name,MAX_PATH,0,0);
 #else
-  strcpy(name,tname);
+  strncpy_s(name,_countof(name),tname,_TRUNCATE);
 #endif
   int res = unzLocateFile(uf,name,ic?CASE_INSENSITIVE:CASE_SENSITIVE);
   if (res!=UNZ_OK)
@@ -3970,7 +3972,7 @@ void EnsureDirectory(const TCHAR *rootdir, const TCHAR *dir)
     EnsureDirectory(rootdir,tmp);
     name++;
   }
-  TCHAR cd[MAX_PATH]; *cd=0; if (rootdir!=0) _tcscpy(cd,rootdir); _tcscat(cd,dir);
+  TCHAR cd[MAX_PATH]; *cd=0; if (rootdir!=0) _tcsncpy_s(cd,_countof(cd),rootdir,_TRUNCATE); _tcsncat_s(cd,_countof(cd),dir,_TRUNCATE);
   if (GetFileAttributes(cd)==0xFFFFFFFF) CreateDirectory(cd,NULL);
 }
 
@@ -4021,11 +4023,12 @@ ZRESULT TUnzip::Unzip(int index,void *dst,unsigned int len,DWORD flags)
     // a malicious zip could unzip itself into c:\windows. Our solution is that GetZipItem (which
     // is how the user retrieve's the file's name within the zip) never returns absolute paths.
     const TCHAR *name=ufn; const TCHAR *c=name; while (*c!=0) {if (*c=='/' || *c=='\\') name=c+1; c++;}
-    TCHAR dir[MAX_PATH]; _tcscpy(dir,ufn); if (name==ufn) *dir=0; else dir[name-ufn]=0;
-    TCHAR fn[MAX_PATH]; 
+    TCHAR dir[MAX_PATH]; _tcsncpy_s(dir,_countof(dir),ufn,_TRUNCATE); if (name==ufn) *dir=0; else dir[name-ufn]=0;
+    TCHAR fn[MAX_PATH];
     bool isabsolute = (dir[0]=='/' || dir[0]=='\\' || (dir[0]!=0 && dir[1]==':'));
-    if (isabsolute) {wsprintf(fn,_T("%s%s"),dir,name); EnsureDirectory(0,dir);}
-    else {wsprintf(fn,_T("%s%s%s"),rootdir,dir,name); EnsureDirectory(rootdir,dir);}
+    //20260907 by claude. wsprintf 는 길이를 받지 않아 MAX_PATH 를 넘는 경로에서 fn 을 넘긴다. 잘라내기로 바꾼다.
+    if (isabsolute) {_sntprintf_s(fn,_countof(fn),_TRUNCATE,_T("%s%s"),dir,name); EnsureDirectory(0,dir);}
+    else {_sntprintf_s(fn,_countof(fn),_TRUNCATE,_T("%s%s%s"),rootdir,dir,name); EnsureDirectory(rootdir,dir);}
     //
     h = CreateFile(fn,GENERIC_WRITE,0,NULL,CREATE_ALWAYS,ze.attr,NULL);
   }
@@ -4092,7 +4095,7 @@ unsigned int FormatZipMessageU(ZRESULT code, TCHAR *buf,unsigned int len)
   unsigned int mlen=(unsigned int)_tcslen(msg);
   if (buf==0 || len==0) return mlen;
   unsigned int n=mlen; if (n+1>len) n=len-1;
-  _tcsncpy(buf,msg,n); buf[n]=0;
+  _tcsncpy_s(buf,len,msg,n);	//n <= len-1 이므로 여기서 잘릴 일은 없고, 널 종료도 함께 해 준다.
   return mlen;
 }
 
@@ -4192,7 +4195,7 @@ ZRESULT UnzipFolder(HZIP hz, const TCHAR* base_folder)
 		ZIPENTRY ze_file;
 		zr = GetZipItem(hz, zi, &ze_file);
 
-        _stprintf(extract_path, _T("%s\\%s"), base_path, ze_file.name);
+        _sntprintf_s(extract_path, _countof(extract_path), _TRUNCATE, _T("%s\\%s"), base_path, ze_file.name);
 		zr = UnzipItem(hz, zi, extract_path);
 	}
 

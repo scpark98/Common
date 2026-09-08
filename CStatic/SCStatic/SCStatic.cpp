@@ -190,7 +190,10 @@ void CSCStatic::PreSubclassWindow()
 	}
 	else
 	{
-		//Vista+ : lfMessageFont = Segoe UI 9pt. XP : Tahoma 8pt.
+		//20260908 by claude. lfMessageFont 는 OS 의 표시 언어를 따른다 — 한국어 Windows 는 Vista+ 에서
+		//맑은 고딕 9pt(실측), 영문은 Segoe UI 9pt, XP 는 굴림/Tahoma 8pt.
+		//즉 이 컨트롤에 고정된 기본 폰트는 없다. 위 분기의 부모(다이얼로그) 폰트 상속이 실제 경로이고,
+		//여기는 부모를 얻지 못한 경우의 fallback 이다.
 		//Vista+ SDK 로 빌드한 exe 를 XP 에서 실행하면 NONCLIENTMETRICS 끝의 iPaddedBorderWidth (4byte) 가
 		//XP 커널이 인식하는 구조체보다 크다 → SystemParametersInfo 가 ERROR_INVALID_PARAMETER 로 실패.
 		//실패 시 4byte 줄여 재시도하면 XP 에서도 lfMessageFont 를 정상 획득.
@@ -226,11 +229,12 @@ void CSCStatic::prepare_tooltip()
 		delete m_tooltip;
 	}
 
-	m_tooltip = new CToolTipCtrl();
+	m_tooltip = new CSCToolTipCtrl();
 
 	try
 	{
-		BOOL b = m_tooltip->Create(this, TTS_ALWAYSTIP | TTS_NOPREFIX | TTS_NOANIMATE);
+		//TTS_NOPREFIX 는 CSCToolTipCtrl::Create 가 항상 붙이므로 여기서 주지 않는다.
+		BOOL b = m_tooltip->Create(this, TTS_ALWAYSTIP | TTS_NOANIMATE);
 	}
 	catch (CException*)
 	{
@@ -240,7 +244,6 @@ void CSCStatic::prepare_tooltip()
 	//m_tooltip->SetDelayTime(TTDT_AUTOPOP, -1);
 	//m_tooltip->SetDelayTime(TTDT_INITIAL, 0);
 	//m_tooltip->SetDelayTime(TTDT_RESHOW, 0);
-	m_tooltip->SetMaxTipWidth(240);
 	m_tooltip->AddTool(this, _T(""));
 	m_tooltip->Activate(TRUE);
 	EnableToolTips(TRUE);

@@ -17,6 +17,7 @@
 #include "../../SCGdiplusBitmap.h"
 #include "../../data_structure/SCParagraph/SCParagraph.h"
 #include "../../CEdit/CSCStaticEdit/SCStaticEdit.h"
+#include "../../CToolTipCtrl/CSCToolTipCtrl/SCToolTipCtrl.h"
 /*
 //scpark
 
@@ -547,7 +548,10 @@ protected:
 	//enable상태일때는 잘 표시되나 disable일때는 표시되지 않는다.
 	//이를 해결하려면 parent의 PreTranslateMessage()에서 처리해야 한다.
 	//pointer 타입으로 선언한 이유는 동적생성시에도 툴팁을 적용하기 위해.
-	CToolTipCtrl*	m_tooltip = NULL;
+	//20260908 by claude. 표준 CToolTipCtrl 은 단일 폰트·단색이라 이 컨트롤이 쓰는 tag 문법을 표시하지 못한다.
+	//CSCToolTipCtrl 은 같은 CSCParagraph 로 그리므로 본문과 툴팁의 서식 결과가 일치한다.
+	//쓰는 법은 CToolTipCtrl 과 같고, 태그 없는 평문도 그대로 나온다.
+	CSCToolTipCtrl*	m_tooltip = NULL;
 	//default = true
 	bool			m_use_tooltip = true;
 	CString			m_tooltip_text = _T("");

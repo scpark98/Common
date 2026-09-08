@@ -127,15 +127,13 @@ public:
 	//20231004. Append~로 시작되는 4개의 함수를 1개로 간소화한다.
 	//맨 끝에 "\n"을 자동으로 붙여주지 않으므로 필요하다면 addl()함수를 사용한다.
 	//간혹 한 라인에 추가적인 로그를 표시할 필요가 있으므로 add(), addl()를 분리함.
+	//20260908 by claude. 옛 AppendToLog / Append / AppendToLogAndScroll 제거.
+	//add() / addl() 로 대체된 지 오래인데 남아 있어 새로 쓰는 사람이 고를 수 있었다.
+	//셋은 자동 스크롤 처리가 제각각이라(각자 LineScroll 을 직접 계산) add() 와 동작이 달랐다.
 	CString				add(Gdiplus::Color cr, LPCTSTR lpszFormat, ...);
 	//addl은 add line의 약자로 맨 끝에 "\n"을 추가할 뿐 add와 동일하다.
 	//단, resource의 속성에서 multiline이 체크되어 있어야 한다.
 	CString				addl(Gdiplus::Color cr, LPCTSTR lpszFormat, ...);
-
-	int					AppendToLog(CString str, Gdiplus::Color color = Gdiplus::Color::Transparent, BOOL bAddNewLine = TRUE);	//color가 Transparent면 기본 컬러(m_theme.cr_text)를 사용한다.
-	void				Append(LPCTSTR lpszFormat, ...);
-	void				Append(Gdiplus::Color cr, LPCTSTR lpszFormat, ...);
-	int					AppendToLogAndScroll(CString str, Gdiplus::Color color = Gdiplus::Color::Transparent, BOOL bAddNewLine = TRUE);
 
 	//한줄씩 deque에 저장된 내용을 모두 합쳐서 rich의 내용을 update한다.
 	void				set_text(std::deque<CString>* dqlist);
@@ -179,6 +177,12 @@ protected:
 	//팝업메뉴를 통해 on/off 할 수 있다.
 	//default = true;
 	bool		m_auto_scroll = true;
+
+	//20260908 by claude. 사용자가 클릭이나 키로 캐럿을 옮긴 적이 있는지.
+	//add() 는 화면이 맨 아래여도 캐럿이 위쪽 줄에 있으면 따라가지 않는데(VS 출력 창과 같다),
+	//한 번도 옮긴 적이 없으면 캐럿이 0번에 있어 그 조건이 시작하자마자 걸린다. 그것을 막는 단서다.
+	//add() 안의 SetSel 은 프로그램이 옮기는 것이라 여기에 반영되지 않는다 — 입력 핸들러에서만 세운다.
+	bool		m_user_moved_caret = false;
 
 	int			m_align = PFA_LEFT;
 

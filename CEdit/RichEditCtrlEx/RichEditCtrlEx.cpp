@@ -77,6 +77,29 @@ CString CRichEditCtrlEx::add(Gdiplus::Color cr, LPCTSTR lpszFormat, ...)
 	if (cr.GetValue() == Gdiplus::Color::Transparent)
 		cr = m_theme.cr_text;
 
+	//20260908 by claude. 붙이기 *전* 의 보기 상태를 기록해 둔다. 자동 스크롤 여부를 이 값으로 정한다.
+	//반드시 첫 SetSel / ReplaceSel 보다 앞이어야 한다 — 그 호출들이 캐럿을 끝으로 옮기고 화면도 함께 끌고 간다.
+	//
+	//판단 기준은 캐럿이 아니라 *스크롤 위치* 다(VS 출력 창과 같다). 캐럿은 이 함수가 글자를 넣으면서
+	//어차피 끝으로 옮기므로 기준으로 삼을 수 없다. 대신 사용자가 찍어둔 선택 영역은 아래에서 되돌려 준다.
+	//리치에디트는 세로 스크롤을 픽셀 단위로 보고한다. 맨 아래에서 nPos + nPage == nMax 다.
+	//스크롤바가 없으면(내용이 한 화면보다 짧다) 맨 아래를 보고 있는 것과 같다.
+	SCROLLINFO	si = { 0 };
+	const bool	was_at_bottom = !GetScrollInfo(SB_VERT, &si) || (si.nPos + (int)si.nPage >= si.nMax);
+	const int	old_first_line = GetFirstVisibleLine();
+
+	long	old_sel_min = 0;
+	long	old_sel_max = 0;
+	GetSel(old_sel_min, old_sel_max);
+
+	//캐럿이 마지막 줄에 있는지. 끝 위치를 GetWindowTextLength 로 재면 안 된다 — 그쪽은 줄바꿈을
+	//CRLF 두 글자로 세는데 선택 위치는 한 글자로 세어, 캐럿이 맨 끝(Ctrl+End)이어도 "중간" 으로 잘못 잡힌다.
+	//줄 번호로 비교하면 그 차이를 타지 않는다.
+	const bool	caret_on_last_line = (old_sel_min == old_sel_max) && (LineFromChar(old_sel_min) >= GetLineCount() - 1);
+
+	//사용자가 중간을 클릭해 캐럿을 옮겨 두었으면 붙인 뒤 그 자리로 되돌린다.
+	const bool	restore_selection = m_user_moved_caret && !caret_on_last_line;
+
 	//CString으로 변환
 	CString new_text;
 	va_list args;
@@ -104,7 +127,6 @@ CString CRichEditCtrlEx::add(Gdiplus::Color cr, LPCTSTR lpszFormat, ...)
 
 
 	// Set insertion point to end of text
-	int			nOldLines = 0, nNewLines = 0, nScroll = 0;
 	long		nInsertionPoint = 0;
 
 	nInsertionPoint = GetWindowTextLength();
@@ -142,26 +164,9 @@ CString CRichEditCtrlEx::add(Gdiplus::Color cr, LPCTSTR lpszFormat, ...)
 		}
 	}
 
-	int nOldFirstVisibleLine = GetFirstVisibleLine();
-	long lMinSel, lMaxSel;
-	GetSel(lMinSel, lMaxSel);
-
-
 	CHARFORMAT	cf;
 	ZeroMemory(&cf, sizeof(cf));
 
-	//CPoint pt = GetCaretPos();
-	////TRACE(_T("%d, %d\n"), pt.x, pt.y);
-	//if (pt.x > 10)
-	//	m_auto_scroll = false;
-
-	SCROLLINFO	si;
-	si.cbSize = sizeof(SCROLLINFO);
-	ZeroMemory(&si, si.cbSize);
-	GetScrollInfo(SB_VERT, &si);
-
-
-	nOldLines = GetLineCount();
 	nInsertionPoint = GetWindowTextLength();
 
 	SetSel(nInsertionPoint, nInsertionPoint);
@@ -189,9 +194,6 @@ CString CRichEditCtrlEx::add(Gdiplus::Color cr, LPCTSTR lpszFormat, ...)
 
 		ReplaceSel(sTime);
 	}
-
-	// Save number of lines before insertion of new text
-	nOldLines = GetLineCount();
 
 	// Initialize character format structure
 	cf.cbSize = sizeof(CHARFORMAT);
@@ -274,82 +276,32 @@ CString CRichEditCtrlEx::add(Gdiplus::Color cr, LPCTSTR lpszFormat, ...)
 	//TRACE(new_text);
 #endif
 
-	//여기서부터의 코드는 맨 마지막 라인으로 스크롤시킬지 말지를 결정.
-	//스크롤 위치가 맨 끝이면 항상 마지막 라인으로 자동 스크롤하고
-	//스크롤 위치가 중간이면 자동 스크롤시키지 않도록 구현하려 했으나 아직 미완성.
-	/*
-	TRACE(_T("m_auto_scroll = %d, pos = %d, trackpos = %d, page = %d, min = %d, max = %d, sel = %d, %d\n"),
-		m_auto_scroll,
-		si.nPos,
-		si.nTrackPos,
-		si.nPage,
-		si.nMin,
-		si.nMax,
-		lMinSel, lMaxSel);
-	*/
-	if (si.nPos != si.nTrackPos)
-		m_auto_scroll = false;
+	//20260908 by claude. 자동 스크롤. 기준은 캐럿이 아니라 *붙이기 전의 스크롤 위치* 다(VS 출력 창과 같다).
+	//맨 아래를 보고 있었으면 새 줄을 따라가고, 위로 올려 둔 상태였으면 보던 자리를 지킨다.
+	//글자를 넣는 과정에서 SetSel / ReplaceSel 이 화면을 끝으로 끌고 가므로 어느 쪽이든 여기서 되돌려야 한다.
+	//
+	//예전 코드가 어긋났던 이유 둘 —
+	//  - 포커스가 있으면(this == GetFocus()) 스크롤하지 않았다. 한 번 클릭하면 그 뒤로 따라가지 않았다.
+	//  - LineScroll(INT_MAX) 로 끝을 지나쳐 간 뒤 GetNumVisibleLines() 만큼 되돌아왔는데, 그 함수는
+	//    화면 수용량이 아니라 *현재 표시된 줄 수* 라 내용이 짧으면 덜 되돌아와 아래에 빈 공간이 남았다.
+	if (restore_selection)
+		SetSel(old_sel_min, old_sel_max);
 
-	//뭔가 의도대로 동작하지 않는다.
-	//현재는 포커스를 가지면 항상 맨 마지막으로 자동 스크롤되고
-	//포커스가 없으면 마지막 줄로 자동 스크롤되진 않는다.
-	/*
-	if (si.nPos + si.nPage == si.nMax + 1)
+	//캐럿을 위쪽 줄에 찍어 두면 화면이 맨 아래여도 따라가지 않는다(VS 출력 창과 같다).
+	//한 번도 캐럿을 옮긴 적이 없으면(m_user_moved_caret == false) 캐럿은 0번에 있으므로 조건에서 뺀다 —
+	//그러지 않으면 앱 시작 직후부터 자동 스크롤이 전혀 되지 않는다.
+	if (m_auto_scroll && was_at_bottom && (!m_user_moved_caret || caret_on_last_line))
 	{
-		//SetScrollPos(SB_VERT, 10000000);
-		int nVisible = GetNumVisibleLines();
-		LineScroll(INT_MAX);
-		LineScroll(1 - nVisible);
+		//SB_BOTTOM 은 끝을 지나치지 않는다 — 마지막 줄이 정확히 아래에 붙는다.
+		SendMessage(WM_VSCROLL, SB_BOTTOM);
 	}
-	*/
-#if 1
-	if (!m_auto_scroll)
-		return new_text;
-
-	int nVisible = GetNumVisibleLines();
-
-	// Now this is the fix of CRichEditCtrl's abnormal behaviour when used
-	// in an application not based on dialogs. Checking the focus prevents
-	// us from scrolling when the CRichEditCtrl does so automatically,
-	// even though ES_AUTOxSCROLL style is NOT set.
-
-
-	if (this != GetFocus())
+	else
 	{
-		LineScroll(INT_MAX);
-		LineScroll(1 - nVisible);
+		const int new_first_line = GetFirstVisibleLine();
+
+		if (old_first_line != new_first_line)
+			LineScroll(old_first_line - new_first_line);
 	}
-
-	return new_text;
-
-	CRect rc;
-	GetClientRect(rc);
-	// Get new line count
-	if (false)//(si.nMax - si.nTrackPos) < rc.Height())
-	{
-		TRACE(_T("true\n"));
-		nNewLines = GetLineCount();
-
-		// Scroll by the number of lines just inserted
-		nScroll = nNewLines - nOldLines;
-		LineScroll(nScroll);
-	}
-	else// if (false)
-	{
-		TRACE(_T("false\n"));
-		//SetSel(lMinSel, lMaxSel);
-
-		int nNewFirstVisibleLine = GetFirstVisibleLine();
-
-		if (nOldFirstVisibleLine != nNewFirstVisibleLine)
-		{
-			SetRedraw(TRUE);
-			LineScroll(nOldFirstVisibleLine - nNewFirstVisibleLine);
-		}
-
-		SetRedraw(TRUE);
-	}
-#endif
 
 	return new_text;
 }
@@ -373,426 +325,6 @@ void CRichEditCtrlEx::set_text(std::deque<CString>* dqlist)
 
 	SetRedraw(TRUE);
 	Invalidate();
-}
-
-
-//=============================================================================
-// Generics
-//=============================================================================
-
-
-//-----------------------------------------------------------------------------
-//  AppendToLog()
-///
-/// \brief	Add a string to the log window at the current position and scroll
-///			by the number of inserted lines (the naive solution for
-///			auto-scrolling).
-///
-/// The string is added to the log starting at the current position,
-/// i.e. without starting a new line. Then the control scrolls down by the
-/// number of lines inserted.
-/// The string is displayed in the specified text color.
-/// The string may be a multiline string using carriage return/line feed
-/// (i.e. newline) characters to indicate a line breaks.
-///
-/// The scrolling mechanism used here is kind of naive, because it assumes
-/// that the user did not touch the scroll bars and that the scroll position
-/// is always the end of the text. However, this is not the general case.
-/// In general, we need to assume that the current scrolling position is
-/// unkown. A solution for that is shown in the AppendToLogAndScroll()
-/// method.
-///
-/// \param [in]		str		The string to add to the message log.
-/// \param [in]		color	The text color of the string. You may use the
-///							RGB(r,g,b) macro to specify the color byte-wise.
-/// \return					An integer indicating sucess or failure:
-///							- 0, if the function succeeded.
-///							- (-1), if the function failed.
-///							(This function always returns 0, because no
-///							parameter or failure checking is done.)
-///
-/// \remark
-/// Support for adding multiline strings requires the ES_MULTILINE style
-/// to be set.
-/// If you are not using the Visual Studio Wizards but create the control
-/// indirectly using the Create() method, you should use the following
-/// style: WS_CHILD|WS_VSCROLL|WS_HSCROLL|ES_MULTILINE|ES_READONLY.
-///
-/// \sa AppendToLogAndScroll()
-//-----------------------------------------------------------------------------
-/*
-* vs처럼 내용을 보기 위해 스크롤하면 그 자리에서 멈춰있고
-* 맨 마지막 라인으로 캐럿을 옮겨놓으면 자동 스크롤되도록 처리했으나
-* 뭔가 깜빡임이 발생한다.
-*/
-int CRichEditCtrlEx::AppendToLog(CString str, Gdiplus::Color color /*= Gdiplus::Color::Transparent*/, BOOL bAddNewLine /*= TRUE*/)
-{
-	if (m_hWnd == nullptr)
-		return 0;
-
-	if (!m_show_log)
-		return 0;
-
-
-	//만약 로그 텍스트의 맨 앞에 \n이 붙어있으면 이전 로그 라인과 라인을 구분하기 위함인데
-	//그냥 기록하면 시간부터 라인번호까지 출력한 후 라인이 변경된다.
-	//log_text의 맨 앞에 \n이 있다면 먼저 처리해준다.
-	int i;
-	int linefeed_count = 0;
-
-	for (i = 0; i < str.GetLength(); i++)
-	{
-		if (str[i] == '\n')
-			linefeed_count++;
-		else
-			break;
-	}
-
-	if (linefeed_count > 0)
-		str = str.Mid(linefeed_count);
-
-
-
-	//SetRedraw(FALSE);
-	int nOldFirstVisibleLine = GetFirstVisibleLine();
-	long lMinSel, lMaxSel;
-	GetSel(lMinSel, lMaxSel);
-
-	//str의 끝에 \n이 있던 없던 옵션대로 추가할 건 추가한다.
-	//str의 끝에 \n이 이미 있으면 스킵하려 했으나 의도적인 경우도 존재하므로
-	//코드는 명시된 규칙 그대로 수행하는게 맞다.
-	if (bAddNewLine)// && (str.Right(1) != "\n"))
-		str += "\n";
-
-	int			nOldLines = 0, nNewLines = 0, nScroll = 0;
-	long		nInsertionPoint = 0;
-	CHARFORMAT	cf;
-
-	CPoint pt = GetCaretPos();
-	//TRACE(_T("%d, %d\n"), pt.x, pt.y);
-	if (pt.x > 1)
-		m_auto_scroll = false;
-
-	SCROLLINFO	si;
-	si.cbSize = sizeof(SCROLLINFO);
-	GetScrollInfo(SB_VERT, &si);
-
-	/*
-	TRACE(_T("m_auto_scroll = %d, pos = %d, trackpos = %d, max = %d, sel = %d, %d\n"),
-		m_auto_scroll,
-		si.nPos,
-		si.nTrackPos,
-		si.nMax,
-		lMinSel, lMaxSel);
-	if (si.nPos != si.nTrackPos)
-		m_auto_scroll = false;
-	*/
-
-	nOldLines = GetLineCount();
-	nInsertionPoint = GetWindowTextLength();
-
-	if (m_hWnd == nullptr)
-		return 0;
-
-	SetSel(nInsertionPoint, nInsertionPoint);
-
-	//TRACE(_T("nOldLines = %d\n"), nOldLines);
-	
-	PARAFORMAT2 pf;
-	GetParaFormat(pf);
-	pf.dwMask = PFM_ALIGNMENT;
-	pf.wAlignment = m_align;
-	SetParaFormat(pf);
-	SendMessage(EM_SETMODIFY, (WPARAM)TRUE, 0L);
-	
-
-	if (m_show_time)
-	{
-		SYSTEMTIME	t;
-		CString sTime;
-
-		::GetLocalTime(&t);
-		sTime.Format(_T("%d-%02d-%02d %02d:%02d:%02d(%03d) "), t.wYear, t.wMonth, t.wDay, t.wHour, t.wMinute, t.wSecond, t.wMilliseconds);
-
-		cf.cbSize		= sizeof(CHARFORMAT);
-		cf.dwMask		= CFM_COLOR;
-		cf.dwEffects	= 0;	// To disable CFE_AUTOCOLOR
-		cf.crTextColor	= RGB(128, 128, 128);
-		SetSelectionCharFormat(cf);
-
-		ReplaceSel(sTime);
-	}
-
-	// Save number of lines before insertion of new text
-	nOldLines		= GetLineCount();
-
-	// Initialize character format structure
-	cf.cbSize		= sizeof(CHARFORMAT);
-	cf.dwMask		= CFM_COLOR;
-	cf.dwEffects	= 0;	// To disable CFE_AUTOCOLOR
-
-	if (color.GetValue() == Gdiplus::Color::Transparent)
-		cf.crTextColor	= m_theme.cr_text.ToCOLORREF();
-	else
-		cf.crTextColor	= color.ToCOLORREF();
-
-	// Set insertion point to end of text
-	nInsertionPoint = GetWindowTextLength();
-
-	if (linefeed_count == 0 && str.IsEmpty())
-	{
-		SetSel(nInsertionPoint, -1);
-		ReplaceSel(_T("\n"));
-	}
-	else
-	{
-		for (i = 0; i < linefeed_count; i++)
-		{
-			SetSel(nInsertionPoint, -1);
-			ReplaceSel(_T("\n"));
-			nInsertionPoint = GetWindowTextLength();
-		}
-	}
-
-	nInsertionPoint = GetWindowTextLength();
-	
-	//텍스트 전체 크기가 특정 크기를 넘어가면 클리어
-	if (m_max_length > 0 && nInsertionPoint >= m_max_length)
-	{
-		//clear
-		SetSel(0, -1);
-		ReplaceSel(_T(""));
-	}
-
-	nInsertionPoint = -1;
-	SetSel(nInsertionPoint, -1);
-
-
-    //  Set the character format
-    SetSelectionCharFormat(cf);
-
-	// Replace selection. Because we have nothing selected, this will simply insert
-	// the string at the current caret position.
-	ReplaceSel(str);
-#ifdef _DEBUG
-	TRACE(str);
-#endif
-
-
-	//if (!m_auto_scroll)
-	//	return 0;
-
-
-	CRect rc;
-	GetClientRect(rc);
-	// Get new line count
-	if ((si.nMax - si.nTrackPos) < rc.Height())
-	{
-		nNewLines = GetLineCount();
-
-		// Scroll by the number of lines just inserted
-		nScroll = nNewLines - nOldLines;
-		LineScroll(nScroll);
-	}
-	else// if (false)
-	{
-		SetSel(lMinSel, lMaxSel);
-
-		int nNewFirstVisibleLine = GetFirstVisibleLine();
-
-		if (nOldFirstVisibleLine != nNewFirstVisibleLine)
-		{
-			SetRedraw(TRUE);
-			LineScroll(nOldFirstVisibleLine - nNewFirstVisibleLine);
-		}
-
-		SetRedraw(TRUE);
-	}
-
-
-	return 0;
-}
-
-void CRichEditCtrlEx::Append(LPCTSTR lpszFormat, ...)
-{
-	TCHAR szBuffer[512];
-
-	size_t cb = 0;
-	va_list args;
-	va_start(args, lpszFormat);
-	::StringCchVPrintfEx(szBuffer, 512, nullptr, &cb, 0, lpszFormat, args);
-	va_end(args);
-
-	//시간 표시가 true라고 하더라도 라인의 맨 처음 컬럼이 아니면 시간표시를 생략시킨다.
-	if (m_show_time)
-	{
-		int total_lines = GetLineCount();
-		int len = LineLength(total_lines);
-		TCHAR sline[1024] = { 0, };
-		GetLine(total_lines - 1, sline, 1024);
-
-		if (len > 0)
-		{
-			m_show_time = false;
-			AppendToLog(szBuffer, m_theme.cr_text, false);
-			m_show_time = true;
-		}
-		else
-		{
-			AppendToLog(szBuffer, m_theme.cr_text, false);
-		}
-	}
-	else
-	{
-		AppendToLog(szBuffer, m_theme.cr_text, false);
-	}
-}
-
-void CRichEditCtrlEx::Append(Gdiplus::Color cr, LPCTSTR lpszFormat, ...)
-{
-	TCHAR szBuffer[512];
-
-	size_t cb = 0;
-	va_list args;
-	va_start(args, lpszFormat);
-	::StringCchVPrintfEx(szBuffer, 512, nullptr, &cb, 0, lpszFormat, args);
-	va_end(args);
-
-	//시간 표시가 true라고 하더라도 라인의 맨 처음 컬럼이 아니면 시간표시를 생략시킨다.
-	if (m_show_time)
-	{
-		int total_lines = GetLineCount();
-		int len = LineLength(total_lines);
-		TCHAR sline[1024] = { 0, };
-		GetLine(total_lines - 1, sline, 1024);
-
-		if (len > 0)
-		{
-			m_show_time = false;
-			AppendToLog(szBuffer, cr, false);
-			m_show_time = true;
-		}
-		else
-		{
-			AppendToLog(szBuffer, cr, false);
-		}
-	}
-	else
-	{
-		AppendToLog(szBuffer, cr, false);
-	}
-}
-
-//-----------------------------------------------------------------------------
-//  AppendToLogAndScroll()
-///
-/// \brief	Add a string to the serial log window at the current position,
-///			then scroll to the end of the text such that the last line of
-///			the text is shown at the bottom of the CRichEditCtrl.
-///
-/// The string is added to the message log starting at the current position,
-/// i.e. without starting a new line. Then the control scrolls down to show
-/// as much text as possible, including the last line of text at the very
-/// bottom.
-/// The string is displayed in the specified text color.
-/// The string may be a multiline string using carriage return/line feed
-/// (i.e. newline) characters to indicate a line breaks.
-///
-/// \param [in]		str		The string to add to the message log.
-/// \param [in]		color	The text color of the string. You may use the
-///							RGB(r,g,b) macro to specify the color byte-wise.
-/// \return					An integer indicating sucess or failure:
-///							- 0, if the function succeeded.
-///							- (-1), if the function failed.
-///							(This function always returns 0, because no
-///							parameter or failure checking is done.)
-///
-/// \remark
-/// The automatic scrolling function would be easy, if the MFC documentation
-/// was correct. Unfortunetely, it is not as trivial as one might think.
-/// If the CRichEditCtrl has the focus, it scrolls automatically if you
-/// insert text programatically. If it does not have the focus, it does not
-/// scroll automatically, so in that case you can use the LineScroll()
-/// method and you get the results you would expect when reading the MFC docs.
-/// This is true even if ES_AUTOxSCROLL style is NOT set.
-///
-/// So the point is to check in the AppendToLogAndScroll() method if the
-/// affected CRichEditCtrl has the focus. If so, we must not call
-/// LineScroll(). If not, it is safe to call LineSroll() to first scroll to
-/// the very end, which means that the last line of text is shown at the top
-/// of the CRichEditCtrl.
-/// Then we call LineScroll() a second time, this time scrolling back by
-/// the number of visible lines. This leads to having the last line of the
-/// text being displayed at the bottom of CRichEditCtrl.
-///
-/// Please note that in this sample application, the CRichEditCtrl never has
-/// the focus, because we always have to click a button in order to insert
-/// text. However, if you are using the code in an application not based on
-/// a dialog and that fills up the control where the user could have set focus
-/// to the control first, this method would fail to scroll correctly without
-/// checking the focus.
-/// I used this code in an MDI application, and there the control claims
-/// to have the focus if I click into the control before clicking a menu
-/// command (whatever the reason might be why in that case the focus is
-/// not lost to the menu command).
-///
-/// Please note that the code is written for maximum comprehension / good
-/// readability, not for code or execution efficiency.
-//-----------------------------------------------------------------------------
-int CRichEditCtrlEx::AppendToLogAndScroll(CString str, Gdiplus::Color color /*= Gdiplus::Color::Transparent*/, BOOL bAddNewLine /*= TRUE*/)
-{
-	if (m_hWnd == nullptr)
-		return 0;
-
-	if (!m_show_log)
-		return 0;
-
-	long nVisible = 0;
-	long nInsertionPoint = 0;
-	CHARFORMAT cf;
-	
-	if (bAddNewLine && (str.Right(1) != "\n"))
-		str += _T("\n");
-
-	// Initialize character format structure
-	cf.cbSize = sizeof(CHARFORMAT);
-	cf.dwMask = CFM_COLOR;
-	cf.dwEffects = 0; // To disable CFE_AUTOCOLOR
-
-	if (color.GetValue() == Gdiplus::Color::Transparent)
-		cf.crTextColor = m_theme.cr_text.ToCOLORREF();
-	else
-		cf.crTextColor = color.ToCOLORREF();
-
-	// Set insertion point to end of text
-	nInsertionPoint = GetWindowTextLength();
-	SetSel(nInsertionPoint, -1);
-	
-	// Set the character format
-	SetSelectionCharFormat(cf);
-
-	// Replace selection. Because we have nothing 
-	// selected, this will simply insert
-	// the string at the current caret position.
-	ReplaceSel(str);
-
-	// Get number of currently visible lines or maximum number of visible lines
-	// (We must call GetNumVisibleLines() before the first call to LineScroll()!)
-	nVisible   = GetNumVisibleLines();
-
-	// Now this is the fix of CRichEditCtrl's abnormal behaviour when used
-	// in an application not based on dialogs. Checking the focus prevents
-	// us from scrolling when the CRichEditCtrl does so automatically,
-	// even though ES_AUTOxSCROLL style is NOT set.
-
-
-	if (this == GetFocus())
-	{
-		LineScroll(INT_MAX);
-		LineScroll(1 - nVisible);
-	}
-
-	return 0;
 }
 
 
@@ -918,15 +450,14 @@ void CRichEditCtrlEx::toggle_show_log()
 
 	if (m_show_log)
 	{
-		AppendToLog(_T("\n"));
-		AppendToLog(_T("로그를 디스플레이합니다."), get_complementary_gcolor(m_theme.cr_back));
+		addl(get_complementary_gcolor(m_theme.cr_back), _T("\n로그를 디스플레이합니다."));
 	}
 	else
 	{
+		//add() 는 m_show_log 가 false 면 아무 것도 하지 않는다. 이 안내만은 보여야 하므로 잠시 켠다.
 		m_show_log = true;
-		AppendToLog(_T("\n"));
-		AppendToLog(_T("로그 디스플레이 옵션을 해제하였습니다."), get_complementary_gcolor(m_theme.cr_back));
-		AppendToLog(_T("로그를 디스플레이 하려면 오른쪽 버튼을 누른 후 \"Display logs\" 옵션을 선택하세요."), get_complementary_gcolor(m_theme.cr_back));
+		addl(get_complementary_gcolor(m_theme.cr_back), _T("\n로그 디스플레이 옵션을 해제하였습니다."));
+		addl(get_complementary_gcolor(m_theme.cr_back), _T("로그를 디스플레이 하려면 오른쪽 버튼을 누른 후 \"Display logs\" 옵션을 선택하세요."));
 		m_show_log = false;
 	}
 }
@@ -1032,7 +563,7 @@ void CRichEditCtrlEx::OnTimer(UINT_PTR nIDEvent)
 	if (nIDEvent == TIMER_CLEAR_LOG)
 	{
 		clear_all();
-		AppendToLog(_T("로그를 주기적으로 Clear 합니다."), get_complementary_gcolor(m_theme.cr_back));
+		addl(get_complementary_gcolor(m_theme.cr_back), _T("로그를 주기적으로 Clear 합니다."));
 	}
 }
 
@@ -1068,10 +599,10 @@ BOOL CRichEditCtrlEx::PreTranslateMessage(MSG* pMsg)
 		//GetParent()->SendMessage(Message_CRichEditCtrlEx, (WPARAM)&CRichEditCtrlExMessage(this, WM_VSCROLL), 0);
 		return FALSE;
 	}
-	else if (pMsg->message == WM_LBUTTONDOWN)
-	{
-		m_auto_scroll = false;
-	}
+	//20260908 by claude. 클릭했다고 자동 스크롤을 끄지 않는다. 예전에는 여기서 껐다가 우클릭 메뉴로만
+	//되살릴 수 있어, 한 번 클릭한 뒤로는 캐럿이 맨 끝에 있어도 따라가지 않았다.
+	//따라갈지 말지는 add() 가 붙이기 직전의 스크롤 위치로 매번 판단한다.
+	//m_auto_scroll 은 사용자가 우클릭 메뉴나 set_auto_scroll() 로 끄는 주 스위치로만 남는다.
 	//20260908 by claude. RichEdit 2.0 은 Ctrl+V 를 내부에서 처리해 WM_PASTE 를 자기 자신에게 보내지 않는다.
 	//붙여넣기 처리를 on_paste 한 곳에 모으기 위해 키 입력을 여기서 WM_PASTE 로 바꿔 보낸다.
 	else if (pMsg->message == WM_KEYDOWN
@@ -1266,9 +797,9 @@ void CRichEditCtrlEx::OnLButtonDown(UINT nFlags, CPoint point)
 {
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
 	//Trace_func();
-	//CPoint pt = GetCaretPos();
-	//TRACE(_T("%d, %d\n"), pt.x, pt.y);
-	m_auto_scroll = false;
+	//20260908 by claude. 클릭으로 자동 스크롤을 끄지 않는다 — PreTranslateMessage 의 같은 자리 주석 참조.
+	//다만 이 클릭으로 캐럿이 옮겨지므로, 이후로는 add() 가 캐럿 위치도 함께 본다(m_user_moved_caret 선언부).
+	m_user_moved_caret = true;
 
 	CRichEditCtrl::OnLButtonDown(nFlags, point);
 }
@@ -1348,6 +879,9 @@ void CRichEditCtrlEx::OnKeyUp(UINT nChar, UINT nRepCnt, UINT nFlags)
 {
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
 	highlight_current_line();
+
+	//20260908 by claude. 키로도 캐럿이 움직인다(Ctrl+End, 방향키 등). 클릭과 같은 이유로 표시해 둔다.
+	m_user_moved_caret = true;
 
 	CRichEditCtrl::OnKeyUp(nChar, nRepCnt, nFlags);
 }

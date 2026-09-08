@@ -39,7 +39,7 @@
 		//SCDeskTools.h
 		CSCSelfPatch	m_self_patch;
 
-		//InitInstance() — 중복 실행 검사 바로 다음, UI 초기화보다 먼저
+		//InitInstance() — 다이얼로그를 만들기 전이면 된다. mutex 검사 앞뒤 어느 쪽이든 무방하다.
 		m_self_patch.server_path = _T("/download/tools/KoinoTools/SCDeskTools");
 		m_self_patch.register_startup = true;		//부팅 시 자동 실행이 필요한 앱만
 		if (m_self_patch.startup())
@@ -57,6 +57,7 @@
 	  2. filelist.lst 를 읽어 로컬 exe 의 FileVersion 과 비교. 서버가 더 새 버전이면 zip 을 받아
 	     <exe>_ 로 풀고 self_updater.bat 을 실행한 뒤 true 를 돌려준다.
 	  3. register_startup 이면 부팅 자동 실행 등록을 *지금 실행 중인 exe 경로* 로 맞춘다.
+	     2 에서 받았으면 여기까지 오지 않는다 — 등록 갱신은 교체 후 새로 뜬 다음 실행에서 이뤄진다.
 
 	버전이 같아도 크기가 다르면 받는다 — 재빌드·재서명처럼 버전은 그대로인 채 내용만 바뀐 경우를 잡는다.
 
@@ -100,6 +101,9 @@
 	check_new_version() 이 _DEBUG 에서 즉시 반환한다. 안 그러면 F5 로 띄운 Debug exe 가
 	서버의 Release 빌드로 교체되어 디버깅이 끊긴다.
 
+	건너뛰는 것은 버전 검사뿐이다. 배치파일 잔재 정리와 부팅 자동 실행 등록은 Debug 에서도 그대로 돈다 —
+	register_startup 인 앱을 Debug 로 실행하면 Run 등록이 Debug 빌드 경로를 가리키게 된다.
+
 	Release 를 빌드 폴더에서 실행하는 것은 막지 않는다. 개발 중에는 로컬 버전이 서버보다 높으므로
 	교체가 일어나지 않는다 — 배포 전에 .rc 의 FileVersion 을 올리는 흐름이 그 자체로 가드가 된다.
 */
@@ -117,11 +121,12 @@ public:
 	//끄면 등록도 하지 않고 이미 있던 등록을 지우지도 않는다 — 이 클래스가 만들지 않은 것을 건드리지 않기 위해서다.
 	bool		register_startup = false;
 
-	//InitInstance 의 앞부분(중복 실행 검사 직후)에서 호출한다.
+	//InitInstance 에서 다이얼로그를 만들기 전에 호출한다. mutex 검사 앞뒤 어느 쪽이든 무방하다.
 	//true = 패치를 배치파일에 넘겼다. 호출자는 즉시 return FALSE 해야 한다.
 	bool		startup();
 
 	//ExitInstance 에서 호출한다. 교체하지 못하고 남은 <exe>_ 가 있으면 여기서 한 번 더 시도한다.
+	//이때의 배치파일은 교체만 하고 앱을 다시 띄우지 않는다.
 	void		shutdown();
 
 private:

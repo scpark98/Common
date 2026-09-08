@@ -47,6 +47,7 @@ BEGIN_MESSAGE_MAP(CRichEditCtrlEx, CRichEditCtrl)
 	//ON_WM_ERASEBKGND()
 	ON_WM_KEYUP()
 	ON_NOTIFY_REFLECT(EN_SELCHANGE, &CRichEditCtrlEx::OnEnSelchange)
+	ON_MESSAGE(WM_PASTE, &CRichEditCtrlEx::on_paste)
 END_MESSAGE_MAP()
 
 
@@ -1047,8 +1048,77 @@ BOOL CRichEditCtrlEx::PreTranslateMessage(MSG* pMsg)
 	{
 		m_auto_scroll = false;
 	}
+	//20260908 by claude. RichEdit 2.0 은 Ctrl+V 를 내부에서 처리해 WM_PASTE 를 자기 자신에게 보내지 않는다.
+	//붙여넣기 처리를 on_paste 한 곳에 모으기 위해 키 입력을 여기서 WM_PASTE 로 바꿔 보낸다.
+	else if (pMsg->message == WM_KEYDOWN
+		&& ((pMsg->wParam == 'V' && (::GetKeyState(VK_CONTROL) & 0x8000))
+		 || (pMsg->wParam == VK_INSERT && (::GetKeyState(VK_SHIFT) & 0x8000))))
+	{
+		SendMessage(WM_PASTE);
+		return TRUE;
+	}
 
 	return CRichEditCtrl::PreTranslateMessage(pMsg);
+}
+
+//20260908 by claude. 붙여넣기 서식을 클립보드 형식에 따라 갈라 처리한다.
+//  RTF 있음  → 원본 서식 그대로. VS 편집기 등에서 복사한 코드의 색·굵기가 유지된다.
+//  텍스트만  → set_default_text_color 로 정한 기본 글자색을 입혀서 넣는다.
+//기본 붙여넣기에 맡기지 않고 직접 넣는 이유 — 삽입 지점 서식을 따르는지에 기대지 않기 위해서다.
+//add() 가 쓰는 "SetSelectionCharFormat 후 ReplaceSel" 경로를 그대로 재사용한다.
+LRESULT CRichEditCtrlEx::on_paste(WPARAM wParam, LPARAM lParam)
+{
+	//PasteSpecial / ReplaceSel 은 readonly 를 검사하지 않는다. 기본 처리와 같아지도록 여기서 막는다.
+	if (GetStyle() & ES_READONLY)
+		return 0;
+
+	//"Rich Text Format" 은 RTF 의 표준 클립보드 형식 이름이다. XP 의 RichEdit 2.0 에도 있다.
+	static const UINT cf_rtf = ::RegisterClipboardFormat(_T("Rich Text Format"));
+
+	if (cf_rtf != 0 && ::IsClipboardFormatAvailable(cf_rtf))
+	{
+		PasteSpecial(cf_rtf);
+		return 0;
+	}
+
+	if (!::IsClipboardFormatAvailable(CF_UNICODETEXT) && !::IsClipboardFormatAvailable(CF_TEXT))
+		return 0;
+
+	if (!OpenClipboard())
+		return 0;
+
+	CString text;
+
+	//CF_TEXT 만 올려둔 앱이어도 OS 가 CF_UNICODETEXT 로 자동 변환해 준다.
+	HANDLE clipboard_data = ::GetClipboardData(CF_UNICODETEXT);
+
+	if (clipboard_data != nullptr)
+	{
+		LPCWSTR p = (LPCWSTR)::GlobalLock(clipboard_data);
+
+		if (p != nullptr)
+		{
+			text = p;
+			::GlobalUnlock(clipboard_data);
+		}
+	}
+
+	::CloseClipboard();
+
+	if (text.IsEmpty())
+		return 0;
+
+	CHARFORMAT cf;
+	ZeroMemory(&cf, sizeof(cf));
+	cf.cbSize = sizeof(cf);
+	cf.dwMask = CFM_COLOR;
+	cf.dwEffects = 0;	// To disable CFE_AUTOCOLOR
+	cf.crTextColor = m_theme.cr_text.ToCOLORREF();
+	SetSelectionCharFormat(cf);
+
+	ReplaceSel(text, TRUE);
+
+	return 0;
 }
 
 

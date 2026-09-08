@@ -205,4 +205,7 @@ public:
 	afx_msg BOOL OnEraseBkgnd(CDC* pDC);
 	afx_msg void OnKeyUp(UINT nChar, UINT nRepCnt, UINT nFlags);
 	afx_msg void OnEnSelchange(NMHDR* pNMHDR, LRESULT* pResult);
+
+	//붙여넣기. 클립보드에 RTF 가 있으면 서식을 그대로, 텍스트만 있으면 기본 글자색(m_theme.cr_text)을 입혀 넣는다.
+	afx_msg LRESULT on_paste(WPARAM wParam, LPARAM lParam);
 };

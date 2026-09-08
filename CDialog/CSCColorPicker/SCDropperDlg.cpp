@@ -443,6 +443,11 @@ void CSCDropperDlg::update_display()
 	CRect rhint(0, 0, 0, 0);
 	CString rgb;
 
+	//캔버스 안에서의 가로 위치와 캔버스의 화면 좌측. 안내를 끄면 원 하나뿐이라 커서 중심 그대로다.
+	int ox = 0;
+	int hint_x = 0;
+	int org_x = cursor.x - ws / 2;
+
 	if (m_show_info)
 	{
 		rgb.Format(_T("%dx%d (%s)"), cursor.x - m_screen_origin.x, cursor.y - m_screen_origin.y, get_color_str(m_center_color));
@@ -454,12 +459,30 @@ void CSCDropperDlg::update_display()
 			::MulDiv((int)m_hint_bitmap->GetHeight(), m_dpi, m_hint_dpi));
 
 		band = max(scaled(kHintBandHeight), rhint.Height() + scaled(4));
-		if (cw < rhint.Width())
-			cw = rhint.Width();
+
+		//20260908 by claude. 캔버스를 커서 중심으로 고정하지 않는다.
+		//안내 띠는 캔버스만큼 넓어서, 커서가 모니터 가장자리에 가면 캔버스의 *보이는* 부분보다 띠가 커진다.
+		//그때는 어느 쪽으로 밀어도 반대쪽이 캔버스 밖으로 나가 잘린다 — 왼쪽 끝에서는 띠의 오른쪽이 잘리고,
+		//오른쪽 끝에서는 clamp 가 서로를 되돌려 띠가 화면 밖으로 그대로 나갔다.
+		//그래서 띠가 화면 안에 들어가는 자리를 먼저 정하고, 원과 띠를 모두 덮도록 캔버스를 잡는다.
+		//원은 여전히 커서 위에 놓인다 — 캔버스 안에서만 중앙을 벗어난다.
+		int hint_left = cursor.x - rhint.Width() / 2;
+
+		if (hint_left + rhint.Width() > m_monitor_rect.right)
+			hint_left = m_monitor_rect.right - rhint.Width();
+		if (hint_left < m_monitor_rect.left)
+			hint_left = m_monitor_rect.left;
+
+		const int circle_left = cursor.x - ws / 2;
+
+		org_x = min(hint_left, circle_left);
+		cw    = max(hint_left + rhint.Width(), circle_left + ws) - org_x;
+
+		ox     = circle_left - org_x;
+		hint_x = hint_left - org_x;
 	}
 
 	const int ch = ws + band * 2;
-	const int ox = (cw - ws) / 2;	//캔버스 안에서 돋보기 원의 좌상단
 	const int oy = band;
 
 	//좌표 폰트(kInfoFontSize)의 pt→px 환산과 안내 띠 DrawImage 가 1:1 이 되도록 해상도를 맞춘다 (위 build_hint_bitmap 참조).
@@ -486,7 +509,7 @@ void CSCDropperDlg::update_display()
 		{
 			//창은 커서를 중심으로 뜨므로 커서가 모니터 가장자리에 있으면 창의 일부가 화면 밖이다.
 			//창 ∩ 모니터 = 실제로 보이는 영역이고, 문자열을 그 안으로 옮겨야 읽을 수 있다.
-			const CPoint org(cursor.x - cw / 2, cursor.y - oy - ws / 2);
+			const CPoint org(org_x, cursor.y - oy - ws / 2);
 			CRect rc_visible(org.x, org.y, org.x + cw, org.y + ch);
 			rc_visible.IntersectRect(rc_visible, m_monitor_rect);
 			rc_visible.OffsetRect(-org.x, -org.y);
@@ -504,7 +527,7 @@ void CSCDropperDlg::update_display()
 			draw_label(g, rinfo, rgb, kInfoFontSize, cr_text, get_distinct_bw_color(cr_text));
 
 			//안내 띠. 원 아래가 기본, 화면 밖이면 원 위로.
-			rhint.OffsetRect((cw - rhint.Width()) / 2, oy + ws + (band - rhint.Height()) / 2);
+			rhint.OffsetRect(hint_x, oy + ws + (band - rhint.Height()) / 2);
 			if (rhint.bottom > rc_visible.bottom)
 				rhint.OffsetRect(0, -(ws + band));
 			clamp_into(rhint, rc_visible);
@@ -528,7 +551,7 @@ void CSCDropperDlg::update_display()
 
 	SIZE  sz = { cw, ch };
 	POINT ptSrc = { 0, 0 };
-	POINT ptDst = { cursor.x - cw / 2, cursor.y - oy - ws / 2 };
+	POINT ptDst = { org_x, cursor.y - oy - ws / 2 };
 
 	::UpdateLayeredWindow(m_hWnd, hDC, &ptDst, &sz,
 		hMemDC, &ptSrc, 0, &blend, ULW_ALPHA);

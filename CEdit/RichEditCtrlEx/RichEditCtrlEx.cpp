@@ -77,28 +77,29 @@ CString CRichEditCtrlEx::add(Gdiplus::Color cr, LPCTSTR lpszFormat, ...)
 	if (cr.GetValue() == Gdiplus::Color::Transparent)
 		cr = m_theme.cr_text;
 
-	//20260908 by claude. 붙이기 *전* 의 보기 상태를 기록해 둔다. 자동 스크롤 여부를 이 값으로 정한다.
-	//반드시 첫 SetSel / ReplaceSel 보다 앞이어야 한다 — 그 호출들이 캐럿을 끝으로 옮기고 화면도 함께 끌고 간다.
-	//
-	//판단 기준은 캐럿이 아니라 *스크롤 위치* 다(VS 출력 창과 같다). 캐럿은 이 함수가 글자를 넣으면서
-	//어차피 끝으로 옮기므로 기준으로 삼을 수 없다. 대신 사용자가 찍어둔 선택 영역은 아래에서 되돌려 준다.
-	//리치에디트는 세로 스크롤을 픽셀 단위로 보고한다. 맨 아래에서 nPos + nPage == nMax 다.
-	//스크롤바가 없으면(내용이 한 화면보다 짧다) 맨 아래를 보고 있는 것과 같다.
-	SCROLLINFO	si = { 0 };
-	const bool	was_at_bottom = !GetScrollInfo(SB_VERT, &si) || (si.nPos + (int)si.nPage >= si.nMax);
+	//20260908 by claude. 붙이기 *전* 의 상태를 기록해 둔다. 반드시 첫 SetSel / ReplaceSel 보다 앞이어야 한다 —
+	//그 호출들이 캐럿을 끝으로 옮기고 화면도 함께 끌고 간다.
 	const int	old_first_line = GetFirstVisibleLine();
 
 	long	old_sel_min = 0;
 	long	old_sel_max = 0;
 	GetSel(old_sel_min, old_sel_max);
 
-	//캐럿이 마지막 줄에 있는지. 끝 위치를 GetWindowTextLength 로 재면 안 된다 — 그쪽은 줄바꿈을
-	//CRLF 두 글자로 세는데 선택 위치는 한 글자로 세어, 캐럿이 맨 끝(Ctrl+End)이어도 "중간" 으로 잘못 잡힌다.
-	//줄 번호로 비교하면 그 차이를 타지 않는다.
-	const bool	caret_on_last_line = (old_sel_min == old_sel_max) && (LineFromChar(old_sel_min) >= GetLineCount() - 1);
+	//따라갈지는 이미 정해져 있다(선언부 참조). 여기서 스크롤 위치를 다시 재서 판단하지 않는다.
+	const bool	follow = is_auto_scrolling();
 
-	//사용자가 중간을 클릭해 캐럿을 옮겨 두었으면 붙인 뒤 그 자리로 되돌린다.
-	const bool	restore_selection = m_user_moved_caret && !caret_on_last_line;
+	//따라가지 않는 중이면 아래에서 사용자가 찍어 둔 캐럿·선택을 그대로 되돌린다.
+	//이 함수는 글자를 넣으려고 SetSel 로 캐럿을 끝으로 옮기므로, 되돌리지 않으면 클릭한 자리가 매번 사라진다.
+	//Ctrl+End 는 이 복원에 걸리지 않는다 — PreTranslateMessage 가 키를 받는 즉시 따라가기를 켜기 때문이다.
+
+	//글자를 넣는 동안 SetSel 이 화면을 캐럿(맨 끝) 쪽으로 끌어온다. 따라가지 않는 중이면 그 뒤에 원래 자리로
+	//되돌리므로 화면이 오가며 심하게 깜빡인다. 그래서 그때만 그리기를 묶는다.
+	//
+	//따라가는 중에는 묶지 않는다. 중간 이동의 목적지가 어차피 최종 목적지(맨 끝)와 같아 왕복이 없고,
+	//무엇보다 SetRedraw 를 끄면 컨트롤이 캐럿을 감추는데 다시 켠다고 저절로 보여주지 않는다.
+	//로그가 계속 들어오면 캐럿이 매번 지워져 깜빡이지 않는 것처럼 보인다(2026-09-08 실측).
+	if (!follow)
+		SetRedraw(FALSE);
 
 	//CString으로 변환
 	CString new_text;
@@ -276,24 +277,17 @@ CString CRichEditCtrlEx::add(Gdiplus::Color cr, LPCTSTR lpszFormat, ...)
 	//TRACE(new_text);
 #endif
 
-	//20260908 by claude. 자동 스크롤. 기준은 캐럿이 아니라 *붙이기 전의 스크롤 위치* 다(VS 출력 창과 같다).
-	//맨 아래를 보고 있었으면 새 줄을 따라가고, 위로 올려 둔 상태였으면 보던 자리를 지킨다.
-	//글자를 넣는 과정에서 SetSel / ReplaceSel 이 화면을 끝으로 끌고 가므로 어느 쪽이든 여기서 되돌려야 한다.
-	//
-	//예전 코드가 어긋났던 이유 둘 —
-	//  - 포커스가 있으면(this == GetFocus()) 스크롤하지 않았다. 한 번 클릭하면 그 뒤로 따라가지 않았다.
-	//  - LineScroll(INT_MAX) 로 끝을 지나쳐 간 뒤 GetNumVisibleLines() 만큼 되돌아왔는데, 그 함수는
-	//    화면 수용량이 아니라 *현재 표시된 줄 수* 라 내용이 짧으면 덜 되돌아와 아래에 빈 공간이 남았다.
-	if (restore_selection)
-		SetSel(old_sel_min, old_sel_max);
+	//스크롤은 반드시 그리기를 다시 켠 뒤에 한다. SetRedraw(FALSE) 동안에는 컨트롤이 스크롤 위치를
+	//갱신하지 않아 여기서 보낸 스크롤 명령이 통째로 무시된다(2026-09-08 실측).
+	if (!follow)
+		SetRedraw(TRUE);
 
-	//캐럿을 위쪽 줄에 찍어 두면 화면이 맨 아래여도 따라가지 않는다(VS 출력 창과 같다).
-	//한 번도 캐럿을 옮긴 적이 없으면(m_user_moved_caret == false) 캐럿은 0번에 있으므로 조건에서 뺀다 —
-	//그러지 않으면 앱 시작 직후부터 자동 스크롤이 전혀 되지 않는다.
-	if (m_auto_scroll && was_at_bottom && (!m_user_moved_caret || caret_on_last_line))
+	//아래 스크롤은 우리가 하는 것이므로 OnVScroll 이 m_at_bottom 을 다시 정하지 않게 막는다.
+	m_in_programmatic_scroll = true;
+
+	if (follow)
 	{
-		//SB_BOTTOM 은 끝을 지나치지 않는다 — 마지막 줄이 정확히 아래에 붙는다.
-		SendMessage(WM_VSCROLL, SB_BOTTOM);
+		scroll_to_bottom();
 	}
 	else
 	{
@@ -301,9 +295,112 @@ CString CRichEditCtrlEx::add(Gdiplus::Color cr, LPCTSTR lpszFormat, ...)
 
 		if (old_first_line != new_first_line)
 			LineScroll(old_first_line - new_first_line);
+
+		//20260908 by claude. 이 Invalidate() 는 반드시 있어야 한다.
+		//위 LineScroll 은 화면 픽셀을 비트블릿으로 옮기는데, SetRedraw(FALSE) 동안 갱신되지 않은
+		//낡은 픽셀이 그대로 옮겨져 같은 줄이 여러 번 찍힌다(2026-09-08 실측 — 500ms 로 늦추니 드러났다).
+		//대신 이 때문에 50ms 처럼 잦은 삽입에서는 캐럿이 매번 지워져 깜빡이지 못한다. 둘은 이 구조에서
+		//동시에 만족시킬 수 없다 — 선택을 건드리지 않고 삽입하는 방식(TOM)으로 가야 풀린다.
+		Invalidate();
+
+		//사용자가 찍어 둔 캐럿·선택을 되돌린다(복사하려던 것이 매번 풀리면 안 된다).
+		//그리기를 켠 *뒤* 에 해야 감춰졌던 캐럿이 함께 살아난다.
+		//캐럿은 방금 되돌린 화면 안에 있으므로 이 SetSel 이 화면을 다시 움직이지는 않는다.
+		SetSel(old_sel_min, old_sel_max);
 	}
 
+	m_in_programmatic_scroll = false;
+
 	return new_text;
+}
+
+//20260908 by claude. 마지막 줄이 화면 맨 아래에 오도록 스크롤한다. *포커스와 무관하게* 동작해야 한다.
+//  - EM_SCROLLCARET 은 캐럿을 보이게 하는 명령이다. 포커스가 없으면 캐럿이 없어 아무 일도 하지 않는다(실측).
+//    예전 코드의 `if (this != GetFocus())` 도 같은 벽을 반대편에서 만나 우회한 흔적이다.
+//  - WM_VSCROLL/SB_BOTTOM 은 최대 스크롤 위치로 가는데, 컨트롤이 내용 끝 뒤에 두는 여유까지
+//    함께 내려가 아래에 빈 공간이 남는다.
+//  - LineScroll(INT_MAX) 는 마지막 줄을 맨 위로 올린다. 되돌리려면 화면에 들어가는 줄 수가 필요한데
+//    GetNumVisibleLines() 는 수용량이 아니라 *현재 표시된 줄 수* 라 내용이 짧으면 덜 되돌아온다.
+//그래서 줄 높이를 직접 재서 목표 위치를 계산하고 LineScroll 로 옮긴다. LineScroll 은 캐럿을 쓰지 않는다.
+//20260908 by claude. 한 줄 높이(px). 연속한 두 줄의 y 차이로 잰다 — 폰트나 줄간격이 바뀌어도 따라온다.
+//화면 밖의 줄이어도 좌표는 나오므로 스크롤 상태와 무관하다. 줄이 둘 미만이면 0.
+int CRichEditCtrlEx::get_line_height()
+{
+	if (GetLineCount() < 2)
+		return 0;
+
+	return PosFromChar(LineIndex(1)).y - PosFromChar(LineIndex(0)).y;
+}
+
+//20260908 by claude. "맨 아래" 로 봤을 때의 첫 표시 줄 번호.
+//스크롤하는 쪽과 판정하는 쪽이 *이 하나의 계산* 을 함께 써야 한다. 그러지 않으면 우리가 맞춰 둔 자리가
+//판정에서는 "맨 아래가 아님" 으로 읽혀 Ctrl+End 나 휠로 내려도 재개가 됐다 안 됐다 한다(2026-09-08 실측).
+//스크롤바의 픽셀 값(nPos + nPage >= nMax)으로 비교하면 반올림 한두 픽셀에 판정이 뒤집힌다.
+int CRichEditCtrlEx::get_bottom_first_line()
+{
+	const int line_count = GetLineCount();
+	const int line_height = get_line_height();
+
+	if (line_count <= 1 || line_height <= 0)
+		return 0;
+
+	//addl() 은 텍스트 뒤에 "\n" 을 붙이므로 마지막 줄은 항상 빈 줄이다.
+	//그 빈 줄을 화면 아래에 맞추면 한 줄이 통째로 비어 보인다. 글자가 있는 마지막 줄을 기준으로 삼는다.
+	int last_line = line_count - 1;
+
+	if (last_line > 0 && LineLength(LineIndex(last_line)) == 0)
+		last_line--;
+
+	CRect rc;
+	GetClientRect(rc);
+
+	const int visible_lines = rc.Height() / line_height;
+
+	return max(0, last_line + 1 - visible_lines);
+}
+
+void CRichEditCtrlEx::scroll_to_bottom()
+{
+	LineScroll(get_bottom_first_line() - GetFirstVisibleLine());
+}
+
+bool CRichEditCtrlEx::is_scrolled_to_bottom()
+{
+	//20260908 by claude. scroll_to_bottom() 과 같은 계산을 쓴다 — 그래야 우리가 맞춰 둔 자리가
+	//반드시 "맨 아래" 로 읽힌다. 스크롤바 픽셀 값으로 비교하던 것을 걷어냈다(get_bottom_first_line 주석 참조).
+	//더 아래로 내려간 경우(끝의 빈 줄까지 보이도록)도 맨 아래로 본다.
+	return (GetFirstVisibleLine() >= get_bottom_first_line());
+}
+
+bool CRichEditCtrlEx::is_caret_on_last_line()
+{
+	long sel_min = 0;
+	long sel_max = 0;
+	GetSel(sel_min, sel_max);
+
+	if (sel_min != sel_max)
+		return false;
+
+	//끝 위치를 GetWindowTextLength 로 재면 안 된다 — 그쪽은 줄바꿈을 CRLF 두 글자로 세는데
+	//선택 위치는 한 글자로 세어, 캐럿이 맨 끝(Ctrl+End)이어도 "중간" 으로 잘못 잡힌다.
+	return (LineFromChar(sel_min) >= GetLineCount() - 1);
+}
+
+//사용자가 스크롤이나 캐럿을 움직인 직후에만 부른다.
+//기준은 *스크롤 위치* 다 — 맨 아래로 내려오면 다시 따라간다(VS 출력 창과 같다).
+//
+//check_caret 은 클릭에서만 켠다. 클릭은 캐럿을 옮기므로 "중간 줄을 찍어 두면 멈춘다" 를 여기서 판단한다.
+//스크롤바·휠·PgUp/PgDn 은 캐럿을 움직이지 않으므로 캐럿까지 따지면 안 된다 — 끝까지 내려도
+//캐럿이 옛 줄에 남아 있어 영영 재개되지 않는다(2026-09-08 실측).
+void CRichEditCtrlEx::update_at_bottom(bool check_caret)
+{
+	m_at_bottom = is_scrolled_to_bottom() && (!check_caret || is_caret_on_last_line());
+
+	//20260908 by claude. 리치에디트는 내용 끝을 지나쳐 스크롤하는 것을 허용한다(메모장과 같다).
+	//휠을 빠르게 굴려 끝을 넘어가면 그만큼 아래가 빈다. 맨 아래에 닿은 순간 정확한 자리로 되돌린다.
+	//위로 올라가는 중에는 is_scrolled_to_bottom() 이 거짓이라 여기 걸리지 않는다.
+	if (m_at_bottom && GetFirstVisibleLine() > get_bottom_first_line())
+		scroll_to_bottom();
 }
 
 //한줄씩 deque에 저장된 내용을 모두 합쳐서 rich의 내용을 update한다.
@@ -408,7 +505,9 @@ void CRichEditCtrlEx::OnRButtonUp(UINT nFlags, CPoint point)
 	paraFormat.dwMask = PFM_LINESPACING;
 	BYTE nLineSpacing = paraFormat.bLineSpacingRule;	//줄간격을 1.5배로 한다. 0=1.0, 1=1.5, 2=2.0
 
-	menu.CheckMenuItem(id_menu_richedit_auto_scroll, m_auto_scroll ? MF_CHECKED : MF_UNCHECKED);
+	//20260908 by claude. 실제로 따라가고 있는지를 그대로 보여준다. 위로 스크롤해 멈춘 상태에서
+	//체크만 켜져 있으면 "체크돼 있는데 왜 안 따라가지" 가 된다.
+	menu.CheckMenuItem(id_menu_richedit_auto_scroll, is_auto_scrolling() ? MF_CHECKED : MF_UNCHECKED);
 	menu.CheckMenuItem(id_menu_richedit_toggle_log, m_show_log ? MF_CHECKED : MF_UNCHECKED);
 	menu.CheckMenuItem(id_menu_richedit_toggle_time, m_show_time ? MF_CHECKED : MF_UNCHECKED);
 	menu.CheckMenuItem(id_menu_richedit_line_space10, nLineSpacing == 0 ? MF_CHECKED : MF_UNCHECKED);
@@ -473,7 +572,20 @@ void CRichEditCtrlEx::OnPopupMenu(UINT menuID)
 	switch (menuID)
 	{
 		case id_menu_richedit_auto_scroll :
-			m_auto_scroll = !m_auto_scroll;
+			//20260908 by claude. 메뉴는 *실제로 따라가고 있는지* 를 켜고 끈다.
+			//켤 때는 위로 스크롤해 둔 상태도 함께 풀고 즉시 맨 아래로 내려간다 — 안 그러면 체크만 되고
+			//화면은 그대로여서 켜진 것으로 보이지 않는다.
+			//끌 때는 주 스위치를 내린다. 그러면 맨 아래로 스크롤하거나 캐럿을 끝에 두어도 따라가지 않는다.
+			if (is_auto_scrolling())
+			{
+				m_use_auto_scroll = false;
+			}
+			else
+			{
+				m_use_auto_scroll = true;
+				m_at_bottom = true;
+				scroll_to_bottom();
+			}
 			break;
 		case id_menu_richedit_toggle_log :
 			toggle_show_log();
@@ -602,7 +714,7 @@ BOOL CRichEditCtrlEx::PreTranslateMessage(MSG* pMsg)
 	//20260908 by claude. 클릭했다고 자동 스크롤을 끄지 않는다. 예전에는 여기서 껐다가 우클릭 메뉴로만
 	//되살릴 수 있어, 한 번 클릭한 뒤로는 캐럿이 맨 끝에 있어도 따라가지 않았다.
 	//따라갈지 말지는 add() 가 붙이기 직전의 스크롤 위치로 매번 판단한다.
-	//m_auto_scroll 은 사용자가 우클릭 메뉴나 set_auto_scroll() 로 끄는 주 스위치로만 남는다.
+	//m_use_auto_scroll 은 사용자가 우클릭 메뉴나 use_auto_scroll() 로 끄는 주 스위치로만 남는다.
 	//20260908 by claude. RichEdit 2.0 은 Ctrl+V 를 내부에서 처리해 WM_PASTE 를 자기 자신에게 보내지 않는다.
 	//붙여넣기 처리를 on_paste 한 곳에 모으기 위해 키 입력을 여기서 WM_PASTE 로 바꿔 보낸다.
 	else if (pMsg->message == WM_KEYDOWN
@@ -611,6 +723,16 @@ BOOL CRichEditCtrlEx::PreTranslateMessage(MSG* pMsg)
 	{
 		SendMessage(WM_PASTE);
 		return TRUE;
+	}
+	//20260908 by claude. Ctrl+End 는 다른 앱에서도 "맨 끝으로" 인 공용키다. 누르는 즉시 따라가기를 켠다.
+	//키를 소비하지는 않는다 — 캐럿·화면을 끝으로 옮기는 일은 컨트롤이 그대로 한다.
+	//OnKeyUp 까지 미루면 안 된다. 그 사이에 들어온 add() 가 (아직 따라가지 않는 상태라)
+	//캐럿과 화면을 원래 자리로 되돌려 버려, 정작 OnKeyUp 은 "맨 아래가 아니다" 로 읽는다.
+	else if (pMsg->message == WM_KEYDOWN
+		&& pMsg->wParam == VK_END
+		&& (::GetKeyState(VK_CONTROL) & 0x8000))
+	{
+		m_at_bottom = true;
 	}
 
 	return CRichEditCtrl::PreTranslateMessage(pMsg);
@@ -773,6 +895,12 @@ void CRichEditCtrlEx::OnVScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar)
 	//GetParent()->SendMessage(WM_VSCROLL, MAKEWPARAM(nSBCode, nPos), (LPARAM)pScrollBar->GetSafeHwnd());
 	//GetParent()->SendMessage(Message_CRichEditCtrlEx, (WPARAM)&CRichEditCtrlExMessage(this, WM_VSCROLL), 0);
 	CRichEditCtrl::OnVScroll(nSBCode, nPos, pScrollBar);
+
+	//20260908 by claude. 사용자가 스크롤바를 움직였을 때만 다시 정한다.
+	//add() 가 보내는 SB_BOTTOM 도 SendMessage 라 이 핸들러를 거치는데, 그것까지 반영하면
+	//스크롤 범위가 아직 잡히지 않은 첫 add 에서 따라가기가 꺼져 버리고 다시는 켜지지 않는다(실측).
+	if (!m_in_programmatic_scroll)
+		update_at_bottom();
 }
 
 
@@ -790,17 +918,19 @@ BOOL CRichEditCtrlEx::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
 	//GetParent()->SendMessage(WM_VSCROLL, MAKEWPARAM(nSBCode, nPos), (LPARAM)pScrollBar->GetSafeHwnd());
 
-	return CRichEditCtrl::OnMouseWheel(nFlags, zDelta, pt);
+	const BOOL result = CRichEditCtrl::OnMouseWheel(nFlags, zDelta, pt);
+
+	//20260908 by claude. 휠로 위를 보면 멈추고, 다시 맨 아래로 내려오면 따라간다.
+	update_at_bottom();
+
+	return result;
 }
 
 void CRichEditCtrlEx::OnLButtonDown(UINT nFlags, CPoint point)
 {
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
 	//Trace_func();
-	//20260908 by claude. 클릭으로 자동 스크롤을 끄지 않는다 — PreTranslateMessage 의 같은 자리 주석 참조.
-	//다만 이 클릭으로 캐럿이 옮겨지므로, 이후로는 add() 가 캐럿 위치도 함께 본다(m_user_moved_caret 선언부).
-	m_user_moved_caret = true;
-
+	//20260908 by claude. 클릭만으로 끄지 않는다. 클릭이 끝난 뒤(OnLButtonUp) 캐럿 위치를 보고 정한다.
 	CRichEditCtrl::OnLButtonDown(nFlags, point);
 }
 
@@ -808,6 +938,10 @@ void CRichEditCtrlEx::OnLButtonUp(UINT nFlags, CPoint point)
 {
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
 	highlight_current_line();
+
+	//20260908 by claude. 클릭이 끝나면 캐럿이 옮겨져 있다. 마지막 줄을 찍었으면 다시 따라가고,
+	//중간 줄을 찍었으면 화면이 맨 아래여도 멈춘다. 캐럿을 보는 것은 이 경로뿐이다.
+	update_at_bottom(true);
 
 	CRichEditCtrl::OnLButtonUp(nFlags, point);
 }
@@ -880,8 +1014,8 @@ void CRichEditCtrlEx::OnKeyUp(UINT nChar, UINT nRepCnt, UINT nFlags)
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
 	highlight_current_line();
 
-	//20260908 by claude. 키로도 캐럿이 움직인다(Ctrl+End, 방향키 등). 클릭과 같은 이유로 표시해 둔다.
-	m_user_moved_caret = true;
+	//20260908 by claude. 키로도 화면과 캐럿이 움직인다(Ctrl+End, PgUp/PgDn, 방향키).
+	update_at_bottom();
 
 	CRichEditCtrl::OnKeyUp(nChar, nRepCnt, nFlags);
 }

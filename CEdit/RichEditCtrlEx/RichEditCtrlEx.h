@@ -141,7 +141,7 @@ public:
 
 	int					GetNumVisibleLines();
 
-	void				set_auto_scroll(bool auto_scroll) { m_auto_scroll = auto_scroll; }
+	void				use_auto_scroll(bool auto_scroll) { m_use_auto_scroll = auto_scroll; }
 	void				set_scroll_size(int nLines) { m_scroll_size = nLines; }
 
 	int					get_align() { return m_align; }
@@ -173,16 +173,43 @@ protected:
 	int			m_clear_log_interval;	//KIOSK에서 메모리 증가를 막기 위해 주기적으로 로그 내용을 지워주는 타이머 세팅(단위.초, 0이면 동작 안함)
 	int			m_max_length;		//정해진 문자수 이상이면 모두 지우고 새로 쓴다.
 	int			m_scroll_size;
-	//내용이 계속 추가될 때 자동 스크롤되는데 text 임의 위치를 클릭하면 auto scroll은 자동 해제된다.
-	//팝업메뉴를 통해 on/off 할 수 있다.
-	//default = true;
-	bool		m_auto_scroll = true;
+	//20260908 by claude. 자동 스크롤은 값 두 개로 정해진다. 실제로 따라가는 조건은 둘 다 참일 때다.
+	//
+	//  m_use_auto_scroll — 사용자가 우클릭 메뉴로 켜고 끄는 주 스위치. 끄면 스크롤 위치나 캐럿과 무관하게 멈춘다.
+	//  m_at_bottom — 지금 화면이 맨 아래를 보고 있는지. 사용자가 스크롤·클릭했을 때만 갱신한다.
+	//
+	//m_at_bottom 을 add() 때마다 기하로 다시 계산하면 안 된다. 줄이 한 화면을 처음 넘는 순간
+	//화면은 아직 맨 위인데 마지막 줄은 이미 안 보여서 "사용자가 위를 보고 있다" 로 잘못 읽히고,
+	//한 번 그렇게 되면 영영 따라가지 않는다(2026-09-08 실측).
+	//add() 안의 SetSel / 스크롤은 프로그램이 하는 것이라 여기에 반영되지 않는다.
+	bool		m_use_auto_scroll = true;
+	bool		m_at_bottom = true;
 
-	//20260908 by claude. 사용자가 클릭이나 키로 캐럿을 옮긴 적이 있는지.
-	//add() 는 화면이 맨 아래여도 캐럿이 위쪽 줄에 있으면 따라가지 않는데(VS 출력 창과 같다),
-	//한 번도 옮긴 적이 없으면 캐럿이 0번에 있어 그 조건이 시작하자마자 걸린다. 그것을 막는 단서다.
-	//add() 안의 SetSel 은 프로그램이 옮기는 것이라 여기에 반영되지 않는다 — 입력 핸들러에서만 세운다.
-	bool		m_user_moved_caret = false;
+	//메뉴에 보여줄 값이자 add() 가 보는 값. 둘 중 하나라도 꺼져 있으면 따라가지 않는다.
+	bool		is_auto_scrolling() { return (m_use_auto_scroll && m_at_bottom); }
+
+	//한 줄 높이(px). 줄이 둘 미만이면 0.
+	int			get_line_height();
+
+	//"맨 아래" 로 봤을 때의 첫 표시 줄 번호. 아래 둘이 이 하나를 공유해야 판정이 흔들리지 않는다.
+	int			get_bottom_first_line();
+
+	//마지막 줄이 화면 맨 아래에 오도록 스크롤한다. 포커스가 없어도 동작한다(구현부 주석 참조).
+	void		scroll_to_bottom();
+
+	//지금 화면이 맨 아래인지.
+	bool		is_scrolled_to_bottom();
+
+	//캐럿이 마지막 줄에 있는지. 선택 영역이 잡혀 있으면 false.
+	bool		is_caret_on_last_line();
+
+	//사용자 조작(스크롤바·휠·키·클릭) 직후에 불러 m_at_bottom 을 다시 정한다.
+	//check_caret 은 클릭에서만 켠다 — 구현부 주석 참조.
+	void		update_at_bottom(bool check_caret = false);
+
+	//add() 가 스스로 스크롤하는 동안 true. 그 스크롤이 OnVScroll 을 타고 들어와 m_at_bottom 을
+	//다시 정하면 안 된다 — 사용자가 움직인 것이 아니기 때문이다.
+	bool		m_in_programmatic_scroll = false;
 
 	int			m_align = PFA_LEFT;
 

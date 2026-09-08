@@ -616,12 +616,38 @@ BOOL CResizeCtrl::ProcessMessage(UINT message, WPARAM wParam, LPARAM lParam, LRE
 					case HTTOPRIGHT    : currentRect.top    = mousePostion.y; // fall through
 					case HTRIGHT       : currentRect.right  = mousePostion.x;	break;
 					}
+					int width  = currentRect.right - currentRect.left;
+					int height = currentRect.bottom - currentRect.top;
+
+					//20260908 by claude. 최소·최대 크기를 이 경로에서도 직접 적용한다.
+					//WM_GETMINMAXINFO 는 OS 가 끄는 사이즈 루프에만 적용된다. resizing border 가 없는 창은
+					//여기서 SetWindowPos 로 크기를 직접 정하는데, DefWindowProc 은 크기만 최소값으로 자르고
+					//위치는 준 값을 그대로 쓴다. 그래서 left/top 을 잡고 줄이면 폭·높이가 멈춘 뒤에도
+					//창이 마우스를 따라 밀려간다(오른쪽·아래는 원점이 안 움직여 증상이 없다).
+					if (m_minTracking.cx != -1 && width < m_minTracking.cx)
+						width = m_minTracking.cx;
+					if (m_maxTracking.cx != -1 && width > m_maxTracking.cx)
+						width = m_maxTracking.cx;
+
+					if (m_minTracking.cy != -1 && height < m_minTracking.cy)
+						height = m_minTracking.cy;
+					if (m_maxTracking.cy != -1 && height > m_maxTracking.cy)
+						height = m_maxTracking.cy;
+
+					//잡지 않은 변이 제자리에 있어야 한다. left/top 을 잡았으면 right/bottom 을 기준으로 되돌린다.
+					if (m_hitCode == HTLEFT || m_hitCode == HTTOPLEFT || m_hitCode == HTBOTTOMLEFT)
+						currentRect.left = currentRect.right - width;
+					else
+						currentRect.right = currentRect.left + width;
+
+					if (m_hitCode == HTTOP || m_hitCode == HTTOPLEFT || m_hitCode == HTTOPRIGHT)
+						currentRect.top = currentRect.bottom - height;
+					else
+						currentRect.bottom = currentRect.top + height;
+
 					if (!::EqualRect(&currentRect, &m_previsionRect))
 					{
-						int width  = currentRect.right - currentRect.left;
-						int height = currentRect.bottom - currentRect.top;
-
-						::SetWindowPos(m_hWndParent, HWND_DESKTOP, currentRect.left, currentRect.top,	
+						::SetWindowPos(m_hWndParent, HWND_DESKTOP, currentRect.left, currentRect.top,
 							width, height, SWP_NOZORDER | SWP_NOACTIVATE);
 					}
 					m_inMouseMove = FALSE;

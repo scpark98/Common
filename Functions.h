@@ -2518,6 +2518,13 @@ h		: 복사할 height 크기(pixel)
 	//특히 전체화면일 경우 lt는 0,0이 아닌 -8,-8로 리턴된다. 실제 보여지는 영역을 구하기 위한 함수
 	CRect		get_window_real_rect(CWnd* pWnd);
 
+	//20260909 by claude. "보이는 창 크기"(DWM 확장 프레임 = 화면에 실제로 보이는 영역)를 원하는 값으로 만들려면
+	//GetWindowRect(외곽 window rect — SetMinimumTrackingSize/ptMinTrackSize 가 쓰는 기준)로 얼마를 줘야 하는지 환산한다.
+	//Win11 은 window rect 에 보이지 않는 리사이즈 테두리(좌/우/하 ~7px, DPI 따라 다름)를 포함하므로 그 차이를 더한다.
+	//예: SetMinimumTrackingSize(get_window_size_for_visible(m_hWnd, 820, 530)) → 보이는 최소 크기가 820x530.
+	//hWnd 는 프레임이 확정된(생성된) 창이어야 정확하다. XP/dwmapi 미존재 시 보정 0(= visible 그대로).
+	CSize		get_window_size_for_visible(HWND hWnd, int visible_w, int visible_h);
+
 	//20260831 by claude. move_windows_together 의 이동 지시 한 건. rect 는 parent client 좌표의 *최종* 위치.
 	struct sc_window_move
 	{
@@ -3337,6 +3344,8 @@ public:
 		return param_str;
 	}
 
+	//reset : full_url, body, result, local_file_path
+	//no ch : is_https, verb, 
 	void		reset(bool sub_url_reset = false)
 	{
 		status = -1;

@@ -15892,6 +15892,30 @@ CRect get_window_real_rect(CWnd* pWnd)
 	return rw;
 }
 
+//20260909 by claude. 계약·근거는 Functions.h 의 선언부 주석 참조.
+//원하는 "보이는 크기"(visible)를 window rect 크기로 환산한다. window rect - 확장프레임(=보이지 않는 테두리)만큼 더한다.
+CSize get_window_size_for_visible(HWND hWnd, int visible_w, int visible_h)
+{
+	CSize sz(visible_w, visible_h);
+
+	if (!::IsWindow(hWnd))
+		return sz;
+
+	RECT rw = {};
+	::GetWindowRect(hWnd, &rw);
+
+	RECT rf = rw;	//실패/XP 시 window rect 그대로 유지 → 보정 0
+	win_compat::dwm::get_extended_frame_bounds_or_window_rect(hWnd, rf);
+
+	int dx = (rw.right - rw.left) - (rf.right - rf.left);	//좌우 보이지 않는 테두리 합
+	int dy = (rw.bottom - rw.top) - (rf.bottom - rf.top);	//상하(주로 하단) 보이지 않는 테두리
+
+	if (dx > 0) sz.cx += dx;
+	if (dy > 0) sz.cy += dy;
+
+	return sz;
+}
+
 //20260831 by claude. 계약·근거는 Functions.h 의 선언부 주석 참조.
 void move_windows_together(HWND parent, const std::vector<sc_window_move>& moves)
 {

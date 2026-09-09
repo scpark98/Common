@@ -230,6 +230,12 @@ void CSCStaticEdit::rebuild_font()
 	}
 	::ReleaseDC(NULL, h_screen);
 
+	//20260909 by claude. 좌우 텍스트 여백을 폰트 크기에 비례시킨다(고정 px 대신). 폰트가 커지면 여백도 커져
+	//native CEdit(EC_USEFONTINFO 여백)과 비슷하게 균형이 유지된다. set_padding 으로 명시 지정하면 그 값을 존중.
+	//비율은 정상 크기(예: size 10, tmHeight≈17)에서 기존 4px 와 같아지도록 잡았다(font_height/4).
+	if (!m_padding_user_set)
+		m_padding = max(2, (int)m_font_height / 4);
+
 	if (m_hWnd)
 	{
 		//폰트가 바뀌면 글자 폭·높이가 달라지므로 캐럿 크기/위치를 새 메트릭으로 다시 계산한다.
@@ -1207,7 +1213,8 @@ void CSCStaticEdit::OnPaint()
 		bool empty = m_text.IsEmpty() && m_compose.IsEmpty();
 		bool focused = (GetFocus() == this);
 
-		if (empty && !focused && !m_dim_text.IsEmpty())
+		//20260909 by claude. readonly 면 입력 안내(dim)는 의미가 없으므로 표시하지 않는다.
+		if (empty && !focused && !m_readonly && !m_dim_text.IsEmpty())
 			draw_dim_text(g, rc_text);
 		else
 		{
@@ -1257,6 +1264,21 @@ void CSCStaticEdit::draw_background(Gdiplus::Graphics& g, const CRect& rc)
 	}
 }
 
+//20260909 by claude. draw + (선택)width/color 를 한 번에 설정. CSCEdit::set_draw_border 와 호출 호환.
+//width < 1 은 "유지"(≥1 만 갱신), cr_border=Transparent 는 "유지". "테두리 없음"은 width 0 이 아니라 draw=false 로 표현한다.
+void CSCStaticEdit::set_draw_border(bool draw, int width, Gdiplus::Color cr_border)
+{
+	m_draw_border = draw;
+
+	if (width >= 1)
+		m_border_width = width;
+
+	if (cr_border.GetValue() != Gdiplus::Color::Transparent)
+		set_border_color(cr_border);
+
+	Invalidate();
+}
+
 void CSCStaticEdit::draw_border(Gdiplus::Graphics& g, const CRect& rc)
 {
 	if (!m_draw_border) return;
@@ -1304,17 +1326,24 @@ void CSCStaticEdit::draw_border(Gdiplus::Graphics& g, const CRect& rc)
 
 int CSCStaticEdit::get_text_top(const CRect& rc_text, int text_h) const
 {
-	//20260902 by claude. 셀(text_h = tmHeight)을 기하학적 정중앙에 두면 글자가 아래로 내려가 보인다.
-	//tmHeight 의 위쪽 tmInternalLeading 은 악센트용 빈 공간이라 실제 잉크는 그만큼 아래에서 시작하기
-	//때문이고, 잉크 기준 중앙은 셀 중앙보다 tmInternalLeading/2 만큼 위다. 그만큼 올려 보정한다.
-	//이 값은 폰트·크기마다 달라(Segoe UI 8 vs 맑은 고딕 9) 상수로는 맞출 수 없다.
-	//셀 top 을 쓰는 draw_text / draw_selection / get_compose_draw_box 가 모두 여기를 거치므로
+	//20260909 by claude. 정석 정렬 — 특수 보정 상수(-1 / internal leading) 없이 영역(rc_text) 기준으로 직접 배치한다.
+	//  center : 영역 세로 중심에 글자 셀(text_h=tmHeight) 중심을 맞춘다 → center.y - text_h/2.
+	//           글자가 영역보다 커도 위아래로 대칭으로 넘쳐 중앙이 보인다(정석 — 한쪽만 잘리는 역전이 없다).
+	//  bottom : 영역 바닥에 셀 바닥을 맞춘다.
+	//  top    : 영역 top.
+	//셀 top 을 쓰는 draw_text / draw_selection / get_compose_draw_box(캐럿·IME) 가 모두 이 함수를 거치므로
 	//글자·선택블록·IME 박스가 함께 이동해 정합이 유지된다.
+
+	//20260909 by claude. 글자가 영역보다 크면(오버사이즈) 정렬로 나눌 세로 공간이 없다. native edit 처럼
+	//세로 중앙에 두어 위아래로 대칭으로만 잘리게 한다(top 정렬이 아래를 통째로 자르면 읽기 어렵고 CSCEdit 과도 어긋남).
+	if (text_h >= rc_text.Height())
+		return rc_text.CenterPoint().y - text_h / 2;
+
 	if (m_valign & DT_VCENTER)
-		return rc_text.top + (rc_text.Height() - text_h) / 2 - m_font_internal_leading / 2;
+		return rc_text.CenterPoint().y - text_h / 2;
 	else if (m_valign & DT_BOTTOM)
 		return rc_text.bottom - text_h;
-	return rc_text.top;
+	return rc_text.top;   // DT_TOP
 }
 
 void CSCStaticEdit::draw_selection(Gdiplus::Graphics& g, const CRect& rc_text)
@@ -1530,7 +1559,8 @@ void CSCStaticEdit::draw_dim_text(Gdiplus::Graphics& g, const CRect& rc_text)
 		TEXTMETRIC tm = {};
 		dc.GetTextMetrics(&tm);
 
-		int text_y = rc_text.top + (rc_text.Height() - tm.tmHeight) / 2;
+		//20260909 by claude. 본문과 같은 세로정렬 기준(get_text_top, m_valign 반영)을 써서 dim 도 Top/Center/Bottom 을 따른다.
+		int text_y = get_text_top(rc_text, tm.tmHeight);
 
 		//dim 텍스트는 실제 입력이 없으므로 m_scroll_offset 은 무시하고 가로 정렬만 적용.
 		CSize sz = dc.GetTextExtent(m_dim_text);
@@ -1554,8 +1584,11 @@ CRect CSCStaticEdit::get_text_area() const
 {
 	CRect rc;
 	GetClientRect(rc);
-	int inset = m_padding + (m_draw_border ? m_border_width : 0);
-	rc.DeflateRect(inset, inset);
+	//20260909 by claude. 좌우 = m_padding + border. 글자는 테두리 안쪽에서 padding 만큼 들어가 시작한다
+	//(테두리가 두꺼워지면 그만큼 글자도 안으로 밀려야 테두리를 침범하지 않는다 — 정상 동작).
+	//세로 = border 만 뺀다: m_padding 을 세로에도 빼면 v-align 범위가 좁아져 center 가 top 위로 가는 역전이 생기므로 세로엔 m_padding 을 안 준다.
+	int border = m_draw_border ? m_border_width : 0;
+	rc.DeflateRect(m_padding + border, border);
 
 	// round rect 의 좌/우 코너 curve 가 텍스트 영역을 침범하므로 radius 에 비례해
 	// 좌/우를 추가로 줄인다. 특히 트랙 모양(radius = height/2)일 때 글자가 curve 에

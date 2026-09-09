@@ -141,7 +141,8 @@ public:
     // ──────────────────────────────────────────────
     // 테두리
     // ──────────────────────────────────────────────
-    void			set_border_width(int width)               { m_border_width = width; Invalidate(); }
+    //20260909 by claude. 그릴 때의 두께는 항상 ≥1(0 은 "테두리 없음" = set_draw_border(false) 로 표현). 그래서 1 미만은 1 로 clamp.
+    void			set_border_width(int width)               { m_border_width = (width < 1) ? 1 : width; Invalidate(); }
     // border 색은 active(focus) / inactive(unfocus) 두 상태로 저장한다.
     //   - set_border_color(cr)                     : 두 상태 동일하게 세팅 (가장 흔한 케이스)
     //   - set_border_color(cr_inactive, cr_active) : 두 상태를 다른 색으로 명시 세팅
@@ -156,7 +157,10 @@ public:
     Gdiplus::Color	get_border_color_inactive() const { return m_theme.cr_border_inactive; }
     Gdiplus::Color	get_border_color_active  () const { return m_theme.cr_border_active;   }
     void			set_round(int radius = -1);
-    void			set_draw_border(bool draw)                { m_draw_border = draw; Invalidate(); }
+    //20260909 by claude. draw + (선택)width/color 를 한 번에(CSCEdit::set_draw_border 와 호출 호환).
+    //width < 1 = 유지(≥1 만 갱신), cr_border=Transparent = 유지. draw 플래그와 width 는 분리된 상태다 —
+    //체크 해제해도 width 는 남고, 재체크 시 그 width 로 그린다.
+    void			set_draw_border(bool draw = true, int width = -1, Gdiplus::Color cr_border = Gdiplus::Color::Transparent);
 
     // ──────────────────────────────────────────────
     // 폰트
@@ -171,6 +175,8 @@ public:
     // ──────────────────────────────────────────────
     void		    set_readonly(bool readonly = true);
     bool		    is_readonly() const { return m_readonly; }
+    //20260909 by claude. CEdit 호환 별칭 — CEdit 에 익숙한 사용자가 그대로 쓰도록 제공. 내부 snake_case 구현으로 위임한다.
+    BOOL		    SetReadOnly(BOOL read_only = TRUE) { set_readonly(read_only != FALSE); return TRUE; }
     //readonly일 때 윈도우 기본색인 gray로 표시할 것인지, 특정색을 사용할 지, transparent라면 m_cr_back을 사용하게 된다.
     void			set_use_default_readonly_color(bool use_default_readonly_color = true, Gdiplus::Color cr_back_readonly = Gdiplus::Color::Transparent);
     //[Common 공통 규칙] disabled text/back 색. 값은 m_theme.cr_text_disabled / cr_back_disabled 에 저장된다.
@@ -190,6 +196,10 @@ public:
     //CEdit::LimitText() 네이밍을 따름.
     void		    set_limit_text(int max)              { m_limit_text = max; }
     int             get_limit_text() const               { return m_limit_text; }
+    //20260909 by claude. CEdit 호환 별칭. CEdit 은 LimitText(nChars), CRichEditCtrl 은 SetLimitText — 둘 다 제공해 어느 쪽을 찾아도 되게 한다.
+    void		    LimitText(int max = 0)               { set_limit_text(max); }
+    void		    SetLimitText(int max)                { set_limit_text(max); }
+    int             GetLimitText() const                 { return get_limit_text(); }
 
     // shift + up/down 방향키로 수치 증감. shift + mousewheel로도 동일.
     // 텍스트가 실수로 파싱되지 않으면 스킵.
@@ -201,7 +211,7 @@ public:
                         { m_use_updown_key = use_updown_key; m_updown_interval = interval; }
 	//dim text를 설정한다. cr_dim이 Transparent가 아니면 dim text 색상을 별도로 지정할 수 있다. 기본값은 m_theme.cr_text_dim.
     void		    set_dim_text(const CString& dim_text, Gdiplus::Color cr_dim_text = Gdiplus::Color::Transparent);
-    void		    set_padding(int padding)             { m_padding = padding; Invalidate(); }
+    void		    set_padding(int padding)             { m_padding = padding; m_padding_user_set = true; Invalidate(); }
 
     // 사용자 정의 4면 margin. inner area 를 (left, top, right, bottom) 만큼 추가로 들여씀.
     //   - margin.left 만큼 prefix image / text 가 우측으로 밀림.
@@ -245,6 +255,9 @@ public:
     void		    set_sel(int start, int end);   // end < 0 이면 텍스트 끝까지 (CEdit SetSel(0,-1) 관용구 = 전체 선택)
     void		    get_sel(int& start, int& end) const  { start = m_sel_start; end = m_sel_end; }
     CString		    get_sel_text() const;
+    //20260909 by claude. CEdit 호환 별칭 — 내부 set_sel/get_sel 로 위임. CEdit 의 bNoScroll 은 이 컨트롤에선 의미 없어 무시.
+    void		    SetSel(int start, int end, BOOL /*no_scroll*/ = FALSE) { set_sel(start, end); }
+    void		    GetSel(int& start, int& end) const { get_sel(start, end); }
 
     // 동적 생성용
     bool		    Create(DWORD dw_style, const RECT& rect, CWnd* parent, UINT id);
@@ -329,7 +342,9 @@ private:
     int			m_mask_dot_size   = 0;	//0 = 자동(폰트 높이 기준)
     int			m_mask_cell_width = 0;	//0 = 자동(점 지름 기준)
     int			m_limit_text = 0;      // 0 = 제한 없음
-    int			m_padding    = 4;      // 텍스트 여백
+    int			m_padding    = 4;      // 좌우 텍스트 여백(px). 기본은 폰트 크기 비례(rebuild_font). set_padding 시 고정.
+    //20260909 by claude. set_padding 으로 명시 지정했는지. false 면 rebuild_font 가 폰트 높이에 비례해 m_padding 을 정한다.
+    bool		m_padding_user_set = false;
     CRect		m_margin     = CRect(0, 0, 0, 0); // 사용자 정의 4면 추가 inset
     DWORD		m_valign     = DT_VCENTER;
     DWORD		m_halign     = DT_LEFT;    // DT_LEFT / DT_CENTER / DT_RIGHT

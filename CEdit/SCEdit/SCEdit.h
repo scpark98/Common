@@ -176,8 +176,8 @@ public:
 	void				set_line_align(DWORD align = DT_VCENTER);
 	int					get_line_align() { return m_valign; }
 //dim text
-	//m_cr_dim_text의 기본값은 Gdiplus::Color::LightGray이며
-	//이 함수를 호출할 때 Gdiplus::Color::Transparent라는 값일 경우는 dim_text 파라미터만 변경하고자 하는 의미일 것이다.
+	//20260909 by claude. dim 색을 지정하지 않으면(Transparent) 테마의 cr_text_dim 을 따른다(theme 우선).
+	//cr_dim_text 에 불투명색을 주면 그 색으로 override 된다(그 경우에만 m_cr_dim_text 에 저장).
 	void				set_dim_text(CString dim_text, Gdiplus::Color cr_dim_text = Gdiplus::Color::Transparent);
 
 	enum BORDER_TYPE
@@ -247,7 +247,8 @@ protected:
 
 //dim text
 	CString				m_dim_text;
-	Gdiplus::Color		m_cr_dim_text = Gdiplus::Color::LightGray;
+	//20260909 by claude. Transparent = 미지정(테마 cr_text_dim 사용). set_dim_text 로 불투명색을 주면 override.
+	Gdiplus::Color		m_cr_dim_text = Gdiplus::Color::Transparent;
 	DWORD				m_dwStyle;
 	void				draw_dim_text();
 

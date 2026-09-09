@@ -1087,7 +1087,8 @@ void CSCEdit::draw_dim_text()
 	CString text;
 	GetWindowText(text);
 
-	if (GetFocus() == this || !IsWindowEnabled() || text.GetLength())
+	//20260909 by claude. readonly 면 입력 안내(dim)는 의미가 없으므로 표시하지 않는다.
+	if (GetFocus() == this || !IsWindowEnabled() || (GetStyle() & ES_READONLY) || text.GetLength())
 		return;
 
 	if (m_dim_text.GetLength() == 0)
@@ -1110,7 +1111,9 @@ void CSCEdit::draw_dim_text()
 	//rRect.OffsetRect( 1, 1 );							// Add Sanity Space
 
 	dc.SelectObject((*GetFont()));					// Use The Control's Current Font
-	dc.SetTextColor(m_cr_dim_text.ToCOLORREF());				// Set The Text Color
+	//20260909 by claude. dim 색 미지정(Transparent)이면 테마의 cr_text_dim 을 따른다(theme 우선). 명시색이면 그 색.
+	Gdiplus::Color cr_dim = (m_cr_dim_text.GetValue() != Gdiplus::Color::Transparent) ? m_cr_dim_text : m_theme.cr_text_dim;
+	dc.SetTextColor(cr_dim.ToCOLORREF());				// Set The Text Color
 	//pDC->SetBkColor(GetSysColor(COLOR_WINDOW));	// Set The Bk Color
 	dc.SetBkMode(TRANSPARENT);
 
@@ -1159,7 +1162,9 @@ void CSCEdit::set_draw_border(bool draw, int border_width, Gdiplus::Color cr_bor
 	if (cr_border.GetValue() != Gdiplus::Color::Transparent)
 		m_theme.cr_border_inactive = cr_border;
 
-	//set_line_align(m_valign);
+	//20260909 by claude. border 두께가 바뀌면 텍스트 좌측(rr.left += border)·세로 정렬 기준이 달라지므로 재레이아웃한다.
+	//(예전엔 주석 처리돼 border 변경 시 텍스트 위치가 갱신 안 됐다 — 폰트 변경이 있어야만 반영되던 불일치.)
+	set_line_align(m_valign);
 
 	Invalidate();
 	//RedrawWindow();

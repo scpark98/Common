@@ -947,8 +947,11 @@ struct	NETWORK_INFO
 	int	extract_digit_number(char *str, int from, double *num);
 
 	//version string valid check
-	//digits : 자릿수(1.0.0.1일 경우는 자릿수 4)
-	bool valid_version_str(CString versionStr, int digits);
+	//20260909 by claude. 숫자와 '.' 로만 이루어져야 하고 각 자리가 비어 있지 않아야 한다.
+	//digits : 허용 최대 자릿수(1.0.0.1 이면 4). 그보다 짧은 "4.7" 도 유효로 본다 —
+	//LMM 레지스트리의 Version 은 구버전 AutoPatcher 가 읽을 수 있도록
+	//의도적으로 2자리로 기록된다.
+	bool is_valid_version_str(CString versionStr, int digits = 4);
 
 	//버전 또는 IP주소등은 그냥 문자열로 비교하면 1.0.9.0이 1.0.10.0보다 더 크다고 나오므로
 	//.을 없앤 숫자로 비교했으나 이 방법도 오류 발생(1.0.1.13 > 1.0.10.3보다 크다고 판단함)
@@ -1589,6 +1592,10 @@ struct	NETWORK_INFO
 	DWORD		get_windows_major_version();
 	//detail=true이면 edition 정보까지 포함
 	CString		get_windows_version_string(bool detail = true);
+
+	//20260909 by claude. 기본 UI 폰트 face. Vista+ 는 "맑은 고딕", XP 는 "굴림"(맑은 고딕이 Vista+ 전용).
+	//둘 다 라틴+한글을 한 face 로 커버해 폴백 없이 줄 높이가 균일하다. Common §2 "기본 폰트" 정책의 단일 소스.
+	LPCTSTR		get_default_ui_font_face();
 
 	bool		open_with_explorer(CString path);
 

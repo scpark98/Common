@@ -10744,6 +10744,14 @@ DWORD get_windows_major_version()
 	return osvi.dwMajorVersion;
 }
 
+//20260909 by claude. 기본 UI 폰트 face. 맑은 고딕/Malgun Gothic 은 Vista+ 전용이라 XP(major 5)에서는 굴림으로 떨어뜨린다.
+//둘 다 라틴+한글을 한 face 로 커버해 한글이 섞여도 폴백이 없어 줄 높이가 균일하다(RichEdit 등). OS 판별은 한 번만 하고 캐시한다.
+LPCTSTR get_default_ui_font_face()
+{
+	static const LPCTSTR face = (get_windows_major_version() >= 6) ? _T("맑은 고딕") : _T("굴림");
+	return face;
+}
+
 CString	get_windows_version_string(bool detail)
 {
 	CString version;
@@ -19619,15 +19627,34 @@ int extract_digit_number(char *str, int from, double *num)
 }
 
 //version string valid check
-//digits : 자릿수(1.0.0.1일 경우는 자릿수 4)
-bool valid_version_str(CString versionStr, int digits)
+//20260909 by claude. 자릿수만 세던 것을 숫자 검증까지 하도록 강화했다.
+//교내망 NAC 장비가 AutoPatcher 의 평문 HTTP 응답을 리다이렉트 HTML 로
+//바꿔치기해 그 본문이 통째로 레지스트리 Version 에 기록된 사례가 있다(2026-08-31).
+//계약은 헤더 참조.
+bool is_valid_version_str(CString versionStr, int digits)
 {
+	if (versionStr.IsEmpty())
+		return false;
+
 	std::deque<CString> token;
 	get_token_str(versionStr, token, '.');
-	if (token.size() == digits)
-		return true;
 
-	return false;
+	if (token.empty() || (int)token.size() > digits)
+		return false;
+
+	for (size_t i = 0; i < token.size(); i++)
+	{
+		if (token[i].IsEmpty())
+			return false;
+
+		for (int j = 0; j < token[i].GetLength(); j++)
+		{
+			if (token[i][j] < _T('0') || token[i][j] > _T('9'))
+				return false;
+		}
+	}
+
+	return true;
 }
 
 //버전 또는 IP주소등은 그냥 문자열로 비교하면 1.0.9.0이 1.0.10.0보다 더 크다고 나오므로

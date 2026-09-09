@@ -117,10 +117,6 @@ void CPathCtrl::PreSubclassWindow()
 			GetObject(GetStockObject(DEFAULT_GUI_FONT), sizeof(m_lf), &m_lf);
 	}
 
-	//Common 규약: 모든 기본 폰트는 Segoe UI 강제 (parent 에 다른 face 가 명시되어 있어도 일관성 우선).
-	_tcscpy_s(m_lf.lfFaceName, _countof(m_lf.lfFaceName), _T("Segoe UI"));
-	m_lf.lfCharSet = DEFAULT_CHARSET;
-
 	ReconstructFont();
 
 	//WS_BORDER 와 WS_EX_WINDOWEDGE 는 시스템이 NC 안쪽에 default 색으로 1-2px frame 을 그려 dark theme 에서

@@ -3,6 +3,7 @@
 
 #include "SCPropertyCtrl.h"
 #include "../../MemoryDC.h"	// CMemoryDC — 더블 버퍼(다른 프로젝트 공통 사용)
+#include "../../Functions.h"	//20260909 by claude. get_default_ui_font_face()
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -72,7 +73,7 @@ bool CSCPropertyCtrl::create(CWnd* parent, int left, int top, int width, int hei
 	m_lf_item.lfCharSet			= DEFAULT_CHARSET;
 	m_lf_item.lfQuality			= DEFAULT_QUALITY;
 	m_lf_item.lfPitchAndFamily	= DEFAULT_PITCH | FF_DONTCARE;
-	_tcscpy_s(m_lf_item.lfFaceName, LF_FACESIZE, _T("Segoe UI"));
+	_tcscpy_s(m_lf_item.lfFaceName, LF_FACESIZE, get_default_ui_font_face());
 	m_font.CreateFontIndirect(&m_lf_item);
 
 	m_lf_section				= m_lf_item;

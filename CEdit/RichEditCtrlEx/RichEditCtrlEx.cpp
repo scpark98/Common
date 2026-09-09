@@ -4,6 +4,8 @@
 //#include "stdafx.h"
 #include "RichEditCtrlEx.h"
 #include "../../Functions.h"
+//20260909 by claude. add_tagged/addl_tagged 가 태그 본문을 run 단위로 파싱하는 데 쓴다(build_paragraph_str).
+#include "../../data_structure/SCParagraph/SCParagraph.h"
 
 //#include <stdarg.h>
 #include <strsafe.h>	//for StringCchCopyN
@@ -227,18 +229,97 @@ END_MESSAGE_MAP()
 
 
 // CRichEditCtrlEx 메시지 처리기입니다.
-CString CRichEditCtrlEx::addl(Gdiplus::Color cr, LPCTSTR lpszFormat, ...)
+//공개 진입점은 (add/addl) × (색 지정/생략) × (평문/태그) 조합이다. 색을 생략하면 Transparent 를 넘겨
+//add_impl 이 set_default_text_color 로 정한 기본 글자색으로 바꾼다. 태그 파싱은 add_tagged/addl_tagged 만 한다.
+CString CRichEditCtrlEx::add(Gdiplus::Color cr, LPCTSTR lpszFormat, ...)
 {
-	//CString으로 변환
 	CString new_text;
 	va_list args;
 	va_start(args, lpszFormat);
 	new_text.FormatV(lpszFormat, args);
+	va_end(args);
 
-	return add(cr, new_text + _T("\n"));
+	return add_impl(cr, new_text, false, false);
 }
 
-CString CRichEditCtrlEx::add(Gdiplus::Color cr, LPCTSTR lpszFormat, ...)
+CString CRichEditCtrlEx::addl(Gdiplus::Color cr, LPCTSTR lpszFormat, ...)
+{
+	CString new_text;
+	va_list args;
+	va_start(args, lpszFormat);
+	new_text.FormatV(lpszFormat, args);
+	va_end(args);
+
+	return add_impl(cr, new_text, false, true);
+}
+
+CString CRichEditCtrlEx::add(LPCTSTR lpszFormat, ...)
+{
+	CString new_text;
+	va_list args;
+	va_start(args, lpszFormat);
+	new_text.FormatV(lpszFormat, args);
+	va_end(args);
+
+	return add_impl(Gdiplus::Color::Transparent, new_text, false, false);
+}
+
+CString CRichEditCtrlEx::addl(LPCTSTR lpszFormat, ...)
+{
+	CString new_text;
+	va_list args;
+	va_start(args, lpszFormat);
+	new_text.FormatV(lpszFormat, args);
+	va_end(args);
+
+	return add_impl(Gdiplus::Color::Transparent, new_text, false, true);
+}
+
+CString CRichEditCtrlEx::add_tagged(Gdiplus::Color cr, LPCTSTR lpszFormat, ...)
+{
+	CString new_text;
+	va_list args;
+	va_start(args, lpszFormat);
+	new_text.FormatV(lpszFormat, args);
+	va_end(args);
+
+	return add_impl(cr, new_text, true, false);
+}
+
+CString CRichEditCtrlEx::addl_tagged(Gdiplus::Color cr, LPCTSTR lpszFormat, ...)
+{
+	CString new_text;
+	va_list args;
+	va_start(args, lpszFormat);
+	new_text.FormatV(lpszFormat, args);
+	va_end(args);
+
+	return add_impl(cr, new_text, true, true);
+}
+
+CString CRichEditCtrlEx::add_tagged(LPCTSTR lpszFormat, ...)
+{
+	CString new_text;
+	va_list args;
+	va_start(args, lpszFormat);
+	new_text.FormatV(lpszFormat, args);
+	va_end(args);
+
+	return add_impl(Gdiplus::Color::Transparent, new_text, true, false);
+}
+
+CString CRichEditCtrlEx::addl_tagged(LPCTSTR lpszFormat, ...)
+{
+	CString new_text;
+	va_list args;
+	va_start(args, lpszFormat);
+	new_text.FormatV(lpszFormat, args);
+	va_end(args);
+
+	return add_impl(Gdiplus::Color::Transparent, new_text, true, true);
+}
+
+CString CRichEditCtrlEx::add_impl(Gdiplus::Color cr, const CString& text_in, bool parse_tags, bool append_newline)
 {
 	CString ret;
 
@@ -271,11 +352,7 @@ CString CRichEditCtrlEx::add(Gdiplus::Color cr, LPCTSTR lpszFormat, ...)
 	if (suppress_redraw)
 		SetRedraw(FALSE);
 
-	//CString으로 변환
-	CString new_text;
-	va_list args;
-	va_start(args, lpszFormat);
-	new_text.FormatV(lpszFormat, args);
+	CString new_text = text_in;	//인자는 이미 FormatV 된 문자열이다(공개 래퍼에서 처리).
 
 
 	//만약 텍스트의 맨 앞에 \n이 붙어 있으면 이전 로그 라인과 라인을 구분하기 위함인데
@@ -337,21 +414,31 @@ CString CRichEditCtrlEx::add(Gdiplus::Color cr, LPCTSTR lpszFormat, ...)
 		append_tom(sTime, gGRAY(128));
 	}
 
-	//텍스트 전체 크기가 특정 크기를 넘어가면 클리어
-	if (m_max_length > 0 && GetWindowTextLength() >= m_max_length)
-		clear_all();
+	//20260909 by claude. 상한을 넘으면 오래된 앞부분만 트림한다(전체 clear 아님) — 롤링 로그. m_max_length<=0 이면 무제한(아무것도 안 함).
+	trim_to_max_length();
 
 	//본문. 넣은 구간의 범위를 받아 키워드 강조에 쓴다.
 	//예전에는 삽입 위치를 문자 인덱스로 계산하면서 "라인이 추가되면 위치가 밀린다" 는 보정(- total_lines)을
 	//두고 있었다. 그 어긋남은 GetWindowTextLength 가 줄바꿈을 CRLF 두 글자로 세기 때문인데,
 	//범위 객체는 그 차이를 타지 않으므로 보정이 필요 없다.
-	ITextRange* body = nullptr;
-
-	if (append_tom(new_text, cr, &body) && body != nullptr)
+	if (parse_tags)
 	{
-		apply_keyword_formats(body, new_text);
-		body->Release();
+		append_tagged_body(new_text, cr);
 	}
+	else
+	{
+		ITextRange* body = nullptr;
+
+		if (append_tom(new_text, cr, &body) && body != nullptr)
+		{
+			apply_keyword_formats(body, new_text);
+			body->Release();
+		}
+	}
+
+	//태그 파서는 개행을 <br> 로 바꿔 소비하므로, addl 계열의 끝 줄바꿈은 여기서 직접 붙인다.
+	if (append_newline)
+		append_tom(_T("\n"), cr);
 
 	//아래 스크롤은 우리가 하는 것이므로 OnVScroll 이 m_at_bottom 을 다시 정하지 않게 막는다.
 	m_in_programmatic_scroll = true;
@@ -390,6 +477,73 @@ CString CRichEditCtrlEx::add(Gdiplus::Color cr, LPCTSTR lpszFormat, ...)
 	m_in_programmatic_scroll = false;
 
 	return new_text;
+}
+
+//20260909 by claude. 태그가 포함된 본문을 넣는다.
+//get_tag_str 이 개행을 <br> 로 바꿔 소비하면 끝 개행이 사라지므로(단독 trailing <br> 는 빈 줄을 안 만든다),
+//개행은 여기서 직접 끊어 원문 개행 수를 그대로 보존하고, 개행 없는 각 줄만 파서에 넘긴다.
+void CRichEditCtrlEx::append_tagged_body(const CString& text, Gdiplus::Color base_cr)
+{
+	const int len = text.GetLength();
+	int start = 0;
+
+	for (int pos = 0; pos <= len; pos++)
+	{
+		if (pos < len && text[pos] != _T('\n'))
+			continue;
+
+		append_tagged_line(text.Mid(start, pos - start), base_cr);
+
+		if (pos < len)		//원문에 있던 개행 하나를 실제 개행으로 넣는다.
+			append_tom(_T("\n"), base_cr);
+
+		start = pos + 1;
+	}
+}
+
+//개행 없는 한 줄을 CSCParagraph 파서로 run 단위로 나눠 넣는다.
+//폰트 name/size 는 건드리지 않고 run 의 색과 스타일 비트(bold/italic/underline/strike)만 적용한다 —
+//나머지는 rich edit 자신의 폰트를 그대로 쓴다.
+void CRichEditCtrlEx::append_tagged_line(const CString& line, Gdiplus::Color base_cr)
+{
+	CSCTextProperty base_prop;
+	base_prop.cr_text = base_cr;
+
+	std::deque<std::deque<CSCParagraph>> para;
+	CString src = line;	//build_paragraph_str 이 인자를 수정하므로 사본을 넘긴다.
+	CSCParagraph::build_paragraph_str(src, para, &base_prop);
+
+	//줄 안에 <br> 가 직접 들어 있으면 para 가 여러 줄이 되므로 그 사이에도 개행을 넣는다.
+	for (size_t li = 0; li < para.size(); li++)
+	{
+		if (li > 0)
+			append_tom(_T("\n"), base_cr);
+
+		for (auto& run : para[li])
+		{
+			if (run.text.IsEmpty())
+				continue;
+
+			ITextRange* body = nullptr;
+
+			if (!append_tom(run.text, run.text_prop.cr_text, &body) || body == nullptr)
+				continue;
+
+			ITextFont* font = nullptr;
+
+			if (SUCCEEDED(body->GetFont(&font)) && font != nullptr)
+			{
+				const int style = run.text_prop.style;
+				font->SetBold((style & Gdiplus::FontStyleBold) ? tomTrue : tomFalse);
+				font->SetItalic((style & Gdiplus::FontStyleItalic) ? tomTrue : tomFalse);
+				font->SetUnderline((style & Gdiplus::FontStyleUnderline) ? tomSingle : tomNone);
+				font->SetStrikeThrough((style & Gdiplus::FontStyleStrikeout) ? tomTrue : tomFalse);
+				font->Release();
+			}
+
+			body->Release();
+		}
+	}
 }
 
 //20260908 by claude. 마지막 줄이 화면 맨 아래에 오도록 스크롤한다. *포커스와 무관하게* 동작해야 한다.
@@ -615,6 +769,42 @@ void CRichEditCtrlEx::clear_all()
 	//SetSel(0, -1);
 	//ReplaceSel("");
 	SetWindowText(_T(""));
+}
+
+//20260909 by claude. m_max_length 를 넘으면 오래된 앞부분(대략 절반)을 줄 경계로 지워 롤링 로그로 유지한다.
+//상한에 닿을 때만, 그것도 한 번에 절반을 지우므로 삽입당 평균 비용은 거의 없다. m_max_length <= 0 이면 무제한(아무것도 안 함).
+void CRichEditCtrlEx::trim_to_max_length()
+{
+	if (m_max_length <= 0)
+		return;
+
+	const int len = GetWindowTextLength();
+	if (len < m_max_length)
+		return;
+
+	//최근 절반만 남기고 앞부분을 지운다. 줄 중간에서 자르지 않도록 줄 경계로 스냅.
+	const int cut = len - m_max_length / 2;
+	if (cut <= 0)
+		return;
+
+	const int cut_pos = LineIndex(LineFromChar(cut));
+	if (cut_pos <= 0)
+		return;
+
+	ITextDocument* doc = get_text_document();
+	ITextRange* range = nullptr;
+
+	if (doc != nullptr && SUCCEEDED(doc->Range(0, cut_pos, &range)) && range != nullptr)
+	{
+		range->SetText(nullptr);	//[0, cut_pos) 삭제 — 선택/캐럿을 건드리지 않는다.
+		range->Release();
+	}
+	else
+	{
+		//TOM 미지원(구형 richedit) 대체 경로. 이어지는 append/scroll 이 선택·화면을 바로잡는다.
+		SetSel(0, cut_pos);
+		ReplaceSel(_T(""));
+	}
 }
 
 void CRichEditCtrlEx::toggle_show_log()
@@ -927,16 +1117,40 @@ void CRichEditCtrlEx::PreSubclassWindow()
 	//리소스에서 Multiline=True 를 빠뜨리면 addl() 의 개행이 동작하지 않으므로 debug 에서 즉시 알린다.
 	ASSERT((GetStyle() & ES_MULTILINE) && "CRichEditCtrlEx: resource control must have Multiline=True for addl() to break lines.");
 
-	CFont* font = GetFont();
-	if (font == nullptr)
-		font = GetParent()->GetFont();
+	//20260909 by claude. Resource Editor 에서 이 컨트롤을 쓰는 dlg 에 지정된 폰트를 그대로 쓴다. 없으면 OS UI 폰트로 폴백.
+	//동적 생성·MainWnd 미생성 시점에도 이 코드를 만날 수 있어 parent 가 NULL 일 수 있다(널 가드).
+	//SC* 컨트롤 공통 정석(SCEdit 참조). lfMessageFont = 한국 Windows 에서 Vista+ 맑은 고딕 / XP 굴림(라틴+한글 한 face 커버).
+	CWnd*  parent = GetParent();
+	CFont* font   = GetFont();
+	if (font == NULL && parent != nullptr)
+		font = parent->GetFont();
 
-	if (font != nullptr)
+	if (font != NULL)
+	{
 		font->GetObject(sizeof(m_lf), &m_lf);
+	}
 	else
-		GetObject(GetStockObject(SYSTEM_FONT), sizeof(m_lf), &m_lf);
+	{
+		NONCLIENTMETRICS ncm = {};
+		ncm.cbSize = sizeof(ncm);
+		BOOL ok = ::SystemParametersInfo(SPI_GETNONCLIENTMETRICS, ncm.cbSize, &ncm, 0);
+#if (WINVER >= 0x0600)
+		//Vista+ SDK 로 빌드한 exe 를 XP 에서 실행하면 NONCLIENTMETRICS 끝의 iPaddedBorderWidth(4byte) 때문에 SPI 가 실패한다.
+		if (!ok)
+		{
+			ncm.cbSize = sizeof(ncm) - sizeof(ncm.iPaddedBorderWidth);
+			ok = ::SystemParametersInfo(SPI_GETNONCLIENTMETRICS, ncm.cbSize, &ncm, 0);
+		}
+#endif
+		if (ok)
+			m_lf = ncm.lfMessageFont;
+		else
+			GetObject(GetStockObject(DEFAULT_GUI_FONT), sizeof(m_lf), &m_lf);
+	}
 
 	CRichEditCtrl::PreSubclassWindow();
+
+	reconstruct_font();
 }
 
 void CRichEditCtrlEx::reconstruct_font()

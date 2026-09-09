@@ -1316,18 +1316,34 @@ bool CSCMenu::create(CWnd* parent, int width)
 
 	if (res)
 	{
+		//20260909 by claude. dlg 에 지정된 폰트를 상속, 없으면 OS UI 폰트(lfMessageFont)로 폴백 — SC* 정석(SCEdit 참조).
+		//강제 face 를 박지 않는다. lfMessageFont = 한국 Windows Vista+ 맑은 고딕 / XP 굴림(라틴+한글 한 face 커버).
 		CFont* font = GetFont();
-
-		if (font == NULL)
-			font = AfxGetMainWnd()->GetFont();
+		if (font == NULL && parent != nullptr)
+			font = parent->GetFont();
 
 		if (font != NULL)
+		{
 			font->GetObject(sizeof(m_lf), &m_lf);
+		}
 		else
-			GetObject(GetStockObject(SYSTEM_FONT), sizeof(m_lf), &m_lf);
-
-		_tcscpy_s(m_lf.lfFaceName, _countof(m_lf.lfFaceName), _T("Segoe UI"));
-		m_lf.lfCharSet = DEFAULT_CHARSET;
+		{
+			NONCLIENTMETRICS ncm = {};
+			ncm.cbSize = sizeof(ncm);
+			BOOL ok = ::SystemParametersInfo(SPI_GETNONCLIENTMETRICS, ncm.cbSize, &ncm, 0);
+#if (WINVER >= 0x0600)
+			//Vista+ SDK 로 빌드한 exe 를 XP 에서 실행하면 iPaddedBorderWidth(4byte) 때문에 SPI 가 실패한다.
+			if (!ok)
+			{
+				ncm.cbSize = sizeof(ncm) - sizeof(ncm.iPaddedBorderWidth);
+				ok = ::SystemParametersInfo(SPI_GETNONCLIENTMETRICS, ncm.cbSize, &ncm, 0);
+			}
+#endif
+			if (ok)
+				m_lf = ncm.lfMessageFont;
+			else
+				GetObject(GetStockObject(DEFAULT_GUI_FONT), sizeof(m_lf), &m_lf);
+		}
 
 		ReconstructFont();
 	}
@@ -2171,7 +2187,7 @@ void CSCMenu::OnPaint()
 					//draw_round_rect 시그니처: (g, rect, cr_stroke, cr_fill, radius=-1, width=1). 5번째 = radius, 6번째 = width.
 					draw_round_rect(&g, grect, cr_border, cr_bg, 6, 1);
 
-					Gdiplus::Font font(_T("Segoe UI"), (Gdiplus::REAL)(m_line_height * 0.45f), Gdiplus::FontStyleRegular, Gdiplus::UnitPixel);
+					Gdiplus::Font font(get_default_ui_font_face(), (Gdiplus::REAL)(m_line_height * 0.45f), Gdiplus::FontStyleRegular, Gdiplus::UnitPixel);
 					Gdiplus::SolidBrush brush(cr_text);
 					Gdiplus::StringFormat sf;
 					sf.SetAlignment(Gdiplus::StringAlignmentCenter);

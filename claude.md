@@ -179,10 +179,13 @@ Common 에 **새 C++ 컨트롤·다이얼로그 클래스 파일을 추가**할 
   - **schema 가 부족하면 응용단에서 우회 말고 `CSCColorTheme` 에 필드를 추가하라**. 예: agent UI 의 primary 버튼이 다이얼로그 bg 와 다른 색이어야 한다면 → dlg 코드에 `m_button_login.set_back_color(blue)` 박지 말고 `cr_button_back` 슬롯을 schema 에 신설해서 `CGdiButton::set_color_theme` 가 읽게 한다. (실제 2026-05-21 LMMLoginManager 작업에서 `cr_button_back`/`cr_button_text` 가 이 경로로 추가됐다. edit 본문도 같은 이유로 `cr_edit_back`/`cr_edit_text` 가 `CSCStaticEdit::set_color_theme` 에서 사용되도록 연결됨.)
   - **Why:** VSCode / Visual Studio / Notepad++ 등 외부 컬러테마를 향후 `CSCColorTheme` 에 import 확장할 계획 — schema 가 design intent 의 단일 source of truth 여야 한다. 응용단 override 가 흩어져 있으면 외부 테마 적용 시 부분만 바뀌어 비일관 발생. 사용자 명시 (2026-05-21).
 - **GDI+ 수동 초기화 금지**. `Common/SCGdiplusBitmap.h` 의 `CGdiplusDummyForInitialization` 전역 인스턴스가 자동 처리. `GdiplusStartup`/`GdiplusShutdown` 호출하지 말 것. 대신 빌드에 `SCGdiplusBitmap.cpp` 가 포함되어 있는지 확인.
-- **기본 폰트 = `Segoe UI` (강제)**. 새 컨트롤·다이얼로그·D2D/GDI+ 텍스트 그리기에서 폰트 face 를 지정하지 않으면 default 가 Segoe UI 가 되도록 한다. 시스템 폰트(굴림/맑은 고딕/Tahoma 등) 을 그대로 두지 말 것. **Why**: 사용자 명시 — *"앞으로도 모든 기본 폰트는 이 폰트를 기본으로 하자"* (2026-05-06, SCMenu). Endorphin / SCDeskTools 등 기존 컨트롤도 D2D 텍스트 그리기에 이미 `_T("Segoe UI")` 를 사용 중이라 일관성 확보.
-  - 새 `LOGFONT` 초기화 시: `GetObject(SYSTEM_FONT)` 또는 부모 폰트로 height/weight 받은 후 `_tcscpy_s(lf.lfFaceName, ..., _T("Segoe UI")); lf.lfCharSet = DEFAULT_CHARSET;` 강제.
-  - GDI+ `Gdiplus::Font` / DirectWrite `IDWriteTextFormat` 생성 시 face 인자에 `_T("Segoe UI")` 직접.
-  - 기존 코드에서 별도 폰트가 *의도적으로* 지정된 부분 (예: 모노스페이스가 필요한 코드 디스플레이) 은 그대로 둠 — 단 default 가 시스템 폰트로 떨어지는 곳을 찾으면 Segoe UI 로 교체.
+- **기본 폰트 정책 = "상속 → lfMessageFont 폴백" 정석 패턴 (강제, 모든 파생 컨트롤 예외 없음)**. 새 컨트롤은 face 를 하드코딩·강제하지 말고, 자기/부모 폰트를 상속하고 없으면 OS 의 UI 폰트(`lfMessageFont`)로 폴백한다. **참조 구현: `Common\CEdit\SCEdit\SCEdit.cpp` 의 PreSubclassWindow** (SC* 컨트롤 전부 동일한 블록).
+  - **순서**: `GetFont()` → (없고 parent 있으면) `GetParent()->GetFont()` → (없으면) `SPI_GETNONCLIENTMETRICS.lfMessageFont` → (SPI 실패 시) `DEFAULT_GUI_FONT`. 취득 후 `reconstruct_font()`(또는 그 컨트롤의 폰트 적용 경로)로 적용한다. parent 는 동적 생성·MainWnd 미생성 시 NULL 일 수 있으니 반드시 널 가드.
+  - **face 를 강제 지정하지 말 것.** `lfMessageFont` 는 OS 표시 언어의 UI 폰트라 **한국 Windows 에서 자동으로 Vista+ 맑은 고딕 / XP 굴림**(라틴+한글을 한 face 로 커버 → 폴백 없이 줄 높이 균일)이고 다른 로케일에선 그 로케일 폰트가 된다. face 를 박으면 (a) dlg 에서 지정한 폰트가 무시되고 (b) 로케일 대응이 깨진다.
+  - `SYSTEM_FONT`(옛 비트맵 fixed font — stroke 가 두꺼워 bold 처럼 보이는 부작용)·`DEFAULT_GUI_FONT`(MS Sans Serif)를 *기본*으로 쓰지 말 것. `DEFAULT_GUI_FONT` 는 SPI 실패 시 최후 폴백으로만.
+  - **XP 재시도**: `NONCLIENTMETRICS` 끝의 `iPaddedBorderWidth`(4byte) 때문에 Vista+ SDK 로 빌드한 exe 가 XP 에서 SPI 실패하므로, `#if (WINVER >= 0x0600)` 안에서 `cbSize` 를 4 줄여(`sizeof(ncm) - sizeof(ncm.iPaddedBorderWidth)`) 재시도한다.
+  - **Why (2026-09-09)**: 옛 규칙 "기본 = Segoe UI 강제"(2026-05-06, SCMenu)는 라틴 전용이라 한글이 폴백돼 줄 높이가 흔들렸다(Test_CEdit 실측). 잠깐 "맑은 고딕 강제"로 바꿨다가, SC* 컨트롤(SCEdit/SCStatic/SCComboBox/SCTreeCtrl/SCListCtrl/VtListCtrlEx/SCListBox/SCThumbCtrl/GdiButton)이 이미 쓰던 이 `lfMessageFont` 정석이 로케일까지 맞고 강제가 없어 더 우수함을 확인, 이 패턴으로 통일하기로 했다. (강제 face 방식으로 되돌리지 말 것 — 운용해 보고 정해진 것이다.)
+  - 기존 코드에서 폰트가 *의도적으로* 지정된 부분(모노스페이스 코드 디스플레이 등)만 예외로 둔다.
 - **참조 구현**: `D:\1.Projects_C++\Common\CEdit\SCEdit\SCEdit.h` — `CSCColorTheme` 사용 대표 예시.
 
 ### 2.2 Common 모듈을 프로젝트에 추가할 때 — "Common" 필터 + cpp·h 둘 다 (강제)
@@ -1425,7 +1428,7 @@ Common 의 `CSCLog` (`log/SCLog/SCLog.cpp`) 가 모든 프로젝트의 `logWrite
 - **API**: Vista+ 전용 API 직접 호출 금지. DWM(`DwmSetWindowAttribute` 등)·immersive dark mode 등은 반드시 Common 의 `win_compat::dwm::*` wrapper 경유 (XP/Vista 에서 자동 no-op). 신규 `dwmapi`/`uxtheme` API 직접 호출 금지.
 
 **적용:**
-- 새 폰트 생성 시 face 를 하드코딩하려면 위 XP 표준 목록에서 고르거나 부모/시스템 폰트를 상속. (Common §2 의 "기본 폰트 = Segoe UI" 는 *D2D/GDI+ 신규 앱* 한정 — XP 타깃 SC 컨트롤에는 적용하지 않는다. 충돌 시 XP 호환 우선.)
+- 새 폰트 생성 시 face 를 하드코딩하려면 위 XP 표준 목록에서 고르거나 부모/시스템 폰트를 상속. (Common §2 의 "기본 폰트 = 맑은 고딕" 는 *D2D/GDI+ 신규 앱* 한정 — XP 타깃 SC 컨트롤은 그 목록의 `굴림` 을 쓴다. 충돌 시 XP 호환 우선.)
 - 기호/아이콘은 벡터로 직접 그림. 작은 글씨 또렷함이 필요하면 `NONANTIALIASED_QUALITY` + 비트맵 내장 XP 폰트(굴림/Tahoma) 조합 (ClearType 색번짐·grayscale 뭉갬 없이 픽셀 또렷).
 - 새 API 쓰기 전 "이게 XP 에 있나?" 자문. 없으면 `win_compat` wrapper 추가 또는 대체 구현.
 
@@ -1499,6 +1502,15 @@ Confluence(`koinodoc.atlassian.net`)에 문서를 만들 때는 **일반 페이�
 - "단순 변수냐 / 방식 자체가 다르냐" 가 애매하면 유지 쪽으로 판단(보존이 기본).
 
 **Why:** 사용자 명시(2026-06-24). 엣지 기반 이미지→드론 매핑을 톤-면채움 방식으로 "개선"하며 기존 함수를 통째 교체 → 사용자가 git 에서 복원 요청. *"방식 자체가 다른 알고리즘으로 개선한다고 하면 기존 알고리즘도 우선 유지하고 선택해서 사용할 수 있는 방향으로 구현하라. 지우고 복원시키는 작업이 그동안에도 좀 빈번했다."* 삭제→복원 왕복은 반복돼 온 비용이다.
+
+## 정확한 표현 — 미세한 차이도 구분해서 쓴다 (강제, 모든 프로젝트)
+
+변경을 설명할 때 비슷하지만 다른 개념을 뭉뚱그리지 말 것. 특히 **"정의를 바꿨다" vs "호출/참조를 바꿨다"** 를 구분한다.
+
+- "`clear_all()` 을 `trim()` 으로 교체" 라고 쓰면 *함수 정의를 바꿨다*로 읽힌다. 실제로 그 자리에서 부르는 대상만 바꿨다면 **"`clear_all()` *호출* 을 `trim()` *호출* 로 교체 (함수 정의는 불변)"** 라고 명시한다.
+- 일반화: `A → B` 로 "교체/변경" 이라 쓸 때, 바뀐 것이 *정의*인지 *호출처*인지 *값*인지 분명히 한다. "함수를 삭제" 와 "호출을 삭제", "폰트를 바꿈" 과 "폰트 지정을 바꿈" 등도 같은 부류.
+
+**Why:** 2026-09-09, "add 중 오버플로 처리를 `clear_all()`(전체 삭제) → `trim_to_max_length()`(앞부분만) 로 교체" 라고 써서, 사용자가 `clear_all()` *함수 자체가* 트림으로 바뀐 것으로 오해했다(실제로는 오버플로 지점의 *호출* 만 교체, clear_all 정의는 불변). 사용자 — *"다음부터는 정확히 표현하라. 미세한 차이에도 소통의 오해가 충분히 생길수 있다."*
 
 ## 보고 범위 — 사용자가 꼭 봐야 할 것만 (강제, 모든 프로젝트)
 

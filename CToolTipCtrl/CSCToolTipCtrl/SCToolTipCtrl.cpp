@@ -19,8 +19,8 @@ CSCToolTipCtrl::CSCToolTipCtrl()
 {
 	m_sz_content = CSize(0, 0);
 
-	//기본 폰트는 Segoe UI. 태그로 지정하지 않은 구간에 적용된다.
-	_tcscpy_s(m_text_prop.name, _countof(m_text_prop.name), _T("Segoe UI"));
+	//20260909 by claude. 기본 폰트(Vista+ 맑은 고딕 / XP 굴림). 태그로 지정하지 않은 구간에 적용된다.
+	_tcscpy_s(m_text_prop.name, _countof(m_text_prop.name), get_default_ui_font_face());
 	m_text_prop.size = 9;
 	m_text_prop.style = Gdiplus::FontStyleRegular;
 }

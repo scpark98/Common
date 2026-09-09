@@ -139,6 +139,19 @@ public:
 	//단, resource의 속성에서 multiline이 체크되어 있어야 한다.
 	CString				addl(Gdiplus::Color cr, LPCTSTR lpszFormat, ...);
 
+	//20260909 by claude. 색을 생략하면 set_default_text_color 로 정한 기본 글자색으로 넣는다(오버로드).
+	CString				add(LPCTSTR lpszFormat, ...);
+	CString				addl(LPCTSTR lpszFormat, ...);
+
+	//20260909 by claude. add/addl 과 같지만 본문을 CSCParagraph 태그 파서(build_paragraph_str)로 해석해
+	//run 별로 색/굵기/기울임/밑줄/취소선을 적용한다. 지원 태그는 SCParagraph.h 참조(<b> <i> <u> <s> <cr=색> 등).
+	//태그가 없는 평문·미지원 태그는 글자 그대로 나오므로 add 와 호환된다. 리터럴 '<' 는 &lt; 로 escape.
+	//색 인자는 태그 밖 텍스트의 기본색이며, 생략하면 set_default_text_color 기본색을 쓴다.
+	CString				add_tagged(Gdiplus::Color cr, LPCTSTR lpszFormat, ...);
+	CString				add_tagged(LPCTSTR lpszFormat, ...);
+	CString				addl_tagged(Gdiplus::Color cr, LPCTSTR lpszFormat, ...);
+	CString				addl_tagged(LPCTSTR lpszFormat, ...);
+
 	//한줄씩 deque에 저장된 내용을 모두 합쳐서 rich의 내용을 update한다.
 	void				set_text(std::deque<CString>* dqlist);
 
@@ -206,6 +219,19 @@ protected:
 
 	//방금 넣은 구간 안에서 등록된 키워드를 찾아 서식을 입힌다.
 	void		apply_keyword_formats(ITextRange* body, const CString& text);
+
+	//20260909 by claude. 네 개의 공개 add/addl 오버로드의 공통 구현.
+	//parse_tags=true 면 본문을 태그 파서로 해석해 run 별 서식을 입히고, false 면 통째로 cr 로 넣는다.
+	//append_newline 은 addl 계열의 끝 "\n"(태그 모드는 파서가 개행을 소비하므로 여기서 붙인다).
+	CString		add_impl(Gdiplus::Color cr, const CString& text_in, bool parse_tags, bool append_newline);
+	//태그가 포함된 본문을 넣는다. 개행은 여기서 직접 끊어(원문 개행 수 보존) 각 줄만 파서에 넘긴다.
+	void		append_tagged_body(const CString& text, Gdiplus::Color base_cr);
+	//개행 없는 한 줄을 CSCParagraph 파서로 run 단위로 나눠 넣고, run 별 색/스타일을 적용한다.
+	void		append_tagged_line(const CString& line, Gdiplus::Color base_cr);
+
+	//20260909 by claude. m_max_length 를 넘으면 오래된 앞부분(대략 절반)을 줄 경계로 지워 롤링 로그로 유지한다.
+	//전체 clear 가 아니라 트림이라 최근 로그는 남고, 문서가 무한히 커져 삽입/스크롤이 느려지는 것을 막는다.
+	void		trim_to_max_length();
 
 	//한 줄 높이(px). 줄이 둘 미만이면 0.
 	int			get_line_height();

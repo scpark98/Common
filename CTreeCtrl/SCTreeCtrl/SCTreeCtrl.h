@@ -641,6 +641,9 @@ protected:
 //마우스가 컨트롤 안에 들어온 경우 true
 	bool			m_is_hovering = false;
 	HTREEITEM		m_hot_item = NULL;	//Y 좌표 기준 row 의 어디든 hover 시 hot 으로 인식 — native HitTest 가 label 외 영역에서 hItem 반환 안 하는 케이스 보완.
+	//20260910 by claude. 커서 밑 항목. m_hot_item 은 '강조할' 항목이라 Track Select(m_use_hover) 가 꺼지면 늘 NULL 이지만,
+	//툴팁은 강조 여부와 무관하게 떠야 하므로 대상 항목을 이 멤버로 따로 둔다(OnMouseMove 가 매번 갱신).
+	HTREEITEM		m_hover_item = NULL;
 
 //20260831 by claude. 잘린 라벨 툴팁 — 트리 폭이 좁아 항목 이름이 잘려 보일 때 hover 하면 전체 이름을 보여준다.
 	//잘림 판정은 OnNMCustomDraw 가 라벨을 그리면서 이미 재고 있는 GetTextExtent 와 클립 폭을 비교해 채운다.

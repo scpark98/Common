@@ -2529,8 +2529,13 @@ void CSCTreeCtrl::OnMouseMove(UINT nFlags, CPoint point)
 	//20260826 by claude. m_use_hover 는 리소스의 Track Select 설정이다(PreSubclassWindow 참조).
 	//꺼져 있으면 m_hot_item 이 계속 NULL 로 남고, 커스텀 드로우의 hover 분기도 성립하지 않는다
 	//(native TVS_TRACKSELECT 를 제거했으므로 CDIS_HOT 도 서지 않는다).
-	HTREEITEM new_hot = NULL;
-	if (m_use_hover && !m_bDragging && !(nFlags & MK_LBUTTON))
+	//20260910 by claude. 커서 밑 항목은 m_use_hover 와 무관하게 항상 구한다 — 이 값은 hover 강조뿐 아니라
+	//[잘린 라벨 툴팁] 의 대상 판정에도 쓰인다. 예전엔 m_use_hover(리소스의 Track Select) 가 꺼진 트리에서
+	//이 루프를 통째로 건너뛰어 대상 항목이 늘 NULL 이었고, 그래서 툴팁이 한 번도 뜨지 않았다
+	//(nFTDServer2 의 로컬/원격 트리가 그 경우). CSCListCtrl 은 같은 기능을 hit_test(point) 로 독립 판정한다.
+	//강조 여부만 아래에서 m_use_hover 로 계속 가른다 — Track Select 를 끈 트리의 외관은 그대로다.
+	HTREEITEM hover_item = NULL;
+	if (!m_bDragging && !(nFlags & MK_LBUTTON))
 	{
 		HTREEITEM cur = GetFirstVisibleItem();
 		while (cur)
@@ -2538,12 +2543,16 @@ void CSCTreeCtrl::OnMouseMove(UINT nFlags, CPoint point)
 			CRect r;
 			if (GetItemRect(cur, &r, FALSE) && point.y >= r.top && point.y < r.bottom)
 			{
-				new_hot = cur;
+				hover_item = cur;
 				break;
 			}
 			cur = GetNextVisibleItem(cur);
 		}
 	}
+
+	m_hover_item = hover_item;
+
+	HTREEITEM new_hot = m_use_hover ? hover_item : NULL;
 	if (new_hot != m_hot_item)
 	{
 		HTREEITEM old_hot = m_hot_item;
@@ -2796,6 +2805,7 @@ void CSCTreeCtrl::OnMouseLeave()
 	}
 
 	//20260831 by claude. [잘린 라벨 툴팁] 나갔다 같은 항목으로 돌아왔을 때 다시 뜨도록 기억을 지운다.
+	m_hover_item = NULL;		//20260910 by claude. 강조와 분리된 툴팁 대상 — 여기서도 같이 비운다.
 	m_tip_item = NULL;
 	if (::IsWindow(m_tooltip.GetSafeHwnd()))
 		m_tooltip.Activate(FALSE);
@@ -2820,12 +2830,45 @@ void CSCTreeCtrl::update_ellipsis_tooltip()
 	}
 
 	//같은 항목 위를 계속 움직이는 동안은 아무것도 하지 않는다 — 매번 다시 넣으면 툴팁이 깜빡인다.
-	if (m_hot_item == m_tip_item)
+	if (m_hover_item == m_tip_item)
 		return;
 
-	m_tip_item = m_hot_item;
+	m_tip_item = m_hover_item;
 
-	if (m_hot_item == NULL || m_clipped_items.find(m_hot_item) == m_clipped_items.end())
+	bool clipped = (m_hover_item != NULL && m_clipped_items.find(m_hover_item) != m_clipped_items.end());
+
+	//20260910 by claude. 라벨이 가로로 잘린 경우(m_clipped_items)뿐 아니라 항목의 위/아래가 트리 밖으로
+	//나가 세로로 잘린 경우도 "화면에서 온전히 읽을 수 없다" 는 같은 기준에 해당한다(탐색기도 이때 툴팁을 띄운다).
+	//이쪽은 그릴 때 기록하지 않고 hover 시점에 직접 잰다 — 세로 잘림은 스크롤·창 크기로 수시로 바뀌는데
+	//네이티브 트리는 스크롤을 BitBlt 로 처리해 모든 행이 다시 그려진다는 보장이 없어, 그릴 때 기록하면
+	//옛 상태가 남는다. hover 항목 하나만 재므로 비용도 없다.
+	//판정 대상은 행이 아니라 *글자가 그려지는 구간* 이다 — 행 높이(shell 트리는 30px)에는 글자 위아래로
+	//여백이 크게 있어, 행 기준으로 보면 글자가 멀쩡히 다 보이는데도 툴팁이 뜬다.
+	//커스텀 드로우가 DT_VCENTER 로 그리므로 글자 구간은 행 세로 중앙에 글자 높이만큼이다.
+	if (!clipped && m_hover_item)
+	{
+		CRect r;
+		CRect rc_client;
+		GetClientRect(rc_client);
+
+		if (GetItemRect(m_hover_item, &r, FALSE))
+		{
+			CClientDC dc(this);
+			CFont* old_font = dc.SelectObject(GetFont());
+			TEXTMETRIC tm = {};
+			dc.GetTextMetrics(&tm);
+			if (old_font)
+				dc.SelectObject(old_font);
+
+			int draw_top = r.CenterPoint().y - tm.tmHeight / 2;
+			int draw_bottom = draw_top + tm.tmHeight;
+
+			if (draw_top < rc_client.top || draw_bottom > rc_client.bottom)
+				clipped = true;
+		}
+	}
+
+	if (!clipped)
 	{
 		if (::IsWindow(m_tooltip.GetSafeHwnd()))
 			m_tooltip.Activate(FALSE);
@@ -2845,7 +2888,7 @@ void CSCTreeCtrl::update_ellipsis_tooltip()
 	m_tooltip.Pop();
 
 	//항목 이름은 사용자 데이터다 — '<' 가 들어 있으면 태그로 파싱되므로 반드시 이스케이프한다.
-	m_tooltip.UpdateTipText(CSCToolTipCtrl::escape_tags(GetItemText(m_hot_item)), this);
+	m_tooltip.UpdateTipText(CSCToolTipCtrl::escape_tags(GetItemText(m_hover_item)), this);
 	m_tooltip.Activate(TRUE);
 }
 

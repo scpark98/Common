@@ -314,15 +314,15 @@ void CSCListCtrl::draw_row(CDC* pDC, int iItem, const CRect& row_bounds)
 	//셀 루프 안에서 매번 GetExtendedStyle() 을 호출하지 않도록 행 단위로 1회만 읽는다.
 	bool		is_use_gridlines = (GetExtendedStyle() & LVS_EX_GRIDLINES);
 
-	//20260728 by claude. 행 상태(선택/drop/교차)만 반영한 배경색 — 마지막 컬럼 오른쪽 잔여 영역을 채우는 데 쓴다.
-	//셀별 override(set_back_color)는 그 셀에만 적용돼야 하므로 여기서는 배제한다.
-	Gdiplus::Color cr_row_back = m_theme.cr_back;
-	if ((m_has_focus || is_show_selection_always) && is_selected && is_full_row_selection)
-		cr_row_back = (m_has_focus ? m_theme.cr_back_selected : m_theme.cr_back_selected_inactive);
-	else if (is_drophilited)
-		cr_row_back = m_theme.cr_back_dropHilited;
-	else if (m_use_alternate_back_color && (iItem % 2))
-		cr_row_back = m_theme.cr_back_alternate;
+	//20260910 by claude. [잘린 셀 툴팁] 세로 잘림 판정에 쓸 항목 영역 = 클라이언트에서 헤더를 뺀 부분.
+	//픽셀 스크롤이라 스크롤 위치에 따라 첫 행·마지막 행이 부분 행으로 그려진다.
+	CRect		rc_view;
+
+	if (m_use_ellipsis_tooltip)
+	{
+		GetClientRect(rc_view);
+		rc_view.top += get_header_height();
+	}
 
 	Gdiplus::Color	crText = m_theme.cr_text;
 	Gdiplus::Color	crBack = m_theme.cr_back;
@@ -715,9 +715,18 @@ void CSCListCtrl::draw_row(CDC* pDC, int iItem, const CRect& row_bounds)
 			//(실제 사례 — Slogan 컬럼이 HDF_RIGHT 이고 컬럼 우단이 화면 밖: 글자가 반쯤 잘려 보이는데도 안 떴다.)
 			//그래서 정렬을 반영해 *실제로 그려질 가로 구간*을 구한 뒤 보이는 영역 안에 온전히 들어오는지 본다.
 			//그리기는 textRect 원본 그대로 둔다 — "..." 는 컬럼 끝에 나와야지 화면 끝에 나오면 안 된다.
+			//20260910 by claude. (3) 세로로 잘린 경우도 같은 기준이다 — 가로로는 다 들어와도 글자의 위나
+			//아래가 잘리면 읽을 수 없다. 픽셀 스크롤이라 항목 영역의 첫 행·마지막 행이 부분 행으로 그려진다.
+			//판정 대상은 행이 아니라 *글자가 그려지는 구간* 이다. 행에는 글자 위아래로 여백이 있어,
+			//행 기준으로 보면 글자가 멀쩡히 다 보이는데도 몇 px 잘렸다고 툴팁이 뜬다.
+			//DT_VCENTER 로 그리므로 글자 구간은 셀 세로 중앙에 글자 높이만큼이다.
 			if (m_use_ellipsis_tooltip && !text.IsEmpty())
 			{
-				int text_w = pDC->GetTextExtent(text).cx;
+				CSize sz_text = pDC->GetTextExtent(text);
+				int text_w = sz_text.cx;
+
+				int draw_top = textRect.CenterPoint().y - sz_text.cy / 2;
+				int draw_bottom = draw_top + sz_text.cy;
 
 				int draw_left = textRect.left;
 				if (format & DT_RIGHT)
@@ -728,8 +737,10 @@ void CSCListCtrl::draw_row(CDC* pDC, int iItem, const CRect& row_bounds)
 				int draw_right = draw_left + text_w;
 
 				if (text_w > textRect.Width() ||					//(1) 컬럼 안에서 잘림
-					draw_left  < row_bounds.left ||					//(2) 왼쪽이 화면 밖
-					draw_right > row_bounds.right)					//(2) 오른쪽이 화면 밖
+					draw_left   < row_bounds.left ||				//(2) 왼쪽이 화면 밖
+					draw_right  > row_bounds.right ||				//(2) 오른쪽이 화면 밖
+					draw_top    < rc_view.top ||					//(3) 위가 항목 영역 밖
+					draw_bottom > rc_view.bottom)					//(3) 아래가 항목 영역 밖
 					m_clipped_cells.insert(std::make_pair(iItem, iSubItem));
 			}
 
@@ -746,17 +757,29 @@ void CSCListCtrl::draw_row(CDC* pDC, int iItem, const CRect& row_bounds)
 		}
 	}
 
-	//20260728 by claude. 컬럼 폭 합이 리스트 폭보다 좁으면 마지막 컬럼 오른쪽이 빈 영역으로 남아, 교차 행 배경과 선택색이
-	//거기서 끊겨 보였다(행이 리스트 중간에서 잘린 인상). 탐색기와 동일하게 행 배경은 리스트 오른쪽 끝까지 이어지도록 채운다.
-	//가로 스크롤로 컬럼이 클라이언트보다 넓은 경우는 잔여 영역이 없어 이 분기를 타지 않는다.
-	CRect rc_client;
-	GetClientRect(rc_client);
-	int trail_left = itemRect.right;
+	//20260910 by claude. 행 단위 가로선(top/bottom/격자)을 선택 테두리보다 *먼저* 그린다.
+	//예전엔 이 블록이 함수 맨 끝에 있어, 행 하단 격자선이 rowRect.bottom - 1 에 그어지며 같은 자리에 있던
+	//선택 테두리의 아래 변을 덮었다(선택 막대의 bottom border 만 안 보이던 원인).
+	CRect rc_line;
+	GetSubItemRect(iItem, 0, LVIR_BOUNDS, rc_line);
+	rc_line.top    = row_bounds.top;
+	rc_line.bottom = row_bounds.bottom;
 
-	if (trail_left < rc_client.right)
+	if (m_draw_top_line)
 	{
-		CRect rc_trail(trail_left, itemRect.top, rc_client.right, itemRect.bottom);
-		pDC->FillSolidRect(rc_trail, cr_row_back.ToCOLORREF());
+		draw_line(pDC, rc_line.left, rc_line.top, rc_line.right, rc_line.top, m_cr_top_line.ToCOLORREF());
+	}
+
+	if (m_draw_bottom_line)
+	{
+		//rowRect.bottom으로 써주면 아이템 영역밖이므로 그려지지 않는다. 반드시 -1을 해야 함.
+		draw_line(pDC, rc_line.left, rc_line.bottom - 1, rc_line.right, rc_line.bottom - 1, m_cr_bottom_line.ToCOLORREF());
+	}
+
+	//격자선(가로): 행 하단 1px. 세로 격자는 subitem 루프 안에서 셀별로 그린다.
+	if (is_use_gridlines)
+	{
+		draw_line(pDC, rc_line.left, rc_line.bottom - 1, rc_line.right, rc_line.bottom - 1, m_theme.cr_gridlines.ToCOLORREF());
 	}
 
 	//선택된 항목은 선택 색상보다 진한 색으로 테두리가 그려진다.
@@ -768,9 +791,6 @@ void CSCListCtrl::draw_row(CDC* pDC, int iItem, const CRect& row_bounds)
 		rowRect.bottom = row_bounds.bottom;
 		if (!is_full_row_selection)
 			rowRect.right = rowRect.left + GetColumnWidth(0);
-		//20260728 by claude. 선택 배경이 리스트 끝까지 채워지므로 테두리도 같은 폭이어야 한다. 안 맞추면 채운 색 한가운데에 세로선이 남는다.
-		else if (rowRect.right < rc_client.right)
-			rowRect.right = rc_client.right;
 
 		//선택된 항목을 표시하는 사각형을 그릴때는 반드시 PenAlignmentInset으로 그려줘야 한다.
 		//특히 width가 2이상이면 unselect되는 항목의 선택 사각형 표시가 갱신되지 않게 되므로
@@ -797,29 +817,6 @@ void CSCListCtrl::draw_row(CDC* pDC, int iItem, const CRect& row_bounds)
 		draw_rect(pDC, rfocus, m_theme.cr_selected_border, Gdiplus::Color::Transparent, 1, Gdiplus::PenAlignmentInset, Gdiplus::DashStyleDot);
 	}
 
-	GetSubItemRect(iItem, 0, LVIR_BOUNDS, rowRect);
-	rowRect.top    = row_bounds.top;		//20260706 by claude. Y 만 호출자 행 위치로 (native no-op / smooth 픽셀).
-	rowRect.bottom = row_bounds.bottom;
-	//20260728 by claude. 행 배경을 리스트 끝까지 채우므로 행 단위 가로선(top/bottom/격자)도 같은 폭으로 그어야 중간에서 끊기지 않는다.
-	if (rowRect.right < rc_client.right)
-		rowRect.right = rc_client.right;
-
-	if (m_draw_top_line)
-	{
-		draw_line(pDC, rowRect.left, rowRect.top, rowRect.right, rowRect.top, m_cr_top_line.ToCOLORREF());
-	}
-
-	if (m_draw_bottom_line)
-	{
-		//rowRect.bottom으로 써주면 아이템 영역밖이므로 그려지지 않는다. 반드시 -1을 해야 함.
-		draw_line(pDC, rowRect.left, rowRect.bottom - 1, rowRect.right, rowRect.bottom - 1, m_cr_bottom_line.ToCOLORREF());
-	}
-
-	//격자선(가로): 행 하단 1px. 세로 격자는 subitem 루프 안에서 셀별로 그린다.
-	if (is_use_gridlines)
-	{
-		draw_line(pDC, rowRect.left, rowRect.bottom - 1, rowRect.right, rowRect.bottom - 1, m_theme.cr_gridlines.ToCOLORREF());
-	}
 }
 
 // ex. "No,20;Item1,50;Item2,50"

@@ -22,7 +22,7 @@ static LPCTSTR kRegSection = _T("setting\\color picker\\dropper");
 
 //커서 좌표 / 색상 정보 문자열
 static const float	kInfoFontSize = 12.0f;	//20260904 by claude. 100% 기준으로 정하고 175% 는 scaled 로 1.75배가 된다 (100%=16px).
-static const int	kInfoOffsetY = 32;	//커서 중심에서 아래로 이만큼 떨어진 자리가 기본 위치
+static const int	kInfoOffsetY = 36;	//20260910 by claude. 커서 중심에서 아래로 이만큼(중앙 픽셀을 덜 가리도록 36 으로 내림)
 
 //조합키 안내 — 돋보기 원 바깥(위/아래 띠)에 그린다.
 //"휠 배율" 처럼 줄이면 처음 보는 사람은 무엇이 키고 무엇이 동작인지 알 수 없으므로
@@ -39,44 +39,12 @@ static LPCTSTR		kHintText =
 	_T("<cr=#FFD54F>휠</cr> : 배율 조정   <t>")
 	_T("<cr=#FFD54F>Shift+휠</cr> : 배율 크게 조정   <t>")
 	_T("<cr=#FFD54F>Ctrl+휠</cr> : 창 크기 조정   <t>")
-	_T("<cr=#FFD54F>ESC</cr> : 취소")
+	_T("<cr=#FFD54F>ESC 우클릭</cr> : 취소")
 	_T("<br>")
 	_T("<cr=#FFD54F>방향키</cr> : 1픽셀 이동   <t>")
 	_T("<cr=#FFD54F>Shift+방향키</cr> : 8픽셀 이동   <t>")
 	_T("<cr=#FFD54F>좌클릭</cr> : 색 선택   <t>")
 	_T("<cr=#FFD54F>휠클릭</cr> : 좌표·안내 On/Off");
-
-//문자열을 실제로 그려질 크기로 잰다. draw_text 는 thickness > 0 이면 emSize = dpi * font_size / 72 로
-//글자 path 를 만들므로 (thickness == 0 인 DrawString 경로의 /96 과 다르다) 여기서도 /72 + UnitPixel 로 맞춘다.
-static CRect measure_label(Gdiplus::Graphics& g, CString text, float font_size)
-{
-	Gdiplus::FontFamily family(L"Arial");
-	Gdiplus::Font font(&family, g.GetDpiY() * font_size / 72.0f, Gdiplus::FontStyleBold, Gdiplus::UnitPixel);
-	Gdiplus::RectF rt = measure_string(&g, font, text);
-
-	return CRect(0, 0, (int)rt.Width + 5, (int)rt.Height + 3);
-}
-
-//rTarget 을 원점에서 시작하는 rect + 우하단 정렬로 넘긴다 — draw_text 는 rTarget.left/top 을
-//기준으로 몇 가지 내부 계산을 하므로 임의 위치 rect 를 주면 결과가 어긋난다.
-//
-//20260904 by claude. shadow_depth 는 0 이어야 한다. draw_text 의 그림자는 글자를 0.4 배로
-//별도 비트맵에 그린 뒤 2.5 배로 되늘리는 방식인데, 그 비트맵은 96 DPI 로 만들어지는 반면
-//본문은 대상 Graphics 의 DPI 로 그려져 배율이 어긋난다. 그 결과 같은 문자열이 크기·위치가 다른
-//두 벌로 겹쳐 보인다 (175% 에서 특히 심함 — 실제 화면에서 확인).
-//thickness 1.0 의 외곽선이 이미 가독성을 담당하므로 그림자는 없어도 된다.
-static void draw_label(Gdiplus::Graphics& g, CRect r, CString text, float font_size,
-	Gdiplus::Color cr_text, Gdiplus::Color cr_shadow)
-{
-	//20260904 by claude. 외곽선 두께는 글자 크기에 비례해야 한다. 상수 1.0f 이면
-	//(펜이 path 중앙 정렬이라 눈에 보이는 두께는 그 절반인 0.5px) 175% 의 큰 글자에서 선이 끊겨 보인다.
-	//실제 픽셀 글자 높이의 1/10 정도가 적당하다 — 100% 에서 약 1.9, 175% 에서 약 3.3.
-	const float px = g.GetDpiY() * font_size / 72.0f;
-	const float thickness = max(1.5f, px / 10.0f);
-
-	draw_text(g, CRect(0, 0, r.right, r.bottom), text, font_size, Gdiplus::FontStyleBold, 0, thickness,
-		_T("Arial"), cr_text, cr_shadow, cr_shadow, Gdiplus::Color::Transparent, DT_RIGHT | DT_BOTTOM);
-}
 
 //안내 문구 폰트. 맑은 고딕은 Vista+ 에만 있으므로 XP 에서는 굴림으로 떨어진다.
 //굴림은 작은 크기에 내장 비트맵을 갖고 획이 픽셀 그리드에 맞도록 설계돼 AA 를 켜도 걸릴 곳이 거의 없다 —
@@ -514,17 +482,37 @@ void CSCDropperDlg::update_display()
 			rc_visible.IntersectRect(rc_visible, m_monitor_rect);
 			rc_visible.OffsetRect(-org.x, -org.y);
 
-			CRect rinfo = measure_label(g, rgb, kInfoFontSize);
-			rinfo.OffsetRect(ox + (ws - rinfo.Width()) / 2, oy + ws / 2 + scaled(kInfoOffsetY) - rinfo.Height() / 2);
+			Gdiplus::Color cr_center;
+			cr_center.SetFromCOLORREF(m_center_color);
 
-			//커서 아래가 잘리면 위로 뒤집는다. 남는 어긋남과 좌우는 밀어서 맞춘다.
-			if (rinfo.bottom > rc_visible.bottom)
-				rinfo.OffsetRect(0, -2 * scaled(kInfoOffsetY));
-			clamp_into(rinfo, rc_visible);
+			//중앙 정보 텍스트도 CSCParagraph 로 그린다 — 픽셀색 글자 + 대비색 glow. hint 띠와 동일한 DPI 처리.
+			CSCTextProperty prop;
+			_tcscpy_s(prop.name, _T("Arial"));
+			prop.style = Gdiplus::FontStyleBold;
+			prop.size = kInfoFontSize * 96.0f / (float)m_hint_dpi;
+			prop.cr_text = cr_center;
+			prop.cr_glow = get_distinct_bw_color(cr_center);
+			prop.glow_sigma = 3.0f * (float)m_hint_dpi / 96.0f;
 
-			Gdiplus::Color cr_text;
-			cr_text.SetFromCOLORREF(m_center_color);
-			draw_label(g, rinfo, rgb, kInfoFontSize, cr_text, get_distinct_bw_color(cr_text));
+			CClientDC info_dc(this);
+			Gdiplus::Bitmap* info = CSCParagraph::render_to_bitmap(rgb, &prop, &info_dc);
+			if (info)
+			{
+				const int dw = ::MulDiv((int)info->GetWidth(),  m_dpi, m_hint_dpi);
+				const int dh = ::MulDiv((int)info->GetHeight(), m_dpi, m_hint_dpi);
+
+				CRect rinfo(0, 0, dw, dh);
+				rinfo.OffsetRect(ox + (ws - dw) / 2, oy + ws / 2 + scaled(kInfoOffsetY) - dh / 2);
+
+				//커서 아래가 잘리면 위로 뒤집는다. 남는 어긋남과 좌우는 밀어서 맞춘다.
+				if (rinfo.bottom > rc_visible.bottom)
+					rinfo.OffsetRect(0, -2 * scaled(kInfoOffsetY));
+				clamp_into(rinfo, rc_visible);
+
+				g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
+				g.DrawImage(info, Gdiplus::Rect(rinfo.left, rinfo.top, rinfo.Width(), rinfo.Height()));
+				delete info;
+			}
 
 			//안내 띠. 원 아래가 기본, 화면 밖이면 원 위로.
 			rhint.OffsetRect(hint_x, oy + ws + (band - rhint.Height()) / 2);

@@ -335,7 +335,10 @@ public:
 	//	없으면 character boundary 로 split 하여 para 구조를 라인 단위로 재구성한다 (CJK 자막처럼 공백 없는 텍스트 대응).
 	//char_spacing != 0 이면 같은 라인 안에서 인접 run 사이에 char_spacing 픽셀 만큼 간격 추가/축소.
 	//	(자간을 진짜 글자 단위로 적용하려면 호출 측이 사전에 per-char 로 run 을 split 해 주어야 한다.)
-	static CRect	calc_text_rect(CRect rc, CDC* pDC, std::deque<std::deque<CSCParagraph>>& para, DWORD align, int max_width = 0, int char_spacing = 0);
+	//20260910 by claude. measure_glyph_ink = true 면 <box> 가 없는 run 도 glyph_ink_top/bottom 을 채운다.
+	//	글자를 라인박스가 아니라 *실제 글리프* 기준으로 세로 정렬하려는 호출자만 켠다 — run 마다 작은 비트맵에
+	//	한 번 그려 잉크 행을 스캔하므로 공짜가 아니다. 기본값 false = 기존 호출 동작 그대로.
+	static CRect	calc_text_rect(CRect rc, CDC* pDC, std::deque<std::deque<CSCParagraph>>& para, DWORD align, int max_width = 0, int char_spacing = 0, bool measure_glyph_ink = false);
 
 	//run 들을 character 단위로 split 한다 — 자간 (char_spacing) 적용 시 각 글자가 독립 run 이 되어
 	//calc_text_rect 가 run 사이에 spacing 을 넣는 것이 곧 글자 사이에 spacing 이 되도록 한다.

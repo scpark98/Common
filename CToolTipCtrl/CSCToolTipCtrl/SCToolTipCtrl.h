@@ -121,6 +121,9 @@ protected:
 
 	int				m_padding_cx = 8;
 	int				m_padding_cy = 6;
+	//20260910 by claude. 글자를 라인박스가 아니라 실제 글리프 기준으로 세로 중앙에 놓기 위한 보정(build 가 채운다).
+	//폰트의 ascent/descent 가 대칭이 아니라(맑은 고딕은 위가 훨씬 크다) 여백을 같은 값으로 줘도 글자가 아래로 내려간다.
+	int				m_draw_offset_y = 0;
 	int				m_max_width = 420;
 	int				m_round = 4;
 	//CSCStatic 의 m_line_spacing 과 같은 기본값 — 같은 태그 문자열이 같은 모양으로 나오게 한다.

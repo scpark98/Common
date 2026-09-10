@@ -157,7 +157,8 @@ CRect CSCToolTipCtrl::build(CString text, CDC* dc)
 	//m_max_width 를 넘으면 자동 줄바꿈. rc 의 높이는 calc_text_rect 가 채우므로 0 으로 둔다.
 	CRect rc(0, 0, m_max_width, 0);
 
-	CSCParagraph::calc_text_rect(rc, dc, m_para, DT_NOCLIP, m_max_width);
+	//20260910 by claude. 마지막 인자 = 글리프 잉크 측정. 아래 세로 중앙 보정이 이 값을 쓴다.
+	CSCParagraph::calc_text_rect(rc, dc, m_para, DT_NOCLIP, m_max_width, 0, true);
 
 	//20260828 by claude. <al=center|right> 는 넘겨받은 rc 폭을 기준으로 라인을 민다.
 	//툴팁은 내용에 맞춰 줄어드는 창이라 첫 패스의 rc(=m_max_width)를 그대로 두면 가운데 정렬한 줄이
@@ -196,7 +197,7 @@ CRect CSCToolTipCtrl::build(CString text, CDC* dc)
 
 		//같은 폭으로 다시 계산하므로 word-wrap 위치는 바뀌지 않는다 — 폭이 가장 넓은 라인의 실제 폭이고
 		//wrap 판정이 '>' 라 딱 맞는 라인은 쪼개지지 않는다.
-		CSCParagraph::calc_text_rect(CRect(0, 0, content_width, 0), dc, m_para, DT_NOCLIP, content_width);
+		CSCParagraph::calc_text_rect(CRect(0, 0, content_width, 0), dc, m_para, DT_NOCLIP, content_width, 0, true);
 	}
 
 	//calc_text_rect 직후는 줄 간격 1.0 상태다. 이 호출이 m_line_spacing 을 적용하고 <ls=값> 태그도 여기서 반영된다.
@@ -254,6 +255,53 @@ CRect CSCToolTipCtrl::build(CString text, CDC* dc)
 	{
 		for (auto& run : line)
 			run.r.OffsetRect(-bounds.left, -bounds.top);
+	}
+
+	//20260910 by claude. [세로 중앙] 위아래 여백을 같은 m_padding_cy 로 잡아도 글자가 아래로 내려가 보였다.
+	//여백의 기준이 글자가 아니라 폰트의 라인박스이기 때문이다. 라인박스는 ascent + descent 인데 이 둘이
+	//대칭이 아니다 — 맑은 고딕은 ascent 2229/2048em, descent 495/2048em 로 위쪽이 훨씬 크다.
+	//실측(맑은 고딕 9pt, padding 6): 창 높이 28 에 잉크가 9~21 행 → 위 9 / 아래 6. 3px 어긋나 있었다.
+	//<box> 가 2026-09-01 에 같은 이유로 라인박스 대신 글리프 잉크를 감싸도록 바뀌었다(SCParagraph.cpp).
+	//여기서도 같은 값(glyph_ink_top/bottom)을 써서 위아래 잉크 여백의 차이를 절반씩 나눠 없앤다.
+	//창 크기는 건드리지 않는다 — 툴팁이 갑자기 얇아지지 않고, 글자만 제자리로 온다.
+	m_draw_offset_y = 0;
+
+	float ink_top = 0.0f;
+	float ink_bottom = 0.0f;
+	bool  ink_measured = false;
+
+	for (auto& line : m_para)
+	{
+		for (auto& run : line)
+		{
+			if (run.glyph_ink_bottom <= run.glyph_ink_top)		//<img> 등 잉크를 못 잰 run.
+				continue;
+
+			float origin_y = (float)run.get_text_origin().y;
+
+			if (!ink_measured)
+			{
+				ink_top = origin_y + run.glyph_ink_top;
+				ink_bottom = origin_y + run.glyph_ink_bottom;
+				ink_measured = true;
+				continue;
+			}
+
+			ink_top = min(ink_top, origin_y + run.glyph_ink_top);
+			ink_bottom = max(ink_bottom, origin_y + run.glyph_ink_bottom);
+		}
+	}
+
+	if (ink_measured)
+	{
+		float bottom_slack = (float)bounds.Height() - ink_bottom;
+		m_draw_offset_y = (int)floor((bottom_slack - ink_top) / 2.0f + 0.5f);
+
+		//보정이 여백을 넘어서면 글자가 테두리를 뚫는다. 잉크를 못 재거나 태그가 극단적인 경우의 안전장치.
+		if (m_draw_offset_y > m_padding_cy)
+			m_draw_offset_y = m_padding_cy;
+		else if (m_draw_offset_y < -m_padding_cy)
+			m_draw_offset_y = -m_padding_cy;
 	}
 
 	return CRect(0, 0, bounds.Width(), bounds.Height());
@@ -400,7 +448,8 @@ void CSCToolTipCtrl::on_custom_draw(NMHDR* nmhdr, LRESULT* result)
 	if (!m_para.empty())
 	{
 		//para 의 좌표는 (0,0) 기준 상대좌표라 여백만큼 옮겨서 그린다.
-		g.TranslateTransform((Gdiplus::REAL)m_padding_cx, (Gdiplus::REAL)m_padding_cy);
+		//20260910 by claude. m_draw_offset_y = 라인박스와 실제 글리프의 위아래 여백 차이 보정(build 참조).
+		g.TranslateTransform((Gdiplus::REAL)m_padding_cx, (Gdiplus::REAL)(m_padding_cy + m_draw_offset_y));
 
 		//다크 배경에서는 ClearType subpixel fringe 가 거슬리므로 draw_text 가 grayscale AA 를 쓰게 한다.
 		//기준(get_luminance < 128)은 CSCStatic 의 단락 그리기와 동일하게 맞춘다.

@@ -854,7 +854,7 @@ void CSCParagraph::apply_auto_tab_columns(std::deque<std::deque<CSCParagraph>>& 
 }
 
 //paragraph text 정보를 dc에 출력할 때 출력 크기를 계산하고 각 텍스트가 출력될 위치까지 CSCParagraph 멤버에 저장한다.
-CRect CSCParagraph::calc_text_rect(CRect rc, CDC* pDC, std::deque<std::deque<CSCParagraph>>& para, DWORD align, int max_width, int char_spacing)
+CRect CSCParagraph::calc_text_rect(CRect rc, CDC* pDC, std::deque<std::deque<CSCParagraph>>& para, DWORD align, int max_width, int char_spacing, bool measure_glyph_ink)
 {
 	if (para.empty())
 		return CRect();
@@ -1273,7 +1273,8 @@ CRect CSCParagraph::calc_text_rect(CRect rc, CDC* pDC, std::deque<std::deque<CSC
 				//그리드 피팅 힌트 3종(ClearType/AntiAlias/SingleBit)은 세로 잉크 행이 모두 같으므로(실측)
 				//어느 것으로 재도 결과가 같다. 원점의 소수부가 스냅에 영향을 주는데 실제 출력 원점
 				//get_text_origin() 도 정수라 정수 위치에 그려 맞춘다. 박스가 있는 run 에서만 도는 비용이다.
-				if (para[i][j].text_prop.cr_box.GetA() > 0)
+				//20260910 by claude. measure_glyph_ink 를 켠 호출자(툴팁의 세로 중앙 정렬)도 같은 측정을 쓴다.
+				if (para[i][j].text_prop.cr_box.GetA() > 0 || measure_glyph_ink)
 				{
 					Gdiplus::RectF box_measure;
 					g.MeasureString(CStringW(para[i][j].text), -1, font,

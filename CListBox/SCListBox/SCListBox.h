@@ -45,7 +45,9 @@
 
 #include <afxwin.h>
 #include <deque>
+#include <set>
 #include "../../Functions.h"
+#include "../../CToolTipCtrl/CSCToolTipCtrl/SCToolTipCtrl.h"
 #include "../../system/ShellImageList/ShellImageList.h"
 #include "../../SCGdiplusBitmap.h"
 #include "../../colors.h"
@@ -205,6 +207,12 @@ public:
 	void		use_over(bool use = true) { m_use_over = use; }
 	int			get_over_item() { return (m_use_over ? m_over_item : -1); }
 
+	//20260910 by claude. 항목이 화면에서 온전히 읽히지 않을 때(가로로 잘림 / 위·아래가 잘림) hover 하면
+	//전체 텍스트를 툴팁으로 보여준다. CSCListCtrl·CSCTreeCtrl 과 같은 기능이며 기본으로 켜져 있다.
+	void			set_use_ellipsis_tooltip(bool use);
+	bool			is_use_ellipsis_tooltip() const { return m_use_ellipsis_tooltip; }
+	CSCToolTipCtrl*	get_tooltip() { return &m_tooltip; }
+
 	//색상
 	void		set_text_color(Gdiplus::Color cr) { m_theme.cr_text = cr; Invalidate(); }
 	void		set_back_color(Gdiplus::Color cr) { m_theme.cr_back = cr; Invalidate(); }
@@ -319,6 +327,19 @@ protected:
 	bool		m_as_static = false;				//true일 경우 키보드, 마우스에 의한 선택 불가
 	bool		m_use_over = false;					//hover hilighted
 	int			m_over_item = -1;
+
+	//20260910 by claude. 잘린 항목 툴팁 — CSCListCtrl·CSCTreeCtrl 과 같은 기능.
+	//가로 잘림은 DrawItem 이 그리면서 m_clipped_items 에 기록하고(자기 보정: 잘렸으면 넣고 아니면 뺀다),
+	//세로 잘림은 스크롤·창 크기로 수시로 바뀌므로 update_ellipsis_tooltip 이 hover 시점에 직접 잰다.
+	bool			m_use_ellipsis_tooltip = true;
+	CSCToolTipCtrl	m_tooltip;
+	std::set<int>	m_clipped_items;
+	int				m_tip_item = -1;		//마지막으로 툴팁을 갱신한 항목.
+	int				m_hover_item = -1;		//커서 밑 항목(m_use_over 와 무관하게 항상 추적).
+	bool			m_is_hovering = false;	//TME_LEAVE 를 이미 걸었는가.
+
+	//hover 항목이 바뀔 때 호출한다. 잘린 항목이면 전체 텍스트를 툴팁에 싣고, 아니면 툴팁을 끈다.
+	void			update_ellipsis_tooltip();
 	bool		m_as_popup = false;					//팝업모드로 동작하는 리스트박스일 경우는 killfocus이면 숨겨진다.
 
 	bool		m_is_local = true;
@@ -403,6 +424,7 @@ protected:
 	// Generated message map functions
 protected:
 	afx_msg void OnMouseMove(UINT nFlags, CPoint point);
+	afx_msg void OnMouseLeave();
 	afx_msg BOOL OnEraseBkgnd(CDC* pDC);
 	virtual void PreSubclassWindow();
 	afx_msg void DrawItem(LPDRAWITEMSTRUCT /*lpDrawItemStruct*/);

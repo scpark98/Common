@@ -86,6 +86,7 @@ BEGIN_MESSAGE_MAP(CSCListBox, CListBox)
 	//{{AFX_MSG_MAP(CSCListBox)
 	//}}AFX_MSG_MAP
 	ON_WM_MOUSEMOVE()
+	ON_WM_MOUSELEAVE()
 	ON_WM_ERASEBKGND()
 	//ON_MESSAGE(WM_SETFONT, OnSetFont)
 	//ON_WM_DRAWITEM_REFLECT()
@@ -538,6 +539,26 @@ void CSCListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 		rect.right = lpDIS->rcItem.right - 10;
 	}
 
+	//20260910 by claude. [잘린 항목 툴팁] 가로 잘림 판정을 그리기 직전 이 자리에서 한다 — DC 에 실제 폰트가
+	//선택돼 있고 rect(아이콘·시간·좌우 여백을 모두 뺀 최종 텍스트 영역)도 확정된 상태라, 레이아웃 산식을
+	//따로 복제하지 않아도 그리기와 항상 일치한다(CSCListCtrl·CSCTreeCtrl 과 같은 방식).
+	//가로 스크롤 시 rect.left 가 음수가 되므로 폭 비교만으로는 부족하다 — 실제로 그려질 구간이 클라이언트
+	//안에 온전히 들어오는지도 함께 본다. 세로 잘림은 스크롤로 수시로 바뀌어 hover 시점에 따로 잰다.
+	if (m_use_ellipsis_tooltip)
+	{
+		int text_w = sText.IsEmpty() ? 0 : pDC->GetTextExtent(sText).cx;
+
+		CRect rc_text_view;
+		GetClientRect(rc_text_view);
+
+		if (text_w > rect.Width() ||						//우측 여백 안에서 잘림
+			rect.left < rc_text_view.left ||				//왼쪽이 화면 밖(가로 스크롤)
+			rect.left + text_w > rc_text_view.right)		//오른쪽이 화면 밖
+			m_clipped_items.insert((int)lpDIS->itemID);
+		else
+			m_clipped_items.erase((int)lpDIS->itemID);
+	}
+
 	//리스트박스는 wordwrap 하지 않는다(DT_SINGLELINE). 넘치는 부분은 우측 clip 되고, 가로 오버레이로 스크롤해 본다.
 	pDC->SetTextColor(cr_text.ToCOLORREF());
 	if (m_text_smooth)
@@ -895,6 +916,27 @@ void CSCListBox::OnMouseMove(UINT nFlags, CPoint point)
 	//paint shift 중이면 시각 위치(point)를 native 항목 좌표로 보정(+shift) — hover 판정·base 드래그선택 모두 정합.
 	point.y += m_v_paint_shift;
 
+	//20260910 by claude. [잘린 항목 툴팁] 커서 밑 항목은 m_use_over(hover 강조) 와 무관하게 항상 구한다.
+	//강조를 쓰지 않는 리스트박스에서도 툴팁은 떠야 한다(CSCTreeCtrl 의 m_hover_item 과 같은 이유).
+	//마우스가 나갔을 때 툴팁을 내리려면 leave 통지가 필요한데 이 컨트롤은 추적하고 있지 않아 여기서 건다.
+	if (m_use_ellipsis_tooltip)
+	{
+		if (!m_is_hovering)
+		{
+			TRACKMOUSEEVENT tme = { sizeof(tme) };
+			tme.dwFlags = TME_LEAVE;
+			tme.hwndTrack = m_hWnd;
+			m_is_hovering = true;
+			_TrackMouseEvent(&tme);
+		}
+
+		BOOL outside = false;
+		UINT hover = ItemFromPoint(point, outside);
+		m_hover_item = outside ? -1 : (int)hover;
+
+		update_ellipsis_tooltip();
+	}
+
 	if (m_use_over)
 	{
 		BOOL outside = false;
@@ -911,6 +953,109 @@ void CSCListBox::OnMouseMove(UINT nFlags, CPoint point)
 	}
 
 	CListBox::OnMouseMove(nFlags, point);
+}
+
+//20260910 by claude. [잘린 항목 툴팁] 마우스가 나가면 툴팁을 내리고 기억을 지운다 — 나갔다 같은 항목으로
+//돌아왔을 때 다시 뜨게 하기 위해서다(CSCTreeCtrl::OnMouseLeave 와 같은 처리).
+void CSCListBox::OnMouseLeave()
+{
+	m_is_hovering = false;
+	m_hover_item = -1;
+	m_tip_item = -1;
+
+	if (::IsWindow(m_tooltip.GetSafeHwnd()))
+		m_tooltip.Activate(FALSE);
+
+	CListBox::OnMouseLeave();
+}
+
+//20260910 by claude. hover 항목이 화면에서 온전히 읽히지 않으면 전체 텍스트를 툴팁으로 준비하고, 아니면 끈다.
+//가로 잘림은 DrawItem 이 그리면서 채워둔 m_clipped_items 로 판정한다(여기서 다시 재지 않는다).
+//세로 잘림은 스크롤·창 크기로 수시로 바뀌고 모든 항목이 매번 다시 그려진다는 보장이 없어 여기서 직접 잰다.
+//판정 대상은 항목 전체가 아니라 *글자가 그려지는 구간* 이다 — 항목 높이에는 글자 위아래로 여백이 있어,
+//항목 기준으로 보면 글자가 멀쩡히 다 보이는데도 몇 px 잘렸다고 툴팁이 뜬다.
+void CSCListBox::update_ellipsis_tooltip()
+{
+	if (!m_use_ellipsis_tooltip)
+		return;
+
+	//편집 중에는 띄우지 않는다. 그 상황에서 툴팁은 조작 대상을 가리기만 한다.
+	if (m_in_editing)
+	{
+		if (::IsWindow(m_tooltip.GetSafeHwnd()))
+			m_tooltip.Activate(FALSE);
+		m_tip_item = -1;
+		return;
+	}
+
+	//같은 항목 위를 계속 움직이는 동안은 아무것도 하지 않는다 — 매번 다시 넣으면 툴팁이 깜빡인다.
+	if (m_hover_item == m_tip_item)
+		return;
+
+	m_tip_item = m_hover_item;
+
+	bool clipped = (m_hover_item >= 0 && m_clipped_items.find(m_hover_item) != m_clipped_items.end());
+
+	if (!clipped && m_hover_item >= 0)
+	{
+		CRect r;
+		CRect rc_client;
+		GetClientRect(rc_client);
+
+		if (GetItemRect(m_hover_item, &r) != LB_ERR)
+		{
+			//GetItemRect 는 native 좌표다. DrawItem 이 DC 원점을 m_v_paint_shift 만큼 올려 그리므로
+			//화면에 실제로 보이는 위치는 그만큼 위다 — 잘림을 보려면 시각 좌표로 맞춰야 한다.
+			r.OffsetRect(0, -m_v_paint_shift);
+
+			CClientDC dc(this);
+			CFont* old_font = dc.SelectObject(&m_font);
+			TEXTMETRIC tm = {};
+			dc.GetTextMetrics(&tm);
+			if (old_font)
+				dc.SelectObject(old_font);
+
+			int draw_top = r.CenterPoint().y - tm.tmHeight / 2;
+			int draw_bottom = draw_top + tm.tmHeight;
+
+			if (draw_top < rc_client.top || draw_bottom > rc_client.bottom)
+				clipped = true;
+		}
+	}
+
+	if (!clipped)
+	{
+		if (::IsWindow(m_tooltip.GetSafeHwnd()))
+			m_tooltip.Activate(FALSE);
+		return;
+	}
+
+	//처음 필요해진 순간에 만든다 — 잘린 항목이 한 번도 없는 리스트박스는 툴팁 창을 만들지 않는다.
+	if (!::IsWindow(m_tooltip.GetSafeHwnd()))
+	{
+		if (!m_tooltip.Create(this, TTS_ALWAYSTIP))
+			return;
+		m_tooltip.set_color_theme(m_theme);
+		m_tooltip.AddTool(this, _T(""));
+	}
+
+	CString text;
+	GetText(m_hover_item, text);
+
+	//이미 떠 있는 툴팁은 크기가 이전 문자열 기준으로 남으므로(측정이 TTN_SHOW 에서 일어난다) 한 번 내린다.
+	m_tooltip.Pop();
+
+	//항목 텍스트는 사용자 데이터다 — '<' 가 들어 있으면 태그로 파싱되므로 반드시 이스케이프한다.
+	m_tooltip.UpdateTipText(CSCToolTipCtrl::escape_tags(text), this);
+	m_tooltip.Activate(TRUE);
+}
+
+void CSCListBox::set_use_ellipsis_tooltip(bool use)
+{
+	m_use_ellipsis_tooltip = use;
+
+	if (!use && ::IsWindow(m_tooltip.GetSafeHwnd()))
+		m_tooltip.Activate(FALSE);
 }
 
 //OnPaint override 삭제 (구현 broken — base 가 BeginPaint/EndPaint 로 region validate 후 두 번째 CPaintDC 의 rcPaint
@@ -1003,6 +1148,11 @@ void CSCListBox::set_line_height(int _line_height)
 
 BOOL CSCListBox::PreTranslateMessage(MSG* pMsg)
 {
+	//20260910 by claude. [잘린 항목 툴팁] 툴팁 컨트롤은 마우스 메시지를 직접 받지 못하므로 여기서 넘겨준다.
+	//메시지를 소비하지 않으므로 아래 로직에는 영향이 없다.
+	if (::IsWindow(m_tooltip.GetSafeHwnd()))
+		m_tooltip.RelayEvent(pMsg);
+
 	// TODO: Add your specialized code here and/or call the base class
 	if (pMsg->message == WM_KEYDOWN)
 	{
@@ -1932,6 +2082,10 @@ void CSCListBox::set_color_theme(int theme, bool invalidate)
 	if (::IsWindow(m_scrollbar_h.m_hWnd))
 		m_scrollbar_h.set_color_theme(m_theme, false);
 
+	//20260910 by claude. 툴팁도 같은 테마를 따른다. 아직 만들어지지 않았으면 만들어질 때 현재 테마를 받는다.
+	if (::IsWindow(m_tooltip.GetSafeHwnd()))
+		m_tooltip.set_color_theme(m_theme);
+
 	//popup 모드는 DWM border 색도 theme 에 맞춤. NC 영역까지 갱신되도록 RDW_FRAME 동반.
 	if (m_as_popup && ::IsWindow(m_hWnd))
 		win_compat::dwm::set_border_color(m_hWnd, m_theme.cr_back.ToCOLORREF());
@@ -1962,6 +2116,10 @@ void CSCListBox::set_color_theme(const CSCColorTheme& theme, bool invalidate)
 		m_scrollbar.set_color_theme(m_theme, invalidate);
 	if (::IsWindow(m_scrollbar_h.m_hWnd))
 		m_scrollbar_h.set_color_theme(m_theme, invalidate);
+
+	//20260910 by claude. 툴팁도 같은 테마를 따른다. 아직 만들어지지 않았으면 만들어질 때 현재 테마를 받는다.
+	if (::IsWindow(m_tooltip.GetSafeHwnd()))
+		m_tooltip.set_color_theme(m_theme);
 
 	//Invalidate(TRUE) — erase background 강제. owner-draw listbox 의 빈 영역 (항목 없는 부분) 이
 	//이전 theme 의 brush 로 남아있는 잔상 차단. CtlColor 가 m_br_back 반환하지 않는 경로 보완.

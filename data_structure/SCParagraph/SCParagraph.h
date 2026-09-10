@@ -317,7 +317,7 @@ public:
 
 	//태그 값(별칭 / "#123" / "#PNG:123" / 파일경로)을 로드해 캐시된 포인터를 돌려준다. 실패 시 NULL.
 	//반환 포인터의 소유권은 캐시에 있다 — 호출자가 delete 하면 안 된다.
-	static CSCGdiplusBitmap* get_image(LPCTSTR key);
+	static CSCGdiplusBitmap* get_registered_image(LPCTSTR key);
 
 
 	//아래 static 함수들은 하나의 CSCParagraph에 대해 수행되는 함수들이 아니고
@@ -377,6 +377,11 @@ public:
 	//깔끔하므로 음절별 임계치를 자동으로 더 낮춰 적용 (get_AA_from_pt 내부에서 처리).
 	//리턴: 실제 그려진 텍스트 영역(모든 run r 의 합집합). 단락 모드에서 호출측이 m_text_rect 로 사용.
 	static CRect	draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCParagraph>>& para, int AA_from_pt = 0, bool dark_background = false);
+
+	//20260910 by claude. 태그 문자열을 파싱·측정·렌더해 내용에 딱 맞는 PARGB 비트맵으로 돌려준다(오프스크린 렌더).
+	//글로우/그림자가 글자 밖으로 번지는 만큼 여백을 두고, 투명 대상이라 grid-fit grayscale 로 그린다(ClearType 은 색 프린지로 불가).
+	//반환 비트맵은 호출자 소유(delete 책임). 렌더 해상도는 pDC 의 DPI 기준. 빈 결과면 nullptr.
+	static Gdiplus::Bitmap* render_to_bitmap(CString text, CSCTextProperty* text_prop, CDC* pDC);
 
 	//폰트 이름별 AA 전환 임계치(pt) 결정 — 우선순위:
 	//  1) add_AA_override 로 등록된 face 별 사용자 강제값 (있으면 즉시 반환)

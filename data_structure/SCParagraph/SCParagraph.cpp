@@ -148,7 +148,7 @@ void CSCParagraph::clear_images()
 	image_alias_map().clear();
 }
 
-CSCGdiplusBitmap* CSCParagraph::get_image(LPCTSTR key)
+CSCGdiplusBitmap* CSCParagraph::get_registered_image(LPCTSTR key)
 {
 	CString k(key);
 	if (k.IsEmpty())
@@ -1196,7 +1196,7 @@ CRect CSCParagraph::calc_text_rect(CRect rc, CDC* pDC, std::deque<std::deque<CSC
 			//높이 0 이면 이 run 의 폰트 높이에 맞춘다 → <la=vcenter> 와 조합하면 "아이콘 + 텍스트" 가 자동 정렬된다.
 			if (!para[i][j].img_key.IsEmpty())
 			{
-				CSCGdiplusBitmap* img = CSCParagraph::get_image(para[i][j].img_key);
+				CSCGdiplusBitmap* img = CSCParagraph::get_registered_image(para[i][j].img_key);
 
 				int img_h = para[i][j].img_height;
 				if (img_h <= 0)
@@ -2046,6 +2046,44 @@ void CSCParagraph::clear_AA_overrides()
 	aa_override_map().clear();
 }
 
+//20260910 by claude. 계약은 헤더 참조. 원래 SCDropperDlg 에 있던 build_paragraph_bitmap 을 범용화해 이관.
+Gdiplus::Bitmap* CSCParagraph::render_to_bitmap(CString text, CSCTextProperty* text_prop, CDC* pDC)
+{
+	UINT dpi = (UINT)pDC->GetDeviceCaps(LOGPIXELSY);
+	if (dpi == 0)
+		dpi = 96;
+
+	std::deque<std::deque<CSCParagraph>> para;
+	build_paragraph_str(text, para, text_prop);
+
+	calc_text_rect(CRect(0, 0, 0, 0), pDC, para, DT_NOCLIP);
+
+	CRect bounds = get_bounding_rect(para);
+
+	//glow/그림자가 글자 bounding 밖으로 번지므로 그만큼 여백을 둔다(안 두면 사방이 잘린다).
+	const float glow_sigma = text_prop ? text_prop->glow_sigma : 0.0f;
+	const int pad = (int)(glow_sigma * 3.0f) + ::MulDiv(2, dpi, 96);
+	for (auto& line : para)
+		for (auto& run : line)
+			run.r.OffsetRect(-bounds.left + pad, -bounds.top + pad);
+
+	const int bw = bounds.Width() + pad * 2;
+	const int bh = bounds.Height() + pad * 2;
+	if (bw <= 0 || bh <= 0)
+		return nullptr;
+
+	Gdiplus::Bitmap* bmp = new Gdiplus::Bitmap(bw, bh, PixelFormat32bppPARGB);
+	bmp->SetResolution((Gdiplus::REAL)dpi, (Gdiplus::REAL)dpi);
+
+	Gdiplus::Graphics gt(bmp);
+	gt.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
+	//투명 비트맵이라 ClearType(서브픽셀)은 색 프린지로 못 쓴다 — grid-fit grayscale 로 스템을 픽셀에 맞춘다.
+	gt.SetTextRenderingHint(Gdiplus::TextRenderingHintAntiAliasGridFit);
+	draw_text(gt, para, 0, true);
+
+	return bmp;
+}
+
 CRect CSCParagraph::draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCParagraph>>& para, int AA_from_pt, bool dark_background)
 {
 	int i, j;
@@ -2314,7 +2352,7 @@ CRect CSCParagraph::draw_text(Gdiplus::Graphics& g, std::deque<std::deque<CSCPar
 			//<img=...> run — 계산된 r 에 이미지를 그리고 끝낸다.
 			if (!para[i][j].img_key.IsEmpty())
 			{
-				CSCGdiplusBitmap* img = CSCParagraph::get_image(para[i][j].img_key);
+				CSCGdiplusBitmap* img = CSCParagraph::get_registered_image(para[i][j].img_key);
 				if (img && img->m_pBitmap)
 				{
 					//같은 라인에 ruby 가 있으면 그 높이만큼 아래로 내려 본문 글자와 세로 위치를 맞춘다.

@@ -2182,6 +2182,8 @@ h		: 복사할 height 크기(pixel)
 		float thickness = 0.0f
 	);
 
+	//20260910 by claude. shadow_passes: 그림자 누적 횟수. D2D1Shadow 를 blur 를 키우며 이 횟수만큼 겹쳐 칠한다.
+	//많을수록 진하고 넓게 퍼진다. 기본 13 은 기존 동작 유지값 — 과하면 호출부에서 낮춘다(예: 5).
 	CRect		draw_text(ID2D1DeviceContext* d2dc,
 		CRect rTarget,
 		CString text,
@@ -2195,7 +2197,8 @@ h		: 복사할 height 크기(pixel)
 		float stroke_width = 0.0f,
 		UINT align = DT_CENTER | DT_VCENTER,
 		bool show_text = true,
-		bool show_shadow = true);
+		bool show_shadow = true,
+		int shadow_passes = 13);
 
 	CRect		draw_text(ID2D1DeviceContext* d2dc,
 		Gdiplus::RectF rTarget,
@@ -2210,7 +2213,8 @@ h		: 복사할 height 크기(pixel)
 		float stroke_width = 0.0f,
 		UINT align = DT_CENTER | DT_VCENTER,
 		bool show_text = true,
-		bool show_shadow = true);
+		bool show_shadow = true,
+		int shadow_passes = 13);
 
 	CRect		draw_text(ID2D1DeviceContext* d2dc,
 		D2D1_RECT_F rTarget,
@@ -2225,7 +2229,8 @@ h		: 복사할 height 크기(pixel)
 		float stroke_width = 0.0f,
 		UINT align = DT_CENTER | DT_VCENTER,
 		bool show_text = true,
-		bool show_shadow = true);
+		bool show_shadow = true,
+		int shadow_passes = 13);
 #endif
 
 	void		unpremultiply(BYTE* p, UINT pixelCount);

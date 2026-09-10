@@ -7277,9 +7277,10 @@ CRect draw_text(ID2D1DeviceContext* d2dc,
 				float stroke_width,
 				UINT align,
 				bool show_text,
-				bool show_shadow)
+				bool show_shadow,
+				int shadow_passes)
 {
-	return draw_text(d2dc, D2D1::RectF(rTarget.left, rTarget.top, rTarget.right, rTarget.bottom), text, font_name, font_size, font_weight, cr_text, cr_stroke, cr_shadow, cr_back, stroke_width, align, show_text, show_shadow);
+	return draw_text(d2dc, D2D1::RectF(rTarget.left, rTarget.top, rTarget.right, rTarget.bottom), text, font_name, font_size, font_weight, cr_text, cr_stroke, cr_shadow, cr_back, stroke_width, align, show_text, show_shadow, shadow_passes);
 }
 
 CRect draw_text(ID2D1DeviceContext* d2dc,
@@ -7295,9 +7296,10 @@ CRect draw_text(ID2D1DeviceContext* d2dc,
 				float stroke_width,
 				UINT align,
 				bool show_text,
-				bool show_shadow)
+				bool show_shadow,
+				int shadow_passes)
 {
-	return draw_text(d2dc, D2D1::RectF(rTarget.X, rTarget.Y, rTarget.GetRight(), rTarget.GetBottom()), text, font_name, font_size, font_weight, cr_text, cr_stroke, cr_shadow, cr_back, stroke_width, align, show_text, show_shadow);
+	return draw_text(d2dc, D2D1::RectF(rTarget.X, rTarget.Y, rTarget.GetRight(), rTarget.GetBottom()), text, font_name, font_size, font_weight, cr_text, cr_stroke, cr_shadow, cr_back, stroke_width, align, show_text, show_shadow, shadow_passes);
 }
 
 CRect draw_text(ID2D1DeviceContext* d2dc,
@@ -7313,7 +7315,8 @@ CRect draw_text(ID2D1DeviceContext* d2dc,
 				float stroke_width,
 				UINT align,
 				bool show_text,
-				bool show_shadow)
+				bool show_shadow,
+				int shadow_passes)
 {
 	//20260807 by claude. 이전에는 raw 포인터로 받아 어느 경로에서도 Release하지 않아
 	//텍스트를 그릴 때마다 factory/format/layout/brush가 그대로 샜다. ComPtr로 바꿔 전 경로에서 해제되게 한다.
@@ -7444,8 +7447,8 @@ CRect draw_text(ID2D1DeviceContext* d2dc,
 		shadow->SetValue(D2D1_SHADOW_PROP_COLOR, get_d2color(cr_shadow));
 
 		//한번 사용해서는 흐릿하고 얊은 그림자가 그려져서 크게 표시나지 않는다.
-		//알파 누적시켜서 좀 더 진한 그림자를 만든다.
-		for (int i = 0; i < 13; i++)
+		//알파 누적시켜서 좀 더 진한 그림자를 만든다. 20260910 by claude. 누적 횟수를 shadow_passes 로 조절(기본 13).
+		for (int i = 0; i < shadow_passes; i++)
 		{
 			//설정값은 폰트 크기나 종류에 따라 달라져야만 최적의 그림자 효과가 적용될 듯 함.
 			shadow->SetValue(D2D1_SHADOW_PROP_BLUR_STANDARD_DEVIATION, 0.5f + i * 1.6f);

@@ -10810,6 +10810,63 @@ static CFont* get_ui_fallback_font()
 	return (font.GetSafeHandle() != NULL) ? &font : NULL;
 }
 
+//20260911 by claude. 이 폰트가 lfHeight 지정을 반영하는가(벡터/TrueType). 래스터면 GDI 가 가진 한 벌로만 그려
+//크기 지정이 통째로 무시된다. 판정하지 못하면(DC 실패) 건드리지 않는 쪽으로 true 를 돌려준다.
+static bool is_scalable_font(CWnd* wnd, CFont* font)
+{
+	if (wnd == NULL || wnd->GetSafeHwnd() == NULL)
+		return true;
+
+	CDC* dc = wnd->GetDC();
+	if (dc == NULL)
+		return true;
+
+	CFont* old_font = (font != NULL) ? dc->SelectObject(font) : NULL;
+
+	TEXTMETRIC tm = { 0 };
+	dc->GetTextMetrics(&tm);
+
+	if (old_font != NULL)
+		dc->SelectObject(old_font);
+
+	wnd->ReleaseDC(dc);
+
+	return (tm.tmPitchAndFamily & (TMPF_TRUETYPE | TMPF_VECTOR)) != 0;
+}
+
+//20260911 by claude. 계약·근거는 Functions.h 의 선언부 주석 참조.
+void get_inherited_ui_logfont(CWnd* wnd, LOGFONT& lf)
+{
+	CWnd*  parent = (wnd != NULL) ? wnd->GetParent() : NULL;
+	CFont* font   = (wnd != NULL) ? wnd->GetFont()   : NULL;
+
+	if (font == NULL && parent != NULL)
+		font = parent->GetFont();
+
+	if (font != NULL && is_scalable_font(wnd, font))
+	{
+		font->GetObject(sizeof(LOGFONT), &lf);
+		return;
+	}
+
+	//Vista+ SDK 로 빌드한 exe 를 XP 에서 실행하면 NONCLIENTMETRICS 끝의 iPaddedBorderWidth(4byte) 때문에
+	//SystemParametersInfo 가 ERROR_INVALID_PARAMETER 로 실패한다. 4byte 줄여 재시도하면 XP 에서도 얻어진다.
+	NONCLIENTMETRICS ncm = {};
+	ncm.cbSize = sizeof(ncm);
+	BOOL ok = ::SystemParametersInfo(SPI_GETNONCLIENTMETRICS, ncm.cbSize, &ncm, 0);
+#if (WINVER >= 0x0600)
+	if (!ok)
+	{
+		ncm.cbSize = sizeof(ncm) - sizeof(ncm.iPaddedBorderWidth);
+		ok = ::SystemParametersInfo(SPI_GETNONCLIENTMETRICS, ncm.cbSize, &ncm, 0);
+	}
+#endif
+
+	if (ok)
+		lf = ncm.lfMessageFont;
+	else
+		::GetObject(::GetStockObject(DEFAULT_GUI_FONT), sizeof(LOGFONT), &lf);
+}
 //20260911 by claude. 계약·근거는 Functions.h 의 선언부 주석 참조.
 bool apply_scalable_ui_font(CWnd* wnd, bool include_children)
 {

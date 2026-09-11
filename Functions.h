@@ -1607,6 +1607,13 @@ struct	NETWORK_INFO
 	//include_children : wnd 의 직계 자식에게도 함께 적용한다(중첩된 손자 창은 대상이 아니다).
 	//반환 : 실제로 바꿨으면 true. 바꿀 필요가 없었거나 판정하지 못했으면 false.
 	bool		apply_scalable_ui_font(CWnd* wnd, bool include_children = true);
+	//20260911 by claude. 컨트롤이 기본으로 쓸 LOGFONT 를 정한다. SC* 컨트롤의 PreSubclassWindow 공통 경로.
+	//자기 폰트 -> 부모(다이얼로그) 폰트 -> OS UI 폰트(lfMessageFont) -> DEFAULT_GUI_FONT 순으로 고른다.
+	//상속한 폰트가 크기 지정을 반영하지 못하는 래스터 폰트면 상속하지 않고 lfMessageFont 로 간다 -
+	//.rc 템플릿 face 가 그 OS 에 없으면(XP 의 \"맑은 고딕\") 대화상자 폰트가 스톡 System(래스터)으로 떨어지는데,
+	//그대로 상속하면 그 뒤 set_font_size() 가 통째로 무시된다(XP 실측: 9pt 도 14pt 도 tmHeight 16).
+	//face 를 강제하지 않으므로 로케일도 OS 가 정한 대로 따라간다(한국어 XP=굴림, 일본어 XP=MS UI Gothic).
+	void		get_inherited_ui_logfont(CWnd* wnd, LOGFONT& lf);
 
 	bool		open_with_explorer(CString path);
 

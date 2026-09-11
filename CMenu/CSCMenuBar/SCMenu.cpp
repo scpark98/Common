@@ -1316,34 +1316,9 @@ bool CSCMenu::create(CWnd* parent, int width)
 
 	if (res)
 	{
-		//20260909 by claude. dlg 에 지정된 폰트를 상속, 없으면 OS UI 폰트(lfMessageFont)로 폴백 — SC* 정석(SCEdit 참조).
-		//강제 face 를 박지 않는다. lfMessageFont = 한국 Windows Vista+ 맑은 고딕 / XP 굴림(라틴+한글 한 face 커버).
-		CFont* font = GetFont();
-		if (font == NULL && parent != nullptr)
-			font = parent->GetFont();
-
-		if (font != NULL)
-		{
-			font->GetObject(sizeof(m_lf), &m_lf);
-		}
-		else
-		{
-			NONCLIENTMETRICS ncm = {};
-			ncm.cbSize = sizeof(ncm);
-			BOOL ok = ::SystemParametersInfo(SPI_GETNONCLIENTMETRICS, ncm.cbSize, &ncm, 0);
-#if (WINVER >= 0x0600)
-			//Vista+ SDK 로 빌드한 exe 를 XP 에서 실행하면 iPaddedBorderWidth(4byte) 때문에 SPI 가 실패한다.
-			if (!ok)
-			{
-				ncm.cbSize = sizeof(ncm) - sizeof(ncm.iPaddedBorderWidth);
-				ok = ::SystemParametersInfo(SPI_GETNONCLIENTMETRICS, ncm.cbSize, &ncm, 0);
-			}
-#endif
-			if (ok)
-				m_lf = ncm.lfMessageFont;
-			else
-				GetObject(GetStockObject(DEFAULT_GUI_FONT), sizeof(m_lf), &m_lf);
-		}
+		//20260911 by claude. dlg 에 지정된 폰트를 상속하되 그것이 래스터면 OS UI 폰트로 폴백한다.
+		//규칙과 근거는 Functions.h 의 get_inherited_ui_logfont 선언부 주석 참조.
+		get_inherited_ui_logfont(this, m_lf);
 
 		ReconstructFont();
 	}

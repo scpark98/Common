@@ -1117,36 +1117,9 @@ void CRichEditCtrlEx::PreSubclassWindow()
 	//리소스에서 Multiline=True 를 빠뜨리면 addl() 의 개행이 동작하지 않으므로 debug 에서 즉시 알린다.
 	ASSERT((GetStyle() & ES_MULTILINE) && "CRichEditCtrlEx: resource control must have Multiline=True for addl() to break lines.");
 
-	//20260909 by claude. Resource Editor 에서 이 컨트롤을 쓰는 dlg 에 지정된 폰트를 그대로 쓴다. 없으면 OS UI 폰트로 폴백.
-	//동적 생성·MainWnd 미생성 시점에도 이 코드를 만날 수 있어 parent 가 NULL 일 수 있다(널 가드).
-	//SC* 컨트롤 공통 정석(SCEdit 참조). lfMessageFont = 한국 Windows 에서 Vista+ 맑은 고딕 / XP 굴림(라틴+한글 한 face 커버).
-	CWnd*  parent = GetParent();
-	CFont* font   = GetFont();
-	if (font == NULL && parent != nullptr)
-		font = parent->GetFont();
-
-	if (font != NULL)
-	{
-		font->GetObject(sizeof(m_lf), &m_lf);
-	}
-	else
-	{
-		NONCLIENTMETRICS ncm = {};
-		ncm.cbSize = sizeof(ncm);
-		BOOL ok = ::SystemParametersInfo(SPI_GETNONCLIENTMETRICS, ncm.cbSize, &ncm, 0);
-#if (WINVER >= 0x0600)
-		//Vista+ SDK 로 빌드한 exe 를 XP 에서 실행하면 NONCLIENTMETRICS 끝의 iPaddedBorderWidth(4byte) 때문에 SPI 가 실패한다.
-		if (!ok)
-		{
-			ncm.cbSize = sizeof(ncm) - sizeof(ncm.iPaddedBorderWidth);
-			ok = ::SystemParametersInfo(SPI_GETNONCLIENTMETRICS, ncm.cbSize, &ncm, 0);
-		}
-#endif
-		if (ok)
-			m_lf = ncm.lfMessageFont;
-		else
-			GetObject(GetStockObject(DEFAULT_GUI_FONT), sizeof(m_lf), &m_lf);
-	}
+	//20260911 by claude. dlg 에 지정된 폰트를 상속하되 그것이 래스터면 OS UI 폰트로 폴백한다.
+	//규칙과 근거는 Functions.h 의 get_inherited_ui_logfont 선언부 주석 참조.
+	get_inherited_ui_logfont(this, m_lf);
 
 	CRichEditCtrl::PreSubclassWindow();
 

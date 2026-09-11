@@ -1696,35 +1696,9 @@ void CSCListCtrl::PreSubclassWindow()
 
 void CSCListCtrl::modify_style()
 {
-	//Resource Editor 에서 이 컨트롤을 사용하는 dlg 에 적용된 폰트를 기본으로 사용해야 한다.
-	//단, 동적으로 생성된 클래스에서 이 클래스를 사용하거나
-	//아직 MainWnd 가 생성되지 않은 상태에서도 이 코드를 만날 수 있으므로 parent 가 NULL 일 수 있다.
-	CWnd*  parent = GetParent();
-	CFont* font   = GetFont();
-	if (font == NULL && parent != nullptr)
-		font = parent->GetFont();
-
-	if (font != NULL)
-	{
-		font->GetObject(sizeof(m_lf), &m_lf);
-	}
-	else
-	{
-		NONCLIENTMETRICS ncm = {};
-		ncm.cbSize = sizeof(ncm);
-		BOOL ok = ::SystemParametersInfo(SPI_GETNONCLIENTMETRICS, ncm.cbSize, &ncm, 0);
-#if (WINVER >= 0x0600)
-		if (!ok)
-		{
-			ncm.cbSize = sizeof(ncm) - sizeof(ncm.iPaddedBorderWidth);
-			ok = ::SystemParametersInfo(SPI_GETNONCLIENTMETRICS, ncm.cbSize, &ncm, 0);
-		}
-#endif
-		if (ok)
-			m_lf = ncm.lfMessageFont;
-		else
-			GetObject(GetStockObject(DEFAULT_GUI_FONT), sizeof(m_lf), &m_lf);
-	}
+	//20260911 by claude. dlg 에 지정된 폰트를 상속하되 그것이 래스터면 OS UI 폰트로 폴백한다.
+	//규칙과 근거는 Functions.h 의 get_inherited_ui_logfont 선언부 주석 참조.
+	get_inherited_ui_logfont(this, m_lf);
 
 	//리소스에서 WS_BORDER / WS_EX_CLIENTEDGE 가 켜져 있으면 native border 제거하고 자체 그리기로 전환.
 	//m_scrollbar_setup 시 OnNcCalcSize 가 NC=0 으로 만들기 때문에 native WM_NCPAINT 가 그릴 영역이 없어

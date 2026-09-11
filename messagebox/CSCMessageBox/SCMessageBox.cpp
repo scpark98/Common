@@ -205,32 +205,9 @@ bool CSCMessageBox::create(CWnd* parent, CString title, UINT icon_id, bool as_mo
 	CRect rc;
 	GetClientRect(rc);
 
-	//폰트 결정 우선순위:
-	//  1) 자기 자신의 GetFont()  - popup 으로 막 생성된 상태라 보통 NULL.
-	//  2) parent->GetFont()      - parent 가 있을 때 외관 일관성을 위해.
-	//  3) SPI_GETNONCLIENTMETRICS.lfMessageFont
-	//                            - Windows 가 "메시지 상자" 용으로 지정한 시스템 폰트
-	//                              (디스플레이 설정에 따라 보통 Segoe UI). parent 가 없어도
-	//                              메시지박스에 가장 적절한 모던 폰트.
-	//  4) DEFAULT_GUI_FONT       - 3) 도 실패할 때의 최후 폴백. SYSTEM_FONT 는 비트맵 계열의
-	//                              구식 폰트라 사용하지 않는다 (안티앨리어싱 없음).
-	CFont* font = GetFont();
-	if (font == NULL && parent != nullptr)
-		font = parent->GetFont();
-
-	if (font != NULL)
-	{
-		font->GetObject(sizeof(m_lf), &m_lf);
-	}
-	else
-	{
-		NONCLIENTMETRICS ncm = {};
-		ncm.cbSize = sizeof(ncm);
-		if (::SystemParametersInfo(SPI_GETNONCLIENTMETRICS, sizeof(ncm), &ncm, 0))
-			m_lf = ncm.lfMessageFont;
-		else
-			GetObject(GetStockObject(DEFAULT_GUI_FONT), sizeof(m_lf), &m_lf);
-	}
+	//20260911 by claude. dlg 에 지정된 폰트를 상속하되 그것이 래스터면 OS UI 폰트로 폴백한다.
+	//규칙과 근거는 Functions.h 의 get_inherited_ui_logfont 선언부 주석 참조.
+	get_inherited_ui_logfont(this, m_lf);
 
 	//필요한 버튼들만 생성하고자 했으나 복잡도 문제로 모두 생성한다.
 	for (int i = 0; i < TOTAL_BUTTON_COUNT; i++)

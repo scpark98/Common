@@ -176,43 +176,9 @@ void CSCStatic::PreSubclassWindow()
 	m_halign = get_halign();
 	m_valign = get_valign();
 
-	//Resource Editor 에서 이 컨트롤을 사용하는 dlg 에 적용된 폰트를 기본으로 사용해야 한다.
-	//단, 동적으로 생성된 클래스에서 이 클래스를 사용하거나
-	//아직 MainWnd 가 생성되지 않은 상태에서도 이 코드를 만날 수 있으므로 parent 가 NULL 일 수 있다.
-	CWnd*  parent = GetParent();
-	CFont* font   = GetFont();
-	if (font == NULL && parent != nullptr)
-		font = parent->GetFont();
-
-	if (font != NULL)
-	{
-		font->GetObject(sizeof(m_lf), &m_lf);
-	}
-	else
-	{
-		//20260908 by claude. lfMessageFont 는 OS 의 표시 언어를 따른다 — 한국어 Windows 는 Vista+ 에서
-		//맑은 고딕 9pt(실측), 영문은 Segoe UI 9pt, XP 는 굴림/Tahoma 8pt.
-		//즉 이 컨트롤에 고정된 기본 폰트는 없다. 위 분기의 부모(다이얼로그) 폰트 상속이 실제 경로이고,
-		//여기는 부모를 얻지 못한 경우의 fallback 이다.
-		//Vista+ SDK 로 빌드한 exe 를 XP 에서 실행하면 NONCLIENTMETRICS 끝의 iPaddedBorderWidth (4byte) 가
-		//XP 커널이 인식하는 구조체보다 크다 → SystemParametersInfo 가 ERROR_INVALID_PARAMETER 로 실패.
-		//실패 시 4byte 줄여 재시도하면 XP 에서도 lfMessageFont 를 정상 획득.
-		NONCLIENTMETRICS ncm = {};
-		ncm.cbSize = sizeof(ncm);
-		BOOL ok = ::SystemParametersInfo(SPI_GETNONCLIENTMETRICS, ncm.cbSize, &ncm, 0);
-#if (WINVER >= 0x0600)
-		if (!ok)
-		{
-			ncm.cbSize = sizeof(ncm) - sizeof(ncm.iPaddedBorderWidth);
-			ok = ::SystemParametersInfo(SPI_GETNONCLIENTMETRICS, ncm.cbSize, &ncm, 0);
-		}
-#endif
-		if (ok)
-			m_lf = ncm.lfMessageFont;
-		else
-			GetObject(GetStockObject(DEFAULT_GUI_FONT), sizeof(m_lf), &m_lf);
-	}
-	//SYSTEM_FONT 경로에 있던 m_lf.lfWidth=0 강제는 lfMessageFont / DEFAULT_GUI_FONT 가 이미 lfWidth=0 이라 불필요.
+	//20260911 by claude. dlg 에 지정된 폰트를 상속하되 그것이 래스터면 OS UI 폰트로 폴백한다.
+	//규칙과 근거는 Functions.h 의 get_inherited_ui_logfont 선언부 주석 참조.
+	get_inherited_ui_logfont(this, m_lf);
 
 	reconstruct_font();
 

@@ -7095,16 +7095,16 @@ CRect draw_text(Gdiplus::Graphics &g,
 				UINT align)
 {
 	bool calcRect = false;
-	HDC hDC = ::GetDC(AfxGetMainWnd()->m_hWnd);
+	//20260911 by claude. ReleaseDC 에 같은 hWnd 를 넘겨야 하므로 핸들을 받아 둔다. DeleteDC 로는 반환되지 않는다.
+	HWND hWnd = AfxGetMainWnd()->m_hWnd;
+	HDC hDC = ::GetDC(hWnd);
 
 	//배경색을 rTarget 크기로 그려서는 안된다. 실제 텍스트가 그려질 boundRect 영역만 그려져야 한다.
 	draw_rect(g, rTarget, Gdiplus::Color::Transparent, cr_back);
 
-	//큰 글씨는 AntiAlias를 해주는게 좋지만 작은 글씨는 오히려 뭉개지므로 안하는게 좋다.
-	//파라미터로 처리해야 한다.
-	g.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
-	g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
-	g.SetTextRenderingHint(Gdiplus::TextRenderingHintAntiAlias);
+	//20260911 by claude. 그리기 품질(SmoothingMode / InterpolationMode / TextRenderingHint)은 여기서 정하지 않는다.
+	//g 는 호출자 것이고, 어떤 품질로 그릴지는 글자 크기·배경 밝기 같은 화면 성격을 아는 호출자만 판단할 수 있다.
+	//예전에는 이 자리에서 셋을 강제해 호출자가 설정한 값이 조용히 덮였다(7pt 버전 문자열이 뭉개진 원인).
 
 	Gdiplus::Unit unit = g.GetPageUnit();
 	float fDpiX = g.GetDpiX();
@@ -7182,7 +7182,8 @@ CRect draw_text(Gdiplus::Graphics &g,
 
 		delete fontFamily;
 		//delete g;
-		::DeleteDC(hDC);
+		::ReleaseDC(hWnd, hDC);
+
 		//TRACE(_T("%f, %f, %f x %f\n"), boundRect.X, boundRect.Y, boundRect.Width, boundRect.Height);
 		return CRect(rTarget.left, rTarget.top, rTarget.left + boundRect.Width, rTarget.top + boundRect.Height);
 	}
@@ -7246,7 +7247,7 @@ CRect draw_text(Gdiplus::Graphics &g,
 	}
 
 	delete fontFamily;
-	::DeleteDC(hDC);
+	::ReleaseDC(hWnd, hDC);
 
 	return CRect(rTarget.left, rTarget.top, rTarget.left + boundRect.Width, rTarget.top + boundRect.Height);
 }
@@ -10753,6 +10754,75 @@ LPCTSTR get_default_ui_font_face()
 {
 	static const LPCTSTR face = (get_windows_major_version() >= 6) ? _T("맑은 고딕") : _T("굴림");
 	return face;
+}
+
+//20260911 by claude. 계약·근거는 Functions.h 의 선언부 주석 참조.
+//프로세스가 공유하는 폴백 폰트. lfMessageFont 는 실행 중 바뀌지 않으므로 한 번만 만들어 둔다.
+static CFont* get_ui_fallback_font()
+{
+	static CFont font;
+
+	if (font.GetSafeHandle() != NULL)
+		return &font;
+
+	NONCLIENTMETRICS ncm = {};
+	ncm.cbSize = sizeof(ncm);
+	BOOL ok = ::SystemParametersInfo(SPI_GETNONCLIENTMETRICS, ncm.cbSize, &ncm, 0);
+#if (WINVER >= 0x0600)
+	//Vista+ SDK 로 빌드한 exe 를 XP 에서 돌리면 iPaddedBorderWidth 만큼 커진 cbSize 때문에 실패한다.
+	if (!ok)
+	{
+		ncm.cbSize = sizeof(ncm) - sizeof(ncm.iPaddedBorderWidth);
+		ok = ::SystemParametersInfo(SPI_GETNONCLIENTMETRICS, ncm.cbSize, &ncm, 0);
+	}
+#endif
+
+	if (ok)
+		font.CreateFontIndirect(&ncm.lfMessageFont);
+	else
+		font.CreateStockObject(DEFAULT_GUI_FONT);
+
+	return (font.GetSafeHandle() != NULL) ? &font : NULL;
+}
+
+//20260911 by claude. 계약·근거는 Functions.h 의 선언부 주석 참조.
+bool apply_scalable_ui_font(CWnd* wnd, bool include_children)
+{
+	if (wnd == NULL || wnd->GetSafeHwnd() == NULL)
+		return false;
+
+	CDC* dc = wnd->GetDC();
+	if (dc == NULL)
+		return false;
+
+	//GetFont() 가 NULL 이면 DC 의 기본 폰트(스톡 System)를 재게 되는데, 그것이 곧 판정 대상이라 그대로 둔다.
+	CFont* font = wnd->GetFont();
+	CFont* old_font = (font != NULL) ? dc->SelectObject(font) : NULL;
+
+	TEXTMETRIC tm = { 0 };
+	dc->GetTextMetrics(&tm);
+
+	if (old_font != NULL)
+		dc->SelectObject(old_font);
+
+	wnd->ReleaseDC(dc);
+
+	if (tm.tmPitchAndFamily & (TMPF_TRUETYPE | TMPF_VECTOR))
+		return false;
+
+	CFont* fallback = get_ui_fallback_font();
+	if (fallback == NULL)
+		return false;
+
+	wnd->SetFont(fallback, FALSE);
+
+	if (include_children)
+	{
+		for (CWnd* child = wnd->GetWindow(GW_CHILD); child != NULL; child = child->GetWindow(GW_HWNDNEXT))
+			child->SetFont(fallback, FALSE);
+	}
+
+	return true;
 }
 
 CString	get_windows_version_string(bool detail)
@@ -15052,7 +15122,8 @@ HBITMAP	PrintWindowToBitmap(HWND hTargetWnd, LPRECT pRect)
 
 	if (!hBitmap)
 	{
-		::DeleteDC(hDC);
+		//20260911 by claude. hDC 는 GetDC 로 얻은 것이라 ReleaseDC 로 돌려줘야 한다. hMemDC 는 CreateCompatibleDC 라 DeleteDC 가 맞다.
+		::ReleaseDC(hTargetWnd, hDC);
 		::DeleteDC(hMemDC);
 		return NULL;
 	}
@@ -15086,7 +15157,7 @@ HBITMAP	PrintWindowToBitmap(HWND hTargetWnd, LPRECT pRect)
 		bSuccess = TRUE;
 	}
 
-	::DeleteDC(hDC);
+	::ReleaseDC(hTargetWnd, hDC);
 	::DeleteDC(hMemDC);
 
 	//WriteBMP(hBitmap, hMemDC, _T("d:\\temp\\test_capture.bmp"));
@@ -18439,11 +18510,12 @@ CSize draw_icon(CDC* pDC, HICON hIcon, CRect r)
 }
 
 //font size to LOGFONT::lfHeight
+//20260911 by claude. GetDC 로 얻은 DC 는 ReleaseDC 로 돌려줘야 한다. DeleteDC 는 실패하고 DC 가 반환되지 않는다.
 LONG get_pixel_size_from_font_size(HWND hWnd, int font_size)
 {
 	HDC hDC = ::GetDC(hWnd);
 	LONG size = -MulDiv(font_size, GetDeviceCaps(hDC, LOGPIXELSY), 72);
-	::DeleteDC(hDC);
+	::ReleaseDC(hWnd, hDC);
 
 	return size;
 }
@@ -18453,7 +18525,7 @@ LONG get_font_size_from_pixel_size(HWND hWnd, int logical_size)
 {
 	HDC hDC = ::GetDC(hWnd);
 	LONG size = -MulDiv(logical_size, 72, GetDeviceCaps(hDC, LOGPIXELSY));
-	::DeleteDC(hDC);
+	::ReleaseDC(hWnd, hDC);
 
 	return size;
 }

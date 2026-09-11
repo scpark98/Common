@@ -1597,6 +1597,17 @@ struct	NETWORK_INFO
 	//둘 다 라틴+한글을 한 face 로 커버해 폴백 없이 줄 높이가 균일하다. Common §2 "기본 폰트" 정책의 단일 소스.
 	LPCTSTR		get_default_ui_font_face();
 
+	//20260911 by claude. wnd 가 쓰는 폰트가 크기 지정을 반영하지 못하는 래스터 폰트일 때만 OS 의 UI 폰트
+	//(SPI_GETNONCLIENTMETRICS 의 lfMessageFont)로 바꾼다. 스케일 가능한 폰트면 아무것도 하지 않는다.
+	//왜 필요한가 : .rc 템플릿에 그 OS 에 없는 face(XP 의 "맑은 고딕" 등)를 지정하면 대화상자 폰트가 스톡
+	//System(래스터)으로 떨어지고, 그 뒤로는 set_font_size() 가 통째로 무시된다. 실패가 조용해서 원인을
+	//찾기 어렵다 (XP 실측 : 9pt 도 14pt 도 tmHeight 16).
+	//호출 시점 : CDialog::OnInitDialog 에서 base 호출 *전*. base 안에서 DDX 가 컨트롤을 subclass 하며
+	//PreSubclassWindow 가 여기서 바꾼 폰트를 상속한다. base 뒤에 부르면 상속이 이미 끝나 늦다.
+	//include_children : wnd 의 직계 자식에게도 함께 적용한다(중첩된 손자 창은 대상이 아니다).
+	//반환 : 실제로 바꿨으면 true. 바꿀 필요가 없었거나 판정하지 못했으면 false.
+	bool		apply_scalable_ui_font(CWnd* wnd, bool include_children = true);
+
 	bool		open_with_explorer(CString path);
 
 	CString		get_system_label(int csidl, int *sysIconIndex = NULL);

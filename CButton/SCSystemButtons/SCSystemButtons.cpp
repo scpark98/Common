@@ -229,6 +229,8 @@ void CSCSystemButtons::OnPaint()
 		//각 버튼을 그려준다.
 		Gdiplus::Graphics g(dc.GetSafeHdc());
 		g.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
+		//20260911 by claude. draw_text(shadow_depth>0) 가 그림자 비트맵을 확대해 그리므로 여기서 보간 품질을 정한다.
+		g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
 
 		if (m_button[i].img.is_valid())
 		{

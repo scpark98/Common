@@ -570,6 +570,10 @@ void CSCListBox::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 		int pt = MulDiv(ppem, 72, GetDeviceCaps(pDC->GetSafeHdc(), LOGPIXELSY));
 		int font_style = (m_lf.lfWeight >= FW_BOLD) ? Gdiplus::FontStyleBold : Gdiplus::FontStyleRegular;
 
+		//20260911 by claude. draw_text 는 g 의 품질 설정을 건드리지 않으므로 여기서 정한다.
+		//이 분기는 굴림·돋움의 embedded bitmap 을 피하려고 GDI+ 로 그리는 것이라 AA 가 켜져 있어야 한다.
+		g.SetTextRenderingHint(Gdiplus::TextRenderingHintAntiAlias);
+
 		draw_text(g, rect, sText, (float)pt, font_style, 0, 0.0f,
 			CString(m_lf.lfFaceName), cr_text,
 			Gdiplus::Color::Transparent, Gdiplus::Color::Transparent, Gdiplus::Color::Transparent,

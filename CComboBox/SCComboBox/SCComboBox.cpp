@@ -8,6 +8,10 @@
 #include "../../CEdit/SCEdit/SCEdit.h"
 #include <imm.h>	// ImmGetCompositionString — IME 조합 중 문자열 취득 (필터링용)
 #include <commctrl.h>	// SetWindowSubclass / RemoveWindowSubclass
+
+//20260911 by claude. [진단] 콤보 알림 순서 확인용. 위 logWrite 주석을 풀 때 함께 살린다.
+//일반 파생 컨트롤은 SCLog 를 포함한 채 push 하지 않는다(Common/claude.md).
+//#include "../../log/SCLog/SCLog.h"
 #pragma comment(lib, "comctl32.lib")
 
 // Combobox 내부 edit 용 subclass proc.
@@ -420,6 +424,13 @@ void CSCComboBox::OnKillFocus(CWnd* pNewWnd)
 
 void CSCComboBox::OnCbnDropdown()
 {
+	//20260911 by claude. [진단] 확인 완료 - 필요하면 주석만 푼다.
+	//logWrite(_T("[Combo] DROPDOWN      sel=%d, text=%s"), GetCurSel(), get_cur_sel_text());
+
+	//20260911 by claude. 최근 블록은 목록을 펼치기 직전에만 다시 만든다. 아래 폭 계산보다 먼저 해야
+	//끼워 넣은 항목까지 폭에 반영된다.
+	rebuild_recent_block();
+
 	// Reset the dropped width
 	int nNumEntries = GetCount();
 	int nWidth = 0;
@@ -639,39 +650,9 @@ void CSCComboBox::apply_edit_text_padding()
 
 void CSCComboBox::PreSubclassWindow()
 {
-	//Resource Editor 에서 이 컨트롤을 사용하는 dlg 에 적용된 폰트를 기본으로 사용해야 한다.
-	//단, 동적으로 생성된 클래스에서 이 클래스를 사용하거나
-	//아직 MainWnd 가 생성되지 않은 상태에서도 이 코드를 만날 수 있으므로 parent 가 NULL 일 수 있다.
-	CWnd*  parent = GetParent();
-	CFont* font   = GetFont();
-	if (font == NULL && parent != nullptr)
-		font = parent->GetFont();
-
-	if (font != NULL)
-	{
-		font->GetObject(sizeof(m_lf), &m_lf);
-	}
-	else
-	{
-		//Vista+ : lfMessageFont = Segoe UI 9pt. XP : Tahoma 8pt.
-		//Vista+ SDK 로 빌드한 exe 를 XP 에서 실행하면 NONCLIENTMETRICS 끝의 iPaddedBorderWidth (4byte) 가
-		//XP 커널이 인식하는 구조체보다 크다 → SystemParametersInfo 가 ERROR_INVALID_PARAMETER 로 실패.
-		//실패 시 4byte 줄여 재시도하면 XP 에서도 lfMessageFont 를 정상 획득.
-		NONCLIENTMETRICS ncm = {};
-		ncm.cbSize = sizeof(ncm);
-		BOOL ok = ::SystemParametersInfo(SPI_GETNONCLIENTMETRICS, ncm.cbSize, &ncm, 0);
-#if (WINVER >= 0x0600)
-		if (!ok)
-		{
-			ncm.cbSize = sizeof(ncm) - sizeof(ncm.iPaddedBorderWidth);
-			ok = ::SystemParametersInfo(SPI_GETNONCLIENTMETRICS, ncm.cbSize, &ncm, 0);
-		}
-#endif
-		if (ok)
-			m_lf = ncm.lfMessageFont;
-		else
-			GetObject(GetStockObject(DEFAULT_GUI_FONT), sizeof(m_lf), &m_lf);
-	}
+	//20260911 by claude. dlg 에 지정된 폰트를 상속하되 그것이 래스터면 OS UI 폰트로 폴백한다.
+	//규칙과 근거는 Functions.h 의 get_inherited_ui_logfont 선언부 주석 참조.
+	get_inherited_ui_logfont(this, m_lf);
 
 	reconstruct_font();
 
@@ -1012,32 +993,9 @@ void CSCComboBox::OnCbnKillfocus()
 //(ON_CONTROL_REFLECT_EX: FALSE 반환 시 parent 에게도 CBN_SELCHANGE 가 전달됨)
 BOOL CSCComboBox::OnCbnSelchange()
 {
-	//20260908 by claude. 최근 항목 갱신.
-	if (m_use_recent_selected)
-	{
-		const CString text = get_cur_sel_text();
+	//20260911 by claude. [진단] 닫힌 콤보의 화살표·휠에서 어떤 알림이 오는지 확인한다. 확인 완료 - 필요하면 주석만 푼다.
+	//logWrite(_T("[Combo] SELCHANGE     dropped=%d, sel=%d, text=%s"), GetDroppedState(), GetCurSel(), get_cur_sel_text());
 
-		if (!text.IsEmpty())
-		{
-			//이미 있는 항목이면 맨 앞으로 올린다.
-			for (std::deque<CString>::iterator it = m_recent.begin(); it != m_recent.end(); ++it)
-			{
-				if (*it == text)
-				{
-					m_recent.erase(it);
-					break;
-				}
-			}
-
-			m_recent.push_front(text);
-
-			while ((int)m_recent.size() > m_recent_count)
-				m_recent.pop_back();
-
-			save_recent();
-			rebuild_recent_block();
-		}
-	}
 
 	//font combo라면 현재 선택된 폰트로 m_lf가 자동 변경되어야 한다.
 	//set_font_name()은 m_is_font_combo==true 인 경우 early return 이므로
@@ -1054,7 +1012,14 @@ BOOL CSCComboBox::OnCbnSelchange()
 			//안에 넣어두므로, 텍스트와 폰트가 함께 확정된 뒤 한 번만 그려진다.
 			//(예전에 이것을 타이머로 미뤘더니 직전 폰트로 한 번 → 새 폰트로 또 한 번, 두 번 그려져
 			// 모핑처럼 보였다. 미루는 대신 새어나가는 그리기를 막는 쪽이 맞다 — m_suspend_paint 참조.)
-			reconstruct_font();
+			//
+			//20260911 by claude. 목록이 펼쳐진 동안은 부르지 않는다(실측 확인). reconstruct_font 는
+			//WM_SETFONT · CB_SETITEMHEIGHT · 자식 Edit 재배치를 하는데, 드롭다운 리스트박스가 살아 있는
+			//상태에서 콤보의 폰트·항목 높이를 갈아엎으면 목록이 닫힌다(방향키로 재현).
+			//OnMouseWheel 은 맨 앞에서 GetDroppedState() 로 빠져나가 이 경로를 타지 않는다.
+			//닫힐 때(SELENDOK / SELENDCANCEL) 한 번 부르므로 최종 상태는 같다.
+			if (!GetDroppedState())
+				reconstruct_font();
 		}
 	}
 
@@ -1062,14 +1027,61 @@ BOOL CSCComboBox::OnCbnSelchange()
 }
 
 
+//20260911 by claude. 최근 항목은 '드롭다운을 펼쳐 실제로 고른 순간' 에만 쌓는다.
+//예전에는 CBN_SELCHANGE 에서 쌓았는데, 닫힌 콤보를 화살표·휠로 넘기는 것도 SELCHANGE 라
+//지나가는 항목이 전부 최근으로 올라왔다. 게다가 그때마다 블록을 다시 만들고 선택을 글자로
+//되찾아서, 맨 위 블록의 복제본이 잡혀 선택이 최근 블록 안에서 맴돌았다.
+//
+//CBN_SELENDOK 도 그것만으로는 부족하다 - 닫힌 콤보의 화살표·휠에서도 온다(실측).
+//목록에서 고른 경우만 그 시점에 목록이 아직 열려 있어 GetDroppedState() 가 TRUE 다.
+//  닫힌 콤보 화살표·휠 : SELENDOK dropped=0 -> SELCHANGE dropped=0
+//  목록에서 클릭       : DROPDOWN -> SELENDOK dropped=1 -> SELCHANGE dropped=0
+//목록 재구성은 여기서 하지 않는다 - CBN_DROPDOWN 에서 목록을 펼치기 직전에 한 번만 한다.
 void CSCComboBox::OnCbnSelendok()
 {
-	// TODO: 여기에 컨트롤 알림 처리기 코드를 추가합니다.
+	//20260911 by claude. [진단] 확인 완료 - 필요하면 주석만 푼다.
+	//logWrite(_T("[Combo] SELENDOK      dropped=%d, sel=%d, text=%s"), GetDroppedState(), GetCurSel(), get_cur_sel_text());
+
+	//20260911 by claude. 목록이 펼쳐진 동안 미뤄 둔 폰트 적용을 여기서 한 번 한다.
+	if (m_is_font_combo)
+		reconstruct_font();
+
+	if (!m_use_recent_selected || !GetDroppedState())
+		return;
+
+	const CString text = get_cur_sel_text();
+
+	if (text.IsEmpty())
+		return;
+
+	//이미 있는 항목이면 맨 앞으로 올린다.
+	for (std::deque<CString>::iterator it = m_recent.begin(); it != m_recent.end(); ++it)
+	{
+		if (*it == text)
+		{
+			m_recent.erase(it);
+			break;
+		}
+	}
+
+	m_recent.push_front(text);
+
+	while ((int)m_recent.size() > m_recent_count)
+		m_recent.pop_back();
+
+	save_recent();
 }
 
 
 void CSCComboBox::OnCbnSelendcancel()
 {
+	//20260911 by claude. [진단] 확인 완료 - 필요하면 주석만 푼다.
+	//logWrite(_T("[Combo] SELENDCANCEL  dropped=%d, sel=%d, text=%s"), GetDroppedState(), GetCurSel(), get_cur_sel_text());
+
+	//20260911 by claude. 취소로 닫혀도 선택이 되돌아간 상태로 한 번 맞춘다.
+	if (m_is_font_combo)
+		reconstruct_font();
+
 	// TODO: 여기에 컨트롤 알림 처리기 코드를 추가합니다.
 }
 
@@ -1341,9 +1353,10 @@ void CSCComboBox::rebuild_recent_block()
 		m_recent_block_size = (int)items.size();
 	}
 
-	//인덱스가 밀렸으므로 선택은 글자로 되찾는다.
+	//인덱스가 밀렸으므로 선택은 글자로 되찾는다. 단 맨 위 블록에는 같은 글자의 복제본이 있으므로
+	//블록 *다음* 부터 찾아 원본을 잡는다. 복제본을 잡으면 이후 화살표·휠 이동이 최근 블록 안에서만 돈다.
 	if (!sel_text.IsEmpty())
-		CComboBox::SetCurSel(FindStringExact(-1, sel_text));
+		CComboBox::SetCurSel(FindStringExact(m_recent_block_size - 1, sel_text));
 
 	SetRedraw(TRUE);
 	Invalidate();

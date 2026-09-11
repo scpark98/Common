@@ -2,6 +2,7 @@
 
 #include <windows.h>
 #include <tchar.h>
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <map>
@@ -25,19 +26,31 @@
 *  결정 우선순위:
 *    1. 앱이 set_ui_language(lang) 로 명시한 값 (ini 설정, 사용자 선택 메뉴 등)
 *    2. Vista+ : GetUserPreferredUILanguages() 의 첫 항목 (= 표시 언어)
-*    3. XP     : MUI 팩이 설치되어 사용자가 표시 언어를 고른 경우에만 GetUserDefaultUILanguage().
-*                고른 적이 없으면 이 API 는 "설치된 Windows 의 언어" 를 돌려줄 뿐 사용자의 의사가
-*                아니므로(문서화된 동작), 사용자 로캘(GetUserDefaultLCID)의 언어를 쓴다.
+*    3. XP     : 사용자가 MUI 로 "설치 언어와 다른" 표시 언어를 고른 경우에만 그 값
+*                (HKCU\Control Panel\Desktop\MultiUILanguageId)을 표시 언어로 인정한다.
+*                값이 없거나 설치 언어(GetSystemDefaultUILanguage)와 같으면 사용자가 고른 것이
+*                아니므로, 사용자 로캘(GetUserDefaultLCID)의 언어를 쓴다.
 *    4. 위 모두 실패하면 영어
 *
-*  3번의 근거 (2026-08-20 실측, Windows XP Professional SP3):
-*    셸은 한국어로 보이지만 MUI 팩이 없어 HKCU\Control Panel\Desktop\MultiUILanguageId 가 없었다.
-*    그래서 GetUserDefaultUILanguage() 가 설치 언어(0409)로 떨어졌고, 사용자 로캘 0412 / ANSI 949 로
-*    다른 신호가 전부 한국어인데도 앱 문자열이 모두 영어로 나왔다.
+*  3번이 "값이 있으면 채택" 이 아닌 이유 (2026-09-11 실측, 영문 XP SP3 + 시스템 로캘 한국어):
+*    같은 exe 가 기동 경로에 따라 다른 언어로 표시됐다. HKCU 가 가리키는 하이브가 달라서다.
+*      - 사용자가 직접 실행 -> HKCU = 로그인 사용자 하이브. MultiUILanguageId 없음 -> 로캘 0412 -> 한국어.
+*      - 서비스가 기동 -> HKCU = SYSTEM 하이브. 거기에는 MultiUILanguageId = 00000409 가 있어 영어가 됐다.
+*        (LMMAgent 의 RunAsUser2 는 winlogon.exe 토큰으로 CreateProcessAsUser 하고 LoadUserProfile 을
+*         부르지 않는다. reg query "HKU\.DEFAULT\Control Panel\Desktop" /v MultiUILanguageId 로 확인.)
+*    SYSTEM 하이브의 0409 는 설치 언어 그대로이지 사용자의 선택이 아니다. GetUserDefaultUILanguage() 도
+*    같은 하이브를 읽으므로 API 로 물어봐도 결과는 같다. 그래서 설치 언어와 같은 값은 신호로 보지 않는다.
+*    반면 로캘은 시스템 로캘이 한국어라 두 하이브 모두 0412 로 일치했다 — 이쪽이 더 신뢰할 수 있었다.
+*
+*  MUI 선택이 없는 XP 도 있다 (2026-08-20 실측, Windows XP Professional SP3):
+*    셸은 한국어로 보이지만 MultiUILanguageId 가 없었다. 이때도 사용자 로캘 0412 / ANSI 949 가
+*    유일한 신호이므로 로캘을 쓴다 — 그대로 두면 설치 언어(0409)로 떨어져 전부 영어로 나온다.
 *
 *  사용법:
 *    - 기본은 자동이다. 이 헤더를 include 한 것만으로 WinMain 보다 먼저 언어가 확정된다.
 *    - 앱이 직접 정한다면 InitInstance 초반에 set_ui_language(원하는 LANGID) 를 호출한다.
+*      ini/명령줄에서 "en"/"ko"/"ja" 같은 문자열로 받는다면 set_ui_language_by_code() 를 쓴다.
+*      어느 쪽이든 첫 문자열 조회보다 앞서 호출해야 한다(캐시는 비워지지만, 이미 읽어 보관한 값은 그대로다).
 *    - 자동 확정을 끄려면 프로젝트 전처리기에 SC_NO_AUTO_UI_LANGUAGE 를 정의한다.
 */
 
@@ -97,18 +110,33 @@ namespace ui_language_detail
 		return self != ::GetModuleHandleW(NULL);
 	}
 
-	//XP 에서 사용자가 MUI 로 표시 언어를 고른 적이 있는지. 값이 없으면 GetUserDefaultUILanguage() 는
-	//설치 언어를 돌려줄 뿐이라 사용자의 의사로 볼 수 없다.
-	inline bool has_mui_selection()
+	//20260911 by claude. XP 에서 사용자가 MUI 로 고른 표시 언어. 고른 적이 없으면 0.
+	//값을 직접 읽는다 — GetUserDefaultUILanguage() 는 이 선택을 반영하지 못하고 설치 언어를
+	//돌려주는 경우가 있다(헤더 상단 2026-09-11 실측 참조).
+	//표준은 REG_SZ 의 8자리 16진 문자열("00000412") 이지만 REG_DWORD 로 들어 있는 경우도 받아준다.
+	inline LANGID mui_selection()
 	{
 		HKEY key = NULL;
 		if (::RegOpenKeyExW(HKEY_CURRENT_USER, L"Control Panel\\Desktop", 0, KEY_QUERY_VALUE, &key) != ERROR_SUCCESS)
-			return false;
+			return 0;
 
-		LONG result = ::RegQueryValueExW(key, L"MultiUILanguageId", NULL, NULL, NULL, NULL);
+		DWORD	type = 0;
+		DWORD	buffer[16] = { 0 };						//WCHAR 로도 읽으므로 정렬이 보장되는 타입으로 잡는다.
+		DWORD	bytes = sizeof(buffer) - sizeof(WCHAR);	//문자열이 널 종료가 아닐 수 있어 뒤를 비워 둔다.
+
+		LONG result = ::RegQueryValueExW(key, L"MultiUILanguageId", NULL, &type, (LPBYTE)buffer, &bytes);
 		::RegCloseKey(key);
 
-		return result == ERROR_SUCCESS;
+		if (result != ERROR_SUCCESS)
+			return 0;
+
+		if (type == REG_DWORD)
+			return (LANGID)buffer[0];
+
+		if (type == REG_SZ || type == REG_EXPAND_SZ)
+			return (LANGID)wcstoul((const WCHAR*)buffer, NULL, 16);
+
+		return 0;
 	}
 
 	inline LANGID& forced_language()
@@ -181,9 +209,10 @@ inline LANGID decide_ui_language()
 			return (LANGID)wcstoul(buffer, NULL, 16);
 	}
 
-	//XP. MUI 로 고른 값이 있을 때만 표시 언어로 인정한다.
-	if (ui_language_detail::has_mui_selection())
-		return ::GetUserDefaultUILanguage();
+	//XP. 설치 언어와 다른 값일 때만 "사용자가 고른 표시 언어" 로 본다. 헤더 상단 2026-09-11 실측 참조.
+	LANGID from_mui = ui_language_detail::mui_selection();
+	if (from_mui != 0 && from_mui != ::GetSystemDefaultUILanguage())
+		return from_mui;
 
 	//표시 언어 신호가 없다. 사용자가 명시적으로 고른 유일한 언어 신호는 로캘뿐이다.
 	LANGID from_locale = LANGIDFROMLCID(::GetUserDefaultLCID());
@@ -241,6 +270,34 @@ inline bool set_ui_language(LANGID lang = 0)
 		applied = true;
 
 	return applied;
+}
+
+//20260911 by claude. 언어 코드로 표시 언어를 강제한다. ini/명령줄/레지스트리 등 문자열로 받은 설정을
+//그대로 넘기는 용도다. 표준은 ISO 639-1 의 en/ko/ja 이고, 국가 코드(ISO 3166)로 흔히 잘못 쓰는
+//kr/jp 도 같은 언어로 받아준다. 대소문자는 구분하지 않으며 "en-US" 처럼 지역이 붙어 있으면 앞 두 자만 본다.
+//code 가 비었거나 아는 언어가 아니면 아무것도 바꾸지 않고 false 를 돌려준다 - 자동 판단이 그대로 유지된다.
+inline bool set_ui_language_by_code(const TCHAR* code)
+{
+	if (code == NULL || code[0] == _T('\0') || code[1] == _T('\0'))
+		return false;
+
+	const TCHAR first = (TCHAR)_totlower(code[0]);
+	const TCHAR second = (TCHAR)_totlower(code[1]);
+
+	LANGID lang = 0;
+
+	if (first == _T('e') && second == _T('n'))
+		lang = ui_language_detail::language_english;
+	else if (first == _T('k') && (second == _T('o') || second == _T('r')))
+		lang = MAKELANGID(LANG_KOREAN, SUBLANG_DEFAULT);
+	else if (first == _T('j') && (second == _T('a') || second == _T('p')))
+		lang = MAKELANGID(LANG_JAPANESE, SUBLANG_DEFAULT);
+
+	if (lang == 0)
+		return false;
+
+	set_ui_language(lang);
+	return true;
 }
 
 //리소스를 읽어올 모듈. 기본값은 GetModuleHandle(NULL)(= 실행 파일 자신).
@@ -350,14 +407,14 @@ inline void format_ui_language_state(TCHAR* out, int count)
 
 	_sntprintf_s(out, count, _TRUNCATE,
 		_T("user_ui=%04X system_ui=%04X user_lcid=%08X thread_lcid=%08X acp=%u thread_acp=%u ")
-		_T("mui_reg=%d mui_api=%d decided=%04X used=%04X"),
+		_T("mui_sel=%04X mui_api=%d decided=%04X used=%04X"),
 		::GetUserDefaultUILanguage(),
 		::GetSystemDefaultUILanguage(),
 		::GetUserDefaultLCID(),
 		::GetThreadLocale(),
 		::GetACP(),
 		thread_acp,
-		ui_language_detail::has_mui_selection() ? 1 : 0,
+		ui_language_detail::mui_selection(),
 		ui_language_detail::get_preferred() != NULL ? 1 : 0,
 		decide_ui_language(),
 		get_ui_language());

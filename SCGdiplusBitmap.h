@@ -354,7 +354,10 @@ public:
 							Gdiplus::Color cr_stroke = Gdiplus::Color::LightGray,
 							Gdiplus::Color cr_shadow = Gdiplus::Color::DarkGray,
 							Gdiplus::Color cr_back = Gdiplus::Color::Transparent,
-							UINT align = DT_CENTER | DT_VCENTER);
+							UINT align = DT_CENTER | DT_VCENTER,
+							//20260911 by claude. 전역 draw_text 의 text_hint 를 그대로 전달한다. 이 래퍼는 Graphics 를
+							//내부에서 만들기 때문에, 이 인자가 없으면 호출자가 글자 품질을 지정할 방법이 아예 없다.
+							int text_hint = text_hint_keep);
 
 	CRect		draw_text(	CRect rTarget,
 							CString text,
@@ -367,7 +370,10 @@ public:
 							Gdiplus::Color cr_stroke = Gdiplus::Color::LightGray,
 							Gdiplus::Color cr_shadow = Gdiplus::Color::DarkGray,
 							Gdiplus::Color cr_back = Gdiplus::Color::Transparent,
-							UINT align = DT_CENTER | DT_VCENTER);
+							UINT align = DT_CENTER | DT_VCENTER,
+							//20260911 by claude. 전역 draw_text 의 text_hint 를 그대로 전달한다. 이 래퍼는 Graphics 를
+							//내부에서 만들기 때문에, 이 인자가 없으면 호출자가 글자 품질을 지정할 방법이 아예 없다.
+							int text_hint = text_hint_keep);
 
 	//InterpolationModeNearestNeighbor		: 원본 화소를 거의 유지하지만 일부 화소는 사라짐. 그래서 더 거친 느낌
 	//InterpolationModeHighQualityBilinear	: 부드럽게 resize되지만 약간 뿌옇게 변함

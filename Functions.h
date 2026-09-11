@@ -2155,6 +2155,10 @@ h		: 복사할 height 크기(pixel)
 	}
 
 	//Gdiplus를 이용한 텍스트 출력
+	//20260911 by claude. draw_text 의 text_hint 기본값. 호출자가 g 에 설정해 둔 글자 품질을 그대로 쓴다.
+	//draw_text 는 g 를 빌려 쓰는 함수라 기본은 건드리지 않는 것이다. Gdiplus::TextRenderingHint 는 0~5 가
+	//모두 유효값이라 '건드리지 않음' 을 담을 자리가 없어 int 로 받는다.
+	enum { text_hint_keep = -1 };
 	CRect		draw_text(Gdiplus::Graphics& g,
 		int x, int y, int w, int h,
 		CString text,
@@ -2167,7 +2171,11 @@ h		: 복사할 height 크기(pixel)
 		Gdiplus::Color cr_stroke = Gdiplus::Color::LightGray,
 		Gdiplus::Color cr_shadow = Gdiplus::Color::DarkGray,
 		Gdiplus::Color cr_back = Gdiplus::Color::Transparent,
-		UINT align = DT_CENTER | DT_VCENTER);
+		UINT align = DT_CENTER | DT_VCENTER,
+		//text_hint_keep 이면 g 의 현재 설정을 그대로 쓴다. 그 외 Gdiplus::TextRenderingHint 값을 주면
+		//이 호출에만 적용하고 함수를 나갈 때 원래 값으로 되돌린다(호출자 g 를 오염시키지 않는다).
+		//작은 글씨는 AntiAlias 계열이 회색으로 퍼져 뭉개진다 - 그때 SingleBitPerPixelGridFit 을 준다.
+		int text_hint = text_hint_keep);
 
 	CRect		draw_text(Gdiplus::Graphics& g,
 		CRect rTarget,
@@ -2181,7 +2189,11 @@ h		: 복사할 height 크기(pixel)
 		Gdiplus::Color cr_stroke = Gdiplus::Color::LightGray,
 		Gdiplus::Color cr_shadow = Gdiplus::Color::DarkGray,
 		Gdiplus::Color cr_back = Gdiplus::Color::Transparent,
-		UINT align = DT_CENTER | DT_VCENTER);
+		UINT align = DT_CENTER | DT_VCENTER,
+		//text_hint_keep 이면 g 의 현재 설정을 그대로 쓴다. 그 외 Gdiplus::TextRenderingHint 값을 주면
+		//이 호출에만 적용하고 함수를 나갈 때 원래 값으로 되돌린다(호출자 g 를 오염시키지 않는다).
+		//작은 글씨는 AntiAlias 계열이 회색으로 퍼져 뭉개진다 - 그때 SingleBitPerPixelGridFit 을 준다.
+		int text_hint = text_hint_keep);
 
 #ifndef _USING_V110_SDK71_
 	CRect		draw_text(ID2D1DeviceContext* d2dc,

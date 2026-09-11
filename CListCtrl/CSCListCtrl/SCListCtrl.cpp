@@ -2147,6 +2147,7 @@ void CSCListCtrl::OnPaint()
 	//(DrawText()는 논리좌표를 사용하고 SelectClipRgn()은 물리좌표를 사용하기 때문에 둘의 좌표가 달라지기 때문)
 	CMemoryDC dc(&dc1, &rc, true);
 	Gdiplus::Graphics g(dc.m_hDC);
+	g.SetTextRenderingHint(Gdiplus::TextRenderingHintAntiAlias);
 
 	//CTreeCtrl, CListCtrl의 배경색은
 	//dc.FillSolidRect(rc, m_theme.cr_back.ToCOLORREF());
@@ -5538,6 +5539,7 @@ CImageList* CSCListCtrl::create_drag_image(CListCtrl* pList, LPPOINT lpPoint, CS
 	CSCGdiplusBitmap drag_img;
 	drag_img.create(max_w, total_h, PixelFormat32bppARGB);
 	Gdiplus::Graphics g(drag_img.m_pBitmap);
+	g.SetTextRenderingHint(Gdiplus::TextRenderingHintAntiAlias);
 
 	int y = 0;
 	for (int it : items)

@@ -2344,6 +2344,7 @@ void CSCTreeCtrl::create_drag_image(CSCGdiplusBitmap& drag_img)
 	drag_img.release();
 	drag_img.create(max_w, total_h, PixelFormat32bppARGB);
 	Gdiplus::Graphics g(drag_img.m_pBitmap);
+	g.SetTextRenderingHint(Gdiplus::TextRenderingHintAntiAlias);
 
 	int y = 0;
 	for (size_t i = 0; i < rows.size(); i++)

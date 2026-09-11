@@ -2124,12 +2124,13 @@ CRect CSCGdiplusBitmap::draw_text(int x, int y, int w, int h,
 							Gdiplus::Color cr_stroke,
 							Gdiplus::Color cr_shadow,
 							Gdiplus::Color cr_back,
-							UINT align)
+							UINT align,
+							int text_hint)
 {
 	CRect rTarget(x, y, w, h);
 	//adjust_rect_range()
 	return draw_text(rTarget, text, font_size, font_style, shadow_depth, thickness, font_name,
-		cr_text, cr_stroke, cr_shadow, cr_back, align);
+		cr_text, cr_stroke, cr_shadow, cr_back, align, text_hint);
 }
 
 CRect CSCGdiplusBitmap::draw_text(CRect rTarget,
@@ -2143,7 +2144,8 @@ CRect CSCGdiplusBitmap::draw_text(CRect rTarget,
 							Gdiplus::Color cr_stroke,
 							Gdiplus::Color cr_shadow,
 							Gdiplus::Color cr_back,
-							UINT align)
+							UINT align,
+							int text_hint)
 {
 	Gdiplus::Graphics g(m_pBitmap);
 
@@ -2151,7 +2153,7 @@ CRect CSCGdiplusBitmap::draw_text(CRect rTarget,
 		rTarget = CRect(0, 0, width, height);
 
 	return ::draw_text(g, rTarget, text, font_size, font_style, shadow_depth, thickness, font_name,
-		cr_text, cr_stroke, cr_shadow, cr_back, align);
+		cr_text, cr_stroke, cr_shadow, cr_back, align, text_hint);
 
 	/*
 	g.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);

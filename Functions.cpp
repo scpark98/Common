@@ -7063,7 +7063,8 @@ CRect draw_text(Gdiplus::Graphics &g,
 				Gdiplus::Color cr_stroke,
 				Gdiplus::Color cr_shadow,
 				Gdiplus::Color cr_back,
-				UINT align)
+				UINT align,
+				int text_hint)
 {
 	return draw_text(g,
 					CRect(x, y, x + w, y + h),
@@ -7077,7 +7078,8 @@ CRect draw_text(Gdiplus::Graphics &g,
 					cr_stroke,
 					cr_shadow,
 					cr_back,
-					align);
+					align,
+					text_hint);
 }
 
 CRect draw_text(Gdiplus::Graphics &g,
@@ -7092,7 +7094,8 @@ CRect draw_text(Gdiplus::Graphics &g,
 				Gdiplus::Color cr_stroke,
 				Gdiplus::Color cr_shadow,
 				Gdiplus::Color cr_back,
-				UINT align)
+				UINT align,
+				int text_hint)
 {
 	bool calcRect = false;
 	//20260911 by claude. ReleaseDC 에 같은 hWnd 를 넘겨야 하므로 핸들을 받아 둔다. DeleteDC 로는 반환되지 않는다.
@@ -7102,9 +7105,13 @@ CRect draw_text(Gdiplus::Graphics &g,
 	//배경색을 rTarget 크기로 그려서는 안된다. 실제 텍스트가 그려질 boundRect 영역만 그려져야 한다.
 	draw_rect(g, rTarget, Gdiplus::Color::Transparent, cr_back);
 
-	//20260911 by claude. 그리기 품질(SmoothingMode / InterpolationMode / TextRenderingHint)은 여기서 정하지 않는다.
-	//g 는 호출자 것이고, 어떤 품질로 그릴지는 글자 크기·배경 밝기 같은 화면 성격을 아는 호출자만 판단할 수 있다.
-	//예전에는 이 자리에서 셋을 강제해 호출자가 설정한 값이 조용히 덮였다(7pt 버전 문자열이 뭉개진 원인).
+	//20260911 by claude. 그리기 품질은 기본적으로 여기서 정하지 않는다. g 는 호출자 것이고, 어떤 품질로 그릴지는
+	//글자 크기·배경 밝기 같은 화면 성격을 아는 호출자만 판단할 수 있다. 예전에는 이 자리에서 SmoothingMode /
+	//InterpolationMode / TextRenderingHint 를 강제해 호출자가 설정한 값이 조용히 덮였다(7pt 문자열이 뭉개진 원인).
+	//text_hint 를 명시한 호출만 예외로 받아주되, 그 호출에 한정하고 나갈 때 되돌린다.
+	const Gdiplus::TextRenderingHint old_text_hint = g.GetTextRenderingHint();
+	if (text_hint != text_hint_keep)
+		g.SetTextRenderingHint((Gdiplus::TextRenderingHint)text_hint);
 
 	Gdiplus::Unit unit = g.GetPageUnit();
 	float fDpiX = g.GetDpiX();
@@ -7184,6 +7191,9 @@ CRect draw_text(Gdiplus::Graphics &g,
 		//delete g;
 		::ReleaseDC(hWnd, hDC);
 
+		if (text_hint != text_hint_keep)
+			g.SetTextRenderingHint(old_text_hint);
+
 		//TRACE(_T("%f, %f, %f x %f\n"), boundRect.X, boundRect.Y, boundRect.Width, boundRect.Height);
 		return CRect(rTarget.left, rTarget.top, rTarget.left + boundRect.Width, rTarget.top + boundRect.Height);
 	}
@@ -7206,21 +7216,33 @@ CRect draw_text(Gdiplus::Graphics &g,
 		//작게 이미지를 만든 후 늘리는 방식은 quality도 떨어지고 그림자 방향을 정하는 것도 다소 문제있다.
 		//shadow는 (+n, +n)에 그림자를 그리고 실제 텍스트를 그리는 방식도 있지만 text를 둘러싸는 그림자도 있으므로
 		//좀 복잡하다. 우선 간단한 방법으로의 shadow만 고려한다.
-		Gdiplus::Bitmap shadow_bitmap(rTarget.Width(), rTarget.Height());
+		//그림자의 흐릿한 정도. 0.0f(그림자 없음), 0.1f(많이 흐림), 0.4f(권장), 1.0f에 가까울수록 선명함.
+		//축소한 글자를 원본크기로 늘려서 흐릿한 이미지로 만듬.
+		float ratio = 0.4f;
+
+		//20260911 by claude. 예전에는 비트맵을 rTarget *크기* 로 만들어 놓고 그 안에 rTarget 의 *절대 좌표* 로
+		//글자를 그렸다. 축소 배율이 걸려 글자가 찍히는 위치가 rTarget.top * ratio 라, 텍스트가 캔버스 좌상단
+		//근처가 아니면 비트맵 밖으로 나가 그림자가 통째로 사라졌다. 완성된 비트맵도 rTarget 이 아니라 늘 
+		//(shadow_depth, shadow_depth) 에 1/ratio 배 크기로 그려 위치·크기가 함께 어긋났다.
+		//(Endorphin2 트랙 프리뷰의 시간값을 상단에서 하단으로 옮긴 뒤 그림자가 안 보이던 원인.)
+		//비트맵은 축소된 크기로 만들고 그 안에서는 로컬 좌표로 그린 뒤, rTarget 자리에 원래 크기로 되돌린다.
+		const int shadow_w = MAX(1, (int)(rTarget.Width()  * ratio));
+		const int shadow_h = MAX(1, (int)(rTarget.Height() * ratio));
+
+		Gdiplus::Bitmap shadow_bitmap(shadow_w, shadow_h);
 		Gdiplus::Graphics g_shadow(&shadow_bitmap);
 		g_shadow.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
 		g_shadow.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
 		g_shadow.SetTextRenderingHint(Gdiplus::TextRenderingHintAntiAlias);
 
-		//그림자의 흐릿한 정도. 0.0f(그림자 없음), 0.1f(많이 흐림), 0.4f(권장), 1.0f에 가까울수록 선명함.
-		//축소한 글자를 원본크기로 늘려서 흐릿한 이미지로 만듬.
-		float ratio = 0.4f;
 		Gdiplus::Matrix mx(ratio, 0, 0, ratio, 0.0f, 0.0f);
 		g_shadow.SetTransform(&mx);
-		g_shadow.DrawString(CStringW(text), -1, &font, CRect_to_gpRectF(rTarget), &sf, &shadow_brush);
+		g_shadow.DrawString(CStringW(text), -1, &font,
+			Gdiplus::RectF(0.0f, 0.0f, (Gdiplus::REAL)rTarget.Width(), (Gdiplus::REAL)rTarget.Height()), &sf, &shadow_brush);
 
-		g.DrawImage(&shadow_bitmap, (Gdiplus::REAL)shadow_depth, (Gdiplus::REAL)shadow_depth,
-			(Gdiplus::REAL)(shadow_bitmap.GetWidth()) / ratio, (Gdiplus::REAL)(shadow_bitmap.GetHeight()) / ratio);
+		g.DrawImage(&shadow_bitmap,
+			(Gdiplus::REAL)(rTarget.left + shadow_depth), (Gdiplus::REAL)(rTarget.top + shadow_depth),
+			(Gdiplus::REAL)rTarget.Width(), (Gdiplus::REAL)rTarget.Height());
 	}
 
 	//return CRect(rTarget.left, rTarget.top, rTarget.left + boundRect.Width, rTarget.top + boundRect.Height);
@@ -7248,6 +7270,9 @@ CRect draw_text(Gdiplus::Graphics &g,
 
 	delete fontFamily;
 	::ReleaseDC(hWnd, hDC);
+
+	if (text_hint != text_hint_keep)
+		g.SetTextRenderingHint(old_text_hint);
 
 	return CRect(rTarget.left, rTarget.top, rTarget.left + boundRect.Width, rTarget.top + boundRect.Height);
 }

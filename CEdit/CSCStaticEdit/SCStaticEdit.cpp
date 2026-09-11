@@ -2202,7 +2202,7 @@ void CSCStaticEdit::draw_action_icon_password_toggle(Gdiplus::Graphics& g)
 {
 	// 아몬드(렌즈) 형 눈 외곽: 상/하 cubic bezier 두 개로 양 끝이 뾰족한 아이라인을 그린다.
 	// 가운데 원형 동공. password 모드 ON 이면 우상→좌하 슬래시 덧그림.
-	Gdiplus::Color cr_stroke = get_weak_color(m_theme.cr_back, 48);// m_theme.cr_text_dim;// m_action_button_pressed ? Gdiplus::Color::RoyalBlue : Gdiplus::Color::DimGray;
+	Gdiplus::Color cr_stroke = get_weak_color(m_theme.cr_back, 72);// m_theme.cr_text_dim;// m_action_button_pressed ? Gdiplus::Color::RoyalBlue : Gdiplus::Color::DimGray;
 
 	g.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
 
@@ -2218,7 +2218,8 @@ void CSCStaticEdit::draw_action_icon_password_toggle(Gdiplus::Graphics& g)
 	float mid_y  = (top + bottom) * 0.5f;
 	float bow    = eye_w * 0.25f;
 
-	Gdiplus::Pen pen(cr_stroke, 1.8f);
+	//20260911 by claude. 1.8f 는 이 크기(약 16x13px)에서 눈 외곽과 동공이 붙어 뭉개진다. 1.2f 부터 동공이 또렷하다.
+	Gdiplus::Pen pen(cr_stroke, 1.2f);
 	pen.SetStartCap(Gdiplus::LineCapRound);
 	pen.SetEndCap  (Gdiplus::LineCapRound);
 
@@ -2238,7 +2239,7 @@ void CSCStaticEdit::draw_action_icon_password_toggle(Gdiplus::Graphics& g)
 	// 동공: 눈 높이의 절반 크기 원, 중앙 정렬
 	// 동공 작게 + 외곽선만(ring) 으로 그려 실제 눈처럼 보이는 무서움 완화
 	float pupil = (float)max(3, eye_h / 3);
-	Gdiplus::Pen pen_pupil(cr_stroke, 1.8f);
+	Gdiplus::Pen pen_pupil(cr_stroke, 1.2f);
 	g.DrawEllipse(&pen_pupil,
 		(left + right) * 0.5f - pupil * 0.5f,
 		mid_y - pupil * 0.5f,
@@ -2246,13 +2247,14 @@ void CSCStaticEdit::draw_action_icon_password_toggle(Gdiplus::Graphics& g)
 
 	if (m_password)
 	{
-		Gdiplus::Pen pen_slash(cr_stroke, 1.8f);
+		Gdiplus::Pen pen_slash(cr_stroke, 1.2f);
 		pen_slash.SetStartCap(Gdiplus::LineCapRound);
 		pen_slash.SetEndCap  (Gdiplus::LineCapRound);
 		//20260902 by claude. 눈 모양 대비 사선이 1px 오른쪽으로 치우쳐 보여 양 끝 x 를 1px 왼쪽으로 옮김.
+		//20260911 by claude. 좌하단 끝이 눈 외곽보다 더 튀어나와 사선만 길어 보여 대각선 방향으로 1px 당겼다.
 		g.DrawLine(&pen_slash,
 			m_r_action_button.right - 3, m_r_action_button.top    + 2,
-			m_r_action_button.left  + 1, m_r_action_button.bottom - 2);
+			m_r_action_button.left  + 2, m_r_action_button.bottom - 3);
 	}
 }
 

@@ -318,7 +318,7 @@ void CImageStatic::OnDropFiles(HDROP hDropInfo)
 	{
 		return;
 	}
-	else if (GetFileTypeFromFilename(sfile) == FILE_TYPE_IMAGE)
+	else if (get_filetype_from_filename(sfile) == FILE_TYPE_IMAGE)
 	{
 		m_img.load(sfile);
 		Invalidate();
@@ -424,4 +424,17 @@ void CImageStatic::set_image(CSCGdiplusBitmap& img)
 {
 	img.deep_copy(&m_img);
 	Invalidate();
+}
+
+void CImageStatic::set_image(CSCGdiplusBitmap& img, CString name)
+{
+	m_filename = name;
+
+	m_image_roi.SetRectEmpty();
+	m_screen_roi.SetRectEmpty();
+
+	img.deep_copy(&m_img);
+	Invalidate();
+
+	::SendMessage(GetParent()->GetSafeHwnd(), Message_CImageStatic, (WPARAM)&CImageStaticMessage(this, message_loading_completed), 0);
 }

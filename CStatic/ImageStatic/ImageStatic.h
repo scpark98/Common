@@ -63,6 +63,10 @@ public:
 
 	void			set_image(CSCGdiplusBitmap& img);
 
+	//20260913 by claude. 파일이 아닌 이미지를 얹을 때 load() 와 같은 뒷정리를 한다.
+	//name 은 파일 경로가 없는 출처(클립보드 등)를 캡션에 표시하기 위한 것이다.
+	void			set_image(CSCGdiplusBitmap& img, CString name);
+
 	CString			get_filename() { return m_filename; }
 
 	bool			copy_to_clipbard();

@@ -215,6 +215,7 @@ BEGIN_MESSAGE_MAP(CRichEditCtrlEx, CRichEditCtrl)
 	ON_WM_MOUSEHWHEEL()
 	ON_WM_HSCROLL()
 	ON_WM_VSCROLL()
+	ON_WM_SIZE()
 	ON_WM_MOUSEWHEEL()
 	//ON_WM_LBUTTONDOWN()
 	ON_WM_LBUTTONUP()
@@ -590,6 +591,16 @@ int CRichEditCtrlEx::get_bottom_first_line()
 void CRichEditCtrlEx::scroll_to_bottom()
 {
 	LineScroll(get_bottom_first_line() - GetFirstVisibleLine());
+}
+
+//20260914 by claude. 리사이즈로 보이는 줄 수가 바뀌어도 하단을 보고 있었으면 하단을 유지한다(VS 출력 창과 같다).
+//m_at_bottom 은 add·스크롤 때 갱신된 값이라 그대로 신뢰한다. 하단이 아니었으면 현재 스크롤 위치를 유지.
+void CRichEditCtrlEx::OnSize(UINT nType, int cx, int cy)
+{
+	CRichEditCtrl::OnSize(nType, cx, cy);
+
+	if (m_at_bottom)
+		scroll_to_bottom();
 }
 
 bool CRichEditCtrlEx::is_scrolled_to_bottom()

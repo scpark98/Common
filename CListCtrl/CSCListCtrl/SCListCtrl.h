@@ -889,6 +889,10 @@ public:
 	void			set_action(int item, int subItem, int action);
 
 protected:
+	//20260914 by claude. 폴더가 실제로 바뀔 때 이전 폴더를 뒤로 스택에 넣는다(판정 조건은 이 함수 한 곳에만 둔다).
+	//set_path(로컬 진입점)와 display_filelist(원격 진입점)가 모두 호출한다 — 원격은 set_path 를 타지 않기 때문.
+	void			push_folder_history(const CString& new_path);
+
 	//begin_bulk_insert/end_bulk_insert 사이는 true — insert_item / set_text* 의 sync_scrollbar/Invalidate 차단.
 	bool			m_in_bulk_insert = false;
 

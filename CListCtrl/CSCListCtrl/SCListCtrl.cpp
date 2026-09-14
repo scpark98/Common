@@ -5022,14 +5022,7 @@ void CSCListCtrl::set_path(CString path, bool refresh)
 	if (path.IsEmpty())
 		path = m_pShellImageList->get_system_path(!m_is_local, CSIDL_DRIVES);
 
-	//20260707 by claude. 뒤로가기 히스토리 — 앞으로 이동(go_back/go_forward 아님)이고 폴더가 실제로 바뀔 때 현재(이전) 폴더를 push.
-	//go_back()/go_forward() 가 부르는 set_path 는 m_navigating_back/forward 로 이 처리를 건너뛰고 스택을 직접 관리한다(무한 누적 방지).
-	//20260709 by claude. 새 폴더로 정상 이동하면 앞으로 스택은 무효화(브라우저와 동일 — 뒤로 갔다가 다른 곳으로 가면 앞으로 기록 소멸).
-	if (m_is_shell_listctrl && !m_navigating_back && !m_navigating_forward && !m_path.IsEmpty() && m_path != path)
-	{
-		m_folder_history.push_back(m_path);
-		m_folder_forward.clear();
-	}
+	push_folder_history(path);
 
 	m_path = path;
 
@@ -5041,6 +5034,23 @@ void CSCListCtrl::set_path(CString path, bool refresh)
 	TRACE(_T("set_path(%s)\n"), m_path);
 
 	refresh_list(refresh);
+}
+
+//20260707 by claude. 뒤로가기 히스토리 — 앞으로 이동(go_back/go_forward 아님)이고 폴더가 실제로 바뀔 때 현재(이전) 폴더를 push.
+//go_back()/go_forward() 가 부르는 경로는 m_navigating_back/forward 로 이 처리를 건너뛰고 스택을 직접 관리한다(무한 누적 방지).
+//20260709 by claude. 새 폴더로 정상 이동하면 앞으로 스택은 무효화(브라우저와 동일 — 뒤로 갔다가 다른 곳으로 가면 앞으로 기록 소멸).
+//20260914 by claude. set_path(로컬)·display_filelist(원격) 두 진입점이 같은 규칙을 쓰도록 여기로 모았다.
+//예전엔 set_path 안에만 있어서, set_path 를 타지 않는 원격 리스트는 스택이 비어 뒤로가기가 동작하지 않았다.
+void CSCListCtrl::push_folder_history(const CString& new_path)
+{
+	if (!m_is_shell_listctrl || m_navigating_back || m_navigating_forward)
+		return;
+
+	if (m_path.IsEmpty() || m_path == new_path)
+		return;
+
+	m_folder_history.push_back(m_path);
+	m_folder_forward.clear();
 }
 
 //20260707 by claude. 뒤로가기 — 히스토리의 마지막 폴더로 이동한다(그 이동은 히스토리에 push 하지 않는다).
@@ -5241,6 +5251,13 @@ void CSCListCtrl::display_filelist(CString cur_path)
 	int index;
 	int insert_index = -1;
 	int img_idx = -1;
+
+	//20260914 by claude. 원격 리스트는 set_path 를 타지 않고 이 함수로 폴더가 바뀐다 — 응용단이 소켓으로 목록을 받아
+	//add_file 로 채운 뒤 display_filelist(new_path) 를 부르는 구조라(nFTDServer2 의 change_directory 가 그렇다),
+	//아래 m_path 대입이 사실상의 '폴더 이동' 이다. 그래서 히스토리 push 도 여기서 해야 한다.
+	//이게 없으면 원격에서만 스택이 영원히 비어 뒤로가기(Backspace/Alt+Left/마우스 back)가 통째로 동작하지 않는다.
+	//refresh/sort 가 부르는 display_filelist(m_path) 는 경로가 같아 push 되지 않는다(아래 함수의 m_path != path 조건).
+	push_folder_history(cur_path);
 
 	m_path = cur_path;
 

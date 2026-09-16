@@ -29,6 +29,8 @@ BEGIN_MESSAGE_MAP(CSCScrollbar, CWnd)
 	ON_WM_MOUSEMOVE()
 	ON_MESSAGE(WM_MOUSELEAVE, &CSCScrollbar::OnMouseLeave)
 	ON_WM_TIMER()
+	ON_WM_MOUSEWHEEL()
+	ON_WM_MOUSEHWHEEL()
 END_MESSAGE_MAP()
 
 
@@ -444,6 +446,31 @@ void CSCScrollbar::OnLButtonUp(UINT nFlags, CPoint point)
 
 	update_hover(point);
 	Invalidate();
+}
+
+//20260915 by claude. 바 위에서 굴린 휠은 바가 아니라 스크롤 대상 컨트롤이 처리한다.
+//owner 의 client 안에 만든 바(트리 V바)는 DefWindowProc 의 부모 전달로 우연히 동작했지만,
+//NC 띠에 놓느라 dialog 의 child 로 만든 바(리스트 V/H, 트리 H)는 휠이 dialog 로 올라가 무시됐다.
+//방향별 메시지를 그대로 owner 에 넘기므로 커서가 어느 바 위에 있든 세로휠=세로, 가로휠=가로 (VS 동작과 동일).
+BOOL CSCScrollbar::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
+{
+	CWnd* owner = get_scroll_owner();
+	if (owner && ::IsWindow(owner->GetSafeHwnd()))
+		return (BOOL)owner->SendMessage(WM_MOUSEWHEEL, MAKEWPARAM(nFlags, zDelta), MAKELPARAM(pt.x, pt.y));
+
+	return CWnd::OnMouseWheel(nFlags, zDelta, pt);
+}
+
+void CSCScrollbar::OnMouseHWheel(UINT nFlags, short zDelta, CPoint pt)
+{
+	CWnd* owner = get_scroll_owner();
+	if (owner && ::IsWindow(owner->GetSafeHwnd()))
+	{
+		owner->SendMessage(WM_MOUSEHWHEEL, MAKEWPARAM(nFlags, zDelta), MAKELPARAM(pt.x, pt.y));
+		return;
+	}
+
+	CWnd::OnMouseHWheel(nFlags, zDelta, pt);
 }
 
 LRESULT CSCScrollbar::OnMouseLeave(WPARAM, LPARAM)

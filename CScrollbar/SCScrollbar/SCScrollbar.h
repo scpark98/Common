@@ -105,11 +105,15 @@ public:
 protected:
 	CWnd*			m_message_target = nullptr;
 
+	//20260915 by claude. 스크롤 대상 컨트롤. 바를 host 의 NC 띠에 놓으려고 dialog 의 child 로 만든 경우
+	//GetParent() 는 dialog 이므로 set_message_target 으로 지정된 쪽이 실제 owner 다.
+	CWnd*			get_scroll_owner() const { return m_message_target ? m_message_target : GetParent(); }
+
 	//20260728 by claude. 스크롤 대상 컨트롤(owner)이 disabled 인가. 리스트/트리는 스크롤바를 자기 자식이
 	//아닌 host 에 두는 경우가 있어 컨트롤 disable 이 스크롤바 자식으로 전파되지 않는다. 입력/호버를 이 값으로 가드.
 	bool			is_owner_enabled() const
 	{
-		CWnd* owner = m_message_target ? m_message_target : GetParent();
+		CWnd* owner = get_scroll_owner();
 		return !owner || owner->IsWindowEnabled();
 	}
 
@@ -184,5 +188,7 @@ protected:
 	afx_msg void	OnMouseMove(UINT nFlags, CPoint point);
 	afx_msg LRESULT	OnMouseLeave(WPARAM wParam, LPARAM lParam);
 	afx_msg void	OnTimer(UINT_PTR nIDEvent);
+	afx_msg BOOL	OnMouseWheel(UINT nFlags, short zDelta, CPoint pt);
+	afx_msg void	OnMouseHWheel(UINT nFlags, short zDelta, CPoint pt);
 	DECLARE_MESSAGE_MAP()
 };

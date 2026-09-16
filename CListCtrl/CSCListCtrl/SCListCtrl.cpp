@@ -113,8 +113,10 @@ BEGIN_MESSAGE_MAP(CSCListCtrl, CListCtrl)
 END_MESSAGE_MAP()
 
 //드래그 중 대상 컨트롤(트리/리스트) 가장자리 호버 시 연속 자동 스크롤용 타이머 ID.
+//20260916 by claude. ID 는 서로 달라야 한다. HSYNC_TRAILING 과 DRAG_HINT_FLUSH 가 둘 다 0x7A32 였고,
+//OnTimer 가 HSYNC_TRAILING 을 먼저 보고 return 해서 드래그힌트 flush 분기는 한 번도 실행되지 않았다.
 #define TIMER_ID_DRAG_AUTO_SCROLL	0x7A31
-#define TIMER_ID_DRAG_HINT_FLUSH	0x7A32	//20260713 by claude. 드래그힌트 재합성 스로틀 flush — 마지막 상태 1회 반영.
+#define TIMER_ID_DRAG_HINT_FLUSH	0x7A33	//20260713 by claude. 드래그힌트 재합성 스로틀 flush — 마지막 상태 1회 반영.
 //20260706 by claude. 가로 스크롤 폭주(native hwheel→다수 WM_HSCROLL) 스로틀의 trailing sync 용 타이머 ID.
 #define TIMER_ID_HSYNC_TRAILING		0x7A32
 
@@ -4930,7 +4932,7 @@ void CSCListCtrl::set_as_shell_listctrl(CShellImageList* pShellImageList, bool i
 	//set_font_size(), set_font_name()을 호출하지 않고 set_header_height()을 호출하면
 	//CSCHeaderCtrl::OnLayout()에서 에러가 발생한다.
 	set_header_height(26);
-	set_line_height(26);
+	set_line_height(25);
 
 	set_column_data_type(col_filesize, column_data_type_numeric);
 

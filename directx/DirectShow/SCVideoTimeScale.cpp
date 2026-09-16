@@ -242,8 +242,8 @@ STDMETHODIMP CSCVideoTimeScaleInputPin::ReceiveConnection(IPin* pConnector, cons
 
 	m_pConnected = pConnector;
 	m_pConnected->AddRef();
-	//logWrite(_T("[VideoTS] ReceiveConnection major.D1=%08lX sub.D1=%08lX cbFmt=%lu"),
-		//pmt->majortype.Data1, pmt->subtype.Data1, pmt->cbFormat);
+	logWrite(_T("[VideoTS] ReceiveConnection major.D1=%08lX sub.D1=%08lX cbFmt=%lu"),
+		pmt->majortype.Data1, pmt->subtype.Data1, pmt->cbFormat);
 	return S_OK;
 }
 
@@ -347,21 +347,52 @@ STDMETHODIMP CSCVideoTimeScaleInputPin::NewSegment(REFERENCE_TIME tStart, REFERE
 	return S_OK;
 }
 
+//20260916 by claude. allocator 협상은 downstream(렌더러) 에게 그대로 위임한다 — 통과(zero-copy) 모드 한정.
+//이 필터는 timestamp 만 고치고 데이터는 손대지 않으므로, upstream 이 *렌더러의 버퍼* 에 직접 디코드하는
+//것이 맞다. 그래야 이 필터가 없던 때(LAV↔렌더러 직결)와 완전히 같은 구성이 된다.
+//예전엔 여기서 VFW_E_NO_ALLOCATOR / E_NOTIMPL 만 돌려줘 upstream 이 자기 allocator 를 만들어 썼고,
+//렌더러는 남의 버퍼에서 온 sample 을 받게 됐다. 그 구성에서 MPC-VR 은 sample 을 S_OK 로 받고도
+//화면을 갱신하지 않아 빈 surface = 전체 녹색이 됐다(550x250 wmv1 실측 2026-09-16 — 이 필터만 빼면 정상).
+//crop(홀수 해상도) 모드는 우리가 자체 allocator 로 복사해 넘기므로 위임하지 않는다.
+IMemInputPin* CSCVideoTimeScaleInputPin::downstream_for_allocator()
+{
+	if (!m_pFilter || m_pFilter->is_crop())
+		return NULL;
+	CSCVideoTimeScaleOutputPin* pOut = m_pFilter->get_output_pin();
+	return pOut ? pOut->get_downstream_input() : NULL;
+}
+
 STDMETHODIMP CSCVideoTimeScaleInputPin::GetAllocator(IMemAllocator** ppAllocator)
 {
 	if (!ppAllocator) return E_POINTER;
-	//우리는 자체 allocator 안 제공 — upstream 의 allocator 사용 (downstream 에 forward).
 	*ppAllocator = NULL;
+
+	IMemInputPin* pDown = downstream_for_allocator();
+	if (pDown && SUCCEEDED(pDown->GetAllocator(ppAllocator)) && *ppAllocator)
+		return S_OK;
+
 	return VFW_E_NO_ALLOCATOR;
 }
-STDMETHODIMP CSCVideoTimeScaleInputPin::NotifyAllocator(IMemAllocator* pAllocator, BOOL)
+STDMETHODIMP CSCVideoTimeScaleInputPin::NotifyAllocator(IMemAllocator* pAllocator, BOOL bReadOnly)
 {
 	if (m_pAllocator) m_pAllocator->Release();
 	m_pAllocator = pAllocator;
 	if (m_pAllocator) m_pAllocator->AddRef();
+
+	//upstream 이 최종 선택한 allocator 를 렌더러에도 알린다 — 직결이었다면 렌더러가 직접 받았을 통보다.
+	IMemInputPin* pDown = downstream_for_allocator();
+	if (pDown)
+		pDown->NotifyAllocator(pAllocator, bReadOnly);
+
 	return S_OK;
 }
-STDMETHODIMP CSCVideoTimeScaleInputPin::GetAllocatorRequirements(ALLOCATOR_PROPERTIES*) { return E_NOTIMPL; }
+STDMETHODIMP CSCVideoTimeScaleInputPin::GetAllocatorRequirements(ALLOCATOR_PROPERTIES* pProps)
+{
+	IMemInputPin* pDown = downstream_for_allocator();
+	if (pDown)
+		return pDown->GetAllocatorRequirements(pProps);
+	return E_NOTIMPL;
+}
 
 STDMETHODIMP CSCVideoTimeScaleInputPin::Receive(IMediaSample* pSample)
 {
@@ -378,6 +409,58 @@ STDMETHODIMP CSCVideoTimeScaleInputPin::Receive(IMediaSample* pSample)
 			tStart = (REFERENCE_TIME)((double)tStart / rate);
 			tStop  = (REFERENCE_TIME)((double)tStop  / rate);
 			pSample->SetTime(&tStart, &tStop);
+		}
+	}
+
+	//20260916 by claude. [진단] 일부 미디어(550x250 wmv1 등)가 전체 녹색으로 표시되는 원인 격리.
+	//녹색 = MPC-VR 의 NV12 surface 가 전부 0 인 상태다. 원인이 (a) 디코더가 빈 프레임을 주는 것인지
+	//(b) 데이터는 오는데 렌더러가 버리는 것(버퍼 크기·stride 불일치)인지를 이 한 줄로 가른다.
+	//upstream(LAV)이 자기 allocator 를 쓰면 stride 를 자기 기준으로 padding 하는데, 광고된 biWidth 는
+	//tight 라 둘이 어긋날 수 있다(crop 경로 주석의 "849" 실측이 같은 현상). 그 판별을 위해
+	//광고 크기·실제 버퍼 크기·역산 stride·Y 평면의 non-zero 여부를 함께 남긴다.
+	{
+		static thread_local int s_diag_count = 0;
+		if (s_diag_count < 5 && m_mt_set && m_mt.pbFormat)
+		{
+			BITMAPINFOHEADER* pbih = NULL;
+			if (m_mt.formattype == FORMAT_VideoInfo2 && m_mt.cbFormat >= sizeof(VIDEOINFOHEADER2))
+				pbih = &((VIDEOINFOHEADER2*)m_mt.pbFormat)->bmiHeader;
+			else if (m_mt.formattype == FORMAT_VideoInfo && m_mt.cbFormat >= sizeof(VIDEOINFOHEADER))
+				pbih = &((VIDEOINFOHEADER*)m_mt.pbFormat)->bmiHeader;
+
+			if (pbih)
+			{
+				++s_diag_count;
+				const int w = pbih->biWidth;
+				const int h = (pbih->biHeight < 0) ? -pbih->biHeight : pbih->biHeight;
+				const long len  = pSample->GetActualDataLength();
+				const long size = pSample->GetSize();
+				//NV12 한 프레임 = stride * h * 3/2 → 버퍼 크기에서 upstream 이 실제로 쓴 stride 를 역산.
+				const int  stride_from_len  = (h > 0) ? (int)(len  / (h * 3 / 2)) : 0;
+				const int  stride_from_size = (h > 0) ? (int)(size / (h * 3 / 2)) : 0;
+
+				BYTE* p = NULL;
+				long nonzero = -1;
+				if (SUCCEEDED(pSample->GetPointer(&p)) && p && len > 0)
+				{
+					//Y 평면 앞부분만 훑어도 "빈 프레임" 판별에는 충분하다.
+					const long scan = (len < 65536) ? len : 65536;
+					nonzero = 0;
+					for (long i = 0; i < scan; ++i)
+					{
+						if (p[i] != 0)
+						{
+							nonzero = 1;
+							break;
+						}
+					}
+				}
+
+				logWrite(_T("[VideoTS/green] 광고=%dx%d(sub.D1=%08lX biSizeImage=%ld) | sample len=%ld size=%ld")
+						 _T(" | 역산 stride: len=%d size=%d (tight=%d) | Y non-zero=%ld | crop=%d"),
+					w, h, m_mt.subtype.Data1, (long)pbih->biSizeImage, len, size,
+					stride_from_len, stride_from_size, w, nonzero, (int)m_pFilter->is_crop());
+			}
 		}
 	}
 
@@ -435,7 +518,20 @@ STDMETHODIMP CSCVideoTimeScaleInputPin::Receive(IMediaSample* pSample)
 	}
 
 	if (m_pFilter->get_output_pin())
-		return m_pFilter->get_output_pin()->deliver_sample(pSample);
+	{
+		HRESULT hrd = m_pFilter->get_output_pin()->deliver_sample(pSample);
+		//20260916 by claude. [진단] 렌더러가 이 sample 을 받아들였는지. 데이터는 멀쩡한데 녹색이면
+		//렌더러가 거절(또는 S_FALSE 로 무시)하고 있는지부터 확인해야 한다.
+		{
+			static thread_local int s_deliver_count = 0;
+			if (s_deliver_count < 5)
+			{
+				++s_deliver_count;
+				logWrite(_T("[VideoTS/green] deliver → 렌더러 hr=0x%08lX"), hrd);
+			}
+		}
+		return hrd;
+	}
 
 	return E_FAIL;
 }
@@ -562,7 +658,7 @@ STDMETHODIMP CSCVideoTimeScaleOutputPin::Connect(IPin* pReceivePin, const AM_MED
 				crop_src_h      = h;
 				crop_dst_w      = even_w;
 				crop_dst_h      = even_h;
-				//logWrite(_T("[VideoTS] odd NV12 %dx%d → crop to even %dx%d for MPC-VR"), w, h, even_w, even_h);
+				logWrite(_T("[VideoTS] odd NV12 %dx%d → crop to even %dx%d for MPC-VR"), w, h, even_w, even_h);
 			}
 		}
 	}
@@ -576,6 +672,24 @@ STDMETHODIMP CSCVideoTimeScaleOutputPin::Connect(IPin* pReceivePin, const AM_MED
 		free_media_type();
 		copy_media_type(&m_mt, p_advertise);
 		m_mt_set = true;
+
+		//20260916 by claude. [진단] MPC-VR 에 실제로 광고한 media type 전체. 크기·stride 는 정상인데 녹색이면
+		//남는 후보는 rcSource/rcTarget(0 이면 렌더러가 그릴 영역을 못 잡는다)·인터레이스 플래그·화면비다.
+		if (p_advertise->pbFormat && p_advertise->formattype == FORMAT_VideoInfo2 &&
+			p_advertise->cbFormat >= sizeof(VIDEOINFOHEADER2))
+		{
+			const VIDEOINFOHEADER2* v2 = (const VIDEOINFOHEADER2*)p_advertise->pbFormat;
+			logWrite(_T("[VideoTS/green] 광고 mt(VIH2): %ldx%ld bitcount=%d compression=%08lX biSizeImage=%lu")
+					 _T(" | rcSource=(%ld,%ld,%ld,%ld) rcTarget=(%ld,%ld,%ld,%ld)")
+					 _T(" | interlace=%08lX control=%08lX AR=%lu:%lu avgTime=%lld bitrate=%lu"),
+				v2->bmiHeader.biWidth, v2->bmiHeader.biHeight, (int)v2->bmiHeader.biBitCount,
+				v2->bmiHeader.biCompression, v2->bmiHeader.biSizeImage,
+				v2->rcSource.left, v2->rcSource.top, v2->rcSource.right, v2->rcSource.bottom,
+				v2->rcTarget.left, v2->rcTarget.top, v2->rcTarget.right, v2->rcTarget.bottom,
+				v2->dwInterlaceFlags, v2->dwControlFlags,
+				v2->dwPictAspectRatioX, v2->dwPictAspectRatioY,
+				(long long)v2->AvgTimePerFrame, v2->dwBitRate);
+		}
 
 		//downstream 의 IMemInputPin cache — fast Receive.
 		if (m_pDownstreamInput) { m_pDownstreamInput->Release(); m_pDownstreamInput = NULL; }
@@ -600,22 +714,17 @@ STDMETHODIMP CSCVideoTimeScaleOutputPin::Connect(IPin* pReceivePin, const AM_MED
 				if (m_pOutAllocator) { m_pOutAllocator->Decommit(); m_pOutAllocator->Release(); }
 				m_pOutAllocator = pOwn;	//keep ref (Decommit+Release in Disconnect/dtor)
 				m_pFilter->set_crop_to_even(crop_dst_w, crop_dst_h, crop_src_stride, crop_src_h);
-				//logWrite(_T("[VideoTS] crop allocator SetProperties hr=0x%08x act.cbBuffer=%ld NotifyAllocator hr=0x%08x"),
-					//hra, act.cbBuffer, hrn);
+				logWrite(_T("[VideoTS] crop allocator SetProperties hr=0x%08x act.cbBuffer=%ld NotifyAllocator hr=0x%08x"),
+					hra, act.cbBuffer, hrn);
 			}
 		}
-		else if (m_pDownstreamInput)
-		{
-			//zero-copy — downstream 의 allocator 를 input pin 에 forward (upstream 이 downstream allocator 직접 사용).
-			IMemAllocator* pAlloc = NULL;
-			if (SUCCEEDED(m_pDownstreamInput->GetAllocator(&pAlloc)) && pAlloc)
-			{
-				if (m_pFilter && m_pFilter->get_input_pin())
-					m_pFilter->get_input_pin()->NotifyAllocator(pAlloc, FALSE);
-				m_pDownstreamInput->NotifyAllocator(pAlloc, FALSE);
-				pAlloc->Release();
-			}
-		}
+		//20260916 by claude. 통과(zero-copy) 모드에서는 allocator 협상에 끼어들지 않는다.
+		//예전 코드는 downstream(렌더러) 의 allocator 를 GetAllocator 로 받아 그대로 NotifyAllocator 로 되돌려줬는데,
+		//이 시점의 그 allocator 는 아직 SetProperties 전이라 cBuffers=0 / cbBuffer=0 이다(실측 2026-09-16).
+		//크기 0 으로 통보받은 렌더러는 업로드 경로를 세우지 못해 빈 surface = 전체 녹색으로 표시됐다
+		//(550x250 wmv1. 이 필터를 빼면 같은 미디어가 정상 재생되는 것으로 원인 확정).
+		//upstream(LAV)은 우리 input pin 이 allocator 를 제공하지 않으면 자기 allocator 를 만들어 쓰고,
+		//우리는 그 sample 을 그대로 렌더러에 Receive 로 넘긴다 — 렌더러는 외부 allocator 의 sample 을 정상 처리한다.
 	}
 
 	if (even_alloc)

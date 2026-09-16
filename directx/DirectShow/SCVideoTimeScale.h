@@ -140,6 +140,9 @@ protected:
 	IMemAllocator*				m_pAllocator;
 
 	void	free_media_type();
+
+	//allocator 협상을 위임할 downstream. 통과 모드에서만 유효하고 crop 모드면 NULL (자체 allocator 사용).
+	IMemInputPin*	downstream_for_allocator();
 };
 
 

@@ -1125,18 +1125,18 @@ void CDShow::setup_video_time_scale_filter()
 
 	if (!pRenderer || !pRendererIn)
 	{
-		//logWrite(_T("[VideoTS] no video renderer found"));
+		logWrite(_T("[VideoTS] no video renderer found"));
 		if (pRenderer) pRenderer->Release();
 		if (pRendererIn) pRendererIn->Release();
 		if (pMC) { if (saved_state == State_Running) pMC->Run(); else if (saved_state == State_Paused) pMC->Pause(); }
 		return;
 	}
-	//logWrite(_T("[VideoTS] video renderer found pRenderer=%p pRendererIn=%p"), pRenderer, pRendererIn);
+	logWrite(_T("[VideoTS] video renderer found pRenderer=%p pRendererIn=%p"), pRenderer, pRendererIn);
 
 	pRendererIn->ConnectedTo(&pUpstreamOut);
 	if (!pUpstreamOut)
 	{
-		//logWrite(_T("[VideoTS] upstream pin not connected"));
+		logWrite(_T("[VideoTS] upstream pin not connected"));
 		pRenderer->Release(); pRendererIn->Release();
 		if (pMC) { if (saved_state == State_Running) pMC->Run(); else if (saved_state == State_Paused) pMC->Pause(); }
 		return;
@@ -1154,7 +1154,7 @@ void CDShow::setup_video_time_scale_filter()
 	pTS->AddRef();
 
 	HRESULT hr_add = m_pGB->AddFilter(pTS, L"SC Video Time-Scale");
-	//logWrite(_T("[VideoTS] AddFilter hr=0x%08lX"), hr_add);
+	logWrite(_T("[VideoTS] AddFilter hr=0x%08lX"), hr_add);
 	if (FAILED(hr_add))
 	{
 		m_pGB->ConnectDirect(pUpstreamOut, pRendererIn, has_saved_mt ? &saved_mt : NULL);
@@ -1166,23 +1166,27 @@ void CDShow::setup_video_time_scale_filter()
 		pTS->FindPin(L"In",  &pTsIn);
 		pTS->FindPin(L"Out", &pTsOut);
 
-		HRESULT hr_t1 = (pTsIn  ? m_pGB->ConnectDirect(pUpstreamOut, pTsIn,  has_saved_mt ? &saved_mt : NULL) : E_FAIL);
+		//20260916 by claude. 렌더러 쪽을 *먼저* 붙인다. upstream 이 우리 input pin 과 allocator 협상을 할 때
+		//우리가 렌더러의 allocator 를 대신 내주려면(CSCVideoTimeScaleInputPin::GetAllocator) 그 시점에 이미
+		//downstream 이 연결돼 있어야 한다. 반대 순서면 내줄 것이 없어 upstream 이 자기 allocator 를 만들고,
+		//그 구성에서 MPC-VR 이 화면을 갱신하지 않는다(녹색).
 		HRESULT hr_t2 = (pTsOut ? m_pGB->ConnectDirect(pTsOut, pRendererIn, has_saved_mt ? &saved_mt : NULL) : E_FAIL);
-		//logWrite(_T("[VideoTS] Connect upstream->ts hr=0x%08lX  ts->renderer hr=0x%08lX"), hr_t1, hr_t2);
+		HRESULT hr_t1 = (pTsIn  ? m_pGB->ConnectDirect(pUpstreamOut, pTsIn,  has_saved_mt ? &saved_mt : NULL) : E_FAIL);
+		logWrite(_T("[VideoTS] Connect ts->renderer hr=0x%08lX  upstream->ts hr=0x%08lX"), hr_t2, hr_t1);
 
 		if (pTsIn) pTsIn->Release();
 		if (pTsOut) pTsOut->Release();
 
 		if (FAILED(hr_t1) || FAILED(hr_t2))
 		{
-			//logWrite(_T("[VideoTS] connect failed - restoring original"));
+			logWrite(_T("[VideoTS] connect failed - restoring original"));
 			m_pGB->RemoveFilter(pTS);
 			pTS->Release();
 			m_pGB->ConnectDirect(pUpstreamOut, pRendererIn, has_saved_mt ? &saved_mt : NULL);
 		}
 		else
 		{
-			//logWrite(_T("[VideoTS] video time-scale inserted into chain"));
+			logWrite(_T("[VideoTS] video time-scale inserted into chain"));
 			m_pVideoTimeScaleFilter = pTS;
 		}
 	}

@@ -16194,14 +16194,6 @@ CSize get_window_size_for_visible(HWND hWnd, int visible_w, int visible_h)
 }
 
 //20260831 by claude. 계약·근거는 Functions.h 의 선언부 주석 참조.
-//20260915 by claude. [계측] 정의 + 구간 타이머. raw QPC 를 쓰는 이유는 CResizeCtrl 쪽 주석과 같다
-//(CPerformance 는 측정마다 SetThreadAffinityMask 두 번 — 이 hot path 에서는 그 syscall 이 잡음).
-LONGLONG	g_mwt_perf_rgn_us = 0;
-LONGLONG	g_mwt_perf_defer_us = 0;
-LONGLONG	g_mwt_perf_erase_us = 0;
-LONGLONG	g_mwt_perf_paint_us = 0;
-
-std::vector<sc_child_paint_cost>	g_mwt_child_costs;
 
 //20260915 by claude. 자식 이동 중 접수한 형제 창 이동(오버레이 스크롤바). 아래 move_windows_together 가 배치로 적용.
 static bool							g_mwt_batching = false;
@@ -16233,47 +16225,10 @@ void mwt_queue_sibling_move(HWND hwnd, const CRect& rect_in_parent)
 	g_mwt_pending_sibling_moves.push_back(m);
 }
 
-void mwt_perf_reset()
-{
-	g_mwt_perf_rgn_us = g_mwt_perf_defer_us = g_mwt_perf_erase_us = g_mwt_perf_paint_us = 0;
-	g_mwt_child_costs.clear();
-}
-
-//20260915 by claude. [계측] 자식 창별 동기 리페인트 시간 누적. 자식 수가 수십 개라 선형 탐색으로 충분하다.
-void mwt_perf_add_child(HWND child, LONGLONG us)
-{
-	for (auto& c : g_mwt_child_costs)
-	{
-		if (c.hwnd == child)
-		{
-			c.us += us;
-			c.count++;
-			return;
-		}
-	}
-
-	sc_child_paint_cost c;
-	c.hwnd  = child;
-	c.us    = us;
-	c.count = 1;
-	g_mwt_child_costs.push_back(c);
-}
-
-static LONGLONG _mwt_now_us()
-{
-	LARGE_INTEGER freq, now;
-	if (!::QueryPerformanceFrequency(&freq) || freq.QuadPart == 0)
-		return 0;
-	::QueryPerformanceCounter(&now);
-	return (now.QuadPart * 1000000LL) / freq.QuadPart;
-}
-
 void move_windows_together(HWND parent, const std::vector<sc_window_move>& moves)
 {
 	if (parent == NULL || !::IsWindow(parent))
 		return;
-
-	LONGLONG mwt_t0 = _mwt_now_us();		//20260915 by claude. [계측]
 
 	if (moves.empty())
 	{
@@ -16305,8 +16260,6 @@ void move_windows_together(HWND parent, const std::vector<sc_window_move>& moves
 		rgn_one.SetRectRgn(m.rect);
 		rgn_new.CombineRgn(&rgn_new, &rgn_one, RGN_OR);
 	}
-
-	LONGLONG mwt_t1 = _mwt_now_us();		//20260915 by claude. [계측] 영역 합성 끝 / 창 이동 시작.
 
 	//20260915 by claude. 이 구간 동안 자식이 요청하는 형제 창 이동(오버레이 스크롤바)은 즉시 옮기지 않고 모은다.
 	//자식의 WM_WINDOWPOSCHANGED 는 아래 EndDeferWindowPos 안에서 동기로 발화하므로, 그때 큐에 쌓인다.
@@ -16378,8 +16331,6 @@ void move_windows_together(HWND parent, const std::vector<sc_window_move>& moves
 	//비워진 자리(옛 위치 - 새 위치)에만 배경을 지우게 한다.
 	//CWnd::RedrawWindow 대신 Win32 를 직접 부른다 — 드래그 중 매 이동마다 도는 경로라
 	//FromHandle 이 임시 CWnd 를 만드는 비용을 둘 이유가 없다.
-	LONGLONG mwt_t2 = _mwt_now_us();		//20260915 by claude. [계측] 창 이동 끝 / erase 시작.
-
 	CRgn rgn_vacated;
 	rgn_vacated.CreateRectRgn(0, 0, 0, 0);
 	rgn_vacated.CombineRgn(&rgn_old, &rgn_new, RGN_DIFF);
@@ -16387,8 +16338,6 @@ void move_windows_together(HWND parent, const std::vector<sc_window_move>& moves
 	//그 형제는 새로 드러났으므로 다시 그려야 한다. 아래 본 갱신에서는 이 플래그를 뺐지만(안 움직인 자식까지
 	//전부 다시 그리는 낭비), 이 영역은 '실제로 비워진 자리' 뿐이라 대상이 적고 빠뜨리면 잔상이 남는다.
 	::RedrawWindow(parent, NULL, (HRGN)rgn_vacated.GetSafeHandle(), RDW_INVALIDATE | RDW_ERASE | RDW_ALLCHILDREN);
-
-	LONGLONG mwt_t3 = _mwt_now_us();		//20260915 by claude. [계측] erase 끝 / 동기 리페인트 시작.
 
 	//옛 위치 ∪ 새 위치 전체를 지금 그린다.
 	rgn_old.CombineRgn(&rgn_old, &rgn_new, RGN_OR);
@@ -16409,22 +16358,13 @@ void move_windows_together(HWND parent, const std::vector<sc_window_move>& moves
 		if (!::IsWindow(m.hwnd))
 			continue;
 
-		//20260915 by claude. [계측] 자식별 동기 리페인트 시간. 원인 컨트롤 추적용이며 원인 확정 후 제거 대상.
-		LONGLONG c0 = _mwt_now_us();
 		::UpdateWindow(m.hwnd);
-		mwt_perf_add_child(m.hwnd, _mwt_now_us() - c0);
 	}
 
 	//위 두 줄은 우리가 지정한 영역만 그린다. 창이 커져 새로 드러난 띠처럼 *OS 가 이미 무효화해 둔* 영역은
 	//그대로 남아 드래그가 끝날 때까지 검게 보인다. 여기서 함께 밀어낸다(무효 영역이 없으면 아무 일도 안 한다).
 	::UpdateWindow(parent);
 
-	//20260915 by claude. [계측] 누적만. 출력은 응용단이 드래그 종료 시 한 번.
-	LONGLONG mwt_t4 = _mwt_now_us();
-	g_mwt_perf_rgn_us   += (mwt_t1 - mwt_t0);
-	g_mwt_perf_defer_us += (mwt_t2 - mwt_t1);
-	g_mwt_perf_erase_us += (mwt_t3 - mwt_t2);
-	g_mwt_perf_paint_us += (mwt_t4 - mwt_t3);
 }
 
 //주어진 점들을 포함하는 최대 사각형을 구한다.

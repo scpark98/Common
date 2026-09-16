@@ -2598,29 +2598,6 @@ h		: 복사할 height 크기(pixel)
 	//무효화해 두는데, 그것 역시 위 (1) 때문에 드래그가 끝날 때까지 안 그려져 검게 남는다. 여기서 함께 밀어낸다.
 	void		move_windows_together(HWND parent, const std::vector<sc_window_move>& moves);
 
-	//20260915 by claude. [계측] move_windows_together 내부 4구간 누적(us). 어느 단계가 비용인지 가르기 위한 것.
-	//  rgn   : 옛/새 영역 CRgn 합성(GetWindowRect + CombineRgn 루프)
-	//  defer : BeginDeferWindowPos ~ EndDeferWindowPos (실제 창 이동)
-	//  erase : 비워진 자리만 RDW_INVALIDATE|RDW_ERASE
-	//  paint : RDW_ALLCHILDREN|RDW_UPDATENOW (부모+모든 자식 동기 리페인트) + 마지막 UpdateWindow
-	//로그를 여기서 찍지 않는 이유는 CResizeCtrl::s_perf_* 와 같다 — SCLog 미링크 프로젝트 대비 + 측정 왜곡 방지.
-	extern LONGLONG	g_mwt_perf_rgn_us;
-	extern LONGLONG	g_mwt_perf_defer_us;
-	extern LONGLONG	g_mwt_perf_erase_us;
-	extern LONGLONG	g_mwt_perf_paint_us;
-	void		mwt_perf_reset();
-
-	//20260915 by claude. [계측] paint 구간을 자식 창별로 분해한다. 어느 컨트롤이 비싼지 알아야
-	//그 컨트롤만 고칠 수 있다(전체를 한 덩어리로 재면 추측만 하게 된다 — 실제로 세 번 빗나갔다).
-	struct sc_child_paint_cost
-	{
-		HWND		hwnd;
-		LONGLONG	us;			//누적 시간
-		int			count;		//그린 횟수
-	};
-	extern std::vector<sc_child_paint_cost>	g_mwt_child_costs;
-	void		mwt_perf_add_child(HWND child, LONGLONG us);
-
 	//20260915 by claude. 자식 이동 중에 그 자식이 *또 다른 형제 창* 을 옮겨야 하는 경우(오버레이 스크롤바가 그렇다)
 	//개별 MoveWindow 를 그때그때 부르면 매번 형제 clip 이 재계산돼 비싸다(측정: 리스트당 3.27ms, 프레임당 12ms).
 	//move_windows_together 가 자식을 옮기는 동안은 그 이동을 여기 모아 두었다가, 배치가 끝난 뒤 한 번의

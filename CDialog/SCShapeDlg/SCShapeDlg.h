@@ -110,7 +110,10 @@ public:
 	bool			load(CWnd* parent, CString sFile);
 
 	//keyboard, mouse 이벤트 처리 여부. false이면 모든 마우스, 키보드 이벤트가 무시된다.
-	void			use_control(bool use);
+	void			use_control(bool use = true);
+
+	//창을 옮길 때 shift를 눌러야만 이동시킬지, 아니면 그냥 드래그로도 옮길지. default = false;
+	void			use_shift_move(bool use = true) { m_use_shift_move = use; }
 
 	//0 : 투명, 255 : 불투명
 	void			set_alpha(int alpha);
@@ -238,6 +241,9 @@ public:
 
 protected:
 	CWnd*			m_parent = NULL;
+
+	//창을 옮길 때 shift를 눌러야만 이동시킬지, 아니면 그냥 드래그로도 옮길지. default = false;
+	bool			m_use_shift_move = false;
 
 	std::deque<std::deque<CSCParagraph>> m_para;	//m_para[0][1] : 0번 라인의 1번 인덱스의 구절
 

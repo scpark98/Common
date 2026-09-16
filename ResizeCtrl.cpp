@@ -381,22 +381,6 @@ BOOL CResizeCtrl::CalcValue(int delta, int part, int & pending, long &position, 
 	return FALSE;
 }
 
-//20260915 by claude. [계측] 정의. CPerformance(Common/Performance.h)를 쓰지 않는 이유 — 그 클래스는 측정마다
-//SetThreadAffinityMask 를 두 번 호출하는데(옛 멀티프로세서 QPC 버그 회피용), 드래그 중 수백 번 도는 이 경로에서는
-//그 syscall 이 측정 대상보다 큰 잡음이 된다. 요즘 Windows 의 QPC 는 코어 간 동기화되어 있어 그 보정이 필요 없다.
-LONGLONG	CResizeCtrl::s_perf_calc_us = 0;
-LONGLONG	CResizeCtrl::s_perf_move_us = 0;
-int			CResizeCtrl::s_perf_count = 0;
-
-static LONGLONG _perf_now_us()
-{
-	LARGE_INTEGER freq, now;
-	if (!::QueryPerformanceFrequency(&freq) || freq.QuadPart == 0)
-		return 0;
-	::QueryPerformanceCounter(&now);
-	return (now.QuadPart * 1000000LL) / freq.QuadPart;
-}
-
 void CResizeCtrl::Resize(int cx, int cy)
 {
 	ASSERT (m_array);
@@ -425,8 +409,6 @@ void CResizeCtrl::Resize(int cx, int cy)
 				//그러면 창을 조금만 빨리 리사이즈해도 (a) 리스트/트리에 이전 픽셀이 밀려 남고
 				//(b) 새로 드러난 부모 배경이 한동안 검게 보였다. 이유와 해법은 move_windows_together 주석 참조.
 				//여기서는 새 위치만 모아 넘긴다.
-				LONGLONG perf_t0 = _perf_now_us();		//20260915 by claude. [계측] 위치 계산 구간 시작.
-
 				std::vector<sc_window_move> moves;
 				moves.reserve(upperBound + 1);
 
@@ -459,17 +441,10 @@ void CResizeCtrl::Resize(int cx, int cy)
 
 				}
 
-				LONGLONG perf_t1 = _perf_now_us();		//20260915 by claude. [계측] 계산 끝 / 이동+리페인트 시작.
-
 				//moves 가 비어도(모든 컨트롤이 고정 앵커) 호출한다 — 새로 드러난 부모 배경을
 				//그 자리에서 그려야 검게 남지 않는다.
 				move_windows_together(m_hWndParent, moves);
 
-				//20260915 by claude. [계측] 누적만 한다(출력은 응용단이 드래그 종료 시 한 번).
-				LONGLONG perf_t2 = _perf_now_us();
-				s_perf_calc_us += (perf_t1 - perf_t0);
-				s_perf_move_us += (perf_t2 - perf_t1);
-				s_perf_count++;
 
 				m_size.cx = cx;
 				m_size.cy = cy;

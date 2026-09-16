@@ -76,17 +76,6 @@ class CResizeCtrl
 {
 public:
 
-	//20260915 by claude. [계측] 리사이즈 비용 분해. WM_SIZE 한 번의 처리를 두 구간으로 나눠 누적한다.
-	//  s_perf_calc_us : 등록 컨트롤들의 새 위치 계산(GetWindowRect/MapWindowPoints + CalcValue 루프)
-	//  s_perf_move_us : move_windows_together — DeferWindowPos 이동 + RDW_UPDATENOW 동기 리페인트
-	//여기서 로그를 찍지 않는 이유 — (1) 이 모듈은 SCLog 를 링크하지 않는 프로젝트도 쓴다(링크 깨짐),
-	//(2) 드래그 중 매 메시지마다 파일에 쓰면 그 I/O 가 측정 대상보다 커진다. 값만 쌓고 출력은 응용단이 한다.
-	//드래그 시작 시 perf_reset(), 종료 시 응용단이 읽어 한 번만 로그.
-	static LONGLONG		s_perf_calc_us;
-	static LONGLONG		s_perf_move_us;
-	static int			s_perf_count;
-	static void			perf_reset() { s_perf_calc_us = 0; s_perf_move_us = 0; s_perf_count = 0; }
-
 	//
 	// Add Method
 	//

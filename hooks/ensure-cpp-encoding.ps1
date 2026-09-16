@@ -1,4 +1,4 @@
-# SessionStart hook: make VS C++ projects safe from Korean (CP949) corruption.
+﻿# SessionStart hook: make VS C++ projects safe from Korean (CP949) corruption.
 #
 # Two protections, applied at session start BEFORE Claude reads/edits anything:
 #   1. Drop a root .editorconfig (charset=utf-8-bom) if missing, so VS in Korean locale
@@ -10,7 +10,7 @@
 # Only touches files that actually need it:
 #   - UTF-8 BOM  -> skip (already safe)
 #   - UTF-16     -> skip (.rc/resource.h, VS-managed)
-#   - pure ASCII -> skip (identical in CP949 and UTF-8; no corruption risk)
+#   - pure ASCII -> add BOM (so Korean can be added later without MSVC reading it as CP949)
 #   - RC-included headers (targetver.h) -> skip by name (rc.exe needs an RC-friendly
 #     encoding; a Korean .h converted to UTF-8 BOM made rc.exe fail with RC 0x40)
 #   - non-ASCII, no BOM: valid UTF-8 -> add BOM; else decode CP949 -> re-encode UTF-8 + BOM
@@ -105,6 +105,24 @@ $skipDirs = @('\x64\', '\win32\', '\debug\', '\release\', '\.vs\', '\ipch\', '\o
 # "unknown character '0x40'" and aborted the RC preprocessor). Never convert these,
 # regardless of their current encoding (compare by file name, case-insensitive).
 $skipNames = @('targetver.h')
+
+#20260914 by claude. .rc 가 include 하는 헤더는 프로젝트마다 이름이 달라 미리 알 수 없다.
+#rc.exe 는 BOM 에 민감해 전처리가 끊기고, 그 여파가 엉뚱한 컴파일 오류로 나타난다.
+#(2026-06-19 KoinoViewer targetver.h) 그래서 .rc 를 훑어 include 된 헤더를 제외 목록에 넣는다.
+foreach ($rcFile in (Get-ChildItem -LiteralPath $proj -Recurse -File -Filter *.rc -ErrorAction SilentlyContinue)) {
+    try {
+        $rcBytes = [IO.File]::ReadAllBytes($rcFile.FullName)
+        if ($rcBytes.Length -ge 2 -and $rcBytes[0] -eq 0xFF -and $rcBytes[1] -eq 0xFE) {
+            $rcText = [Text.Encoding]::Unicode.GetString($rcBytes)
+        } else {
+            $rcText = [Text.Encoding]::UTF8.GetString($rcBytes)
+        }
+        foreach ($m in [regex]::Matches($rcText, '(?i)#includes+"([^"]+.h)"')) {
+            $hn = [IO.Path]::GetFileName($m.Groups[1].Value).ToLower()
+            if ($skipNames -notcontains $hn) { $skipNames += $hn }
+        }
+    } catch {}
+}
 $bom = [byte[]](0xEF, 0xBB, 0xBF)
 $utf8Strict = New-Object Text.UTF8Encoding($false, $true)   # throwOnInvalidBytes
 $cp949 = [Text.Encoding]::GetEncoding(949)
@@ -133,10 +151,21 @@ foreach ($f in $files) {
     # UTF-16 (BOM) -> leave to VS
     if ($bytes.Length -ge 2 -and (($bytes[0] -eq 0xFF -and $bytes[1] -eq 0xFE) -or ($bytes[0] -eq 0xFE -and $bytes[1] -eq 0xFF))) { continue }
 
-    # pure ASCII -> no corruption risk, leave as-is
+    #20260914 by claude. 순수 ASCII 파일도 BOM 을 붙인다.
+    #예전에는 "깨질 한글이 없으니 그대로 둔다" 로 건너뛰었다. 그러면 그 파일에 한글 주석을
+    #처음 넣는 순간 MSVC 가 CP949 로 읽어 깨지고, 넣는 사람은 그 사실을 모른다.
+    #실제로 LMMHost 의 CursorShapeDetector.cpp 가 그 상태였다(2026-09-14).
+    #훅의 목표를 "손상 방지" 에서 "모든 소스를 UTF-8 BOM 으로 통일" 로 넓힌다.
     $hasHigh = $false
     foreach ($b in $bytes) { if ($b -ge 0x80) { $hasHigh = $true; break } }
-    if (-not $hasHigh) { continue }
+    if (-not $hasHigh) {
+        $out = New-Object byte[] ($bom.Length + $bytes.Length)
+        [Array]::Copy($bom, 0, $out, 0, $bom.Length)
+        [Array]::Copy($bytes, 0, $out, $bom.Length, $bytes.Length)
+        [IO.File]::WriteAllBytes($f.FullName, $out)
+        $converted++
+        continue
+    }
 
     # non-ASCII, no BOM: decide UTF-8-missing-BOM vs CP949
     $isUtf8 = $true

@@ -7913,20 +7913,6 @@ void CSCListCtrl::end_bulk_insert()
 
 bool CSCListCtrl::s_in_live_resize = false;	//20260712 by claude. 리사이즈 드래그 중 바 조작 스킵 플래그(모든 인스턴스 공유).
 
-//20260915 by claude. [계측] sync_scrollbar 내부 3구간 누적. raw QPC 를 쓰는 이유는 CResizeCtrl 쪽 주석 참조.
-LONGLONG	CSCListCtrl::s_sync_calc_us = 0;
-LONGLONG	CSCListCtrl::s_sync_frame_us = 0;
-LONGLONG	CSCListCtrl::s_sync_bar_us = 0;
-int			CSCListCtrl::s_sync_count = 0;
-
-static LONGLONG _sync_perf_now_us()
-{
-	LARGE_INTEGER freq, now;
-	if (!::QueryPerformanceFrequency(&freq) || freq.QuadPart == 0)
-		return 0;
-	::QueryPerformanceCounter(&now);
-	return (now.QuadPart * 1000000LL) / freq.QuadPart;
-}
 
 void CSCListCtrl::sync_scrollbar()
 {
@@ -7959,9 +7945,6 @@ void CSCListCtrl::sync_scrollbar()
 	//native scrollbar 의 시각화는 setup_scrollbar 의 SWP_FRAMECHANGED + OnNcCalcSize(NC=0) 가
 	//영구 차단 — sync 마다 ShowScrollBar 토글은 무용하면서 OS 가 NCCALCSIZE/paint 사이클을 발화시켜
 	//컬럼 폭 드래그 중 변경 컬럼이 추가 repaint 되는 flicker 원인. 따라서 sync 진입부에선 호출 X.
-
-	LONGLONG sync_t0 = _sync_perf_now_us();		//20260915 by claude. [계측] calc 구간 시작.
-	s_sync_count++;
 
 	int total = size();	//20260706 by claude. [팬텀 행] 로직 total 은 실제 항목수(가상 리스트=m_list_db.size()). native item count 는 아래에서 pad 를 더해 늘리지만, need_v 판정·thumb range·max_pos 는 실제값 기준이어야 한다.
 
@@ -8005,8 +7988,6 @@ void CSCListCtrl::sync_scrollbar()
 
 	//need_v / need_h 상태가 바뀌면 framechange 로 우측/하단 NC 재적용. 두 플래그는 OnNcCalcSize 가 읽으므로
 	//framechange *전* 에 갱신. 창 크기 불변 → 리사이즈 헬퍼 충돌·렌더 깨짐 없음.
-	LONGLONG sync_t1 = _sync_perf_now_us();		//20260915 by claude. [계측] calc 끝 / framechange 시작.
-
 	bool old_v = m_v_visible_state;
 	bool old_h = m_h_visible_state;
 	m_v_visible_state = need_v;
@@ -8030,8 +8011,6 @@ void CSCListCtrl::sync_scrollbar()
 		}
 	}
 
-
-	LONGLONG sync_t2 = _sync_perf_now_us();		//20260915 by claude. [계측] framechange 끝 / 바 배치 시작.
 
 	//최종 content 영역 기준 — NC 가 이미 우측/하단 gw 를 뺐으므로 rc 가 곧 가시 영역.
 	//가로 폭 단일 출처(회귀 방지): content_view_w = rc.Width(). need_h 판정·가로바 길이·max scroll·page·range 가 모두 사용.
@@ -8171,11 +8150,6 @@ void CSCListCtrl::sync_scrollbar()
 		m_scrollbar_h.RedrawWindow(NULL, NULL, RDW_INVALIDATE | RDW_UPDATENOW);
 	}
 
-	//20260915 by claude. [계측] 누적만. 출력은 응용단이 드래그 종료 시 한 번.
-	LONGLONG sync_t3 = _sync_perf_now_us();
-	s_sync_calc_us  += (sync_t1 - sync_t0);
-	s_sync_frame_us += (sync_t2 - sync_t1);
-	s_sync_bar_us   += (sync_t3 - sync_t2);
 }
 
 LRESULT CSCListCtrl::on_message_CSCScrollbar(WPARAM wParam, LPARAM lParam)

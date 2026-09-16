@@ -1217,17 +1217,6 @@ public:
 	//20260915 by claude. 직전 client 크기. OnSize 가 '새로 드러난 띠' 만 무효화하는 데 쓴다.
 	//0 이면 아직 모르는 상태라 전체를 무효화한다(첫 표시·재생성 직후).
 	CSize			m_last_client_size = CSize(0, 0);
-
-	//20260915 by claude. [계측] sync_scrollbar 내부 3구간 누적(us). 리사이즈 비용의 남은 최대 항목이
-	//DeferWindowPos(=자식들의 WM_WINDOWPOSCHANGED 처리, 프레임당 36ms)라 그 안을 갈라 본다.
-	//  calc  : 컬럼 폭 합산 + 세로/가로바 필요 여부 수렴 계산
-	//  frame : need_v/need_h 가 바뀔 때의 SWP_FRAMECHANGED (NCCALCSIZE + paint 유발)
-	//  bar   : 오버레이 바 MoveWindow (형제 clip 재계산 — 비싸다고 알려진 지점)
-	static LONGLONG	s_sync_calc_us;
-	static LONGLONG	s_sync_frame_us;
-	static LONGLONG	s_sync_bar_us;
-	static int		s_sync_count;
-	static void		sync_perf_reset() { s_sync_calc_us = 0; s_sync_frame_us = 0; s_sync_bar_us = 0; s_sync_count = 0; }
 };
 
 

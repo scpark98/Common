@@ -736,12 +736,17 @@ void CSCListCtrl::draw_row(CDC* pDC, int iItem, const CRect& row_bounds)
 
 				int draw_right = draw_left + text_w;
 
+				//20260915 by claude. 넣기만 하지 않고 아니면 빼도록 바꿨다 — OnPaint 가 더 이상 매 paint 마다
+				//집합을 비우지 않기 때문(무효 영역의 행만 그리므로 비우면 안 그린 행의 기록이 사라진다).
+				//이제 그려지는 셀마다 자기 상태를 스스로 갱신한다.
 				if (text_w > textRect.Width() ||					//(1) 컬럼 안에서 잘림
 					draw_left   < row_bounds.left ||				//(2) 왼쪽이 화면 밖
 					draw_right  > row_bounds.right ||				//(2) 오른쪽이 화면 밖
 					draw_top    < rc_view.top ||					//(3) 위가 항목 영역 밖
 					draw_bottom > rc_view.bottom)					//(3) 아래가 항목 영역 밖
 					m_clipped_cells.insert(std::make_pair(iItem, iSubItem));
+				else
+					m_clipped_cells.erase(std::make_pair(iItem, iSubItem));
 			}
 
 			pDC->DrawText(text, textRect, format);
@@ -2072,7 +2077,17 @@ void CSCListCtrl::OnPaint()
 		//20260705 by claude. bBg=false: 예전엔 true 라 매 paint 마다 화면 전체를 buffer 로 SRCCOPY 읽어왔는데, 바로 아래에서
 		//cornerTop + rc 배경을 전부 다시 칠하고 DefWindowProc 가 header/items 를 덮으므로 그 읽기는 100% 버려졌다(비싼 VRAM read).
 		//false 로 하면 buffer 를 bk color 로 채우기만 하고 어차피 전부 overpaint → 결과 동일, 화면 되읽기 제거.
-		CMemoryDC mdc(&dc1, &rcFull, false);
+		//20260915 by claude. 버퍼를 클라이언트 전체가 아니라 *무효 영역* 크기로 잡는다.
+		//CMemoryDC 는 넘겨받은 rect 크기로 CreateCompatibleBitmap 하고 소멸자에서 그 rect 전체를 BitBlt 한다.
+		//전체를 넘기면 3px 만 무효해도 매 프레임 화면 크기 비트맵 생성 + 전체 BitBlt 이 돈다 —
+		//창 리사이즈 측정에서 이 경로(자식 동기 리페인트)가 프레임당 48ms 로 가장 큰 비용이었다.
+		//무효 영역만 넘기면 리사이즈로 새로 드러난 띠만 만들고 옮긴다. 전체 무효화(테마 변경 등)는 rcPaint 가
+		//전체라 기존과 동일하게 동작한다.
+		CRect rc_paint = dc1.m_ps.rcPaint;
+		if (rc_paint.IsRectEmpty())
+			return;
+
+		CMemoryDC mdc(&dc1, &rc_paint, false);
 		CDC* pDC = &mdc;
 
 		if (!rcCornerTop.IsRectEmpty())
@@ -2101,13 +2116,22 @@ void CSCListCtrl::OnPaint()
 		int first = scroll_y / rowH;
 		int y = rc.top - (scroll_y % rowH);
 
-		//20260831 by claude. [잘린 셀 툴팁] 이 루프는 무효 영역과 무관하게 보이는 행을 매번 전부 그리므로,
-		//여기서 비우고 draw_row 가 다시 채우면 집합이 항상 현재 화면과 일치한다.
-		m_clipped_cells.clear();
+		//20260915 by claude. [잘린 셀 툴팁] 예전엔 여기서 m_clipped_cells 를 통째로 비웠다 — 이 루프가 보이는 행을
+		//'전부' 다시 그렸으므로 그래야 집합이 화면과 일치했다. 이제는 무효 영역의 행만 그리므로 비우면 안 된다
+		//(안 그린 행의 기록까지 사라져 툴팁이 죽는다). 대신 draw_row 가 셀마다 넣고/빼도록 바꿔 자기 보정한다.
 
 		for (int i = first; i < total && y < area_bottom; i++, y += rowH)
 		{
 			CRect row_bounds(rc.left, y, rc.right, y + rowH);
+
+			//20260915 by claude. 무효 영역에 걸치지 않는 행은 그리지 않는다. draw_row 한 번이 셀마다
+			//GetSubItemRect·텍스트 측정·DrawText 를 도는 실제 비용이라, 리사이즈로 3px 만 드러났는데
+			//보이는 행을 전부 그리던 것이 프레임당 48ms 의 정체였다. 클립만으로는 이 비용이 줄지 않는다.
+			if (row_bounds.bottom <= rc_paint.top)
+				continue;
+			if (row_bounds.top >= rc_paint.bottom)
+				break;
+
 			draw_row(pDC, i, row_bounds);
 		}
 		if (pOldFont)
@@ -7544,6 +7568,8 @@ void CSCListCtrl::OnSize(UINT nType, int cx, int cy)
 	//특정 컬럼 너비를 고정 처리(가변 컬럼이 남는 폭 흡수).
 	//20260714 by claude. 단 사용자가 컬럼 divider 를 수동으로 끄는 중(헤더가 마우스 캡처 보유)이면 건너뛴다 — 그 사이 폭을 다시 계산하면
 	//컬럼 경계가 마우스 밑에서 밀려 헤더 track 이 어긋나고(창 밖 release 무시 등) 사용자 조정과 싸운다. 드래그가 끝나면 다음 리사이즈 때 반영된다.
+	bool column_width_changed = false;		//20260915 by claude. 아래 무효화 범위 판단용.
+
 	bool header_tracking = (m_HeaderCtrlEx.GetSafeHwnd() && ::GetCapture() == m_HeaderCtrlEx.GetSafeHwnd());
 	if (!header_tracking && m_fixed_width_column >= 0 && m_fixed_width_column < get_column_count())
 	{
@@ -7560,18 +7586,45 @@ void CSCListCtrl::OnSize(UINT nType, int cx, int cy)
 		int fill_width = rc.Width() - total_column_width - 2;
 		if (fill_width < m_fixed_width_column_min)
 			fill_width = m_fixed_width_column_min;
-		set_column_width(m_fixed_width_column, fill_width);
+
+		//20260915 by claude. 값이 같으면 건너뛴다 — native SetColumnWidth 는 헤더 재배치 + 내부 전면 무효화를
+		//유발하므로, 세로로만 늘리는 리사이즈에서 매 프레임 같은 값을 다시 넣던 것이 순수한 낭비였다.
+		column_width_changed = (GetColumnWidth(m_fixed_width_column) != fill_width);
+		if (column_width_changed)
+			set_column_width(m_fixed_width_column, fill_width);
 
 		//20260705 by claude. 고정 컬럼 폭이 방금 바뀌었으니 여기서만 재동기화. (그 외 순수 resize 의 sync 는 아래처럼 제거 —
 		//OnWindowPosChanged 가 WM_SIZE 안 뜨는 케이스까지 포함해 size/move 변화마다 이미 sync 하므로, OnSize 의 무조건 호출은
 		//리스트당 sync 2회 중복이었다. 측정: sync_scrollbar 739회 → 절반 이상이 이 중복.)
-		sync_scrollbar();
+		//20260915 by claude. 폭이 실제로 바뀐 경우에만. 안 바뀌었으면 동기화할 것도 없다.
+		if (column_width_changed)
+			sync_scrollbar();
 	}
 
 	//WS_CLIPCHILDREN + 자식 스크롤바 환경에서 대각 resize 로 새로 확장된 client 영역이
 	//listctrl native invalidate 만으로는 stale pixel 남음 — 부모가 그릴 영역 강제 invalidate.
+	//20260915 by claude. 단 *새로 드러난 띠만* 무효화한다. 예전엔 client 전체라, 창을 1px 키워도
+	//OnPaint 가 보이는 행을 전부 다시 그렸다(리사이즈 비용의 최대 항목). 이 주석이 말하는 목적
+	//"새로 확장된 영역의 stale pixel" 에는 그 띠만으로 충분하다.
+	//컬럼 폭이 바뀌었다면 콘텐츠가 가로로 밀리므로 그때는 기존처럼 전체를 무효화한다.
 	if (m_scrollbar_setup)
-		Invalidate(FALSE);
+	{
+		CSize size_now(rc.Width(), rc.Height());
+
+		if (column_width_changed || m_last_client_size.cx == 0 || m_last_client_size.cy == 0)
+		{
+			Invalidate(FALSE);
+		}
+		else
+		{
+			if (size_now.cx > m_last_client_size.cx)
+				InvalidateRect(CRect(m_last_client_size.cx, 0, size_now.cx, size_now.cy), FALSE);
+			if (size_now.cy > m_last_client_size.cy)
+				InvalidateRect(CRect(0, m_last_client_size.cy, size_now.cx, size_now.cy), FALSE);
+		}
+
+		m_last_client_size = size_now;
+	}
 }
 
 void CSCListCtrl::OnWindowPosChanged(WINDOWPOS* lpwndpos)
@@ -7860,6 +7913,21 @@ void CSCListCtrl::end_bulk_insert()
 
 bool CSCListCtrl::s_in_live_resize = false;	//20260712 by claude. 리사이즈 드래그 중 바 조작 스킵 플래그(모든 인스턴스 공유).
 
+//20260915 by claude. [계측] sync_scrollbar 내부 3구간 누적. raw QPC 를 쓰는 이유는 CResizeCtrl 쪽 주석 참조.
+LONGLONG	CSCListCtrl::s_sync_calc_us = 0;
+LONGLONG	CSCListCtrl::s_sync_frame_us = 0;
+LONGLONG	CSCListCtrl::s_sync_bar_us = 0;
+int			CSCListCtrl::s_sync_count = 0;
+
+static LONGLONG _sync_perf_now_us()
+{
+	LARGE_INTEGER freq, now;
+	if (!::QueryPerformanceFrequency(&freq) || freq.QuadPart == 0)
+		return 0;
+	::QueryPerformanceCounter(&now);
+	return (now.QuadPart * 1000000LL) / freq.QuadPart;
+}
+
 void CSCListCtrl::sync_scrollbar()
 {
 	if (!m_scrollbar_setup || !::IsWindow(m_scrollbar.m_hWnd))
@@ -7891,6 +7959,9 @@ void CSCListCtrl::sync_scrollbar()
 	//native scrollbar 의 시각화는 setup_scrollbar 의 SWP_FRAMECHANGED + OnNcCalcSize(NC=0) 가
 	//영구 차단 — sync 마다 ShowScrollBar 토글은 무용하면서 OS 가 NCCALCSIZE/paint 사이클을 발화시켜
 	//컬럼 폭 드래그 중 변경 컬럼이 추가 repaint 되는 flicker 원인. 따라서 sync 진입부에선 호출 X.
+
+	LONGLONG sync_t0 = _sync_perf_now_us();		//20260915 by claude. [계측] calc 구간 시작.
+	s_sync_count++;
 
 	int total = size();	//20260706 by claude. [팬텀 행] 로직 total 은 실제 항목수(가상 리스트=m_list_db.size()). native item count 는 아래에서 pad 를 더해 늘리지만, need_v 판정·thumb range·max_pos 는 실제값 기준이어야 한다.
 
@@ -7934,6 +8005,8 @@ void CSCListCtrl::sync_scrollbar()
 
 	//need_v / need_h 상태가 바뀌면 framechange 로 우측/하단 NC 재적용. 두 플래그는 OnNcCalcSize 가 읽으므로
 	//framechange *전* 에 갱신. 창 크기 불변 → 리사이즈 헬퍼 충돌·렌더 깨짐 없음.
+	LONGLONG sync_t1 = _sync_perf_now_us();		//20260915 by claude. [계측] calc 끝 / framechange 시작.
+
 	bool old_v = m_v_visible_state;
 	bool old_h = m_h_visible_state;
 	m_v_visible_state = need_v;
@@ -7957,6 +8030,8 @@ void CSCListCtrl::sync_scrollbar()
 		}
 	}
 
+
+	LONGLONG sync_t2 = _sync_perf_now_us();		//20260915 by claude. [계측] framechange 끝 / 바 배치 시작.
 
 	//최종 content 영역 기준 — NC 가 이미 우측/하단 gw 를 뺐으므로 rc 가 곧 가시 영역.
 	//가로 폭 단일 출처(회귀 방지): content_view_w = rc.Width(). need_h 판정·가로바 길이·max scroll·page·range 가 모두 사용.
@@ -7991,7 +8066,12 @@ void CSCListCtrl::sync_scrollbar()
 		}
 		if (rCurV != rTargetV)
 		{
-			m_scrollbar.MoveWindow(rTargetV);
+			//20260915 by claude. 창 리사이즈로 자식들이 한 배치로 옮겨지는 중이면, 바 이동도 그 배치에 합친다.
+			//개별 MoveWindow 는 매번 형제 clip 을 재계산시켜 리스트당 3.27ms(프레임당 12ms) 를 썼다.
+			if (mwt_is_batching())
+				mwt_queue_sibling_move(m_scrollbar.GetSafeHwnd(), rTargetV);
+			else
+				m_scrollbar.MoveWindow(rTargetV);
 			//20260712 by claude. 바 이동 후 비운 옛 위치(rCurV) 잔상 제거 — parent 가 WS_CLIPCHILDREN + OnEraseBkgnd=FALSE 라 자동으로
 			//안 지워진다. 폴더 전환으로 세로바가 재배치될 때 옛 위치에 "두 번째 스크롤바" 잔상이 보이던 원인. 옛 rect 를 형제(리스트) 포함
 			//무효화해 다시 그려 지운다. 리사이즈 중엔 s_in_live_resize 로 sync 가 조기 반환해 이 코드에 도달 안 함 → 리사이즈 성능 무관.
@@ -8017,7 +8097,11 @@ void CSCListCtrl::sync_scrollbar()
 		}
 		if (rCurH != rTargetH)
 		{
-			m_scrollbar_h.MoveWindow(rTargetH);
+			//20260915 by claude. 세로바와 동일 — 리사이즈 배치 중이면 그 배치에 합친다.
+			if (mwt_is_batching())
+				mwt_queue_sibling_move(m_scrollbar_h.GetSafeHwnd(), rTargetH);
+			else
+				m_scrollbar_h.MoveWindow(rTargetH);
 			//20260712 by claude. 가로바 이동 후 옛 위치(rCurH) 잔상 제거 — 세로바와 동일 이유(위 참조).
 			if (CWnd* pParent = GetParent())
 				pParent->RedrawWindow(rCurH, NULL, RDW_INVALIDATE | RDW_ERASE | RDW_ALLCHILDREN);
@@ -8086,6 +8170,12 @@ void CSCListCtrl::sync_scrollbar()
 		//만 마크하고 즉시 그려지지 않는다 (release 후에야 보이는 현상). 즉시 paint 강제.
 		m_scrollbar_h.RedrawWindow(NULL, NULL, RDW_INVALIDATE | RDW_UPDATENOW);
 	}
+
+	//20260915 by claude. [계측] 누적만. 출력은 응용단이 드래그 종료 시 한 번.
+	LONGLONG sync_t3 = _sync_perf_now_us();
+	s_sync_calc_us  += (sync_t1 - sync_t0);
+	s_sync_frame_us += (sync_t2 - sync_t1);
+	s_sync_bar_us   += (sync_t3 - sync_t2);
 }
 
 LRESULT CSCListCtrl::on_message_CSCScrollbar(WPARAM wParam, LPARAM lParam)

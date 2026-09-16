@@ -122,6 +122,7 @@ void CGdiButton::release_all()
 	}
 
 	m_image.clear();
+	invalidate_drop_shadow_cache();		//20260916 by claude. 원본 이미지가 사라졌으니 섀도 캐시를 버린다.
 }
 
 BEGIN_MESSAGE_MAP(CGdiButton, CButton)
@@ -234,6 +235,7 @@ bool CGdiButton::add_image_resize(UINT normal, float ratio)
 		btn->img[3].set_matrix(&m_grayMatrix);
 
 	m_image.push_back(btn);
+	invalidate_drop_shadow_cache();		//20260916 by claude. 원본 이미지가 바뀌었으니 섀도 캐시를 버린다.
 
 	m_fit2image = false;
 
@@ -303,6 +305,7 @@ bool CGdiButton::add_image(CString lpType, UINT normal, UINT over, UINT down, UI
 
 
 	m_image.push_back(btn);
+	invalidate_drop_shadow_cache();		//20260916 by claude. 원본 이미지가 바뀌었으니 섀도 캐시를 버린다.
 
 	//이미지를 설정하면 m_cr_back은 clear()시키고 transparent는 true로 세팅되어야 한다.
 	//만약 배경색 지정이 필요하다면 add_image()후에 set_back_color()로 세팅한다.
@@ -345,6 +348,7 @@ bool CGdiButton::add_image(CSCGdiplusBitmap *img, bool add_auto_state_images)
 		btn->img[3].set_matrix(&m_grayMatrix);
 
 	m_image.push_back(btn);
+	invalidate_drop_shadow_cache();		//20260916 by claude. 원본 이미지가 바뀌었으니 섀도 캐시를 버린다.
 
 	//fit_to_image(m_fit2image);
 
@@ -502,6 +506,8 @@ void CGdiButton::set_alpha(int alpha)
 		m_image[i]->img[2].set_alpha(alpha);
 		m_image[i]->img[3].set_alpha(alpha);
 	}
+
+	invalidate_drop_shadow_cache();		//20260916 by claude. 원본 이미지가 바뀌었으니 섀도 캐시를 버린다.
 }
 /*
 void CGdiButton::add_rgb(int red, int green, int blue, Gdiplus::Color crExcept)
@@ -811,6 +817,8 @@ void CGdiButton::resize(bool image_only, int cx, int cy)
 		m_image[i]->img[2].resize(cx, cy);
 		m_image[i]->img[3].resize(cx, cy);
 	}
+
+	invalidate_drop_shadow_cache();		//20260916 by claude. 원본 이미지가 바뀌었으니 섀도 캐시를 버린다.
 
 	if (!image_only)
 		SetWindowPos(NULL, 0, 0, cx, cy, SWP_NOMOVE | SWP_NOZORDER);
@@ -1347,28 +1355,31 @@ void CGdiButton::DrawItem(LPDRAWITEMSTRUCT lpDIS/*lpDrawItemStruct*/)
 		//g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
 
 		//이미지를 그리기 전에 shadow를 먼저 그려준다.
+		//20260916 by claude. 섀도 생성(deep_copy + blur + gray)은 get_drop_shadow_image() 로 옮겨 캐시한다.
+		//여기서 매 페인트마다 만들던 시절에는 Bitmap 을 네 개 새로 할당하고 raw 버퍼를 두 번 왕복했다.
 		if (m_draw_drop_shadow)
 		{
 			//m_down_offset = CPoint(1, 1);
-			CSCGdiplusBitmap img_shadow;
-			m_image[idx]->img[0].deep_copy(&img_shadow);
-#ifdef _DEBUG
-			img_shadow.save(_T("d:\\0.origin.png"));
-#endif
-			//img_shadow.resize(rc.Width(), rc.Height());
-			//img_shadow.blur(20, TRUE);
-			img_shadow.blur(m_drop_shadow_blur_sigma);
-#ifdef _DEBUG
-			img_shadow.save(_T("d:\\1.blur.png"));
-#endif
-			img_shadow.gray(m_drop_shadow_weight);
-			//img_shadow.apply_effect_rgba(0.4f, 0.4f, 0.4f);
-#ifdef _DEBUG
-			img_shadow.save(_T("d:\\2.gray.png"));
-#endif
-			CRect rc_shadow = rc;
-			rc_shadow.OffsetRect(2, 2);
-			img_shadow.draw(g, rc_shadow, CSCGdiplusBitmap::draw_mode_zoom);
+			CSCGdiplusBitmap* p_shadow = get_drop_shadow_image(idx);
+			if (p_shadow)
+			{
+				//20260916 by claude. 그림자 위치 = m_down_offset. 종전엔 (2,2) 로 박혀 있어 왼쪽을 향하는
+				//이미지에서 방향이 어긋났다. 이 값은 버튼이 떠 있는 높이이자 눌렸을 때 내려가는 거리이므로,
+				//눌린 순간 이미지가 자기 그림자에 정확히 겹쳐 '바닥에 닿았다' 로 읽힌다. set_down_offset 주석 참조.
+				//그림자는 down_offset 보다 바깥으로 1px 더 나간 자리에 그린다. 같은 값으로 두면 블러 반경보다
+				//가까워(1px 은 sigma 1.6 의 번짐 안이다) halo 에 묻혀 그림자가 보이지 않는다.
+				//0 인 축은 '그 축으로 안 움직인다' 는 뜻이지 그림자 높이가 0 이라는 뜻이 아니므로 기본 2 를 쓴다.
+				//  (0,0)  → (2,2)   종전 하드코딩 값과 같다. set_down_offset 을 부르지 않던 사용처의 외관이 그대로 유지된다.
+				//  (1,1)  → (2,2)   눌리면 간격이 2 에서 1 로 좁아져 바닥에 가까워진 것으로 읽힌다.
+				//  (-1,0) → (-2,2)  누름은 좌측 슬라이드만, 그림자는 좌하단.
+				CPoint shadow_offset = m_down_offset;
+				shadow_offset.x = (shadow_offset.x == 0) ? 2 : shadow_offset.x + ((shadow_offset.x > 0) ? 1 : -1);
+				shadow_offset.y = (shadow_offset.y == 0) ? 2 : shadow_offset.y + ((shadow_offset.y > 0) ? 1 : -1);
+
+				CRect rc_shadow = rc;
+				rc_shadow.OffsetRect(shadow_offset.x, shadow_offset.y);
+				p_shadow->draw(g, rc_shadow, CSCGdiplusBitmap::draw_mode_zoom);
+			}
 		}
 		else
 		{
@@ -2565,6 +2576,44 @@ void CGdiButton::draw_drop_shadow(bool draw, float shadow_weight, float blur_sig
 	//RedrawWindow();
 }
 
+//20260916 by claude. 드롭섀도 이미지는 (원본 img[0], sigma, weight) 로만 결정되고 버튼 크기와 무관하다
+//(크기 맞춤은 draw 시점의 draw_mode_zoom 이 한다). 그래서 키가 그대로면 만들어 둔 것을 그대로 돌려준다.
+//예전엔 DrawItem 이 페인트마다 이걸 처음부터 다시 만들었고, blur() 내부에서 또 deep_copy + raw 버퍼 왕복이
+//일어나 작은 32x32 이미지에도 Bitmap 이 네 개씩 새로 할당됐다.
+CSCGdiplusBitmap* CGdiButton::get_drop_shadow_image(int idx)
+{
+	if (idx < 0 || idx >= (int)m_image.size())
+		return NULL;
+
+	if (!m_image[idx]->img[0].is_valid())
+		return NULL;
+
+	if (m_drop_shadow_cached_idx == idx
+		&& m_drop_shadow_cached_sigma == m_drop_shadow_blur_sigma
+		&& m_drop_shadow_cached_weight == m_drop_shadow_weight
+		&& m_img_drop_shadow.is_valid())
+	{
+		return &m_img_drop_shadow;
+	}
+
+	m_image[idx]->img[0].deep_copy(&m_img_drop_shadow);
+	//20260916 by claude. [진단] 섀도 생성 단계별 덤프. 예전엔 _DEBUG 빌드에서 *페인트마다* 세 번 저장해
+	//버튼 하나가 프레임당 2ms 를 썼다(32x32 PNG 저장 1회 = 0.68ms 실측). 필요할 때만 주석을 푼다.
+	//m_img_drop_shadow.save(_T("d:\\0.origin.png"));
+
+	m_img_drop_shadow.blur(m_drop_shadow_blur_sigma);
+	//m_img_drop_shadow.save(_T("d:\\1.blur.png"));
+
+	m_img_drop_shadow.gray(m_drop_shadow_weight);
+	//m_img_drop_shadow.save(_T("d:\\2.gray.png"));
+
+	m_drop_shadow_cached_idx    = idx;
+	m_drop_shadow_cached_sigma  = m_drop_shadow_blur_sigma;
+	m_drop_shadow_cached_weight = m_drop_shadow_weight;
+
+	return &m_img_drop_shadow;
+}
+
 void CGdiButton::draw_back_shadow(bool draw, float shadow_weight, float blur_sigma)
 {
 	m_draw_back_shadow = draw;
@@ -2672,6 +2721,7 @@ void CGdiButton::replace_color(int index, int state_index, int x, int y, Gdiplus
 		}
 	}
 
+	invalidate_drop_shadow_cache();		//20260916 by claude. 원본 이미지가 바뀌었으니 섀도 캐시를 버린다.
 	redraw_window();
 }
 
@@ -2706,6 +2756,7 @@ void CGdiButton::set_image_color(Gdiplus::Color cr, int index)
 		}
 	}
 
+	invalidate_drop_shadow_cache();		//20260916 by claude. 원본 이미지가 바뀌었으니 섀도 캐시를 버린다.
 	redraw_window();
 }
 
@@ -2747,6 +2798,7 @@ void CGdiButton::apply_effect_hsl(int state_index, int hue, int sat, int light)
 		}
 	}
 
+	invalidate_drop_shadow_cache();		//20260916 by claude. 원본 이미지가 바뀌었으니 섀도 캐시를 버린다.
 	redraw_window();
 }
 
@@ -2788,6 +2840,7 @@ void CGdiButton::apply_effect_rgba(int state_index, float r, float g, float b, f
 		}
 	}
 
+	invalidate_drop_shadow_cache();		//20260916 by claude. 원본 이미지가 바뀌었으니 섀도 캐시를 버린다.
 	redraw_window();
 }
 
@@ -2829,6 +2882,7 @@ void CGdiButton::apply_effect_blur(int state_index, float radius, BOOL expandEdg
 		}
 	}
 
+	invalidate_drop_shadow_cache();		//20260916 by claude. 원본 이미지가 바뀌었으니 섀도 캐시를 버린다.
 	redraw_window();
 }
 
@@ -2943,9 +2997,8 @@ void CGdiButton::OnNcPaint()
 		Gdiplus::Graphics g(img_shadow.m_pBitmap);
 		g.FillEllipse(&br, Gdiplus::Rect(4, 4, rc.Width() - 8, rc.Height() - 8));
 	}
-#ifdef _DEBUG
-	img_shadow.save(_T("d:\\back_shadow.png"));
-#endif
+	//20260916 by claude. [진단] 예전엔 _DEBUG 빌드에서 WM_NCPAINT 마다 저장했다. 필요할 때만 주석을 푼다.
+	//img_shadow.save(_T("d:\\back_shadow.png"));
 
 	//parent의 dc를 구해서 그리는 것이므로 좌표 또한 parent 기준의 상대좌표로 그려줘야 한다.
 	CRect rw;

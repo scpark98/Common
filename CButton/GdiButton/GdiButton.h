@@ -458,6 +458,14 @@ public:
 	void		draw_hover_rect(bool draw = true, int thick = -1, int round = -1, Gdiplus::Color cr = Gdiplus::Color::Transparent);
 	void		set_hover_rect_thick(int thick);
 	void		set_hover_rect_color(Gdiplus::Color cr);
+	//20260916 by claude. 이 값은 두 가지를 동시에 정한다 — 버튼이 바닥에서 떠 있는 '높이'이자, 눌렸을 때 내려가는 거리.
+	//  평상시 : 이미지는 (0,0), 그림자는 (ox,oy)  → 그만큼 떠 있어 보인다.
+	//  눌렸을 때 : 이미지가 (ox,oy) 로 내려가 자기 그림자에 정확히 겹친다 → 방향성 그림자가 사라지고
+	//              둘레의 옅은 halo 만 남아 '바닥에 닿았다' 로 읽힌다.
+	//그림자는 이 값에서 축별로 바깥으로 1px 더 나간 자리에 그린다(같은 값이면 블러에 묻혀 안 보인다).
+	//0 인 축은 '그 축으로 안 움직인다' 는 뜻이지 그림자 높이가 0 이라는 뜻이 아니므로 기본 2.
+	//  (0,0)→(2,2) / (1,1)→(2,2) / (-1,0)→(-2,2) / (2,2)→(3,3)
+	//왼쪽을 향하는 이미지는 부호를 뒤집어 (-1,0) 처럼 준다 — 그림자가 이미지가 가리키는 쪽으로 따라간다.
 	void		set_down_offset(int ox, int oy) { m_down_offset = CPoint(ox, oy); Invalidate(); }
 
 //border. thick, round 값이 -1이면 기존 설정값의 변경없음의 의미임
@@ -701,6 +709,19 @@ protected:
 	float		m_drop_shadow_weight = 1.0f;
 	//blur sigma가 크면 클수록 그림자의 blur가 강해짐. default = 5.0f
 	float		m_drop_shadow_blur_sigma = 5.0f;
+
+	//20260916 by claude. 드롭섀도 캐시. 섀도는 (원본 img[0], sigma, weight) 로만 결정되므로 페인트마다 다시 만들 이유가 없다.
+	//원본 이미지의 픽셀을 바꾸는 함수는 반드시 invalidate_drop_shadow_cache() 를 불러 캐시를 버려야 한다
+	//(sigma/weight 변경은 키 비교로 자동 감지되므로 별도 호출이 필요 없다).
+	CSCGdiplusBitmap	m_img_drop_shadow;
+	int					m_drop_shadow_cached_idx = -1;
+	float				m_drop_shadow_cached_sigma = 0.0f;
+	float				m_drop_shadow_cached_weight = 0.0f;
+
+	void				invalidate_drop_shadow_cache() { m_drop_shadow_cached_idx = -1; }
+
+	//캐시된 섀도 이미지. 키가 바뀌었으면 여기서 다시 만든다. 이미지가 없으면 NULL.
+	CSCGdiplusBitmap*	get_drop_shadow_image(int idx);
 
 
 	//default = false

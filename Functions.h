@@ -1503,7 +1503,16 @@ struct	NETWORK_INFO
 	// 폴더의 모든 파일을 지운다.
 	int			delete_all_files(CString folder, CString name_filter, CString ext_filter, bool recursive = true, bool trash_can = false);
 	bool		DeleteFolder(LPCTSTR lpFolder);
-	bool		SHDeleteFolder(CString sFolder);
+
+	//SHFileOperation 기반 폴더 삭제. 실패 원인을 알아야 하면 sh_result / aborted 를 받는다.
+	//sh_result 는 Win32 오류 코드가 아니라 SHFileOperation 전용 코드다(DE_* 또는 pre-Vista 의 Win32 코드).
+	//따라서 실패 시 GetLastError() 는 의미가 없고 이 값을 봐야 한다. 사람이 읽을 문자열은
+	//get_shfileoperation_error_str() 로 얻는다.
+	//sh_result 의 음수는 SHFileOperation 을 호출하기도 전에 이 함수가 거른 경우다.
+	//  -1 : 경로가 비었음
+	//  -2 : 경로가 MAX_PATH 를 넘음(pFrom 버퍼에 담을 수 없음)
+	bool		SHDeleteFolder(CString sFolder, int* sh_result = NULL, BOOL* aborted = NULL);
+	CString		get_shfileoperation_error_str(int sh_result);
 
 
 	//풀패스를 주면 폴더를 자동으로 만들어준다.
@@ -2588,6 +2597,37 @@ h		: 복사할 height 크기(pixel)
 	//마지막의 UpdateWindow 는 *컨트롤이 없는 부모 배경* 을 위한 것이다. 창이 커지면 새로 드러난 띠를 OS 가
 	//무효화해 두는데, 그것 역시 위 (1) 때문에 드래그가 끝날 때까지 안 그려져 검게 남는다. 여기서 함께 밀어낸다.
 	void		move_windows_together(HWND parent, const std::vector<sc_window_move>& moves);
+
+	//20260915 by claude. [계측] move_windows_together 내부 4구간 누적(us). 어느 단계가 비용인지 가르기 위한 것.
+	//  rgn   : 옛/새 영역 CRgn 합성(GetWindowRect + CombineRgn 루프)
+	//  defer : BeginDeferWindowPos ~ EndDeferWindowPos (실제 창 이동)
+	//  erase : 비워진 자리만 RDW_INVALIDATE|RDW_ERASE
+	//  paint : RDW_ALLCHILDREN|RDW_UPDATENOW (부모+모든 자식 동기 리페인트) + 마지막 UpdateWindow
+	//로그를 여기서 찍지 않는 이유는 CResizeCtrl::s_perf_* 와 같다 — SCLog 미링크 프로젝트 대비 + 측정 왜곡 방지.
+	extern LONGLONG	g_mwt_perf_rgn_us;
+	extern LONGLONG	g_mwt_perf_defer_us;
+	extern LONGLONG	g_mwt_perf_erase_us;
+	extern LONGLONG	g_mwt_perf_paint_us;
+	void		mwt_perf_reset();
+
+	//20260915 by claude. [계측] paint 구간을 자식 창별로 분해한다. 어느 컨트롤이 비싼지 알아야
+	//그 컨트롤만 고칠 수 있다(전체를 한 덩어리로 재면 추측만 하게 된다 — 실제로 세 번 빗나갔다).
+	struct sc_child_paint_cost
+	{
+		HWND		hwnd;
+		LONGLONG	us;			//누적 시간
+		int			count;		//그린 횟수
+	};
+	extern std::vector<sc_child_paint_cost>	g_mwt_child_costs;
+	void		mwt_perf_add_child(HWND child, LONGLONG us);
+
+	//20260915 by claude. 자식 이동 중에 그 자식이 *또 다른 형제 창* 을 옮겨야 하는 경우(오버레이 스크롤바가 그렇다)
+	//개별 MoveWindow 를 그때그때 부르면 매번 형제 clip 이 재계산돼 비싸다(측정: 리스트당 3.27ms, 프레임당 12ms).
+	//move_windows_together 가 자식을 옮기는 동안은 그 이동을 여기 모아 두었다가, 배치가 끝난 뒤 한 번의
+	//DeferWindowPos 로 함께 적용한다 — clip 재계산이 4회에서 1회로 줄어든다.
+	//batching 중이 아니면(평소 스크롤·폴더 전환 등) 호출자가 기존대로 즉시 옮긴다.
+	bool		mwt_is_batching();
+	void		mwt_queue_sibling_move(HWND hwnd, const CRect& rect_in_parent);
 
 	bool		pt_in_rect(CRect r, CPoint pt);
 	bool		pt_in_rect(Gdiplus::RectF r, CPoint pt);

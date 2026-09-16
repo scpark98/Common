@@ -191,6 +191,10 @@ BOOL CPathCtrl::PreTranslateMessage(MSG* pMsg)
 		}
 	}
 
+	//20260916 by claude. [잘린 항목 툴팁] 툴팁이 마우스 이동을 알아야 표시 타이밍을 잡는다.
+	if (::IsWindow(m_tooltip.GetSafeHwnd()))
+		m_tooltip.RelayEvent(pMsg);
+
 	return CStatic::PreTranslateMessage(pMsg);
 }
 
@@ -330,6 +334,13 @@ void CPathCtrl::OnPaint()
 		//disabled 면 상태색 무시하고 테마 disabled 텍스트색.
 		dc.SetTextColor((is_disabled ? m_theme.cr_text_disabled
 			: (i == m_index ? (m_down ? m_theme.cr_text_selected : m_theme.cr_text_hover) : m_theme.cr_text)).ToCOLORREF());
+
+		//20260916 by claude. [잘린 항목 툴팁] 실제로 잘렸는지를 '그리는 그 자리에서' 기록한다 — 그리기와
+		//판정이 한 출처라 어긋날 수 없다(CSCListCtrl 의 m_clipped_cells 와 같은 방식).
+		//종전 m_path[i].ellipsis 는 세팅하는 코드가 주석처리돼 있어 항상 false 였고, 아래 두 분기가 모두
+		//DT_END_ELLIPSIS 를 쓰는 탓에 화면에는 "..." 가 나오는데 플래그만 false 인 상태였다.
+		//0번은 루트 아이콘 셀이라 텍스트를 그리지 않으므로 대상이 아니다.
+		m_path[i].ellipsis = (i > 0 && dc.GetTextExtent(m_path[i].label).cx > rt.Width());
 
 		if (m_path[i].ellipsis)
 		{
@@ -780,6 +791,7 @@ void CPathCtrl::OnMouseMove(UINT nFlags, CPoint point)
 			{
 				m_index = i;
 				//TRACE(_T("m_index = %d\n"), m_index);
+				update_ellipsis_tooltip();		//20260916 by claude. 잘린 항목이면 전체 레이블을 툴팁으로.
 				Invalidate();
 				if (m_down)
 					show_sub_folder_list(m_down);
@@ -795,12 +807,70 @@ void CPathCtrl::OnMouseMove(UINT nFlags, CPoint point)
 	if (m_index != -1 &&!m_list_folder.IsWindowVisible())
 	{
 		m_index = -1;
+		update_ellipsis_tooltip();				//20260916 by claude. 항목 밖으로 나가면 툴팁을 내린다.
 		Invalidate();
 	}
 
 	CStatic::OnMouseMove(nFlags, point);
 }
 
+
+//20260916 by claude. [잘린 항목 툴팁] hover 항목의 레이블이 말줄임표로 잘려 있으면 온전한 레이블을
+//툴팁으로 준비하고, 아니면 끈다. 잘림 판정은 OnPaint 가 폭을 계산하며 세팅해 둔 m_path[i].ellipsis 를
+//그대로 신뢰한다 — 그리기와 판정이 한 출처라 둘이 어긋날 수 없다.
+void CPathCtrl::update_ellipsis_tooltip()
+{
+	if (!m_use_ellipsis_tooltip)
+		return;
+
+	//경로 편집 중에는 띄우지 않는다. 그 상황에서 툴팁은 조작 대상을 가리기만 한다.
+	if (m_pEdit != NULL && ::IsWindow(m_pEdit->GetSafeHwnd()) && m_pEdit->IsWindowVisible())
+	{
+		if (::IsWindow(m_tooltip.GetSafeHwnd()))
+			m_tooltip.Activate(FALSE);
+		m_tip_index = -1;
+		return;
+	}
+
+	//같은 항목 위를 계속 움직이는 동안은 아무것도 하지 않는다 — 매번 다시 넣으면 툴팁이 깜빡인다.
+	if (m_index == m_tip_index)
+		return;
+
+	m_tip_index = m_index;
+
+	bool clipped = (m_index >= 0 && m_index < (int)m_path.size() && m_path[m_index].ellipsis);
+
+	if (!clipped)
+	{
+		if (::IsWindow(m_tooltip.GetSafeHwnd()))
+			m_tooltip.Activate(FALSE);
+		return;
+	}
+
+	//처음 필요해진 순간에 만든다 — 잘린 항목이 한 번도 없으면 툴팁 창을 만들지 않는다.
+	if (!::IsWindow(m_tooltip.GetSafeHwnd()))
+	{
+		if (!m_tooltip.Create(this, TTS_ALWAYSTIP))
+			return;
+		m_tooltip.set_color_theme(m_theme);
+		m_tooltip.AddTool(this, _T(""));
+	}
+
+	//이미 떠 있는 툴팁은 크기가 이전 문자열 기준으로 남으므로(측정이 TTN_SHOW 에서 일어난다) 한 번 내린다.
+	m_tooltip.Pop();
+
+	//레이블은 폴더명 = 사용자 데이터다 — '<' 가 들어 있으면 태그로 파싱되므로 반드시 이스케이프한다.
+	m_tooltip.UpdateTipText(CSCToolTipCtrl::escape_tags(m_path[m_index].label), this);
+	m_tooltip.Activate(TRUE);
+}
+
+void CPathCtrl::set_use_ellipsis_tooltip(bool use)
+{
+	m_use_ellipsis_tooltip = use;
+
+	if (!use && ::IsWindow(m_tooltip.GetSafeHwnd()))
+		m_tooltip.Activate(FALSE);
+}
 
 void CPathCtrl::OnRButtonDown(UINT nFlags, CPoint point)
 {
@@ -834,6 +904,7 @@ void CPathCtrl::OnTimer(UINT_PTR nIDEvent)
 			KillTimer(timer_mouse_over);
 			m_index = -1;
 			m_down = false;
+			update_ellipsis_tooltip();			//20260916 by claude. 커서가 컨트롤 밖으로 나갔으므로 툴팁도 내린다.
 			m_list_folder.ShowWindow(SW_HIDE);
 			Invalidate();
 		}
@@ -1238,6 +1309,10 @@ void CPathCtrl::set_color_theme(int theme, bool invalidate)
 	if (::IsWindow(m_list_folder.m_hWnd))
 		m_list_folder.set_color_theme(theme, invalidate);
 
+	//20260916 by claude. 잘린 항목 툴팁도 같은 테마로.
+	if (::IsWindow(m_tooltip.GetSafeHwnd()))
+		m_tooltip.set_color_theme(m_theme);
+
 	if (invalidate && m_hWnd)
 		Invalidate();
 }
@@ -1260,6 +1335,10 @@ void CPathCtrl::set_color_theme(const CSCColorTheme& theme, bool invalidate)
 
 	if (::IsWindow(m_list_folder.m_hWnd))
 		m_list_folder.set_color_theme(m_theme, invalidate);
+
+	//20260916 by claude. 잘린 항목 툴팁도 같은 테마로.
+	if (::IsWindow(m_tooltip.GetSafeHwnd()))
+		m_tooltip.set_color_theme(m_theme);
 
 	if (invalidate && m_hWnd)
 		Invalidate();

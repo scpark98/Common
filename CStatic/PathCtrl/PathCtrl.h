@@ -107,6 +107,12 @@ public:
 	void			set_text_color(Gdiplus::Color cr_text) { m_theme.cr_text = cr_text; Invalidate(); }
 	void			set_back_color(Gdiplus::Color cr_back) { m_theme.cr_back = cr_back; Invalidate(); }
 
+	//20260916 by claude. [잘린 항목 툴팁] 폭이 좁아 레이블이 말줄임표로 잘린 항목 위에 커서를 두면
+	//온전한 레이블을 툴팁으로 보여준다(탐색기 주소표시줄과 동일). 트리·리스트·리스트박스와 같은 동작.
+	void			set_use_ellipsis_tooltip(bool use);
+	bool			is_use_ellipsis_tooltip() const { return m_use_ellipsis_tooltip; }
+	CSCToolTipCtrl*	get_tooltip() { return &m_tooltip; }
+
 	CShellImageList* m_pShellImageList = NULL;
 	CShellImageList* get_shell_imagelist() { return m_pShellImageList; }
 	void			set_shell_imagelist(CShellImageList* pShellImageList, bool is_local)
@@ -173,6 +179,13 @@ protected:
 
 	int			m_index = -1;	//현재 over되거나 down인 항목
 	bool		m_down = false;
+
+	//20260916 by claude. [잘린 항목 툴팁] 잘림 여부는 OnPaint 가 폭을 계산하며 세팅해 두는 m_path[i].ellipsis
+	//를 그대로 쓴다 — 여기서 다시 재지 않는다. 툴팁 창은 처음 필요해진 순간에 만든다.
+	bool			m_use_ellipsis_tooltip = true;
+	CSCToolTipCtrl	m_tooltip;
+	int				m_tip_index = -1;	//툴팁에 올려둔 항목. 같은 항목 위를 움직이는 동안 재삽입(깜빡임)을 막는다.
+	void			update_ellipsis_tooltip();
 	int			m_start_index = 1;	//width가 rc.right보다 큰 경우 표시되는 시작 인덱스. 0번은 항상 표시되는 항목이므로 m_start_index는 반드시 1이상이다.
 	bool		m_has_subfolder;	//fullpath아래 subfolder가 존재하지는지 여부에 따라 UI가 다르다.
 

@@ -115,6 +115,9 @@ public:
 	//창을 옮길 때 shift를 눌러야만 이동시킬지, 아니면 그냥 드래그로도 옮길지. default = false;
 	void			use_shift_move(bool use = true) { m_use_shift_move = use; }
 
+	//shift+방향키로 창을 1px씩 이동시킬지. default = false;
+	void			set_allow_move_shift_arrow(bool allow = true) { m_allow_move_shift_arrow = allow; }
+
 	//0 : 투명, 255 : 불투명
 	void			set_alpha(int alpha);
 
@@ -244,6 +247,9 @@ protected:
 
 	//창을 옮길 때 shift를 눌러야만 이동시킬지, 아니면 그냥 드래그로도 옮길지. default = false;
 	bool			m_use_shift_move = false;
+
+	//shift+방향키로 창을 1px씩 이동시킬지. default = false;
+	bool			m_allow_move_shift_arrow = false;
 
 	std::deque<std::deque<CSCParagraph>> m_para;	//m_para[0][1] : 0번 라인의 1번 인덱스의 구절
 

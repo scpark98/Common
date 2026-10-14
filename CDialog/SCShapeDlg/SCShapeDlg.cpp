@@ -186,6 +186,38 @@ BOOL CSCShapeDlg::PreTranslateMessage(MSG* pMsg)
 	//모든 키입력은 parent에서 처리.
 	if (pMsg->message == WM_KEYDOWN)
 	{
+		TRACE(_T("CSCShapeDlg WM_KEYDOWN. key = %d\n"), (int)pMsg->wParam);
+
+		if (m_allow_move_shift_arrow && IsShiftPressed())
+		{
+			int dx = 0;
+			int dy = 0;
+
+			switch (pMsg->wParam)
+			{
+				case VK_LEFT:
+					dx = -1;
+					break;
+				case VK_RIGHT:
+					dx = 1;
+					break;
+				case VK_UP:
+					dy = -1;
+					break;
+				case VK_DOWN:
+					dy = 1;
+					break;
+			}
+
+			if (dx != 0 || dy != 0)
+			{
+				CRect rw;
+				GetWindowRect(rw);
+				SetWindowPos(NULL, rw.left + dx, rw.top + dy, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+				return TRUE;
+			}
+		}
+
 		//parent의 PreTranslateMessage()에서 해당 키를 처리하는 코드가 있어야 한다.
 		//ex. VK_ESCAPE키를 눌렀을 때 mainDlg에서 OnBnClickedCancel()가 자동 호출되리라 예상했으나
 		//자동 호출되지 않으므로 처리코드를 추가해야 한다.
